@@ -10,20 +10,34 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import imageCompression from 'browser-image-compression';
+import type { ImageFile } from '@/lib/types';
 
-type ImageFile = {
+// The local state for this component, including temporary properties
+type ImageFileState = ImageFile & {
   id: string;
-  file: File;
-  preview: string;
   isLoading: boolean;
 };
+
+const fileToDataUrl = (file: Blob | File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+};
+
 
 export function PhotosStep() {
   const { formData, setFormData, nextStep } = useSellForm();
   const { toast } = useToast();
 
-  const [imageFiles, setImageFiles] = useState<ImageFile[]>(
-    formData.images?.map((img, i) => ({ ...img, id: `initial-${i}`, isLoading: false })) || []
+  const [imageFiles, setImageFiles] = useState<ImageFileState[]>(
+    formData.images?.map((img, i) => ({ 
+        ...img,
+        id: `initial-${i}-${Math.random()}`, 
+        isLoading: false 
+    })) || []
   );
 
   const onDrop = useCallback(
@@ -36,11 +50,13 @@ export function PhotosStep() {
         });
       }
 
-      const newFilesToProcess: ImageFile[] = acceptedFiles.map(file => ({
+      const newFilesToProcess: (ImageFileState & { file: File })[] = acceptedFiles.map(file => ({
         id: `${file.name}-${file.lastModified}-${Math.random()}`,
-        file,
-        preview: URL.createObjectURL(file),
+        preview: URL.createObjectURL(file), // Use temporary object URL for immediate feedback
+        name: file.name,
+        type: file.type,
         isLoading: true,
+        file: file,
       }));
 
       setImageFiles(current => [...current, ...newFilesToProcess]);
@@ -52,18 +68,15 @@ export function PhotosStep() {
             maxWidthOrHeight: 1920,
             useWebWorker: true,
           });
-
-          // Create a new preview URL for the compressed file
-          const newPreview = URL.createObjectURL(compressedFile);
           
-          // Once compressed, update the specific file in the state
+          const dataUrl = await fileToDataUrl(compressedFile);
+          
           setImageFiles(current => {
-             // Revoke the old object URL to free memory
              const originalFile = current.find(f => f.id === imageFile.id);
              if (originalFile) {
-               URL.revokeObjectURL(originalFile.preview);
+               URL.revokeObjectURL(originalFile.preview); // Free up memory from the temporary object URL
              }
-             return current.map(f => f.id === imageFile.id ? { ...f, file: compressedFile, preview: newPreview, isLoading: false } : f);
+             return current.map(f => f.id === imageFile.id ? { ...f, preview: dataUrl, isLoading: false } : f);
           });
 
         } catch (error) {
@@ -73,7 +86,6 @@ export function PhotosStep() {
             title: 'Image Processing Failed',
             description: `Could not process ${imageFile.file.name}.`,
           });
-          // Remove the file that failed to process
           setImageFiles(current => current.filter(f => f.id !== imageFile.id));
         }
       });
@@ -87,13 +99,7 @@ export function PhotosStep() {
   });
 
   const removeFile = (idToRemove: string) => {
-    setImageFiles(prev => prev.filter(file => {
-      if (file.id === idToRemove) {
-        URL.revokeObjectURL(file.preview);
-        return false;
-      }
-      return true;
-    }));
+    setImageFiles(prev => prev.filter(file => file.id !== idToRemove));
   };
   
   const handleNext = () => {
@@ -113,15 +119,27 @@ export function PhotosStep() {
       });
       return;
     }
-    const filesToSave = imageFiles.map(({ file, preview }) => ({ file, preview }));
-    setFormData({ images: filesToSave });
+    // Data is already in the context via the useEffect hook
     nextStep();
   }
 
   useEffect(() => {
-    // Revoke object URLs on unmount
+    // This effect ensures that any changes to imageFiles are propagated to the form context
+    // This is key for the draft mechanism to work as you add/remove photos
+    const filesToSave: ImageFile[] = imageFiles
+        .filter(f => !f.isLoading)
+        .map(({ preview, name, type }) => ({ preview, name, type }));
+    setFormData({ images: filesToSave });
+  }, [imageFiles, setFormData]);
+
+  // Clean up object URLs on unmount
+  useEffect(() => {
     return () => {
-        imageFiles.forEach(file => URL.revokeObjectURL(file.preview));
+        imageFiles.forEach(file => {
+            if (file.preview.startsWith('blob:')) {
+                URL.revokeObjectURL(file.preview);
+            }
+        });
     }
   }, []);
 
@@ -154,13 +172,10 @@ export function PhotosStep() {
             <div key={file.id} className="relative aspect-square">
               <Image
                 src={file.preview}
-                alt={`Preview ${file.file.name}`}
+                alt={`Preview ${file.name}`}
                 fill
                 sizes="128px"
                 className="rounded-md object-cover"
-                onLoad={() => {
-                  // If you need to do something on load, but for compression, the state update handles it.
-                }}
               />
               {file.isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/70 rounded-md">

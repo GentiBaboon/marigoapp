@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useDropzone } from 'react-dropzone';
 import Image from 'next/image';
 import * as React from 'react';
+import imageCompression from 'browser-image-compression';
 
 import {
   Form,
@@ -39,21 +40,31 @@ import {
   shoeSizes,
   clothingSizes,
 } from '@/lib/mock-data';
-import { FileText, X } from 'lucide-react';
+import { FileText, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
+import type { ProofFile } from '@/lib/types';
 
 type Step2Values = z.infer<typeof sellStep2Schema>;
-type ProofFile = {
-  file: File;
-  preview: string;
+
+type ProofFileState = ProofFile & {
+    id: string;
+    isLoading: boolean;
+};
+
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 };
 
 export function DetailsStep() {
   const { formData, setFormData, nextStep } = useSellForm();
   const { toast } = useToast();
-  const [proofFiles, setProofFiles] = useState<ProofFile[]>(formData.proofOfOrigin || []);
 
   const getCategoryPath = React.useCallback((slug: string | undefined): string => {
     if (!slug) return '';
@@ -80,10 +91,17 @@ export function DetailsStep() {
       proofOfOrigin: formData.proofOfOrigin || [],
     },
   });
+  
+  const [proofFiles, setProofFiles] = useState<ProofFileState[]>(
+    formData.proofOfOrigin?.map((file, i) => ({
+        ...file,
+        id: `initial-proof-${i}`,
+        isLoading: false,
+    })) || []
+  );
 
   const selectedSizeStandard = form.watch('sizeStandard');
 
-  // Corrected logic to determine if sizing is applicable
   const { isClothing, isShoes, isSizingApplicable } = React.useMemo(() => {
     const selectedSubCategorySlug = formData.category;
     if (!selectedSubCategorySlug) {
@@ -129,29 +147,65 @@ export function DetailsStep() {
       });
     }
 
-    const newFiles = acceptedFiles.map(file => Object.assign({ file }, {
-      preview: URL.createObjectURL(file)
+    const newFilesToProcess = acceptedFiles.map(file => ({
+        id: `${file.name}-${file.lastModified}-${Math.random()}`,
+        preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : '', // Create blob only for images
+        name: file.name,
+        type: file.type,
+        isLoading: true,
+        file: file, // Keep original file for processing
     }));
+    
+    setProofFiles(current => [...current, ...newFilesToProcess]);
 
-    setProofFiles(prevFiles => [...prevFiles, ...newFiles]);
-  }, [toast]);
+    newFilesToProcess.forEach(async (fileState) => {
+        try {
+            let finalFile = fileState.file;
+            if (fileState.type.startsWith('image/')) {
+                finalFile = await imageCompression(fileState.file, { maxSizeMB: 1, maxWidthOrHeight: 1920 });
+            }
+
+            const dataUrl = await fileToDataUrl(finalFile);
+
+            setProofFiles(current => {
+                const originalFile = current.find(f => f.id === fileState.id);
+                if (originalFile && originalFile.preview.startsWith('blob:')) {
+                    URL.revokeObjectURL(originalFile.preview);
+                }
+                return current.map(f => f.id === fileState.id ? { ...f, preview: dataUrl, isLoading: false } : f);
+            });
+        } catch (error) {
+            console.error("File processing error:", error);
+            toast({ variant: 'destructive', title: 'File Error', description: `Could not process ${fileState.name}.` });
+            setProofFiles(current => current.filter(f => f.id !== fileState.id));
+        }
+    });
+}, [toast]);
   
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': [], 'application/pdf': [] },
   });
 
+  const removeFile = (idToRemove: string) => {
+    setProofFiles(prevFiles => prevFiles.filter(file => file.id !== idToRemove));
+  };
+  
   useEffect(() => {
-    form.setValue('proofOfOrigin', proofFiles);
+    const filesToSave: ProofFile[] = proofFiles
+        .filter(f => !f.isLoading)
+        .map(({ preview, name, type }) => ({ preview, name, type }));
+    form.setValue('proofOfOrigin', filesToSave);
   }, [proofFiles, form]);
 
-  useEffect(() => {
-    return () => proofFiles.forEach(file => URL.revokeObjectURL(file.preview));
-  }, [proofFiles]);
 
-  const removeFile = (previewUrl: string) => {
-    setProofFiles(prevFiles => prevFiles.filter(file => file.preview !== previewUrl));
-  };
+  useEffect(() => {
+    return () => proofFiles.forEach(file => {
+        if(file.preview.startsWith('blob:')) {
+            URL.revokeObjectURL(file.preview)
+        }
+    });
+  }, [proofFiles]);
 
 
   const onSubmit = (data: Step2Values) => {
@@ -378,12 +432,12 @@ export function DetailsStep() {
                    </div>
                    {proofFiles.length > 0 && (
                      <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-4">
-                       {proofFiles.map((file, index) => (
-                         <div key={index} className="relative aspect-square">
-                           {file.file.type.startsWith('image/') ? (
+                       {proofFiles.map((file) => (
+                         <div key={file.id} className="relative aspect-square">
+                           {file.type.startsWith('image/') ? (
                               <Image
                                 src={file.preview}
-                                alt={`Proof preview ${index}`}
+                                alt={`Proof preview ${file.name}`}
                                 fill
                                 sizes="128px"
                                 className="rounded-md object-cover"
@@ -391,17 +445,24 @@ export function DetailsStep() {
                            ) : (
                               <div className="flex flex-col items-center justify-center h-full w-full bg-muted rounded-md p-2">
                                 <FileText className="h-8 w-8 text-muted-foreground" />
-                                <span className="text-xs text-center break-all text-muted-foreground mt-2">{file.file.name}</span>
+                                <span className="text-xs text-center break-all text-muted-foreground mt-2">{file.name}</span>
                               </div>
                            )}
-                           <Button
-                               variant="destructive"
-                               size="icon"
-                               className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                               onClick={() => removeFile(file.preview)}
-                           >
-                             <X className="h-4 w-4" />
-                           </Button>
+                           {file.isLoading && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-background/70 rounded-md">
+                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                </div>
+                            )}
+                           {!file.isLoading && (
+                               <Button
+                                   variant="destructive"
+                                   size="icon"
+                                   className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                                   onClick={() => removeFile(file.id)}
+                               >
+                                 <X className="h-4 w-4" />
+                               </Button>
+                           )}
                          </div>
                        ))}
                      </div>

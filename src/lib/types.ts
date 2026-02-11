@@ -55,6 +55,20 @@ export const addressSchema = z.object({
 export type AddressFormValues = z.infer<typeof addressSchema>;
 
 // --- Sell Schemas ---
+export const imageFileSchema = z.object({
+  preview: z.string(), // This will be a data URL
+  name: z.string(),
+  type: z.string(),
+});
+export type ImageFile = z.infer<typeof imageFileSchema>;
+
+export const proofFileSchema = z.object({
+  preview: z.string(), // data URL or object URL for PDFs
+  name: z.string(),
+  type: z.string(),
+});
+export type ProofFile = z.infer<typeof proofFileSchema>;
+
 
 export const sellStep1Schema = z.object({
   gender: z.enum(['womenswear', 'menswear', 'girlswear', 'boyswear'], { required_error: 'Please select a type.' }),
@@ -70,11 +84,11 @@ export const sellStep2Schema = z.object({
   color: z.string().min(1, 'Color is required.'),
   pattern: z.string().optional(),
   vintage: z.boolean().default(false),
-  proofOfOrigin: z.array(z.object({ file: z.any(), preview: z.string() })).optional(),
+  proofOfOrigin: z.array(proofFileSchema).optional(),
 });
 
 export const sellStep3Schema = z.object({
-  images: z.array(z.object({ file: z.any(), preview: z.string() })).min(3, 'At least three images are required.').max(15, 'You can upload a maximum of 15 images.'),
+  images: z.array(imageFileSchema).min(3, 'At least three images are required.').max(15, 'You can upload a maximum of 15 images.'),
 });
 
 export const sellStep4Schema = z.object({

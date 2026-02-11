@@ -1,5 +1,5 @@
 'use client';
-
+import { useEffect } from 'react';
 import { CheckCircle, Home, Plus } from 'lucide-react';
 import ReactConfetti from 'react-confetti';
 import {
@@ -11,8 +11,16 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useSellForm } from '@/components/sell/SellFormContext';
 
 export function SuccessStep() {
+    const { resetForm } = useSellForm();
+
+    useEffect(() => {
+        resetForm();
+    }, [resetForm]);
+
+
   return (
     <>
       <ReactConfetti width={typeof window !== 'undefined' ? window.innerWidth : 0} height={typeof window !== 'undefined' ? window.innerHeight : 0} />
