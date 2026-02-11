@@ -7,6 +7,9 @@ export type Product = {
   price: number;
   originalPrice?: number;
   image: ImagePlaceholder['id'];
+  condition?: 'new' | 'like_new' | 'good' | 'fair';
+  size?: string;
+  color?: string;
 };
 
 export type Category = {
@@ -26,6 +29,43 @@ export const categories: Category[] = [
   { id: '8', name: 'Home', slug: 'home' },
   { id: '9', name: 'Art', slug: 'art' },
 ];
+
+export const brands = [
+    { name: 'Chanel', slug: 'chanel' },
+    { name: 'Gucci', slug: 'gucci' },
+    { name: 'Prada', slug: 'prada' },
+    { name: 'Dior', slug: 'dior' },
+    { name: 'Louis Vuitton', slug: 'louis-vuitton' },
+    { name: 'Hermès', slug: 'hermes' },
+    { name: 'Bottega Veneta', slug: 'bottega-veneta' },
+    { name: 'Saint Laurent', slug: 'saint-laurent' },
+    { name: 'Fendi', slug: 'fendi' },
+    { name: 'Celine', slug: 'celine' },
+];
+
+export const productConditions = [
+    { value: 'new', label: 'New' },
+    { value: 'like_new', label: 'Like New' },
+    { value: 'good', label: 'Good' },
+    { value: 'fair', label: 'Fair' },
+]
+
+export const productSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+export const productColors = [
+    { name: 'Black', hex: '#000000' },
+    { name: 'White', hex: '#FFFFFF' },
+    { name: 'Gray', hex: '#808080' },
+    { name: 'Red', hex: '#FF0000' },
+    { name: 'Blue', hex: '#0000FF' },
+    { name: 'Green', hex: '#008000' },
+    { name: 'Yellow', hex: '#FFFF00' },
+    { name: 'Brown', hex: '#A52A2A' },
+    { name: 'Beige', hex: '#F5F5DC' },
+];
+
+export const productMaterials = ['Leather', 'Cotton', 'Denim', 'Silk', 'Wool', 'Cashmere'];
+
 
 export const newArrivals: Product[] = [
   {

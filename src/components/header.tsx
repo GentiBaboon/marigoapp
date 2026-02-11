@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Button } from './ui/button';
-import { Bell, ShoppingCart } from 'lucide-react';
+import { Bell, Search, ShoppingCart } from 'lucide-react';
 import { UserNav } from '@/components/user-nav';
 
 
@@ -18,6 +18,11 @@ export function Header() {
         </div>
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-1">
+            <Button asChild variant="ghost" size="icon" aria-label="Search">
+              <Link href="/search">
+                <Search className="h-5 w-5" />
+              </Link>
+            </Button>
             <Button variant="ghost" size="icon" aria-label="Notifications">
               <Bell className="h-5 w-5" />
             </Button>
