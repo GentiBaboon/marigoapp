@@ -1,56 +1,99 @@
 'use client';
 import { useEffect } from 'react';
-import { CheckCircle, Home, Plus } from 'lucide-react';
-import ReactConfetti from 'react-confetti';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Sprout } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useSellForm } from '@/components/sell/SellFormContext';
+import Image from 'next/image';
+import { Separator } from '@/components/ui/separator';
+
+const GreenCheckIcon = () => (
+    <div className="h-12 w-12 rounded-full bg-green-500 flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check"><path d="M20 6 9 17l-5-5"/></svg>
+    </div>
+);
+
 
 export function SuccessStep() {
-    const { deleteActiveDraft } = useSellForm();
+    const { formData, deleteActiveDraft } = useSellForm();
 
     useEffect(() => {
         // This will now delete the completed draft from localStorage
         deleteActiveDraft();
     }, [deleteActiveDraft]);
 
+    const currencyFormatter = (value: number | undefined) => {
+        if (value === undefined) return '';
+        const currency = formData.currency || 'EUR';
+        let locale = 'en-US';
+        if (currency === 'EUR') locale = 'de-DE';
+        if (currency === 'ALL') locale = 'sq-AL';
 
-  return (
-    <>
-      <ReactConfetti width={typeof window !== 'undefined' ? window.innerWidth : 0} height={typeof window !== 'undefined' ? window.innerHeight : 0} />
-      <Card className="text-center">
-        <CardHeader className="items-center">
-          <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
-          <CardTitle className="font-headline text-3xl">Congratulations!</CardTitle>
-          <CardDescription>
-            Your item has been successfully listed on Marigo.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground">
-            You can now view your listing or list another item.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button asChild className="w-full">
-              <Link href="/home">
-                <Home className="mr-2 h-4 w-4" /> Go to Homepage
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/sell">
-                <Plus className="mr-2 h-4 w-4" /> List Another Item
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </>
-  );
+        try {
+            return new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+        } catch(e) {
+            // Fallback for unsupported currency in some environments
+            return `${currency} ${value}`;
+        }
+    }
+    
+    // In a real app this would be calculated based on the order. Hardcoding based on image for now.
+    const buyerServiceFee = 6;
+
+    return (
+        <div className="flex flex-col items-center text-center space-y-6">
+            <GreenCheckIcon />
+            <div className="space-y-2">
+                <h1 className="text-2xl font-semibold">Item submitted</h1>
+                <p className="text-muted-foreground max-w-xs">
+                    We'll review your listing, edit the main photo, and email you an update soon.
+                </p>
+            </div>
+
+            <Separator className="w-full" />
+
+            <div className="flex items-center gap-4 w-full text-left">
+                <div className="relative h-20 w-20 flex-shrink-0 bg-muted rounded-md">
+                    {formData.images && formData.images.length > 0 ? (
+                        <Image
+                            src={formData.images[0].preview}
+                            alt={formData.title || 'Submitted item'}
+                            fill
+                            sizes="80px"
+                            className="object-cover rounded-md"
+                        />
+                    ) : (
+                         <div className="h-full w-full bg-muted rounded-md" />
+                    )}
+                </div>
+                <div className="flex-1">
+                    <p className="font-semibold uppercase text-muted-foreground text-sm">{formData.brand || 'NON SIGNÉ / UNSIGNED'}</p>
+                    <p className="font-medium">{formData.title || 'Cloth handbag'}</p>
+                    <p className="font-semibold">{currencyFormatter(formData.price)} (You earn {currencyFormatter(formData.sellerEarning)})</p>
+                    <p className="text-sm text-muted-foreground">The buyer will also pay a {currencyFormatter(buyerServiceFee)} service fee.</p>
+                </div>
+            </div>
+
+            <Separator className="w-full" />
+
+            <div className="bg-green-50 text-green-900 p-4 rounded-lg w-full text-left flex items-start gap-4">
+                 <div className="border border-green-200 rounded-full p-1 mt-1">
+                    <Sprout className="h-4 w-4 text-green-700"/>
+                 </div>
+                 <div>
+                    <p className="font-semibold">You're supporting sustainability</p>
+                    <p className="text-sm">82% of items sold with us replace a new purchase.</p>
+                 </div>
+            </div>
+            
+            <div className="flex w-full gap-4 pt-4">
+                <Button asChild variant="outline" className="w-full" size="lg">
+                    <Link href="/profile/listings">View your listings</Link>
+                </Button>
+                <Button asChild className="w-full bg-foreground text-background hover:bg-foreground/90" size="lg">
+                    <Link href="/sell">Sell another item</Link>
+                </Button>
+            </div>
+        </div>
+    );
 }
