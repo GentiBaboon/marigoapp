@@ -27,10 +27,17 @@ import { useSellForm } from '@/components/sell/SellFormContext';
 import { sellStep2Schema } from '@/lib/types';
 import type { z } from 'zod';
 import { StepActions } from '@/components/sell/StepActions';
-import { productConditions, categories } from '@/lib/mock-data';
+import {
+  productConditions,
+  categories,
+  productMaterials,
+  productColors,
+  productPatterns,
+} from '@/lib/mock-data';
 import { FileText, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 
 type Step2Values = z.infer<typeof sellStep2Schema>;
 type ProofFile = {
@@ -133,10 +140,20 @@ export function DetailsStep() {
           control={form.control}
           name="material"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className="flex flex-col">
               <FormLabel>Material</FormLabel>
               <FormControl>
-                <Input placeholder="e.g. Cashmere" {...field} />
+                <Combobox
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  items={productMaterials.map((material) => ({
+                    value: material,
+                    label: material,
+                  }))}
+                  placeholder="Select material"
+                  searchPlaceholder="Search materials..."
+                  emptyPlaceholder="No material found."
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -147,10 +164,20 @@ export function DetailsStep() {
           control={form.control}
           name="color"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className="flex flex-col">
               <FormLabel>Color</FormLabel>
               <FormControl>
-                <Input placeholder="e.g. Anthracite" {...field} />
+                <Combobox
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  items={productColors.map((color) => ({
+                    value: color.name,
+                    label: color.name,
+                  }))}
+                  placeholder="Select color"
+                  searchPlaceholder="Search colors..."
+                  emptyPlaceholder="No color found."
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -161,10 +188,20 @@ export function DetailsStep() {
           control={form.control}
           name="pattern"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className="flex flex-col">
               <FormLabel>Pattern</FormLabel>
               <FormControl>
-                <Input placeholder="e.g. Plain" {...field} />
+                <Combobox
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  items={productPatterns.map((pattern) => ({
+                    value: pattern,
+                    label: pattern,
+                  }))}
+                  placeholder="Select pattern"
+                  searchPlaceholder="Search patterns..."
+                  emptyPlaceholder="No pattern found."
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

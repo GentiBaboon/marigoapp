@@ -77,9 +77,17 @@ export const productColors = [
     { name: 'Yellow', hex: '#FFFF00' },
     { name: 'Brown', hex: '#A52A2A' },
     { name: 'Beige', hex: '#F5F5DC' },
+    { name: 'Pink', hex: '#FFC0CB' },
+    { name: 'Purple', hex: '#800080' },
+    { name: 'Orange', hex: '#FFA500' },
+    { name: 'Silver', hex: '#C0C0C0' },
+    { name: 'Gold', hex: '#FFD700' },
+    { name: 'Multi-color', hex: '#FFFFFF' },
 ];
 
-export const productMaterials = ['Leather', 'Cotton', 'Denim', 'Silk', 'Wool', 'Cashmere'];
+export const productMaterials = ['Leather', 'Cotton', 'Denim', 'Silk', 'Wool', 'Cashmere', 'Suede', 'Linen', 'Velvet', 'Fur', 'Synthetic', 'Nylon', 'Polyester'];
+
+export const productPatterns = ['Plain', 'Striped', 'Checked', 'Dotted', 'Floral', 'Animal Print', 'Geometric', 'Paisley', 'Houndstooth', 'Plaid'];
 
 
 export const newArrivals: Product[] = [
