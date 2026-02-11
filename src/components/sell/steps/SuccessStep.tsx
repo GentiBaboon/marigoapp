@@ -14,11 +14,12 @@ import Link from 'next/link';
 import { useSellForm } from '@/components/sell/SellFormContext';
 
 export function SuccessStep() {
-    const { resetForm } = useSellForm();
+    const { deleteActiveDraft } = useSellForm();
 
     useEffect(() => {
-        resetForm();
-    }, [resetForm]);
+        // This will now delete the completed draft from localStorage
+        deleteActiveDraft();
+    }, [deleteActiveDraft]);
 
 
   return (

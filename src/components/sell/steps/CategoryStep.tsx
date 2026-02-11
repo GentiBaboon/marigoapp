@@ -20,8 +20,6 @@ import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 import { brands } from '@/lib/mock-data';
 import { StepActions } from '../StepActions';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 
 type Step1Values = z.infer<typeof sellStep1Schema>;
 
@@ -31,7 +29,7 @@ const categoryItems = productCategories.map(group => ({
 }));
 
 export function CategoryStep() {
-  const { formData, setFormData, nextStep, isDraft, savedStep, goToStep } = useSellForm();
+  const { formData, setFormData, nextStep } = useSellForm();
 
   const form = useForm<Step1Values>({
     resolver: zodResolver(sellStep1Schema),
@@ -50,16 +48,6 @@ export function CategoryStep() {
   const genderValue = form.watch('gender');
 
   return (
-    <>
-      {isDraft && (
-        <Card className="mb-8 bg-amber-50 border border-amber-200">
-            <CardContent className="p-6 text-center">
-                <p className="font-semibold mb-4">You have a listing in progress.</p>
-                <Button onClick={() => goToStep(savedStep)}>Continue</Button>
-            </CardContent>
-        </Card>
-      )}
-
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           <FormField
@@ -145,9 +133,8 @@ export function CategoryStep() {
             )}
           />
 
-          <StepActions onNext={form.handleSubmit(onSubmit)} hideBack />
+          <StepActions onNext={form.handleSubmit(onSubmit)} backText="Back to drafts" />
         </form>
       </Form>
-    </>
   );
 }

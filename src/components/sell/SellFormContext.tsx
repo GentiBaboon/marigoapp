@@ -1,91 +1,145 @@
 'use client';
 
-import React, { useState, createContext, useContext, ReactNode, useEffect, useCallback } from 'react';
-import type { SellFormValues } from '@/lib/types';
+import React, { useState, createContext, useContext, ReactNode, useEffect, useCallback, useMemo } from 'react';
+import type { SellFormValues, SellDraft } from '@/lib/types';
 
 interface SellFormContextType {
-  formData: Partial<SellFormValues>;
+  drafts: SellDraft[];
+  activeDraft: SellDraft | undefined;
+  startNewDraft: () => void;
+  selectDraft: (draftId: string) => void;
+  deleteDraft: (draftId: string) => void;
+  unselectDraft: () => void;
   setFormData: (data: Partial<SellFormValues>) => void;
   currentStep: number;
   nextStep: () => void;
   prevStep: () => void;
   goToStep: (step: number) => void;
-  resetForm: () => void;
+  deleteActiveDraft: () => void;
   totalSteps: number;
-  isDraft: boolean;
-  savedStep: number;
+  formData: Partial<SellFormValues>;
 }
 
 const SellFormContext = createContext<SellFormContextType | undefined>(undefined);
 
 export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [formData, setFormDataState] = useState<Partial<SellFormValues>>({});
-  const [currentStep, setCurrentStep] = useState(1);
+  const [drafts, setDrafts] = useState<SellDraft[]>([]);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isDraft, setIsDraft] = useState(false);
-  const [savedStep, setSavedStep] = useState(1);
   const totalSteps = 6;
 
-  // Load draft from localStorage on initial mount
+  // Load drafts from localStorage on initial mount
   useEffect(() => {
     try {
-      const savedDraft = localStorage.getItem('sell_form_draft');
-      if (savedDraft) {
-        const draft = JSON.parse(savedDraft);
-        // Only consider it a draft if there's actual data
-        if (draft.formData && Object.keys(draft.formData).length > 0) {
-            setFormDataState(draft.formData);
-            setSavedStep(draft.currentStep || 1);
-            setIsDraft(true);
-        }
+      const savedDrafts = localStorage.getItem('sell_form_drafts');
+      if (savedDrafts) {
+        setDrafts(JSON.parse(savedDrafts));
       }
     } catch (error) {
-      console.error("Failed to load draft from localStorage", error);
-      localStorage.removeItem('sell_form_draft');
+      console.error("Failed to load drafts from localStorage", error);
+      localStorage.removeItem('sell_form_drafts');
     }
     setIsInitialized(true);
   }, []);
 
-  // Save draft to localStorage whenever formData or currentStep changes
+  // Save drafts to localStorage whenever the drafts array changes
   useEffect(() => {
     if (!isInitialized) return;
     try {
-       // Don't save an empty draft
-      if (Object.keys(formData).length > 0) {
-        const draft = { formData, currentStep };
-        localStorage.setItem('sell_form_draft', JSON.stringify(draft));
+      if (drafts.length > 0) {
+        localStorage.setItem('sell_form_drafts', JSON.stringify(drafts));
       } else {
-        // If form becomes empty (e.g. after reset), remove draft from storage
-        localStorage.removeItem('sell_form_draft');
+        localStorage.removeItem('sell_form_drafts');
       }
     } catch (error) {
-      console.error("Failed to save draft to localStorage. Draft may be too large.", error);
+      console.error("Failed to save drafts to localStorage. Data may be too large.", error);
     }
-  }, [formData, currentStep, isInitialized]);
+  }, [drafts, isInitialized]);
 
-
+  const activeDraft = useMemo(() => drafts.find(d => d.id === activeDraftId), [drafts, activeDraftId]);
+  
   const setFormData = useCallback((newData: Partial<SellFormValues>) => {
-    setFormDataState((prev) => ({ ...prev, ...newData }));
+    if (!activeDraftId) return;
+    setDrafts(prevDrafts =>
+        prevDrafts.map(d =>
+            d.id === activeDraftId
+            ? { ...d, formData: { ...d.formData, ...newData }, lastModified: Date.now() }
+            : d
+        )
+    );
+  }, [activeDraftId]);
+  
+  const startNewDraft = useCallback(() => {
+    const newDraftId = `draft_${Date.now()}`;
+    const newDraft: SellDraft = {
+        id: newDraftId,
+        formData: {},
+        currentStep: 1,
+        lastModified: Date.now(),
+    };
+    setDrafts(prev => [...prev, newDraft]);
+    setActiveDraftId(newDraftId);
+  }, []);
+
+  const selectDraft = useCallback((draftId: string) => {
+      setActiveDraftId(draftId);
   }, []);
   
-  const resetForm = useCallback(() => {
-    setFormDataState({});
-    setCurrentStep(1);
-    setIsDraft(false);
-    setSavedStep(1);
-    localStorage.removeItem('sell_form_draft');
+  const unselectDraft = useCallback(() => {
+      setActiveDraftId(null);
   }, []);
 
-  const nextStep = useCallback(() => setCurrentStep((prev) => Math.min(prev + 1, totalSteps + 1)), [totalSteps]);
-  const prevStep = useCallback(() => setCurrentStep((prev) => Math.max(prev - 1, 1)), []);
-  const goToStep = useCallback((step: number) => {
-    if (step > 0 && step <= totalSteps + 1) {
-      setCurrentStep(step);
+  const deleteDraft = useCallback((draftId: string) => {
+    setDrafts(prev => prev.filter(d => d.id !== draftId));
+    if (activeDraftId === draftId) {
+        setActiveDraftId(null);
     }
-  }, [totalSteps]);
+  }, [activeDraftId]);
+
+  const deleteActiveDraft = useCallback(() => {
+      if(activeDraftId) {
+          deleteDraft(activeDraftId);
+      }
+  }, [activeDraftId, deleteDraft]);
+  
+  const goToStep = useCallback((step: number) => {
+    if (!activeDraftId || step <= 0 || step > totalSteps + 1) return;
+     setDrafts(prevDrafts =>
+        prevDrafts.map(d =>
+            d.id === activeDraftId
+            ? { ...d, currentStep: step, lastModified: Date.now() }
+            : d
+        )
+    );
+  }, [activeDraftId, totalSteps]);
+
+  const nextStep = useCallback(() => goToStep((activeDraft?.currentStep || 0) + 1), [activeDraft, goToStep]);
+  
+  const prevStep = useCallback(() => {
+     if (activeDraft?.currentStep === 1) {
+        unselectDraft();
+    } else {
+        goToStep((activeDraft?.currentStep || 1) - 1);
+    }
+  }, [activeDraft, goToStep, unselectDraft]);
 
   return (
-    <SellFormContext.Provider value={{ formData, setFormData, currentStep, nextStep, prevStep, goToStep, resetForm, totalSteps, isDraft, savedStep }}>
+    <SellFormContext.Provider value={{ 
+        drafts, 
+        activeDraft, 
+        startNewDraft, 
+        selectDraft, 
+        deleteDraft, 
+        unselectDraft,
+        setFormData, 
+        currentStep: activeDraft?.currentStep || 1,
+        formData: activeDraft?.formData || {},
+        nextStep, 
+        prevStep, 
+        goToStep, 
+        deleteActiveDraft: deleteActiveDraft,
+        totalSteps,
+    }}>
       {children}
     </SellFormContext.Provider>
   );

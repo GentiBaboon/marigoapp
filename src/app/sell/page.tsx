@@ -1,4 +1,5 @@
 'use client';
+import { useEffect, useState } from 'react';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { CategoryStep } from '@/components/sell/steps/CategoryStep';
 import { DetailsStep } from '@/components/sell/steps/DetailsStep';
@@ -8,14 +9,73 @@ import { PricingStep } from '@/components/sell/steps/PricingStep';
 import { ReviewStep } from '@/components/sell/steps/ReviewStep';
 import { SuccessStep } from '@/components/sell/steps/SuccessStep';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Card, CardContent } from '@/components/ui/card';
-import Link from 'next/link';
-import { Tag, User } from 'lucide-react';
 import { SellProgressHeader } from '@/components/sell/SellProgressHeader';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { SellDraft } from '@/lib/types';
+import Image from 'next/image';
+import { productCategories } from '@/lib/mock-data';
 
+const getCategoryName = (gender: string, categorySlug: string) => {
+    const genderName = gender ? `${gender.charAt(0).toUpperCase()}${gender.slice(1)}'s` : '';
+    
+    for (const mainCategory of productCategories) {
+        const sub = mainCategory.subcategories.find(s => s.slug === categorySlug);
+        if (sub) {
+            return `${genderName} ${sub.name}`;
+        }
+    }
+    return `${genderName}`;
+}
+
+const DraftItem = ({ draft, onSelect, onDelete, totalSteps }: { draft: SellDraft, onSelect: () => void, onDelete: () => void, totalSteps: number }) => {
+    const { formData, currentStep } = draft;
+    const stepsRemaining = totalSteps - currentStep + 1;
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center gap-4">
+                <div className="relative h-24 w-24 flex-shrink-0 bg-muted rounded-md flex items-center justify-center">
+                    {formData.images && formData.images.length > 0 ? (
+                        <Image
+                            src={formData.images[0].preview}
+                            alt={formData.title || 'Draft image'}
+                            fill
+                            sizes="96px"
+                            className="object-cover rounded-md"
+                        />
+                    ) : (
+                        <span className="font-bold text-4xl text-muted-foreground">V.</span>
+                    )}
+                </div>
+                <div className="flex-1">
+                    <p className="font-bold text-lg">{formData.brand || 'Untitled'}</p>
+                    <p className="text-muted-foreground">{getCategoryName(formData.gender || '', formData.category || '')}</p>
+                    <p className="text-sm text-muted-foreground">{stepsRemaining} step{stepsRemaining > 1 ? 's' : ''} remaining</p>
+                </div>
+            </div>
+            <div className="flex items-center justify-end gap-4">
+                <Button variant="ghost" onClick={onDelete}>Delete</Button>
+                <Button variant="outline" onClick={onSelect}>Finish listing</Button>
+            </div>
+             <Separator />
+        </div>
+    )
+}
 
 export default function SellPage() {
-  const { currentStep, totalSteps } = useSellForm();
+  const { drafts, activeDraft, startNewDraft, selectDraft, deleteDraft, currentStep, totalSteps } = useSellForm();
+  
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => setIsClient(true), []);
+
+  const handleStartNew = () => {
+    startNewDraft();
+  }
+
+  const handleSelectDraft = (draftId: string) => {
+    selectDraft(draftId);
+  }
 
   const stepComponents = [
     <CategoryStep key={1} />,
@@ -27,22 +87,56 @@ export default function SellPage() {
     <SuccessStep key={7} />,
   ]
 
-  return (
-    <div className="space-y-8">
-      {currentStep > 1 && currentStep <= totalSteps ? (
-        <SellProgressHeader />
-      ) : (
+  if (!isClient) {
+      // Render nothing or a skeleton loader on the server
+      return null;
+  }
+
+  if (!activeDraft) {
+    return (
+      <div className="space-y-8">
         <div className="text-left">
           <h1 className="font-headline text-4xl font-bold tracking-tight text-foreground mb-2">
             Sell an item
           </h1>
-          {currentStep === 1 && (
-            <p className="text-muted-foreground">
-                Give your wardrobe a second life. List in minutes. Ship for free. Start earning effortlessly.
-            </p>
-          )}
+          <p className="text-muted-foreground">
+            Give your wardrobe a second life. List in minutes. Ship for free. Start earning effortlessly.
+          </p>
         </div>
-      )}
+        <Button className="w-full bg-foreground text-background hover:bg-foreground/90" size="lg" onClick={handleStartNew}>
+          Start new listing
+        </Button>
+        
+        {drafts.length > 0 && (
+            <div className="space-y-6">
+                <div className="relative pt-4">
+                    <div className="absolute inset-0 flex items-center">
+                        <Separator />
+                    </div>
+                    <div className="relative flex justify-start">
+                        <span className="bg-background pr-3 text-sm font-medium text-muted-foreground">
+                            Listing drafts
+                        </span>
+                    </div>
+                </div>
+                {drafts.map(draft => (
+                    <DraftItem 
+                        key={draft.id} 
+                        draft={draft} 
+                        onSelect={() => handleSelectDraft(draft.id)}
+                        onDelete={() => deleteDraft(draft.id)}
+                        totalSteps={totalSteps}
+                    />
+                ))}
+            </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {currentStep > 1 && currentStep <= totalSteps && <SellProgressHeader />}
       
       <div>
         <AnimatePresence mode="wait">
@@ -57,31 +151,6 @@ export default function SellPage() {
           </motion.div>
         </AnimatePresence>
       </div>
-
-       {currentStep === 1 && (
-        <div className="space-y-6 animate-in fade-in duration-500">
-            <Card>
-                <CardContent className="p-6 flex items-start gap-4">
-                    <Tag className="h-6 w-6 text-primary flex-shrink-0 mt-1"/>
-                    <div>
-                        <h3 className="font-semibold">How selling works</h3>
-                        <p className="text-sm text-muted-foreground">From listing to shipping, we make it easy.</p>
-                        <Link href="#" className="text-sm font-medium text-primary underline mt-1 inline-block">Learn more</Link>
-                    </div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardContent className="p-6 flex items-start gap-4">
-                    <User className="h-6 w-6 text-primary flex-shrink-0 mt-1"/>
-                    <div>
-                        <h3 className="font-semibold">Professional sellers</h3>
-                        <p className="text-sm text-muted-foreground">We have extra benefits for the pros.</p>
-                        <Link href="#" className="text-sm font-medium text-primary underline mt-1 inline-block">Contact us</Link>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-       )}
     </div>
   );
 }

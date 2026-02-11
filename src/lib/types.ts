@@ -114,4 +114,11 @@ export const sellStep5Schema = z.object({
 
 export const sellFormSchema = sellStep1Schema.merge(sellStep2Schema).merge(sellStep3Schema).merge(sellStep4Schema).merge(sellStep5Schema);
 
-export type SellFormValues = z.infer<typeof sellFormSchema>;
+export type SellFormValues = z.infer<typeof sellFormSchema> & { sellerEarning?: number };
+
+export interface SellDraft {
+  id: string;
+  formData: Partial<SellFormValues>;
+  currentStep: number;
+  lastModified: number;
+}
