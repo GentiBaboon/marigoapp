@@ -1,16 +1,14 @@
 'use client';
+import { useCallback, useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { useDropzone } from 'react-dropzone';
+import Image from 'next/image';
+
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -23,28 +21,73 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { sellStep2Schema } from '@/lib/types';
 import type { z } from 'zod';
 import { StepActions } from '@/components/sell/StepActions';
-import { productColors, productConditions, productMaterials } from '@/lib/mock-data';
+import { productConditions, categories } from '@/lib/mock-data';
+import { FileText, X } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
 
 type Step2Values = z.infer<typeof sellStep2Schema>;
+type ProofFile = {
+  file: File;
+  preview: string;
+};
 
 export function DetailsStep() {
   const { formData, setFormData, nextStep } = useSellForm();
+  const { toast } = useToast();
+  const [proofFiles, setProofFiles] = useState<ProofFile[]>(formData.proofOfOrigin || []);
 
   const form = useForm<Step2Values>({
     resolver: zodResolver(sellStep2Schema),
     defaultValues: {
       condition: formData.condition,
-      color: formData.color,
-      material: formData.material || ''
+      material: formData.material || '',
+      color: formData.color || '',
+      pattern: formData.pattern || '',
+      vintage: formData.vintage || false,
+      proofOfOrigin: formData.proofOfOrigin || [],
     },
   });
+
+  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
+    if (rejectedFiles.length > 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Upload Error',
+        description: 'Some files were rejected. Please upload valid image or PDF files.',
+      });
+    }
+
+    const newFiles = acceptedFiles.map(file => Object.assign({ file }, {
+      preview: URL.createObjectURL(file)
+    }));
+
+    setProofFiles(prevFiles => [...prevFiles, ...newFiles]);
+  }, [toast]);
+  
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'image/*': [], 'application/pdf': [] },
+  });
+
+  useEffect(() => {
+    form.setValue('proofOfOrigin', proofFiles);
+  }, [proofFiles, form]);
+
+  useEffect(() => {
+    return () => proofFiles.forEach(file => URL.revokeObjectURL(file.preview));
+  }, [proofFiles]);
+
+  const removeFile = (previewUrl: string) => {
+    setProofFiles(prevFiles => prevFiles.filter(file => file.preview !== previewUrl));
+  };
+
 
   const onSubmit = (data: Step2Values) => {
     setFormData(data);
@@ -52,85 +95,169 @@ export function DetailsStep() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Item Details</CardTitle>
-        <CardDescription>Provide more specific details about your item.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <FormField
-              control={form.control}
-              name="condition"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Condition</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a condition" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {productConditions.map(c => (
-                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="color"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Color: <span className="font-normal text-muted-foreground">{field.value}</span></FormLabel>
-                  <FormControl>
-                    <div className="flex flex-wrap gap-2">
-                        {productColors.map((color) => (
-                            <Button
-                            key={color.name}
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className={cn('rounded-full h-8 w-8', {
-                                'ring-2 ring-primary ring-offset-2': field.value === color.name,
-                            })}
-                            onClick={() => field.onChange(color.name)}
-                            >
-                            <div
-                                className="h-6 w-6 rounded-full border"
-                                style={{ backgroundColor: color.hex }}
-                            ></div>
-                            <span className="sr-only">{color.name}</span>
-                            </Button>
-                        ))}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="material"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Material</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Lambskin Leather" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <StepActions onNext={form.handleSubmit(onSubmit)} />
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <h2 className="text-2xl font-semibold tracking-tight">Item details</h2>
+
+        <FormItem>
+          <FormLabel>Category</FormLabel>
+          <FormControl>
+            <Input readOnly value={formData.category ? categories.find(c => c.slug === formData.category)?.name : ''} />
+          </FormControl>
+        </FormItem>
+
+        <FormField
+          control={form.control}
+          name="condition"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Condition</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a condition" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {productConditions.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="material"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Material</FormLabel>
+              <FormControl>
+                <Input placeholder="e.g. Cashmere" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="color"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Color</FormLabel>
+              <FormControl>
+                <Input placeholder="e.g. Anthracite" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="pattern"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Pattern</FormLabel>
+              <FormControl>
+                <Input placeholder="e.g. Plain" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="vintage"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <FormLabel className="text-base">
+                  Vintage <span className="font-normal text-muted-foreground">(optional)</span>
+                </FormLabel>
+                <FormDescription>
+                  Select if this item is over 15 years old.
+                </FormDescription>
+              </div>
+              <FormControl>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="proofOfOrigin"
+          render={({ field }) => (
+            <FormItem>
+               <FormLabel>
+                 Proof of origin <span className="font-normal text-muted-foreground">(optional)</span>
+               </FormLabel>
+               <FormDescription>
+                 This information will not be publicly displayed.
+               </FormDescription>
+               <FormControl>
+                 <div>
+                   <div
+                     {...getRootProps()}
+                     className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
+                       isDragActive ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
+                     }`}
+                   >
+                     <input {...getInputProps()} />
+                     <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+                     <p className="mt-4 text-muted-foreground">
+                      Add receipt, authenticity card, or invoice
+                     </p>
+                   </div>
+                   {proofFiles.length > 0 && (
+                     <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-4">
+                       {proofFiles.map((file, index) => (
+                         <div key={index} className="relative aspect-square">
+                           {file.file.type.startsWith('image/') ? (
+                              <Image
+                                src={file.preview}
+                                alt={`Proof preview ${index}`}
+                                fill
+                                sizes="128px"
+                                className="rounded-md object-cover"
+                              />
+                           ) : (
+                              <div className="flex flex-col items-center justify-center h-full w-full bg-muted rounded-md p-2">
+                                <FileText className="h-8 w-8 text-muted-foreground" />
+                                <span className="text-xs text-center break-all text-muted-foreground mt-2">{file.file.name}</span>
+                              </div>
+                           )}
+                           <Button
+                               variant="destructive"
+                               size="icon"
+                               className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                               onClick={() => removeFile(file.preview)}
+                           >
+                             <X className="h-4 w-4" />
+                           </Button>
+                         </div>
+                       ))}
+                     </div>
+                   )}
+                 </div>
+               </FormControl>
+               <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <StepActions onNext={form.handleSubmit(onSubmit)} />
+      </form>
+    </Form>
   );
 }

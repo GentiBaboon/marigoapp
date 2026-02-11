@@ -64,8 +64,11 @@ export const sellStep1Schema = z.object({
 
 export const sellStep2Schema = z.object({
   condition: z.enum(['new', 'like_new', 'good', 'fair'], { required_error: 'Please select a condition.' }),
-  color: z.string().min(1, 'Please select a color.'),
-  material: z.string().min(2, 'Material is required.'),
+  material: z.string().min(1, 'Material is required.'),
+  color: z.string().min(1, 'Color is required.'),
+  pattern: z.string().optional(),
+  vintage: z.boolean().default(false),
+  proofOfOrigin: z.array(z.object({ file: z.any(), preview: z.string() })).optional(),
 });
 
 export const sellStep3Schema = z.object({
@@ -84,7 +87,7 @@ export const sellStep5Schema = z.object({
             if (typeof a === 'string') return parseFloat(a);
             return a;
         },
-        z.number().min(1, "Price must be at least 1.")
+        z.number({invalid_type_error: "Price must be a number."}).min(1, "Price must be at least 1.")
     ),
     currency: z.enum(['EUR', 'ALL'], { required_error: 'A currency is required.' }),
 });
