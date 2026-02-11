@@ -12,6 +12,11 @@ export type Product = {
   color?: string;
 };
 
+export type CartProduct = Product & {
+  selectedSize: string;
+  quantity: number;
+};
+
 export type Category = {
   id: string;
   name: string;
@@ -158,5 +163,38 @@ export const outletProducts: Product[] = [
     price: 1500,
     originalPrice: 1900,
     image: 'product-5',
+  },
+];
+
+export const cartItems: CartProduct[] = [
+  {
+    id: '1',
+    brand: 'Chanel',
+    title: 'Classic Flap Bag',
+    price: 8200,
+    originalPrice: 9000,
+    image: 'product-1',
+    selectedSize: 'Medium',
+    quantity: 1,
+  },
+  {
+    id: '4',
+    brand: 'Dior',
+    title: "J'Adior Slingback Pump",
+    price: 990,
+    originalPrice: 1100,
+    image: 'product-4',
+    selectedSize: '38',
+    quantity: 1,
+  },
+  {
+    id: '7',
+    brand: 'Bottega Veneta',
+    title: 'Mini Jodie',
+    price: 2100,
+    originalPrice: 2500,
+    image: 'product-7',
+    selectedSize: 'Mini',
+    quantity: 1,
   },
 ];
