@@ -57,12 +57,12 @@ export type AddressFormValues = z.infer<typeof addressSchema>;
 // --- Sell Schemas ---
 
 export const sellStep1Schema = z.object({
-  gender: z.enum(['women', 'men', 'children', 'unisex'], { required_error: 'Please select a gender.' }),
+  gender: z.enum(['womenswear', 'menswear', 'girlswear', 'boyswear'], { required_error: 'Please select a type.' }),
   category: z.string().min(1, 'Please select a category.'),
+  brand: z.string().min(1, 'Brand is required.'),
 });
 
 export const sellStep2Schema = z.object({
-  brand: z.string().min(1, 'Brand is required.'),
   condition: z.enum(['new', 'like_new', 'good', 'fair'], { required_error: 'Please select a condition.' }),
   color: z.string().min(1, 'Please select a color.'),
   material: z.string().min(2, 'Material is required.'),

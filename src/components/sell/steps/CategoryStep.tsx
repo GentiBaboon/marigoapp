@@ -3,13 +3,6 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
   Form,
   FormControl,
   FormField,
@@ -28,8 +21,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { sellStep1Schema } from '@/lib/types';
 import type { z } from 'zod';
-import { StepActions } from '@/components/sell/StepActions';
 import { categories } from '@/lib/mock-data';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
+import { Search } from 'lucide-react';
 
 type Step1Values = z.infer<typeof sellStep1Schema>;
 
@@ -41,6 +38,7 @@ export function CategoryStep() {
     defaultValues: {
       gender: formData.gender,
       category: formData.category,
+      brand: formData.brand || '',
     },
   });
 
@@ -49,77 +47,95 @@ export function CategoryStep() {
     nextStep();
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Category</CardTitle>
-        <CardDescription>
-          First, tell us about the basic category of your item.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <FormField
-              control={form.control}
-              name="gender"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>Who is this for?</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className="flex flex-col sm:flex-row sm:flex-wrap gap-4"
-                    >
-                      {['Women', 'Men', 'Children', 'Unisex'].map((gender) => (
-                        <FormItem
-                          key={gender}
-                          className="flex items-center space-x-3 space-y-0"
-                        >
-                          <FormControl>
-                            <RadioGroupItem value={gender.toLowerCase()} />
-                          </FormControl>
-                          <FormLabel className="font-normal">
-                            {gender}
-                          </FormLabel>
-                        </FormItem>
-                      ))}
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+  const genderValue = form.watch('gender');
 
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.slug}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <StepActions onNext={form.handleSubmit(onSubmit)} />
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <FormField
+          control={form.control}
+          name="gender"
+          render={({ field }) => (
+            <FormItem className="space-y-4">
+              <FormLabel className="font-semibold">What type of item are you selling?</FormLabel>
+              <FormControl>
+                <RadioGroup
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                  className="space-y-3"
+                >
+                  {['Womenswear', 'Menswear', 'Girlswear', 'Boyswear'].map(
+                    (gender) => (
+                      <FormItem key={gender} className="flex items-center">
+                        <FormControl>
+                          <Label
+                            className={cn(
+                              'flex w-full cursor-pointer items-center gap-4 rounded-md border p-4 transition-colors hover:border-primary',
+                              genderValue === gender.toLowerCase()
+                                ? 'border-primary ring-2 ring-primary'
+                                : 'border-input'
+                            )}
+                          >
+                            <RadioGroupItem value={gender.toLowerCase()} />
+                            <span className="font-medium">{gender}</span>
+                          </Label>
+                        </FormControl>
+                      </FormItem>
+                    )
+                  )}
+                </RadioGroup>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="category"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-semibold">Category</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select item type" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.slug}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="brand"
+          render={({ field }) => (
+            <FormItem className="flex flex-col">
+              <FormLabel className="font-semibold">Brand</FormLabel>
+               <FormControl>
+                <div className="relative">
+                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                   <Input placeholder="Brand Name" {...field} className="pl-10" />
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Button type="submit" size="lg" className="w-full">
+          Continue
+        </Button>
+      </form>
+    </Form>
   );
 }

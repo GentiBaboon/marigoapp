@@ -27,8 +27,7 @@ import { useSellForm } from '@/components/sell/SellFormContext';
 import { sellStep2Schema } from '@/lib/types';
 import type { z } from 'zod';
 import { StepActions } from '@/components/sell/StepActions';
-import { brands, productColors, productConditions, productMaterials } from '@/lib/mock-data';
-import { Combobox } from '@/components/ui/combobox';
+import { productColors, productConditions, productMaterials } from '@/lib/mock-data';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -41,7 +40,6 @@ export function DetailsStep() {
   const form = useForm<Step2Values>({
     resolver: zodResolver(sellStep2Schema),
     defaultValues: {
-      brand: formData.brand || '',
       condition: formData.condition,
       color: formData.color,
       material: formData.material || ''
@@ -62,26 +60,6 @@ export function DetailsStep() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <FormField
-              control={form.control}
-              name="brand"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Brand</FormLabel>
-                  <FormControl>
-                    <Combobox
-                       items={brands.map(b => ({ value: b.slug, label: b.name }))}
-                       placeholder="Select brand"
-                       searchPlaceholder="Search for a brand..."
-                       emptyPlaceholder="No brand found."
-                       value={field.value}
-                       onValueChange={field.onChange}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="condition"
