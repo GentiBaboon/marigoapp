@@ -23,6 +23,72 @@
       "description": "A diverse group of fashionable people",
       "imageUrl": "https://images.unsplash.com/flagged/photo-1561645157-4bfc50a803bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxmYXNoaW9uJTIwY29tbXVuaXR5fGVufDB8fHx8MTc3MDgyNTQ5MXww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "fashion community"
+    },
+    {
+      "id": "banner-1",
+      "description": "Luxury store front",
+      "imageUrl": "https://images.unsplash.com/photo-1526745925052-dd824d27b9ab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjByZXRhaWx8ZW58MHx8fHwxNzcwODI2MDg4fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "luxury retail"
+    },
+    {
+      "id": "banner-2",
+      "description": "Fashion runway show",
+      "imageUrl": "https://images.unsplash.com/photo-1554881070-74595ca2b74c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxmYXNoaW9uJTIwc2hvd3xlbnwwfHx8fDE3NzA3NjE3ODd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "fashion show"
+    },
+    {
+      "id": "banner-3",
+      "description": "Collection of luxury bags",
+      "imageUrl": "https://images.unsplash.com/photo-1590739225287-bd31519780c3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxsdXh1cnklMjBiYWdzfGVufDB8fHx8MTc3MDgyNjA4OHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "luxury bags"
+    },
+    {
+      "id": "product-1",
+      "description": "A classic flap bag",
+      "imageUrl": "https://images.unsplash.com/photo-1542957057-debadce4ce81?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxmbGFwJTIwYmFnfGVufDB8fHx8MTc3MDgyNjA4OHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "flap bag"
+    },
+    {
+      "id": "product-2",
+      "description": "A horsebit shoulder bag",
+      "imageUrl": "https://images.unsplash.com/photo-1594633313593-bab3825d0caf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxzaG91bGRlciUyMGJhZ3xlbnwwfHx8fDE3NzA4MjYwODh8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "shoulder bag"
+    },
+    {
+      "id": "product-3",
+      "description": "A black bucket hat",
+      "imageUrl": "https://images.unsplash.com/photo-1637039796091-a3c6279fad80?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxidWNrZXQlMjBoYXR8ZW58MHx8fHwxNzcwODEzNTg1fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "bucket hat"
+    },
+    {
+      "id": "product-4",
+      "description": "A slingback pump shoe",
+      "imageUrl": "https://images.unsplash.com/photo-1756749204932-572e2025db79?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxwdW1wJTIwc2hvZXxlbnwwfHx8fDE3NzA4MjYwODh8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pump shoe"
+    },
+    {
+      "id": "product-5",
+      "description": "A large tote bag",
+      "imageUrl": "https://images.unsplash.com/photo-1663573690125-d326a87a2535?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHx0b3RlJTIwYmFnfGVufDB8fHx8MTc3MDgyNjA4OHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "tote bag"
+    },
+    {
+      "id": "product-6",
+      "description": "A leather sandal",
+      "imageUrl": "https://images.unsplash.com/photo-1613912804931-c3512f360cd3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxsZWF0aGVyJTIwc2FuZGFsfGVufDB8fHx8MTc3MDgyNjA4OHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "leather sandal"
+    },
+    {
+      "id": "product-7",
+      "description": "A small woven bag",
+      "imageUrl": "https://images.unsplash.com/photo-1566812538013-80f9d77a3564?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx3b3ZlbiUyMGJhZ3xlbnwwfHx8fDE3NzA4MjYwODh8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woven bag"
+    },
+    {
+      "id": "product-8",
+      "description": "A chain wallet bag",
+      "imageUrl": "https://images.unsplash.com/photo-1767392060677-9e13bcb85ca8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8Y2hhaW4lMjB3YWxsZXR8ZW58MHx8fHwxNzcwODI2MDg4fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "chain wallet"
     }
   ]
 }
