@@ -1,8 +1,11 @@
 import Link from 'next/link';
 import { Button } from './ui/button';
 import { Bell, ShoppingCart } from 'lucide-react';
+import { UserNav } from '@/components/user-nav';
+
 
 export function Header() {
+
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur-sm">
       <div className="container flex h-16 items-center space-x-4 sm:justify-between sm:space-x-0">
@@ -21,7 +24,7 @@ export function Header() {
             <Button variant="ghost" size="icon" aria-label="Shopping Cart">
               <ShoppingCart className="h-5 w-5" />
             </Button>
-            <Button>Sign In</Button>
+            <UserNav />
           </nav>
         </div>
       </div>
