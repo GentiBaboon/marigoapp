@@ -147,7 +147,7 @@ export function PricingStep() {
                         <FormItem>
                         <FormLabel>Your Price</FormLabel>
                         <FormControl>
-                            <Input type="number" placeholder="e.g. 550" {...field} />
+                            <Input type="number" placeholder="e.g. 550" {...field} value={field.value ?? ''} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
