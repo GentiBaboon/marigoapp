@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { createListing } from '@/app/sell/actions';
 import { Separator } from '@/components/ui/separator';
@@ -36,9 +37,10 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
 
 
 export function ReviewStep() {
-  const { formData, nextStep, goToStep } = useSellForm();
+  const { formData, nextStep, goToStep, unselectDraft } = useSellForm();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   const handlePublish = async () => {
     setIsLoading(true);
@@ -54,6 +56,11 @@ export function ReviewStep() {
       });
     }
     setIsLoading(false);
+  };
+
+  const handleSaveDraft = () => {
+    unselectDraft();
+    router.push('/sell');
   };
   
   const getCategoryName = (slug: string | undefined) => {
@@ -152,7 +159,7 @@ export function ReviewStep() {
                 By clicking on "Submit my item", I confirm that the information provided complies with the <Link href="#" className="underline">general terms of use</Link>.
              </p>
             <div className="flex items-center justify-between">
-                <Button variant="link" className="text-foreground font-semibold px-0">Save draft</Button>
+                <Button variant="link" className="text-foreground font-semibold px-0" onClick={handleSaveDraft}>Save draft</Button>
                 <Button size="lg" className="bg-foreground text-background hover:bg-foreground/90" onClick={handlePublish} disabled={isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Submit my item
