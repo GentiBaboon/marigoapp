@@ -1,11 +1,12 @@
 'use client';
 
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import type { FirestoreProduct } from '@/lib/types';
 import { ProductCard } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Product } from '@/lib/mock-data';
+import * as React from 'react';
 
 function NewArrivalsSkeleton() {
   return (
@@ -26,25 +27,36 @@ function NewArrivalsSkeleton() {
 
 export function NewArrivalsSection() {
   const firestore = useFirestore();
+  const { user } = useUser();
 
   const productsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    // Query for 4 active products, ordered by creation date
+    // Query for 20 active products to have a buffer for client-side filtering
     return query(
       collection(firestore, 'products'),
       where('status', '==', 'active'),
       orderBy('createdAt', 'desc'),
-      limit(4)
+      limit(20)
     );
   }, [firestore]);
 
   const { data: products, isLoading } = useCollection<FirestoreProduct>(productsQuery);
+  
+  const filteredProducts = React.useMemo(() => {
+    if (!products) return null;
+    // If a user is logged in, filter out their own products. Otherwise, show all.
+    const productList = user
+      ? products.filter((p) => p.sellerId !== user.uid)
+      : products;
+    return productList.slice(0, 4); // Take the first 4 products
+  }, [products, user]);
+
 
   if (isLoading) {
     return <NewArrivalsSkeleton />;
   }
 
-  if (!products || products.length === 0) {
+  if (!filteredProducts || filteredProducts.length === 0) {
     return (
       <div className="text-center py-10 bg-muted/50 rounded-lg">
         <p className="text-muted-foreground">No new arrivals at the moment. Check back later!</p>
@@ -53,7 +65,7 @@ export function NewArrivalsSection() {
   }
   
   // Adapt FirestoreProduct to Product for ProductCard
-  const adaptedProducts: Product[] = products.map(p => ({
+  const adaptedProducts: Product[] = filteredProducts.map(p => ({
       id: p.id,
       brand: p.brandId,
       title: p.title,
