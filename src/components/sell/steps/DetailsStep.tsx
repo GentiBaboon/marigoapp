@@ -44,7 +44,7 @@ export function DetailsStep() {
       brand: formData.brand,
       condition: formData.condition,
       color: formData.color,
-      material: formData.material
+      material: formData.material || ''
     },
   });
 
