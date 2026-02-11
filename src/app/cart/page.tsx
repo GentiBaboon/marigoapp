@@ -8,22 +8,20 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useCart } from '@/context/CartContext';
-import { Trash2, ShoppingCart } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Trash2, ShoppingCart, Minus, Plus } from 'lucide-react';
+import { format } from 'date-fns';
+import { addDays } from 'date-fns';
 
 export default function CartPage() {
-  const { items, updateQuantity, removeFromCart, subtotal } = useCart();
+  const { items, updateQuantity, removeFromCart, subtotal, totalItems } = useCart();
+  const estimatedDeliveryDate = format(addDays(new Date(), 5), 'dd/MM/yyyy');
 
-  const currencyFormatter = new Intl.NumberFormat('de-DE', {
-    style: 'currency',
-    currency: 'EUR',
-  });
+  const currencyFormatter = (value: number) => {
+    return new Intl.NumberFormat('de-DE', {
+        style: 'currency',
+        currency: 'EUR',
+    }).format(value);
+  }
 
   const savings = items.reduce(
     (acc, item) =>
@@ -32,17 +30,11 @@ export default function CartPage() {
         item.quantity,
     0
   );
-  const shipping = 15; // Example shipping cost
+  const shipping = 0; // As per image
   const total = subtotal + shipping;
 
   return (
-    <div className="container mx-auto px-4 py-8 md:py-12">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-headline font-bold text-center">
-          Shopping Bag
-        </h1>
-      </div>
-
+    <div className="container mx-auto max-w-4xl px-4 py-8 md:py-12">
       {items.length === 0 ? (
         <div className="text-center py-20">
           <ShoppingCart className="mx-auto h-16 w-16 text-muted-foreground" />
@@ -55,122 +47,125 @@ export default function CartPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 lg:gap-12">
-          <div className="lg:col-span-2 space-y-6">
-            {items.map((item) => {
-              const productImage = PlaceHolderImages.find(
-                (p) => p.id === item.image
-              );
-              return (
-                <div key={item.id} className="flex gap-4">
-                  <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-md border">
-                    {productImage && (
-                      <Image
-                        src={productImage.imageUrl}
-                        alt={item.title}
-                        fill
-                        className="object-cover"
-                        sizes="128px"
-                      />
-                    )}
-                  </div>
-                  <div className="flex flex-1 flex-col justify-between py-1">
-                    <div>
-                      <p className="text-sm font-semibold text-muted-foreground">
-                        {item.brand}
-                      </p>
-                      <h3 className="font-medium text-foreground">{item.title}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Size: {item.selectedSize || 'One Size'}
-                      </p>
-                    </div>
-                    <div className="flex items-end justify-between mt-2">
-                       <div className="flex items-baseline gap-2">
-                        <p className="font-bold text-destructive">
-                          {currencyFormatter.format(item.price)}
-                        </p>
-                        {item.originalPrice && (
-                          <p className="text-sm text-muted-foreground line-through">
-                            {currencyFormatter.format(item.originalPrice)}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                         <Select 
-                            value={String(item.quantity)} 
-                            onValueChange={(value) => updateQuantity(item.id, parseInt(value))}
-                          >
-                            <SelectTrigger className="h-8 w-[70px]">
-                                <SelectValue placeholder="Qty" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {[1, 2, 3, 4, 5].map(q => (
-                                    <SelectItem key={q} value={String(q)}>{q}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => removeFromCart(item.id)}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="md:col-span-2 space-y-6">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-bold">{totalItems} Item{totalItems > 1 ? 's' : ''} in the bag</h1>
+                    <p className="text-muted-foreground">Estimated delivery: <span className="font-semibold text-foreground">{estimatedDeliveryDate}</span></p>
                 </div>
-              );
-            })}
-          </div>
-
-          <div className="lg:col-span-1 mt-10 lg:mt-0">
-            <Card className="sticky top-24">
-              <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                 <div className="flex items-center gap-2">
-                    <Input placeholder="Gift card or promo code" />
-                    <Button variant="outline">Apply</Button>
-                </div>
-                <Separator />
-                <div className="space-y-2">
-                    <div className="flex justify-between">
-                        <span>Subtotal</span>
-                        <span>{currencyFormatter.format(subtotal)}</span>
-                    </div>
-                     {savings > 0 && (
-                        <div className="flex justify-between text-destructive">
-                            <span>Savings</span>
-                            <span>-{currencyFormatter.format(savings)}</span>
+                {items.map((item) => {
+                const productImage = PlaceHolderImages.find(
+                    (p) => p.id === item.image
+                );
+                return (
+                    <div key={item.id} className="flex gap-4 border rounded-lg p-4 relative">
+                        <div className="relative h-40 w-32 flex-shrink-0 overflow-hidden rounded-md bg-muted">
+                            {productImage && (
+                            <Image
+                                src={productImage.imageUrl}
+                                alt={item.title}
+                                fill
+                                className="object-cover"
+                                sizes="128px"
+                            />
+                            )}
                         </div>
-                    )}
-                     <div className="flex justify-between">
-                        <span>Shipping</span>
-                        <span>{currencyFormatter.format(shipping)}</span>
+                        <div className="flex flex-1 flex-col justify-between py-1">
+                            <div>
+                                <p className="text-sm font-semibold text-muted-foreground">
+                                    by {item.brand}
+                                </p>
+                                <h3 className="font-bold text-lg text-foreground">{item.title}</h3>
+                                <div className="flex items-baseline gap-2 mt-1">
+                                    {item.originalPrice && (
+                                    <p className="text-lg text-muted-foreground line-through">
+                                        {currencyFormatter(item.originalPrice)}
+                                    </p>
+                                    )}
+                                    <p className="font-bold text-lg text-destructive">
+                                    {currencyFormatter(item.price)}
+                                    </p>
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-2">
+                                    {item.selectedColor || 'White'}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-6 mt-2">
+                                <div>
+                                    <p className="text-xs text-muted-foreground mb-1">Size</p>
+                                    <div className="border rounded-md px-4 py-1.5 text-sm font-medium w-16 text-center">
+                                         {item.selectedSize || 'L'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground mb-1">Qty</p>
+                                    <div className="flex items-center border rounded-md">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
+                                            <Minus className="h-4 w-4" />
+                                        </Button>
+                                        <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => updateQuantity(item.id, item.quantity + 1)}>
+                                            <Plus className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 text-muted-foreground" onClick={() => removeFromCart(item.id)}>
+                            <Trash2 className="h-5 w-5" />
+                        </Button>
                     </div>
+                );
+                })}
+            </div>
+
+            <div className="md:col-span-1">
+                <div className="sticky top-24 space-y-6">
+                    <Card>
+                    <CardContent className="p-4 space-y-4">
+                        <div className="flex items-center gap-2">
+                            <Input placeholder="Gift Card" />
+                            <Button variant="outline">Submit</Button>
+                        </div>
+                        <Separator />
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-muted-foreground">
+                                <span>Subtotal</span>
+                                <span className="font-medium text-foreground">{currencyFormatter(subtotal)}</span>
+                            </div>
+                            {savings > 0 && (
+                                <div className="flex justify-between text-destructive">
+                                    <span>Saving</span>
+                                    <span className="font-medium">-{currencyFormatter(savings)}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between text-muted-foreground">
+                                <span>Shipping</span>
+                                <span className="font-medium text-foreground">{currencyFormatter(shipping)}</span>
+                            </div>
+                        </div>
+                    </CardContent>
+                    </Card>
+                    <Card>
+                         <CardContent className="p-4">
+                             <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="font-bold text-lg">Total</p>
+                                    {savings > 0 && (
+                                        <p className="text-muted-foreground line-through">{currencyFormatter(subtotal + shipping)}</p>
+                                    )}
+                                </div>
+                                <p className="font-bold text-2xl">{currencyFormatter(total)}</p>
+                            </div>
+                         </CardContent>
+                    </Card>
+                    <Button className="w-full" size="lg" asChild>
+                    <Link href="/checkout">Continue to Checkout</Link>
+                    </Button>
                 </div>
-                 <Separator />
-                 <div className="flex justify-between font-bold text-lg">
-                    <span>Total</span>
-                    <span>{currencyFormatter.format(total)}</span>
-                </div>
-                <Button className="w-full" size="lg" asChild>
-                  <Link href="/checkout">Continue to Checkout</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+            </div>
         </div>
       )}
-      {items.length > 0 && (
-         <div className="fixed bottom-16 left-0 right-0 border-t bg-background p-4 lg:hidden">
-             <div className="flex justify-between items-center mb-2">
-                 <span className="font-bold text-lg">Total</span>
-                 <span className="font-bold text-lg">{currencyFormatter.format(total)}</span>
-             </div>
-             <Button className="w-full" size="lg" asChild>
-               <Link href="/checkout">Continue to Checkout</Link>
-             </Button>
-         </div>
-       )}
     </div>
   );
 }
