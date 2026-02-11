@@ -28,16 +28,21 @@ export function StepActions({
   const handleNext = onNext || nextStep;
 
   return (
-    <div className="flex flex-col-reverse sm:flex-row gap-4 mt-8">
-      {!hideBack && (
-        <Button variant="outline" onClick={handleBack} className="w-full">
-          {backText}
-        </Button>
-      )}
-      <Button onClick={handleNext} disabled={isNextLoading || isNextDisabled} className="w-full">
+    <div className="flex flex-col gap-4 mt-8">
+       <Button
+        onClick={handleNext}
+        disabled={isNextLoading || isNextDisabled}
+        className="w-full bg-foreground text-background hover:bg-foreground/90"
+        size="lg"
+      >
         {isNextLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {nextText}
       </Button>
+      {!hideBack && (
+        <Button variant="outline" onClick={handleBack} className="w-full" size="lg">
+          {backText}
+        </Button>
+      )}
     </div>
   );
 }

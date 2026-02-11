@@ -72,7 +72,7 @@ export const sellStep2Schema = z.object({
 });
 
 export const sellStep3Schema = z.object({
-  images: z.array(z.object({ file: z.any(), preview: z.string() })).min(1, 'At least one image is required.').max(10, 'You can upload a maximum of 10 images.'),
+  images: z.array(z.object({ file: z.any(), preview: z.string() })).min(3, 'At least three images are required.').max(15, 'You can upload a maximum of 15 images.'),
 });
 
 export const sellStep4Schema = z.object({
@@ -84,10 +84,11 @@ export const sellStep4Schema = z.object({
 export const sellStep5Schema = z.object({
     price: z.preprocess(
         (a) => {
-            if (typeof a === 'string') return parseFloat(a);
-            return a;
+            if (typeof a === 'string' && a.trim() !== '') return parseFloat(a);
+            if (typeof a === 'number') return a;
+            return undefined;
         },
-        z.number({invalid_type_error: "Price must be a number."}).min(1, "Price must be at least 1.")
+        z.number({required_error: "Price is required.", invalid_type_error: "Price must be a number."}).min(1, "Price must be at least 1.")
     ),
     currency: z.enum(['EUR', 'ALL'], { required_error: 'A currency is required.' }),
 });

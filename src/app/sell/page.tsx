@@ -11,6 +11,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
 import { Tag, User } from 'lucide-react';
+import { SellProgressHeader } from '@/components/sell/SellProgressHeader';
 
 
 export default function SellPage() {
@@ -27,15 +28,19 @@ export default function SellPage() {
   ]
 
   return (
-    <div className="space-y-12">
-      {currentStep <= totalSteps && (
+    <div className="space-y-8">
+      {currentStep > 1 && currentStep <= totalSteps ? (
+        <SellProgressHeader />
+      ) : (
         <div className="text-left">
           <h1 className="font-headline text-4xl font-bold tracking-tight text-foreground mb-2">
             Sell an item
           </h1>
-          <p className="text-muted-foreground">
-            Give your wardrobe a second life. List in minutes. Ship for free. Start earning effortlessly.
-          </p>
+          {currentStep === 1 && (
+            <p className="text-muted-foreground">
+                Give your wardrobe a second life. List in minutes. Ship for free. Start earning effortlessly.
+            </p>
+          )}
         </div>
       )}
       
