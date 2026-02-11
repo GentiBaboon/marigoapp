@@ -51,6 +51,7 @@ const FIXED_FEE = 5;
 
 const SimilarItemCard = ({ item }: { item: SimilarSoldItem }) => {
     const productImage = PlaceHolderImages.find((p) => p.id === item.image);
+    const currencyFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
     return (
         <div className="border rounded-lg overflow-hidden">
             <div className="relative aspect-square bg-muted">
@@ -59,7 +60,7 @@ const SimilarItemCard = ({ item }: { item: SimilarSoldItem }) => {
             <div className="p-2 text-sm">
                 <p className="font-bold">{item.brand}</p>
                 <p className="text-muted-foreground truncate">{item.title}</p>
-                <p className="font-semibold">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(item.price)}</p>
+                <p className="font-semibold">{currencyFormatter.format(item.price)}</p>
                 <p className="text-xs text-muted-foreground">{item.soldDate}</p>
             </div>
         </div>
@@ -173,7 +174,7 @@ export function PricingStep() {
                     <p className="font-bold text-lg">{currencyFormatter(earning)}</p>
                 </div>
             </div>
-            <p className="text-sm text-muted-foreground">The buyer will also pay a 7€ service fee. <a href="#" className="underline">Learn more</a></p>
+            <p className="text-sm text-muted-foreground">The buyer will also pay for shipping. <a href="#" className="underline">Learn more</a></p>
             
             <Button type="button" onClick={handleGetSuggestion} disabled={isAISuggestionLoading} className="w-full" variant="outline">
                 {isAISuggestionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}

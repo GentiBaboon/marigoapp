@@ -1,21 +1,38 @@
 'use client';
 import { useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from '@/components/ui/card';
 import { useSellForm } from '@/components/sell/SellFormContext';
-import { StepActions } from '@/components/sell/StepActions';
 import { createListing } from '@/app/sell/actions';
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Pencil } from 'lucide-react';
+import { Pencil, Info, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { categories, productConditions } from '@/lib/mock-data';
+import Link from 'next/link';
+
+// Helper component for each review section
+const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode; }) => (
+    <div>
+        <div className="flex justify-between items-start mb-2">
+            <h3 className="text-lg font-semibold">{title}</h3>
+            <Button variant="ghost" onClick={onEdit} className="flex items-center gap-1.5 text-sm text-muted-foreground h-auto p-0 hover:bg-transparent hover:text-primary">
+                <Pencil className="h-3 w-3" />
+                Edit
+            </Button>
+        </div>
+        <div className="space-y-1 text-sm">{children}</div>
+    </div>
+);
+
+// Helper for detail rows
+const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="flex justify-between items-center">
+        <span className="text-muted-foreground">{label}:</span>
+        <span className="font-medium text-right">{value}</span>
+    </div>
+);
+
 
 export function ReviewStep() {
   const { formData, nextStep, goToStep } = useSellForm();
@@ -26,12 +43,8 @@ export function ReviewStep() {
     setIsLoading(true);
     const result = await createListing(formData);
     if (result.success) {
-      toast({
-        title: 'Listing Published!',
-        description: 'Your item is now live on the marketplace.',
-        variant: 'success',
-      });
-      nextStep(); // Move to success step
+      // The success step will show confetti, so no toast is needed here.
+      nextStep();
     } else {
       toast({
         variant: 'destructive',
@@ -41,60 +54,110 @@ export function ReviewStep() {
     }
     setIsLoading(false);
   };
-
-  const DetailItem = ({ label, value, step }: { label: string, value: React.ReactNode, step: number }) => (
-    <div className="flex justify-between items-start">
-        <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="font-medium">{value}</p>
-        </div>
-        <Button variant="ghost" size="icon" onClick={() => goToStep(step)} className="h-8 w-8">
-            <Pencil className="h-4 w-4 text-muted-foreground"/>
-        </Button>
-    </div>
-  );
-
+  
+  const getCategoryName = (slug: string | undefined) => {
+    if (!slug) return 'N/A';
+    // The image shows "Handbags", which isn't a direct category, so we'll do our best.
+    const cat = categories.find(c => c.slug === slug);
+    if(cat?.slug === 'bags') return 'Handbags';
+    return cat?.name || slug;
+  }
+  
+  const getConditionLabel = (value: string | undefined) => {
+    if (!value) return 'N/A';
+    const condition = productConditions.find(c => c.value === value);
+    // The image shows "Good condition"
+    return condition ? `${condition.label} condition` : value;
+  }
+  
+  const currencyFormatter = (value: number) => {
+    // The image shows 37$
+    return `${value}$`;
+  }
+  
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Review & Publish</CardTitle>
-        <CardDescription>
-          One final look. If everything is correct, publish your listing.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="space-y-4">
-            <h3 className="font-semibold">Item Preview</h3>
-            <div className="grid grid-cols-3 gap-4">
-                {formData.images?.slice(0,3).map((image, index) => (
-                    <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-                        <Image src={image.preview} alt={`preview ${index}`} fill sizes="150px" className="object-cover" />
-                    </div>
-                ))}
+    <div className="space-y-8">
+        <div>
+            <h2 className="text-2xl font-bold">Review before listing</h2>
+        </div>
+
+        <Alert variant="default" className="bg-amber-50 border-amber-200">
+            <Info className="h-4 w-4 text-amber-600"/>
+            <AlertDescription className="text-amber-900">
+                Double check everything: after listing, you can only add photos and lower the price.
+            </AlertDescription>
+        </Alert>
+        
+        <div className="space-y-6">
+            <ReviewSection title="Details" onEdit={() => goToStep(2)}>
+                 <DetailRow label="Category" value={getCategoryName(formData.category)} />
+                 <DetailRow label="Condition" value={getConditionLabel(formData.condition)} />
+                 <DetailRow label="Material" value={formData.material || 'N/A'} />
+                 <DetailRow label="Color" value={formData.color || 'N/A'} />
+                 <DetailRow label="Pattern" value={formData.pattern || 'Plain'} />
+            </ReviewSection>
+
+            <Separator/>
+
+            <ReviewSection title="Photos" onEdit={() => goToStep(3)}>
+                <p className="text-muted-foreground text-xs">Main photo</p>
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                    {formData.images?.slice(0, 3).map((image, index) => (
+                        <div key={index} className="relative aspect-[1/1] rounded-md overflow-hidden bg-muted">
+                            <Image src={image.preview} alt={`preview ${index}`} fill sizes="150px" className="object-cover" />
+                        </div>
+                    ))}
+                </div>
+            </ReviewSection>
+
+            <Separator/>
+            
+             <ReviewSection title="Description" onEdit={() => goToStep(4)}>
+                <p className="text-foreground">{formData.description}</p>
+            </ReviewSection>
+
+            <Separator/>
+
+            <ReviewSection title="Price" onEdit={() => goToStep(5)}>
+                <p className="font-semibold text-lg">{currencyFormatter(formData.price || 0)} (you earn {currencyFormatter(formData.sellerEarning || 0)})</p>
+                <p className="text-sm text-muted-foreground flex items-center">
+                    Buyer service fee not included
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-4 w-4 ml-1 cursor-default">
+                                    <Info className="h-3 w-3" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>The buyer will pay an additional service fee on top of your listing price.</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </p>
+            </ReviewSection>
+
+            <Separator/>
+
+            {/* In a real app, this would come from the user's profile */}
+            <ReviewSection title="Address" onEdit={() => alert('Address editing is not implemented in this step.')}>
+                 <p className="font-medium">Genti Dhimitri</p>
+                 <p className="text-muted-foreground">Via Malvolta, 19, 40137 Bologna</p>
+            </ReviewSection>
+        </div>
+        
+        <div className="space-y-4 pt-4">
+             <p className="text-xs text-center text-muted-foreground">
+                By clicking on "Submit my item", I confirm that the information provided complies with the <Link href="#" className="underline">general terms of use</Link>.
+             </p>
+            <div className="flex items-center justify-between">
+                <Button variant="link" className="text-foreground font-semibold px-0">Save draft</Button>
+                <Button size="lg" className="bg-foreground text-background hover:bg-foreground/90" onClick={handlePublish} disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Submit my item
+                </Button>
             </div>
         </div>
-
-        <Separator />
-
-        <div className="space-y-4">
-            <DetailItem label="Title" value={formData.title} step={4} />
-            <Separator />
-            <DetailItem label="Category" value={`${formData.gender}, ${formData.category}`} step={1} />
-             <Separator />
-            <DetailItem label="Brand" value={formData.brand} step={2} />
-             <Separator />
-            <DetailItem label="Condition" value={formData.condition} step={2} />
-             <Separator />
-             <DetailItem label="Price" value={`${new Intl.NumberFormat('de-DE', { style: 'currency', currency: formData.currency || 'EUR' }).format(formData.price!)}`} step={5} />
-        </div>
-      </CardContent>
-      <CardFooter>
-        <StepActions
-          onNext={handlePublish}
-          nextText="Publish Listing"
-          isNextLoading={isLoading}
-        />
-      </CardFooter>
-    </Card>
+    </div>
   );
 }
