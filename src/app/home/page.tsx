@@ -2,7 +2,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/product-card';
-import { shopByCategory, trendingProducts } from '@/lib/mock-data';
+import {
+  recentlyViewedProducts,
+  vintageGems,
+  newArrivals,
+} from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Info } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -25,10 +29,21 @@ export default function HomePage() {
       <div className="container mx-auto px-4 py-8 md:py-12 space-y-12">
         <section>
           <h2 className="text-xl md:text-2xl font-serif mb-6">
-            Shop by Category
+            Recently Viewed
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {shopByCategory.map((category) => {
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-8">
+            {recentlyViewedProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-xl md:text-2xl font-serif mb-6">
+            Vintage Gems
+          </h2>
+          <div className="grid grid-cols-3 gap-4">
+            {vintageGems.map((category) => {
               const imageData = PlaceHolderImages.find(
                 (p) => p.id === category.image
               );
@@ -44,7 +59,7 @@ export default function HomePage() {
                         src={imageData.imageUrl}
                         alt={category.name}
                         fill
-                        sizes="(max-width: 768px) 50vw, 25vw"
+                        sizes="(max-width: 768px) 33vw, 33vw"
                         className="object-contain p-4 transition-transform duration-300 group-hover:scale-105"
                         data-ai-hint={imageData.imageHint}
                       />
@@ -61,10 +76,10 @@ export default function HomePage() {
 
         <section>
           <h2 className="text-xl md:text-2xl font-serif mb-6">
-            Now Trending
+            New Arrivals
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-8">
-            {trendingProducts.map((product) => (
+            {newArrivals.slice(0, 6).map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
@@ -75,7 +90,7 @@ export default function HomePage() {
               variant="outline"
               className="rounded-full px-12"
             >
-              <Link href="/browse?section=trending">View all</Link>
+              <Link href="/browse?section=new-arrivals">View all</Link>
             </Button>
           </div>
         </section>
@@ -83,5 +98,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    

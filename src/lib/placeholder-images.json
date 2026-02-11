@@ -81,7 +81,7 @@
     {
       "id": "product-3",
       "description": "A black bucket hat",
-      "imageUrl": "https://images.unsplash.com/photo-1637039796091-a3c6279fad80?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxidWNrZXQlMjBoYXR8ZW58MHx8fHwxNzcwODEzNTg1fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://images.unsplash.com/photo-1637039796091-a3c66279fad80?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxidWNrZXQlMjBoYXR8ZW58MHx8fHwxNzcwODEzNTg1fDA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "bucket hat"
     },
     {
@@ -191,6 +191,36 @@
       "description": "A pair of denim jeans",
       "imageUrl": "https://images.unsplash.com/photo-1714143136372-ddaf8b606da7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxkZW5pbSUyMGplYW5zfGVufDB8fHx8MTc3MDc3ODI5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "denim jeans"
+    },
+    {
+      "id": "loro-piana-coat",
+      "description": "A dark cashmere coat",
+      "imageUrl": "https://images.unsplash.com/photo-1515464838703-2980f7b027a6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxkYXJrJTIwY29hdHxlbnwwfHx8fDE3NzA5MjU1ODd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "dark coat"
+    },
+    {
+      "id": "burberry-boots",
+      "description": "A pair of brown leather boots",
+      "imageUrl": "https://images.unsplash.com/photo-1608256247730-16d42653a4e9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxsZWF0aGVyJTIwYm9vdHN8ZW58MHx8fHwxNzcwOTI1NjUxfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "leather boots"
+    },
+    {
+      "id": "vintage-jacket",
+      "description": "A vintage green jacket",
+      "imageUrl": "https://images.unsplash.com/photo-1591047139829-d916bb69a64e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxncmVlbiUyMGphY2tldHxlbnwwfHx8fDE3NzA5MjU3MTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "green jacket"
+    },
+    {
+      "id": "vintage-jewellery",
+      "description": "A black bracelet with gold patterns",
+      "imageUrl": "https://images.unsplash.com/photo-1620950346231-b5145821a7a2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxibGFjayUyMGJyYWNlbGV0fGVufDB8fHx8MTc3MDkyNTc0Mnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "black bracelet"
+    },
+    {
+      "id": "vintage-knitwear",
+      "description": "A yellow polo knitwear shirt",
+      "imageUrl": "https://images.unsplash.com/photo-1621217036499-158a434254ad?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx5ZWxsb3clMjBwb2xvfGVufDB8fHx8MTc3MDkyNTc3NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "yellow polo"
     }
   ]
 }

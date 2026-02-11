@@ -456,6 +456,46 @@ export const outletProducts: Product[] = [
   },
 ];
 
+export const recentlyViewedProducts: Product[] = [
+  {
+    id: 'loro-piana-1',
+    brand: 'LORO PIANA',
+    title: 'Cashmere coat',
+    price: 2800,
+    image: 'loro-piana-coat',
+    sellerId: 'seller-1',
+    size: 'M International',
+    sellerLocation: 'France',
+  },
+  {
+    id: 'vetements-1',
+    brand: 'VETEMENTS',
+    title: 'Sweatshirt',
+    price: 489,
+    originalPrice: 511,
+    image: 'trending-vetements', // Reusing this image id
+    sellerId: 'seller-2',
+    size: 'XS International',
+    sellerLocation: 'Italy',
+  },
+  {
+    id: 'burberry-1',
+    brand: 'BURBERRY',
+    title: 'Leather boots',
+    price: 294,
+    image: 'burberry-boots',
+    sellerId: 'seller-3',
+    size: '42 EU',
+    sellerLocation: 'Spain',
+  },
+];
+
+export const vintageGems = [
+  { id: '1', name: 'JACKETS', slug: 'jackets', image: 'vintage-jacket' },
+  { id: '2', name: 'JEWELLERY', slug: 'jewellery', image: 'vintage-jewellery' },
+  { id: '3', name: 'KNITWEAR', slug: 'knitwear', image: 'vintage-knitwear' },
+];
+
 export const cartItems: CartProduct[] = [
   {
     id: '1',
