@@ -53,3 +53,42 @@ export const addressSchema = z.object({
 });
 
 export type AddressFormValues = z.infer<typeof addressSchema>;
+
+// --- Sell Schemas ---
+
+export const sellStep1Schema = z.object({
+  gender: z.enum(['women', 'men', 'children', 'unisex'], { required_error: 'Please select a gender.' }),
+  category: z.string().min(1, 'Please select a category.'),
+});
+
+export const sellStep2Schema = z.object({
+  brand: z.string().min(1, 'Brand is required.'),
+  condition: z.enum(['new', 'like_new', 'good', 'fair'], { required_error: 'Please select a condition.' }),
+  color: z.string().min(1, 'Please select a color.'),
+  material: z.string().min(2, 'Material is required.'),
+});
+
+export const sellStep3Schema = z.object({
+  images: z.array(z.object({ file: z.any(), preview: z.string() })).min(1, 'At least one image is required.').max(10, 'You can upload a maximum of 10 images.'),
+});
+
+export const sellStep4Schema = z.object({
+    title: z.string().min(10, 'Title must be at least 10 characters.').max(70, 'Title must be 70 characters or less.'),
+    description: z.string().min(20, 'Description must be at least 20 characters.').max(500, 'Description cannot exceed 500 characters.'),
+    size: z.string().min(1, 'Please select a size.'),
+});
+
+export const sellStep5Schema = z.object({
+    price: z.preprocess(
+        (a) => {
+            if (typeof a === 'string') return parseFloat(a);
+            return a;
+        },
+        z.number().min(1, "Price must be at least 1.")
+    ),
+    currency: z.enum(['EUR', 'ALL'], { required_error: 'A currency is required.' }),
+});
+
+export const sellFormSchema = sellStep1Schema.merge(sellStep2Schema).merge(sellStep3Schema).merge(sellStep4Schema).merge(sellStep5Schema);
+
+export type SellFormValues = z.infer<typeof sellFormSchema>;
