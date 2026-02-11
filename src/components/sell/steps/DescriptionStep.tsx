@@ -11,6 +11,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -26,8 +27,35 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { productSizes } from '@/lib/mock-data';
+import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type Step4Values = z.infer<typeof sellStep4Schema>;
+
+const currentYear = new Date().getFullYear();
+const years = Array.from({ length: 30 }, (_, i) => String(currentYear - i));
+
+const originOptions = [
+    { value: 'direct', label: 'Direct from brand' },
+    { value: 'private', label: 'Private sale or staff sale' },
+    { value: 'vestiaire', label: 'Bought on Vestiaire Collective' },
+    { value: 'other', label: 'Other' },
+]
+
+const packagingItems = [
+    { id: 'card', label: 'Card or certificate' },
+    { id: 'dustBag', label: 'Dust bag' },
+    { id: 'box', label: 'Original box' },
+]
 
 export function DescriptionStep() {
   const { formData, setFormData, nextStep } = useSellForm();
@@ -38,6 +66,10 @@ export function DescriptionStep() {
       title: formData.title || '',
       description: formData.description || '',
       size: formData.size,
+      origin: formData.origin,
+      yearOfPurchase: formData.yearOfPurchase,
+      serialNumber: formData.serialNumber || '',
+      packaging: formData.packaging || [],
     },
   });
 
@@ -49,9 +81,9 @@ export function DescriptionStep() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Title & Description</CardTitle>
+        <CardTitle>Description</CardTitle>
         <CardDescription>
-          Give your item a great title and a detailed description.
+          Add details about your item to attract buyers.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -121,6 +153,127 @@ export function DescriptionStep() {
                 </FormItem>
               )}
             />
+            <Separator />
+
+            <FormField
+              control={form.control}
+              name="origin"
+              render={({ field }) => (
+                <FormItem className="space-y-4">
+                  <FormLabel>Origin <span className="font-normal text-muted-foreground">(optional)</span></FormLabel>
+                   <Alert variant="default" className="bg-muted/50">
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                        We can't accept items gifted at VIP or press events, sent complimentary, or offered in-store as part of a purchase. Items from private and staff sales may also be ineligible.
+                    </AlertDescription>
+                  </Alert>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="space-y-2"
+                    >
+                      {originOptions.map((option) => (
+                        <FormItem key={option.value} className="flex items-center space-x-3">
+                          <FormControl>
+                            <RadioGroupItem value={option.value} />
+                          </FormControl>
+                          <FormLabel className="font-normal">{option.label}</FormLabel>
+                        </FormItem>
+                      ))}
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="yearOfPurchase"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Year of purchase</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {years.map((year) => (
+                        <SelectItem key={year} value={year}>{year}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="serialNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Serial number <span className="font-normal text-muted-foreground">(optional)</span></FormLabel>
+                  <FormDescription>
+                    This information will not be publicly displayed.
+                  </FormDescription>
+                  <FormControl>
+                    <Input placeholder="Serial number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="packaging"
+              render={() => (
+                <FormItem>
+                  <div className="mb-4">
+                    <FormLabel className="text-base">Packaging <span className="font-normal text-muted-foreground">(optional)</span></FormLabel>
+                  </div>
+                  {packagingItems.map((item) => (
+                    <FormField
+                      key={item.id}
+                      control={form.control}
+                      name="packaging"
+                      render={({ field }) => {
+                        return (
+                          <FormItem
+                            key={item.id}
+                            className="flex flex-row items-start space-x-3 space-y-0 mb-3"
+                          >
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(item.id)}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? field.onChange([...(field.value || []), item.id])
+                                    : field.onChange(
+                                        field.value?.filter(
+                                          (value) => value !== item.id
+                                        )
+                                      )
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              {item.label}
+                            </FormLabel>
+                          </FormItem>
+                        )
+                      }}
+                    />
+                  ))}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <StepActions onNext={form.handleSubmit(onSubmit)} />
           </form>
         </Form>
