@@ -122,3 +122,42 @@ export interface SellDraft {
   currentStep: number;
   lastModified: number;
 }
+
+
+// --- Product Schemas ---
+
+export const productImageSchema = z.object({
+  url: z.string(),
+  thumbnailUrl: z.string().optional(),
+  position: z.number().optional(),
+});
+export type ProductImage = z.infer<typeof productImageSchema>;
+
+
+export const firestoreProductSchema = z.object({
+  sellerId: z.string(),
+  title: z.string(),
+  description: z.string(),
+  categoryId: z.string(),
+  subcategoryId: z.string(),
+  brandId: z.string(),
+  condition: z.enum(["new", "like_new", "good", "fair"]),
+  listingType: z.enum(["fixed_price", "auction"]),
+  price: z.number(),
+  originalPrice: z.number().optional().nullable(),
+  currency: z.enum(["EUR", "ALL", "USD"]),
+  size: z.string().optional().nullable(),
+  color: z.string().optional().nullable(),
+  material: z.string().optional().nullable(),
+  gender: z.enum(["women", "men", "children", "unisex"]).optional().nullable(),
+  images: z.array(productImageSchema),
+  status: z.enum(["draft", "pending_review", "active", "sold", "removed", "expired"]),
+  views: z.number().default(0),
+  wishlistCount: z.number().default(0),
+  isFeatured: z.boolean().default(false),
+  isAuthenticated: z.boolean().optional(),
+  createdAt: z.any(),
+  updatedAt: z.any(),
+});
+
+export type FirestoreProduct = z.infer<typeof firestoreProductSchema> & { id: string };

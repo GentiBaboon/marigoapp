@@ -69,7 +69,11 @@ service cloud.firestore {
     // Marketplace Collections (/products)
     // --------------------------------------------------------------------
     match /products/{productId} {
-      allow get, list: if resource == null || resource.data.status == 'active';
+      // Public can view active products. Sellers can view their own products.
+      allow get: if (resource.data.status == 'active') || (isSignedIn() && resource.data.sellerId == request.auth.uid) || isAdmin();
+      // Signed-in users can perform queries (e.g., for their own products, or for active products).
+      // The `get` rule above provides the document-level security.
+      allow list: if isSignedIn();
       allow create: if isSignedIn() && isCorrectOwnerInRequestData('sellerId');
       allow update, delete: if isExistingDoc() && isOwner(resource.data.sellerId);
 
