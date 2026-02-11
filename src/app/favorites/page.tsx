@@ -9,8 +9,10 @@ import type { Product } from '@/lib/mock-data';
 import { HeartOff } from 'lucide-react';
 import Link from 'next/link';
 
-// Combine all mock products for demonstration
-const allFavoriteProducts: Product[] = [...newArrivals, ...trendingProducts, ...outletProducts.slice(0,2)];
+// Combine all mock products for demonstration and remove duplicates
+const combinedProducts = [...newArrivals, ...trendingProducts, ...outletProducts.slice(0, 2)];
+const allFavoriteProducts: Product[] = Array.from(new Map(combinedProducts.map(p => [p.id, p])).values());
+
 
 // Mock data for other categories
 const clothes: Product[] = allFavoriteProducts.filter(p => p.id === '3' || p.id === '4');
