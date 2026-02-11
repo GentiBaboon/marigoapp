@@ -11,11 +11,11 @@ import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/product-card';
 import {
   categories,
-  newArrivals,
   trendingProducts,
   outletProducts,
 } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { NewArrivalsSection } from '@/components/home/NewArrivalsSection';
 
 export default function HomePage() {
   const bannerImages = PlaceHolderImages.filter((p) =>
@@ -84,11 +84,7 @@ export default function HomePage() {
           <h2 className="text-2xl md:text-3xl font-headline font-bold mb-6">
             New Arrivals
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {newArrivals.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          <NewArrivalsSection />
         </section>
 
         <section className="mb-12">

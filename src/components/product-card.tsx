@@ -13,8 +13,23 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
-  const productImage = PlaceHolderImages.find((p) => p.id === product.image);
   const currencyFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+
+  let imageUrl: string | undefined;
+  let imageHint: string | undefined;
+
+  // Check if image is a full URL (from firestore) or an ID (from mock data)
+  const isUrl = product.image?.startsWith('http') || product.image?.startsWith('data:');
+
+  if (isUrl) {
+    imageUrl = product.image;
+  } else if (product.image) {
+    const productImage = PlaceHolderImages.find((p) => p.id === product.image);
+    if (productImage) {
+      imageUrl = productImage.imageUrl;
+      imageHint = productImage.imageHint;
+    }
+  }
 
   return (
     <Card
@@ -27,15 +42,17 @@ export function ProductCard({ product, className }: ProductCardProps) {
         <div className="relative">
           <Link href={`/products/${product.id}`} className="block">
             <div className="relative aspect-square w-full overflow-hidden">
-              {productImage && (
+              {imageUrl ? (
                 <Image
-                  src={productImage.imageUrl}
+                  src={imageUrl}
                   alt={product.title}
                   fill
                   sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                   className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  data-ai-hint={productImage.imageHint}
+                  data-ai-hint={imageHint}
                 />
+              ) : (
+                <div className="aspect-square w-full bg-muted" />
               )}
             </div>
           </Link>

@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSellForm } from '@/components/sell/SellFormContext';
-import { createListing } from '@/app/sell/actions';
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +11,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { categories, productConditions } from '@/lib/mock-data';
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useUser, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 // Helper component for each review section
 const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode; }) => (
@@ -41,21 +42,66 @@ export function ReviewStep() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const { user } = useUser();
+  const firestore = useFirestore();
 
   const handlePublish = async () => {
-    setIsLoading(true);
-    const result = await createListing(formData);
-    if (result.success) {
-      // The success step will show confetti, so no toast is needed here.
-      nextStep();
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'Publishing Failed',
-        description: 'There was an error publishing your listing. Please try again.',
-      });
+    if (!user || !firestore) {
+        toast({
+            variant: 'destructive',
+            title: 'Authentication Error',
+            description: 'You must be signed in to create a listing.',
+        });
+        return;
     }
-    setIsLoading(false);
+    setIsLoading(true);
+
+    const listingData = {
+      sellerId: user.uid,
+      title: formData.title || '',
+      description: formData.description || '',
+      brandId: formData.brand || '',
+      categoryId: formData.category || '',
+      subcategoryId: formData.category || '',
+      condition: formData.condition || 'good',
+      listingType: 'fixed_price',
+      price: formData.price || 0,
+      originalPrice: null,
+      currency: formData.currency || 'EUR',
+      size: formData.sizeValue || null,
+      color: formData.color || null,
+      material: formData.material || null,
+      gender: formData.gender ? (formData.gender.replace('wear', '') as any) : null,
+      images: formData.images?.map((img, i) => ({ url: img.preview, position: i })) || [],
+      status: 'active',
+      views: 0,
+      wishlistCount: 0,
+      isFeatured: false,
+      isAuthenticated: false,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    addDoc(collection(firestore, "products"), listingData)
+        .then(docRef => {
+            nextStep();
+        })
+        .catch(error => {
+            const permissionError = new FirestorePermissionError({
+                path: 'products',
+                operation: 'create',
+                requestResourceData: listingData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            toast({
+                variant: 'destructive',
+                title: 'Publishing Failed',
+                description: 'There was a problem publishing your listing. Please try again.',
+            });
+        })
+        .finally(() => {
+            setIsLoading(false);
+        });
   };
 
   const handleSaveDraft = () => {
