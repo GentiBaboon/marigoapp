@@ -31,13 +31,14 @@ type ComboboxProps = {
     className?: string;
     value?: string;
     onValueChange?: (value: string) => void;
+    disabled?: boolean;
 }
 
 const isGrouped = (items: ComboboxData): items is ComboboxGroup[] => {
     return items.length > 0 && typeof items[0] === 'object' && items[0] !== null && 'heading' in items[0] && 'items' in items[0];
 }
 
-export function Combobox({ items, placeholder, searchPlaceholder, emptyPlaceholder, className, value, onValueChange }: ComboboxProps) {
+export function Combobox({ items, placeholder, searchPlaceholder, emptyPlaceholder, className, value, onValueChange, disabled }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
 
   const flatItems = React.useMemo(() => 
@@ -58,6 +59,7 @@ export function Combobox({ items, placeholder, searchPlaceholder, emptyPlacehold
           role="combobox"
           aria-expanded={open}
           className={cn("w-full justify-between", className)}
+          disabled={disabled}
         >
           {selectedLabel}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -76,7 +78,7 @@ export function Combobox({ items, placeholder, searchPlaceholder, emptyPlacehold
                                 key={item.value}
                                 value={item.value}
                                 onSelect={(currentValue) => {
-                                    onValueChange?.(currentValue === value ? "" : currentValue)
+                                    onValueChange?.(currentValue)
                                     setOpen(false)
                                 }}
                             >
@@ -98,7 +100,7 @@ export function Combobox({ items, placeholder, searchPlaceholder, emptyPlacehold
                         key={item.value}
                         value={item.value}
                         onSelect={(currentValue) => {
-                            onValueChange?.(currentValue === value ? "" : currentValue)
+                            onValueChange?.(currentValue)
                             setOpen(false)
                         }}
                         >
