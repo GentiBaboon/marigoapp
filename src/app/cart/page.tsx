@@ -20,6 +20,9 @@ import type { FirestoreAddress } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AddressForm } from '@/components/profile/address-form';
 
 const currencyFormatter = (value: number) => {
     return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
@@ -33,6 +36,9 @@ export default function CheckoutPage() {
     const { toast } = useToast();
     const [step, setStep] = useState(1);
     const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+    
+    const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+    const [editingAddress, setEditingAddress] = useState<FirestoreAddress | null>(null);
 
     const addressesCollection = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -112,6 +118,16 @@ export default function CheckoutPage() {
             setIsPlacingOrder(false);
         }
     };
+    
+    const handleChangeAddress = () => {
+        setEditingAddress(shippingAddress || null);
+        setIsAddressModalOpen(true);
+    }
+    
+    const handleAddAddress = () => {
+        setEditingAddress(null);
+        setIsAddressModalOpen(true);
+    }
 
     if (cart.items.length === 0 && !isPlacingOrder) {
         return (
@@ -130,133 +146,190 @@ export default function CheckoutPage() {
 
     return (
         <div className="container mx-auto max-w-2xl px-4 py-8 md:py-12">
-            <div className="space-y-8">
-                <section>
-                    <h1 className="text-2xl font-bold mb-4">1. Bag</h1>
-                    {cart.sellers.map(({ sellerId, items }) => {
-                        const seller = mockSellers.find(s => s.id === sellerId);
-                        return (
-                            <Card key={sellerId} className="mb-6 overflow-hidden">
-                                <CardHeader className="flex-row items-center justify-between bg-muted/50 p-4">
-                                    <div className="flex items-center gap-3">
-                                        <Avatar className="h-8 w-8">
-                                            <AvatarImage src={seller?.avatar} alt={seller?.username}/>
-                                            <AvatarFallback>{seller?.username?.charAt(0).toUpperCase()}</AvatarFallback>
-                                        </Avatar>
-                                        <span className="font-semibold">{seller?.username}</span>
-                                    </div>
-                                    <Button variant="ghost" size="sm" className="text-muted-foreground">More info <ChevronDown className="h-4 w-4 ml-1"/></Button>
-                                </CardHeader>
-                                <CardContent className="p-4 space-y-4">
-                                    {items.map((item, index) => {
-                                        const productImage = PlaceHolderImages.find(p => p.id === item.image);
-                                        const hasDirectShipping = item.price < 1000; // Condition from context
-                                        return (
-                                            <React.Fragment key={item.id}>
-                                                <div className="flex gap-4">
-                                                    <div className="relative h-28 w-24 flex-shrink-0">
-                                                        {productImage && <Image src={productImage.imageUrl} alt={item.title} fill className="object-cover rounded-md" sizes="96px" />}
-                                                    </div>
-                                                    <div className="flex-1 space-y-1">
-                                                        <div className="flex justify-between">
-                                                            <p className="font-bold uppercase text-sm">{item.brand}</p>
-                                                            <p className="font-bold">{currencyFormatter(item.price)}</p>
+            <div className="space-y-6">
+                
+                {step === 1 ? (
+                    <section>
+                        <h1 className="text-2xl font-bold mb-4">1. Bag</h1>
+                        {cart.sellers.map(({ sellerId, items }) => {
+                            const seller = mockSellers.find(s => s.id === sellerId);
+                            return (
+                                <Card key={sellerId} className="mb-6 overflow-hidden">
+                                    <CardHeader className="flex-row items-center justify-between bg-muted/50 p-4">
+                                        <div className="flex items-center gap-3">
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarImage src={seller?.avatar} alt={seller?.username}/>
+                                                <AvatarFallback>{seller?.username?.charAt(0).toUpperCase()}</AvatarFallback>
+                                            </Avatar>
+                                            <span className="font-semibold">{seller?.username}</span>
+                                        </div>
+                                        <Button variant="ghost" size="sm" className="text-muted-foreground">More info <ChevronDown className="h-4 w-4 ml-1"/></Button>
+                                    </CardHeader>
+                                    <CardContent className="p-4 space-y-4">
+                                        {items.map((item, index) => {
+                                            const productImage = PlaceHolderImages.find(p => p.id === item.image);
+                                            const hasDirectShipping = item.price < 1000;
+                                            return (
+                                                <React.Fragment key={item.id}>
+                                                    <div className="flex gap-4">
+                                                        <div className="relative h-28 w-24 flex-shrink-0">
+                                                            {productImage && <Image src={productImage.imageUrl} alt={item.title} fill className="object-cover rounded-md" sizes="96px" />}
                                                         </div>
-                                                        <p>{item.title}</p>
-                                                        <p className="text-sm text-muted-foreground">Size: {item.selectedSize || 'M'}</p>
+                                                        <div className="flex-1 space-y-1">
+                                                            <div className="flex justify-between">
+                                                                <p className="font-bold uppercase text-sm">{item.brand}</p>
+                                                                <p className="font-bold">{currencyFormatter(item.price)}</p>
+                                                            </div>
+                                                            <p>{item.title}</p>
+                                                            <p className="text-sm text-muted-foreground">Size: {item.selectedSize || 'M'}</p>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <RadioGroup value={item.shippingMethod} onValueChange={(val) => cart.updateShippingMethod(item.id, val as ShippingMethod)}>
-                                                    {hasDirectShipping && (
-                                                        <Label className="flex items-start gap-4 rounded-md border p-3 cursor-pointer has-[:checked]:border-foreground">
-                                                            <RadioGroupItem value="direct" id={`direct-${item.id}`}/>
-                                                            <div className="w-full">
-                                                                <div className="flex items-center justify-between">
-                                                                    <p className="font-semibold flex items-center gap-2"><Truck className="h-5 w-5"/>Direct Shipping</p>
-                                                                    <p className="font-semibold">{currencyFormatter(item.directShippingFee)}</p>
+                                                    <RadioGroup value={item.shippingMethod} onValueChange={(val) => cart.updateShippingMethod(item.id, val as ShippingMethod)}>
+                                                        {hasDirectShipping && (
+                                                            <Label className="flex items-start gap-4 rounded-md border p-3 cursor-pointer has-[:checked]:border-foreground">
+                                                                <RadioGroupItem value="direct" id={`direct-${item.id}`}/>
+                                                                <div className="w-full">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <p className="font-semibold flex items-center gap-2"><Truck className="h-5 w-5"/>Direct Shipping</p>
+                                                                        <p className="font-semibold">{currencyFormatter(item.directShippingFee)}</p>
+                                                                    </div>
+                                                                    <p className="text-sm text-muted-foreground ml-7">Shipping fee</p>
                                                                 </div>
-                                                                <p className="text-sm text-muted-foreground ml-7">Shipping fee</p>
+                                                            </Label>
+                                                        )}
+                                                         <Label className="flex items-start gap-4 rounded-md border p-3 cursor-pointer has-[:checked]:border-foreground">
+                                                            <RadioGroupItem value="authentication" id={`auth-${item.id}`}/>
+                                                            <div className="w-full">
+                                                                <p className="font-semibold flex items-center gap-2"><ShieldCheck className="h-5 w-5"/>Authentication & quality control</p>
+                                                                <div className="flex items-center justify-between ml-7">
+                                                                    <p className="text-sm text-muted-foreground">Authentication & quality control</p>
+                                                                    <p className="text-sm font-semibold">{item.authenticationFee > 0 ? currencyFormatter(item.authenticationFee) : 'Included'}</p>
+                                                                </div>
+                                                                <div className="flex items-center justify-between ml-7">
+                                                                    <p className="text-sm text-muted-foreground">Shipping fee</p>
+                                                                    <p className="text-sm font-semibold">{currencyFormatter(item.authShippingFee)}</p>
+                                                                </div>
                                                             </div>
                                                         </Label>
-                                                    )}
-                                                     <Label className="flex items-start gap-4 rounded-md border p-3 cursor-pointer has-[:checked]:border-foreground">
-                                                        <RadioGroupItem value="authentication" id={`auth-${item.id}`}/>
-                                                        <div className="w-full">
-                                                            <p className="font-semibold flex items-center gap-2"><ShieldCheck className="h-5 w-5"/>Authentication & quality control</p>
-                                                            <div className="flex items-center justify-between ml-7">
-                                                                <p className="text-sm text-muted-foreground">Authentication & quality control</p>
-                                                                <p className="text-sm font-semibold">{item.authenticationFee > 0 ? currencyFormatter(item.authenticationFee) : 'Included'}</p>
-                                                            </div>
-                                                            <div className="flex items-center justify-between ml-7">
-                                                                <p className="text-sm text-muted-foreground">Shipping fee</p>
-                                                                <p className="text-sm font-semibold">{currencyFormatter(item.authShippingFee)}</p>
-                                                            </div>
+                                                    </RadioGroup>
+                                                    <Button variant="link" className="text-muted-foreground h-auto p-0 text-sm" onClick={() => cart.removeFromCart(item.id)}>Delete item</Button>
+                                                    {index < items.length - 1 && <Separator />}
+                                                </React.Fragment>
+                                            )
+                                        })}
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
+                        <Button className="w-full" variant="outline" size="lg" onClick={() => setStep(2)}>Confirm step</Button>
+                    </section>
+                ) : (
+                     <Card>
+                        <CardHeader className="flex-row items-center justify-between p-4 border-b">
+                            <h2 className="text-lg font-semibold">1. Bag</h2>
+                            <Button variant="ghost" onClick={() => setStep(1)}><Edit className="mr-2 h-4 w-4" />Edit</Button>
+                        </CardHeader>
+                        <CardContent className="space-y-1 p-4">
+                            {cart.items.map(item => (
+                                <p key={item.id} className="text-muted-foreground text-sm">{item.brand}, {item.title}, {item.selectedSize || 'Size M'}</p>
+                            ))}
+                            <p className="flex items-center gap-1 text-sm pt-2"><ShieldCheck className="h-4 w-4 text-green-600" /> Authentication & quality control included</p>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {step > 1 && (
+                    <div className="space-y-6">
+                        {step === 2 ? (
+                            <Card>
+                                <CardHeader className="p-4 border-b">
+                                    <h2 className="text-lg font-semibold flex items-center gap-2">2. Shipping <Info className="h-4 w-4 text-muted-foreground" /></h2>
+                                </CardHeader>
+                                <CardContent className="space-y-6 p-4">
+                                    <RadioGroup defaultValue="homedelivery" className="space-y-4">
+                                        <div className="border rounded-md has-[:checked]:border-primary has-[:checked]:ring-1 has-[:checked]:ring-primary">
+                                            <Label className="flex items-start gap-4 p-4 cursor-pointer">
+                                                <RadioGroupItem value="homedelivery" id="homedelivery" className="mt-1"/>
+                                                <div className="w-full">
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="font-semibold">Home delivery</p>
+                                                        <p className="font-semibold">{currencyFormatter(cart.totalShipping)}</p>
+                                                    </div>
+                                                </div>
+                                            </Label>
+                                            
+                                            {shippingAddress ? (
+                                                <>
+                                                    <Separator />
+                                                    <div className="p-4 ml-9 text-sm space-y-1">
+                                                        <p className="font-semibold">{shippingAddress.fullName}</p>
+                                                        <p className="text-muted-foreground">{shippingAddress.address}</p>
+                                                        <p className="text-muted-foreground">{shippingAddress.city}, {shippingAddress.postal}</p>
+                                                        <p className="text-muted-foreground">{shippingAddress.country}</p>
+                                                        <div className="mt-3">
+                                                            <Button variant="link" className="p-0 h-auto underline text-xs" onClick={handleChangeAddress}>Change Address</Button>
+                                                            <span className="mx-2 text-muted-foreground">|</span>
+                                                            <Button variant="link" className="p-0 h-auto underline text-xs" onClick={handleAddAddress}>Add a new address</Button>
                                                         </div>
-                                                    </Label>
-                                                </RadioGroup>
-                                                <Button variant="link" className="text-muted-foreground h-auto p-0 text-sm" onClick={() => cart.removeFromCart(item.id)}>Delete item</Button>
-                                                {index < items.length - 1 && <Separator />}
-                                            </React.Fragment>
-                                        )
-                                    })}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                 <div className="p-4 ml-9">
+                                                    <Button onClick={handleAddAddress}>Add shipping address</Button>
+                                                 </div>
+                                            )}
+                                        </div>
+                                    </RadioGroup>
+
+                                    <div className="flex items-center space-x-2">
+                                      <Checkbox id="billing-address" defaultChecked />
+                                      <Label htmlFor="billing-address" className="text-sm font-medium leading-none">
+                                        Billing address matches shipping address
+                                      </Label>
+                                    </div>
+
+                                    <Button className="w-full" variant="outline" size="lg" onClick={() => setStep(3)} disabled={!shippingAddress}>Confirm step</Button>
                                 </CardContent>
                             </Card>
-                        )
-                    })}
-                    <Button className="w-full" variant="outline" size="lg" onClick={() => setStep(2)}>Confirm step</Button>
-                </section>
-                
-                <section className={cn("space-y-4", step < 2 && "opacity-40 pointer-events-none")}>
-                    <div className="flex justify-between items-center">
-                        <h2 className="text-2xl font-bold">2. Shipping</h2>
-                         <Button variant="ghost" size="sm" className={cn(step > 1 ? "" : "hidden")}><Edit className="h-4 w-4 mr-2"/>Edit</Button>
+                         ) : (
+                            <Card>
+                                <CardHeader className="flex-row items-center justify-between p-4 border-b">
+                                   <h2 className="text-lg font-semibold">2. Shipping</h2>
+                                    <Button variant="ghost" onClick={() => setStep(2)}><Edit className="mr-2 h-4 w-4" />Edit</Button>
+                                </CardHeader>
+                                <CardContent className="p-4">
+                                   <p className="font-medium text-sm">{shippingAddress?.fullName}</p>
+                                   <p className="text-muted-foreground text-sm">{shippingAddress?.address}, {shippingAddress?.city}</p>
+                                </CardContent>
+                            </Card>
+                         )}
+
+                        <div className={cn(step < 3 && "hidden")}>
+                            {/* Payment and Final summary would go here */}
+                             <Button className="w-full bg-foreground text-background hover:bg-foreground/90" size="lg" disabled={isPlacingOrder} onClick={handlePlaceOrder}>
+                                {isPlacingOrder && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                                Place order
+                            </Button>
+                        </div>
                     </div>
-                    {shippingAddress && (
-                        <p>{shippingAddress.fullName}, {shippingAddress.address}, {shippingAddress.city}</p>
-                    )}
-                </section>
-                
-                <Separator />
-
-                <section className={cn("space-y-4", step < 2 && "opacity-40 pointer-events-none")}>
-                    <div className="flex justify-between items-center">
-                        <h2 className="text-2xl font-bold">3. Payment</h2>
-                        <Button variant="ghost" size="sm"><Edit className="h-4 w-4 mr-2"/>Edit</Button>
-                    </div>
-                </section>
-
-                <Separator />
-                
-                 <Accordion type="single" collapsible defaultValue="summary" className={cn(step < 2 && "opacity-40 pointer-events-none")}>
-                    <AccordionItem value="summary">
-                        <AccordionTrigger className="text-lg font-bold">Order Summary</AccordionTrigger>
-                        <AccordionContent className="space-y-2 pt-2">
-                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">Products price</span>
-                                <span>{currencyFormatter(cart.subtotal)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Authentication & quality control</span>
-                                <span>{currencyFormatter(cart.totalAuthentication)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Shipping fees</span>
-                                <span>{currencyFormatter(cart.totalShipping)}</span>
-                            </div>
-                            <Separator className="my-2"/>
-                            <div className="flex justify-between font-bold text-lg">
-                                <span>Total</span>
-                                <span>{currencyFormatter(cart.grandTotal)}</span>
-                            </div>
-                        </AccordionContent>
-                    </AccordionItem>
-                </Accordion>
-
-                <Button className="w-full bg-foreground text-background hover:bg-foreground/90" size="lg" disabled={step < 2 || isPlacingOrder} onClick={handlePlaceOrder}>
-                    {isPlacingOrder && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                    Place order
-                </Button>
+                )}
             </div>
+
+            <Dialog open={isAddressModalOpen} onOpenChange={setIsAddressModalOpen}>
+                <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{editingAddress ? 'Edit Address' : 'Add New Address'}</DialogTitle>
+                </DialogHeader>
+                {user && (
+                    <AddressForm
+                    userId={user.uid}
+                    addressToEdit={editingAddress}
+                    onSave={() => setIsAddressModalOpen(false)}
+                    />
+                )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
+    
