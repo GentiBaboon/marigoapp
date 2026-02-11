@@ -41,7 +41,7 @@ export const forgotPasswordSchema = z.object({
 
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
-// --- Checkout Schemas ---
+// --- Checkout & Address Schemas ---
 
 export const addressSchema = z.object({
   fullName: z.string().min(2, "Full name is required."),
@@ -53,6 +53,11 @@ export const addressSchema = z.object({
 });
 
 export type AddressFormValues = z.infer<typeof addressSchema>;
+
+export type FirestoreAddress = AddressFormValues & {
+  id: string;
+  isDefault: boolean;
+};
 
 // --- Sell Schemas ---
 export const imageFileSchema = z.object({
