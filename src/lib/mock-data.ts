@@ -12,6 +12,7 @@ export type Product = {
   condition?: 'new' | 'like_new' | 'good' | 'fair';
   size?: string;
   color?: string;
+  sellerLocation?: string;
 };
 
 export type SimilarSoldItem = {
@@ -56,6 +57,13 @@ export type Category = {
   name: string;
   slug: string;
 };
+
+export const shopByCategory = [
+  { id: '1', name: 'Clothing', slug: 'clothing', image: 'category-clothing' },
+  { id: '2', name: 'Shoes', slug: 'shoes', image: 'category-shoes' },
+  { id: '3', name: 'Watches', slug: 'watches', image: 'category-watch' },
+  { id: '4', name: 'Accessories', slug: 'accessories', image: 'category-accessories' },
+];
 
 export const categories: Category[] = [
   { id: '1', name: 'Women', slug: 'women' },
@@ -158,6 +166,8 @@ export const brands = [
     { name: 'Max Mara', slug: 'max-mara' },
     { name: 'Zimmermann', slug: 'zimmermann' },
     { name: 'Acne Studios', slug: 'acne-studios' },
+    { name: 'MAISON MARTIN MARGIELA', slug: 'maison-martin-margiela'},
+    { name: 'ZEGNA', slug: 'zegna' },
 ];
 
 export const productConditions = [
@@ -217,7 +227,9 @@ export const newArrivals: Product[] = [
     title: 'Leather Biker Jacket',
     price: 3200,
     image: 'product-9',
-    sellerId: 'seller-4'
+    sellerId: 'seller-4',
+    size: 'M',
+    sellerLocation: 'France'
   },
   {
     id: '10',
@@ -225,7 +237,9 @@ export const newArrivals: Product[] = [
     title: 'Triple S Trainers',
     price: 750,
     image: 'product-10',
-    sellerId: 'seller-5'
+    sellerId: 'seller-5',
+    size: '42 EU',
+    sellerLocation: 'Spain'
   },
   {
     id: '11',
@@ -233,7 +247,9 @@ export const newArrivals: Product[] = [
     title: 'Submariner Watch',
     price: 12500,
     image: 'product-11',
-    sellerId: 'seller-6'
+    sellerId: 'seller-6',
+    size: '41mm',
+    sellerLocation: 'Switzerland'
   },
   {
     id: '12',
@@ -241,7 +257,9 @@ export const newArrivals: Product[] = [
     title: 'Classic Check Scarf',
     price: 350,
     image: 'product-12',
-    sellerId: 'seller-7'
+    sellerId: 'seller-7',
+    size: 'One Size',
+    sellerLocation: 'United Kingdom'
   },
   {
     id: '13',
@@ -249,7 +267,9 @@ export const newArrivals: Product[] = [
     title: 'Snowdon Sunglasses',
     price: 280,
     image: 'product-13',
-    sellerId: 'seller-8'
+    sellerId: 'seller-8',
+    size: 'One Size',
+    sellerLocation: 'USA'
   },
   {
     id: '14',
@@ -257,7 +277,9 @@ export const newArrivals: Product[] = [
     title: 'Manuela Wool Coat',
     price: 1500,
     image: 'product-14',
-    sellerId: 'seller-9'
+    sellerId: 'seller-9',
+    size: 'L',
+    sellerLocation: 'Italy'
   },
   {
     id: '15',
@@ -265,7 +287,9 @@ export const newArrivals: Product[] = [
     title: 'Postcard Silk Dress',
     price: 650,
     image: 'product-15',
-    sellerId: 'seller-10'
+    sellerId: 'seller-10',
+    size: 'S',
+    sellerLocation: 'Australia'
   },
   {
     id: '16',
@@ -273,7 +297,9 @@ export const newArrivals: Product[] = [
     title: 'Trio Crossbody Bag',
     price: 980,
     image: 'product-16',
-    sellerId: 'seller-11'
+    sellerId: 'seller-11',
+    size: 'Small',
+    sellerLocation: 'France'
   },
   {
     id: '17',
@@ -281,7 +307,9 @@ export const newArrivals: Product[] = [
     title: 'GG Marmont Belt',
     price: 420,
     image: 'product-17',
-    sellerId: 'seller-12'
+    sellerId: 'seller-12',
+    size: '85',
+    sellerLocation: 'Italy'
   },
   {
     id: '18',
@@ -289,7 +317,9 @@ export const newArrivals: Product[] = [
     title: '1996 Denim Jeans',
     price: 250,
     image: 'product-18',
-    sellerId: 'seller-13'
+    sellerId: 'seller-13',
+    size: '32/32',
+    sellerLocation: 'Sweden'
   },
   {
     id: '1',
@@ -298,7 +328,9 @@ export const newArrivals: Product[] = [
     price: 8200,
     originalPrice: 9000,
     image: 'product-1',
-    sellerId: 'seller-1'
+    sellerId: 'seller-1',
+    size: 'Medium',
+    sellerLocation: 'France'
   },
   {
     id: '2',
@@ -306,7 +338,9 @@ export const newArrivals: Product[] = [
     title: 'Horsebit 1955 Shoulder Bag',
     price: 2500,
     image: 'product-2',
-    sellerId: 'seller-2'
+    sellerId: 'seller-2',
+    size: 'Medium',
+    sellerLocation: 'Italy'
   },
   {
     id: '3',
@@ -314,7 +348,9 @@ export const newArrivals: Product[] = [
     title: 'Re-Nylon Bucket Hat',
     price: 550,
     image: 'product-3',
-    sellerId: 'seller-1'
+    sellerId: 'seller-1',
+    size: 'M',
+    sellerLocation: 'Italy'
   },
   {
     id: '4',
@@ -323,28 +359,43 @@ export const newArrivals: Product[] = [
     price: 990,
     originalPrice: 1100,
     image: 'product-4',
-    sellerId: 'seller-3'
+    sellerId: 'seller-3',
+    size: '38 IT',
+    sellerLocation: 'France'
   },
 ];
 
 export const trendingProducts: Product[] = [
   {
-    id: '5',
-    brand: 'Louis Vuitton',
-    title: 'Neverfull MM',
-    price: 1800,
-    image: 'product-5',
-    sellerId: 'seller-2'
+    id: 'vetements-1',
+    brand: 'VETEMENTS',
+    title: 'Sweatshirt',
+    price: 489,
+    originalPrice: 511,
+    image: 'trending-vetements',
+    sellerId: 'seller-1',
+    size: 'XS International',
+    sellerLocation: 'Italy'
   },
-  { id: '6', brand: 'Hermès', title: 'Oran Sandal', price: 660, image: 'product-6', sellerId: 'seller-3' },
   {
-    id: '7',
-    brand: 'Bottega Veneta',
-    title: 'Mini Jodie',
-    price: 2100,
-    originalPrice: 2500,
-    image: 'product-7',
-    sellerId: 'seller-1'
+    id: 'margiela-1',
+    brand: 'MAISON MARTIN MARGIELA',
+    title: 'Pull',
+    price: 101,
+    image: 'trending-margiela',
+    sellerId: 'seller-2',
+    size: 'S International',
+    sellerLocation: 'Italy'
+  },
+  {
+    id: 'zegna-1',
+    brand: 'ZEGNA',
+    title: 'Wool jacket',
+    price: 3300,
+    image: 'trending-zegna',
+    sellerId: 'seller-3',
+    size: '48 IT',
+    sellerLocation: 'Greece'
   },
   {
     id: '8',
@@ -352,7 +403,9 @@ export const trendingProducts: Product[] = [
     title: 'Kate Chain Wallet',
     price: 1550,
     image: 'product-8',
-    sellerId: 'seller-2'
+    sellerId: 'seller-2',
+    size: 'Small',
+    sellerLocation: 'France'
   },
 ];
 
@@ -364,7 +417,9 @@ export const outletProducts: Product[] = [
     price: 750,
     originalPrice: 1100,
     image: 'product-4',
-    sellerId: 'seller-3'
+    sellerId: 'seller-3',
+    size: '38 IT',
+    sellerLocation: 'France'
   },
   {
     id: '7',
@@ -373,7 +428,9 @@ export const outletProducts: Product[] = [
     price: 1800,
     originalPrice: 2500,
     image: 'product-7',
-    sellerId: 'seller-1'
+    sellerId: 'seller-1',
+    size: 'Mini',
+    sellerLocation: 'Italy'
   },
   {
     id: '1',
@@ -382,7 +439,9 @@ export const outletProducts: Product[] = [
     price: 7000,
     originalPrice: 9000,
     image: 'product-1',
-    sellerId: 'seller-1'
+    sellerId: 'seller-1',
+    size: 'Medium',
+    sellerLocation: 'France'
   },
   {
     id: '5',
@@ -391,7 +450,9 @@ export const outletProducts: Product[] = [
     price: 1500,
     originalPrice: 1900,
     image: 'product-5',
-    sellerId: 'seller-2'
+    sellerId: 'seller-2',
+    size: 'MM',
+    sellerLocation: 'France'
   },
 ];
 
@@ -501,3 +562,5 @@ export const mockMessages = {
         { id: 'msg-4', senderId: 'user-A', content: 'Ok, thank you!', createdAt: { seconds: Date.now() / 1000 - 86400, nanoseconds: 0 } },
     ]
 } as Record<string, FirestoreMessage[]>;
+
+    

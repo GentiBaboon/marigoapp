@@ -1,126 +1,87 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from '@/components/ui/carousel';
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/product-card';
-import {
-  categories,
-  trendingProducts,
-  outletProducts,
-} from '@/lib/mock-data';
+import { shopByCategory, trendingProducts } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { NewArrivalsSection } from '@/components/home/NewArrivalsSection';
+import { Info } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function HomePage() {
-  const bannerImages = PlaceHolderImages.filter((p) =>
-    p.id.startsWith('banner-')
-  );
-
   return (
-    <div className="flex flex-col">
-      <section className="w-full">
-        <Carousel
-          opts={{
-            loop: true,
-          }}
-          className="w-full"
-        >
-          <CarouselContent>
-            {bannerImages.map((image) => (
-              <CarouselItem key={image.id}>
-                <div className="relative h-64 md:h-[500px] w-full">
-                  <Image
-                    src={image.imageUrl}
-                    alt={image.description}
-                    data-ai-hint={image.imageHint}
-                    fill
-                    className="object-cover"
-                    priority
-                  />
-                </div>
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-          <CarouselPrevious className="absolute left-4 hidden md:flex" />
-          <CarouselNext className="absolute right-4 hidden md:flex" />
-        </Carousel>
-      </section>
+    <div className="flex flex-col bg-background">
+      <Alert className="w-full text-center rounded-none border-x-0 border-t-0 bg-amber-100 border-amber-200 text-amber-900">
+        <div className="container mx-auto flex items-center justify-center p-2 relative">
+          <div>
+            <AlertTitle className="font-bold">You've Earned 20% Off</AlertTitle>
+            <AlertDescription className="text-sm">
+              Save on orders 100€+ as a gift for selling with us. Code: FIRSTVC
+            </AlertDescription>
+          </div>
+          <Info className="h-4 w-4 absolute right-4 top-1/2 -translate-y-1/2" />
+        </div>
+      </Alert>
 
-      <div className="container mx-auto px-4 py-8 md:py-12">
-        <section className="mb-12">
-          <h2 className="text-2xl md:text-3xl font-headline font-bold mb-6 text-center">
+      <div className="container mx-auto px-4 py-8 md:py-12 space-y-12">
+        <section>
+          <h2 className="text-xl md:text-2xl font-serif mb-6">
             Shop by Category
           </h2>
-          <div className="relative">
-            <div className="flex space-x-4 overflow-x-auto pb-4 [-ms-overflow-style:none] [scrollbar-width:none]">
-              <div className="flex-shrink-0 w-2 md:w-0"></div>
-              {categories.map((category) => (
-                <Button
-                  asChild
-                  variant="outline"
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {shopByCategory.map((category) => {
+              const imageData = PlaceHolderImages.find(
+                (p) => p.id === category.image
+              );
+              return (
+                <Link
+                  href={`/browse?category=${category.slug}`}
                   key={category.id}
-                  className="flex-shrink-0 rounded-full"
-                  size="lg"
+                  className="group text-center"
                 >
-                  <Link href={`/browse?category=${category.slug}`}>
+                  <div className="relative aspect-square w-full overflow-hidden bg-muted mb-2">
+                    {imageData && (
+                      <Image
+                        src={imageData.imageUrl}
+                        alt={category.name}
+                        fill
+                        sizes="(max-width: 768px) 50vw, 25vw"
+                        className="object-contain p-4 transition-transform duration-300 group-hover:scale-105"
+                        data-ai-hint={imageData.imageHint}
+                      />
+                    )}
+                  </div>
+                  <p className="font-semibold uppercase tracking-wider text-xs">
                     {category.name}
-                  </Link>
-                </Button>
-              ))}
-              <div className="flex-shrink-0 w-2 md:w-0"></div>
-            </div>
-            <div className="absolute top-0 bottom-0 left-0 w-8 bg-gradient-to-r from-background to-transparent pointer-events-none"></div>
-            <div className="absolute top-0 bottom-0 right-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none"></div>
-          </div>
-        </section>
-
-        <section className="mb-12">
-          <h2 className="text-2xl md:text-3xl font-headline font-bold mb-6">
-            New Arrivals
-          </h2>
-          <NewArrivalsSection />
-        </section>
-
-        <section className="mb-12">
-          <h2 className="text-2xl md:text-3xl font-headline font-bold mb-6">
-            Trending Now
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {trendingProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+                  </p>
+                </Link>
+              );
+            })}
           </div>
         </section>
 
         <section>
-          <div className="bg-muted/50 rounded-lg p-6 md:p-10">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl md:text-4xl font-headline font-bold text-primary">
-                The Outlet
-              </h2>
-              <p className="text-muted-foreground mt-2">
-                Unbeatable prices on last season's treasures. Up to 70% off.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-              {outletProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-            <div className="text-center mt-8">
-              <Button asChild size="lg">
-                <Link href="/browse?section=outlet">Shop All Outlet</Link>
-              </Button>
-            </div>
+          <h2 className="text-xl md:text-2xl font-serif mb-6">
+            Now Trending
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-8">
+            {trendingProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+          <div className="text-center mt-8">
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="rounded-full px-12"
+            >
+              <Link href="/browse?section=trending">View all</Link>
+            </Button>
           </div>
         </section>
       </div>
     </div>
   );
 }
+
+    

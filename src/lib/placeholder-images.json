@@ -25,22 +25,46 @@
       "imageHint": "fashion community"
     },
     {
-      "id": "banner-1",
-      "description": "Luxury store front",
-      "imageUrl": "https://images.unsplash.com/photo-1526745925052-dd824d27b9ab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjByZXRhaWx8ZW58MHx8fHwxNzcwODI2MDg4fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "luxury retail"
+      "id": "category-clothing",
+      "description": "A yellow jacket on a white background",
+      "imageUrl": "https://images.unsplash.com/photo-1720457148840-f69a762729d6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx5ZWxsb3clMjBqYWNrZXR8ZW58MHx8fHwxNzcwODUzMDkxfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "yellow jacket"
     },
     {
-      "id": "banner-2",
-      "description": "Fashion runway show",
-      "imageUrl": "https://images.unsplash.com/photo-1554881070-74595ca2b74c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxmYXNoaW9uJTIwc2hvd3xlbnwwfHx8fDE3NzA3NjE3ODd8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "fashion show"
+      "id": "category-shoes",
+      "description": "A pair of white sneakers on a white background",
+      "imageUrl": "https://images.unsplash.com/photo-1591300424743-f601d8b0031a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHx3aGl0ZSUyMHNuZWFrZXJzfGVufDB8fHx8MTc3MDgyNTczN3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "white sneakers"
     },
     {
-      "id": "banner-3",
-      "description": "Collection of luxury bags",
-      "imageUrl": "https://images.unsplash.com/photo-1590739225287-bd31519780c3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxsdXh1cnklMjBiYWdzfGVufDB8fHx8MTc3MDgyNjA4OHww&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "luxury bags"
+      "id": "category-watch",
+      "description": "A luxury watch on a white background",
+      "imageUrl": "https://images.unsplash.com/photo-1600003014608-c2ccc1570a65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxsdXh1cnklMjB3YXRjaHxlbnwwfHx8fDE3NzA3OTk2NTJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "luxury watch"
+    },
+    {
+      "id": "category-accessories",
+      "description": "A gold and black bracelet on a white background",
+      "imageUrl": "https://images.unsplash.com/photo-1633810543462-77c4a3b13f07?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxnb2xkJTIwYnJhY2VsZXR8ZW58MHx8fHwxNzcwODM2NjQwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "gold bracelet"
+    },
+    {
+      "id": "trending-vetements",
+      "description": "A red Vetements hoodie on a white background",
+      "imageUrl": "https://images.unsplash.com/photo-1614574197860-15eb761f6480?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxyZWQlMjBob29kaWV8ZW58MHx8fHwxNzcwODUzMDkwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "red hoodie"
+    },
+    {
+      "id": "trending-margiela",
+      "description": "A black Maison Martin Margiela cardigan on a white background",
+      "imageUrl": "https://images.unsplash.com/photo-1746363077223-68080a281f7f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxibGFjayUyMGNhcmRpZ2FufGVufDB8fHx8MTc3MDg1MzA5MHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "black cardigan"
+    },
+    {
+      "id": "trending-zegna",
+      "description": "A dark Zegna wool jacket on a white background",
+      "imageUrl": "https://images.unsplash.com/photo-1579419833240-d70be757967a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8d29vbCUyMGphY2tldHxlbnwwfHx8fDE3NzA4NTMwOTF8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "wool jacket"
     },
     {
       "id": "product-1",

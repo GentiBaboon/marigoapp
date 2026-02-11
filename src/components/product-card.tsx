@@ -1,8 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart } from 'lucide-react';
+import { Heart, Leaf } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import type { Product } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
@@ -13,13 +12,19 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
-  const currencyFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+  const currencyFormatter = (value: number) =>
+    new Intl.NumberFormat('de-DE', {
+      style: 'currency',
+      currency: 'EUR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
 
   let imageUrl: string | undefined;
   let imageHint: string | undefined;
 
-  // Check if image is a full URL (from firestore) or an ID (from mock data)
-  const isUrl = product.image?.startsWith('http') || product.image?.startsWith('data:');
+  const isUrl =
+    product.image?.startsWith('http') || product.image?.startsWith('data:');
 
   if (isUrl) {
     imageUrl = product.image;
@@ -32,60 +37,58 @@ export function ProductCard({ product, className }: ProductCardProps) {
   }
 
   return (
-    <Card
-      className={cn(
-        'overflow-hidden rounded-lg border-border/60 shadow-sm hover:shadow-xl transition-shadow duration-300 group',
-        className
-      )}
-    >
-      <CardContent className="p-0">
-        <div className="relative">
-          <Link href={`/products/${product.id}`} className="block">
-            <div className="relative aspect-square w-full overflow-hidden">
-              {imageUrl ? (
-                <Image
-                  src={imageUrl}
-                  alt={product.title}
-                  fill
-                  sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                  className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  data-ai-hint={imageHint}
-                />
-              ) : (
-                <div className="aspect-square w-full bg-muted" />
-              )}
-            </div>
-          </Link>
+    <div className={cn('group', className)}>
+      <Link href={`/products/${product.id}`} className="block mb-2">
+        <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
+          {imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt={product.title}
+              fill
+              sizes="(max-width: 768px) 50vw, 33vw"
+              className="object-cover"
+              data-ai-hint={imageHint}
+            />
+          ) : (
+            <div className="aspect-square w-full bg-muted" />
+          )}
+        </div>
+      </Link>
+      <div className="px-1">
+        <div className="flex justify-between items-start">
+          <div className="text-sm">
+            <p className="font-bold uppercase">{product.brand}</p>
+            <p className="text-muted-foreground">{product.title}</p>
+            <p className="text-muted-foreground">{product.size}</p>
+          </div>
           <Button
-            variant="secondary"
+            variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white text-muted-foreground hover:text-destructive"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
             aria-label="Add to wishlist"
           >
-            <Heart className="h-4 w-4" />
+            <Heart className="h-5 w-5" />
           </Button>
         </div>
-        <div className="p-3 md:p-4 space-y-2">
-          <Link href={`/products/${product.id}`} className="space-y-1">
-            <p className="text-sm font-semibold text-muted-foreground truncate">
-              {product.brand}
+        <div className="mt-2">
+          {product.originalPrice && (
+            <p className="text-sm text-muted-foreground line-through">
+              {currencyFormatter(product.originalPrice)}
             </p>
-            <h3 className="font-medium text-foreground truncate">
-              {product.title}
-            </h3>
-          </Link>
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <p className="text-lg font-bold text-destructive">
-              {currencyFormatter.format(product.price)}
-            </p>
-            {product.originalPrice && (
-              <p className="text-sm text-muted-foreground line-through">
-                {currencyFormatter.format(product.originalPrice)}
-              </p>
-            )}
-          </div>
+          )}
+          <p className="font-semibold text-red-600">
+            {currencyFormatter(product.price)}
+          </p>
+          {product.sellerLocation && (
+            <div className="flex items-center text-sm text-muted-foreground mt-1">
+              <Leaf className="h-3 w-3 mr-1" />
+              <span>{product.sellerLocation}</span>
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
+
+    
