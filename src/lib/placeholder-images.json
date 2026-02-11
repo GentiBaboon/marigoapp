@@ -107,6 +107,66 @@
       "description": "Pink handbag",
       "imageUrl": "https://images.unsplash.com/photo-1683921590274-a83862cb11c3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxwaW5rJTIwaGFuZGJhZ3xlbnwwfHx8fDE3NzA3MzcxNTR8MA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "pink handbag"
+    },
+    {
+      "id": "product-9",
+      "description": "A stylish leather jacket",
+      "imageUrl": "https://images.unsplash.com/photo-1578198576866-7e0ba6078128?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxsZWF0aGVyJTIwamFja2V0fGVufDB8fHx8MTc3MDgzNTA4MHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "leather jacket"
+    },
+    {
+      "id": "product-10",
+      "description": "A pair of trendy sneakers",
+      "imageUrl": "https://images.unsplash.com/photo-1770528713866-f1e5f9b0cc25?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHx0cmVuZHklMjBzbmVha2Vyc3xlbnwwfHx8fDE3NzA4NTI2MzR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "trendy sneakers"
+    },
+    {
+      "id": "product-11",
+      "description": "A luxury watch",
+      "imageUrl": "https://images.unsplash.com/photo-1600003014608-c2ccc1570a65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxsdXh1cnklMjB3YXRjaHxlbnwwfHx8fDE3NzA3OTk2NTJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "luxury watch"
+    },
+    {
+      "id": "product-12",
+      "description": "A designer scarf",
+      "imageUrl": "https://images.unsplash.com/photo-1770394644050-a68b0dc77e0e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxkZXNpZ25lciUyMHNjYXJmfGVufDB8fHx8MTc3MDg1MjYzNHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "designer scarf"
+    },
+    {
+      "id": "product-13",
+      "description": "A pair of sunglasses",
+      "imageUrl": "https://images.unsplash.com/photo-1608539733292-190446b22b83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxzdW5nbGFzc2VzfGVufDB8fHx8MTc3MDgzNTUwNHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "sunglasses"
+    },
+    {
+      "id": "product-14",
+      "description": "A wool coat",
+      "imageUrl": "https://images.unsplash.com/photo-1765099271937-b56f29e7679f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHx3b29sJTIwY29hdHxlbnwwfHx8fDE3NzA3NzgyOTd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "wool coat"
+    },
+    {
+      "id": "product-15",
+      "description": "A silk dress",
+      "imageUrl": "https://images.unsplash.com/photo-1742794572842-6836a8d0b11b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxzaWxrJTIwZHJlc3N8ZW58MHx8fHwxNzcwODUyNjM0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "silk dress"
+    },
+    {
+      "id": "product-16",
+      "description": "A crossbody bag",
+      "imageUrl": "https://images.unsplash.com/photo-1709899098146-378a8057a441?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxjcm9zc2JvZHklMjBiYWd8ZW58MHx8fHwxNzcwODUyNjM0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "crossbody bag"
+    },
+    {
+      "id": "product-17",
+      "description": "A leather belt",
+      "imageUrl": "https://images.unsplash.com/photo-1637868796504-32f45a96d5a0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxsZWF0aGVyJTIwYmVsdHxlbnwwfHx8fDE3NzA3OTQwNTB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "leather belt"
+    },
+    {
+      "id": "product-18",
+      "description": "A pair of denim jeans",
+      "imageUrl": "https://images.unsplash.com/photo-1714143136372-ddaf8b606da7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxkZW5pbSUyMGplYW5zfGVufDB8fHx8MTc3MDc3ODI5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "denim jeans"
     }
   ]
 }

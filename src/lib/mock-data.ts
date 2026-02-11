@@ -33,6 +33,16 @@ export const sellers: Seller[] = [
     { id: 'seller-1', username: 'smoke_laughter_gigi', avatar: 'https://picsum.photos/seed/seller1/40/40' },
     { id: 'seller-2', username: 'bertolino34307352', avatar: 'https://picsum.photos/seed/seller2/40/40' },
     { id: 'seller-3', username: 'fashion_maven', avatar: 'https://picsum.photos/seed/seller3/40/40' },
+    { id: 'seller-4', username: 'vintage_vibes', avatar: 'https://picsum.photos/seed/seller4/40/40' },
+    { id: 'seller-5', username: 'luxe_resale', avatar: 'https://picsum.photos/seed/seller5/40/40' },
+    { id: 'seller-6', username: 'style_cycler', avatar: 'https://picsum.photos/seed/seller6/40/40' },
+    { id: 'seller-7', username: 'closet_curator', avatar: 'https://picsum.photos/seed/seller7/40/40' },
+    { id: 'seller-8', username: 'designer_deals', avatar: 'https://picsum.photos/seed/seller8/40/40' },
+    { id: 'seller-9', username: 'secondhand_chic', avatar: 'https://picsum.photos/seed/seller9/40/40' },
+    { id: 'seller-10', username: 'preloved_luxe', avatar: 'https://picsum.photos/seed/seller10/40/40' },
+    { id: 'seller-11', username: 'trend_reviver', avatar: 'https://picsum.photos/seed/seller11/40/40' },
+    { id: 'seller-12', username: 'archive_fashion', avatar: 'https://picsum.photos/seed/seller12/40/40' },
+    { id: 'seller-13', username: 'gentis_closet', avatar: 'https://picsum.photos/seed/seller13/40/40' },
 ];
 
 
@@ -141,6 +151,13 @@ export const brands = [
     { name: 'Lacoste', slug: 'lacoste' },
     { name: 'VETEMENTS', slug: 'vetements' },
     { name: 'LORO PIANA', slug: 'loro-piana' },
+    { name: 'Balenciaga', slug: 'balenciaga' },
+    { name: 'Rolex', slug: 'rolex' },
+    { name: 'Burberry', slug: 'burberry' },
+    { name: 'Tom Ford', slug: 'tom-ford' },
+    { name: 'Max Mara', slug: 'max-mara' },
+    { name: 'Zimmermann', slug: 'zimmermann' },
+    { name: 'Acne Studios', slug: 'acne-studios' },
 ];
 
 export const productConditions = [
@@ -194,6 +211,86 @@ export const clothingSizes = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'One Size
 
 
 export const newArrivals: Product[] = [
+  {
+    id: '9',
+    brand: 'Saint Laurent',
+    title: 'Leather Biker Jacket',
+    price: 3200,
+    image: 'product-9',
+    sellerId: 'seller-4'
+  },
+  {
+    id: '10',
+    brand: 'Balenciaga',
+    title: 'Triple S Trainers',
+    price: 750,
+    image: 'product-10',
+    sellerId: 'seller-5'
+  },
+  {
+    id: '11',
+    brand: 'Rolex',
+    title: 'Submariner Watch',
+    price: 12500,
+    image: 'product-11',
+    sellerId: 'seller-6'
+  },
+  {
+    id: '12',
+    brand: 'Burberry',
+    title: 'Classic Check Scarf',
+    price: 350,
+    image: 'product-12',
+    sellerId: 'seller-7'
+  },
+  {
+    id: '13',
+    brand: 'Tom Ford',
+    title: 'Snowdon Sunglasses',
+    price: 280,
+    image: 'product-13',
+    sellerId: 'seller-8'
+  },
+  {
+    id: '14',
+    brand: 'Max Mara',
+    title: 'Manuela Wool Coat',
+    price: 1500,
+    image: 'product-14',
+    sellerId: 'seller-9'
+  },
+  {
+    id: '15',
+    brand: 'Zimmermann',
+    title: 'Postcard Silk Dress',
+    price: 650,
+    image: 'product-15',
+    sellerId: 'seller-10'
+  },
+  {
+    id: '16',
+    brand: 'Celine',
+    title: 'Trio Crossbody Bag',
+    price: 980,
+    image: 'product-16',
+    sellerId: 'seller-11'
+  },
+  {
+    id: '17',
+    brand: 'Gucci',
+    title: 'GG Marmont Belt',
+    price: 420,
+    image: 'product-17',
+    sellerId: 'seller-12'
+  },
+  {
+    id: '18',
+    brand: 'Acne Studios',
+    title: '1996 Denim Jeans',
+    price: 250,
+    image: 'product-18',
+    sellerId: 'seller-13'
+  },
   {
     id: '1',
     brand: 'Chanel',
