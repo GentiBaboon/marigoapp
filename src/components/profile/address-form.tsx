@@ -8,6 +8,7 @@ import { doc, addDoc, updateDoc, collection } from 'firebase/firestore';
 
 import { useFirestore } from '@/firebase';
 import { addressSchema, type AddressFormValues, type FirestoreAddress } from '@/lib/types';
+import { countries, type Country } from '@/lib/countries';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +21,15 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
+import { Separator } from '../ui/separator';
 
 interface AddressFormProps {
   userId: string;
@@ -32,9 +42,18 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
   const firestore = useFirestore();
   const { toast } = useToast();
 
+  const [selectedCountry, setSelectedCountry] = React.useState<Country | undefined>();
+  const [phoneCode, setPhoneCode] = React.useState<string | undefined>();
+  const [phoneNumber, setPhoneNumber] = React.useState('');
+
+  const sortedCountriesByPhoneCode = React.useMemo(
+    () => [...countries].sort((a, b) => b.phone.length - a.phone.length),
+    []
+  );
+
   const form = useForm<AddressFormValues>({
     resolver: zodResolver(addressSchema),
-    defaultValues: addressToEdit || {
+    defaultValues: {
       fullName: '',
       phone: '',
       address: '',
@@ -43,17 +62,33 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
       country: '',
     },
   });
-  
+
   React.useEffect(() => {
-      form.reset(addressToEdit || {
-        fullName: '',
-        phone: '',
-        address: '',
-        city: '',
-        postal: '',
-        country: '',
-      });
-  }, [addressToEdit, form]);
+    if (addressToEdit) {
+      form.reset(addressToEdit);
+      const country = countries.find(c => c.name === addressToEdit.country);
+      setSelectedCountry(country);
+      
+      const foundCountry = sortedCountriesByPhoneCode.find(c => addressToEdit.phone.startsWith(c.phone));
+      if (foundCountry) {
+        setPhoneCode(foundCountry.phone);
+        setPhoneNumber(addressToEdit.phone.substring(foundCountry.phone.length));
+      } else {
+        setPhoneNumber(addressToEdit.phone);
+      }
+    } else {
+        form.reset({
+          fullName: '', phone: '', address: '', city: '', postal: '', country: '',
+        });
+        setSelectedCountry(undefined);
+        setPhoneCode(undefined);
+        setPhoneNumber('');
+    }
+  }, [addressToEdit, form, sortedCountriesByPhoneCode]);
+
+  React.useEffect(() => {
+    form.setValue('phone', `${phoneCode || ''}${phoneNumber}`);
+  }, [phoneCode, phoneNumber, form]);
 
   async function onSubmit(data: AddressFormValues) {
     if (!firestore) return;
@@ -63,16 +98,14 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
 
     try {
       if (addressToEdit) {
-        // Update existing address
         const addressRef = doc(addressesCollection, addressToEdit.id);
         await updateDoc(addressRef, data);
         toast({ title: 'Address updated successfully.' });
       } else {
-        // Add new address
         await addDoc(addressesCollection, { ...data, isDefault: false });
         toast({ title: 'Address added successfully.' });
       }
-      onSave(); // Close dialog
+      onSave();
     } catch (error) {
       console.error('Error saving address:', error);
       toast({
@@ -85,6 +118,19 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
     }
   }
 
+  const handleCountryChange = (countryName: string) => {
+    const country = countries.find(c => c.name === countryName);
+    setSelectedCountry(country);
+    form.setValue('country', countryName, { shouldValidate: true });
+    form.setValue('city', '', { shouldValidate: true }); // Reset city
+    if (country) {
+      setPhoneCode(country.phone);
+    }
+  };
+
+  const countryItems = countries.map(c => ({ value: c.name, label: c.name }));
+  const cityItems = selectedCountry?.cities.map(c => ({ value: c.name, label: c.name })) || [];
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
@@ -95,25 +141,38 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
             <FormItem>
               <FormLabel>Full Name</FormLabel>
               <FormControl>
-                <Input placeholder="e.g. John Doe" {...field} />
+                <Input placeholder="e.g. Genti Selenica" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Phone Number</FormLabel>
-              <FormControl>
-                <Input placeholder="+1 234 567 890" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <FormItem>
+            <FormLabel>Phone Number</FormLabel>
+            <div className="flex items-start gap-2">
+                <Select value={phoneCode} onValueChange={setPhoneCode}>
+                    <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="Code" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {countries.map((country) => (
+                        <SelectItem key={country.code} value={country.phone}>
+                            <span className="flex items-center gap-2">{country.flag} {country.code}</span>
+                        </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <div className="w-full">
+                    <Input 
+                        placeholder="e.g. 67700900" 
+                        value={phoneNumber} 
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                    />
+                    <FormMessage className="mt-2">{form.formState.errors.phone?.message}</FormMessage>
+                </div>
+            </div>
+        </FormItem>
+
         <FormField
           control={form.control}
           name="address"
@@ -121,26 +180,54 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
             <FormItem>
               <FormLabel>Street Address</FormLabel>
               <FormControl>
-                <Input placeholder="123 Main St" {...field} />
+                <Input placeholder="e.g. 123 Main St" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
+        <FormField
+            control={form.control}
+            name="country"
+            render={({ field }) => (
+            <FormItem className="flex flex-col">
+                <FormLabel>Country</FormLabel>
+                <FormControl>
+                    <Combobox
+                        value={field.value}
+                        onValueChange={handleCountryChange}
+                        items={countryItems}
+                        placeholder="Select country"
+                        searchPlaceholder="Search countries..."
+                        emptyPlaceholder="No country found."
+                    />
+                </FormControl>
+                <FormMessage />
+            </FormItem>
+            )}
+        />
         <div className="grid grid-cols-2 gap-4">
-          <FormField
+           <FormField
             control={form.control}
             name="city"
             render={({ field }) => (
-              <FormItem>
+                <FormItem className="flex flex-col">
                 <FormLabel>City</FormLabel>
                 <FormControl>
-                  <Input placeholder="New York" {...field} />
+                    <Combobox
+                        value={field.value}
+                        onValueChange={(value) => form.setValue('city', value, { shouldValidate: true })}
+                        items={cityItems}
+                        placeholder="Select city"
+                        searchPlaceholder="Search cities..."
+                        emptyPlaceholder="No city found."
+                        disabled={!selectedCountry}
+                    />
                 </FormControl>
                 <FormMessage />
-              </FormItem>
+                </FormItem>
             )}
-          />
+            />
           <FormField
             control={form.control}
             name="postal"
@@ -148,26 +235,14 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
               <FormItem>
                 <FormLabel>Postal Code</FormLabel>
                 <FormControl>
-                  <Input placeholder="10001" {...field} />
+                  <Input placeholder="e.g. 10001" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-        <FormField
-          control={form.control}
-          name="country"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Country</FormLabel>
-              <FormControl>
-                <Input placeholder="United States" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
