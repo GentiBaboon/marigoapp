@@ -26,8 +26,10 @@ export function Header() {
             <Button variant="ghost" size="icon" aria-label="Notifications">
               <Bell className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" aria-label="Shopping Cart">
-              <ShoppingCart className="h-5 w-5" />
+            <Button asChild variant="ghost" size="icon" aria-label="Shopping Cart">
+              <Link href="/cart">
+                <ShoppingCart className="h-5 w-5" />
+              </Link>
             </Button>
             <UserNav />
           </nav>

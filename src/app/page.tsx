@@ -7,17 +7,13 @@ export default function SplashPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      // Check if onboarding is complete
-      const onboardingComplete = localStorage.getItem('marigo_onboarding_complete');
-      if (onboardingComplete === 'true') {
-        router.replace('/home');
-      } else {
-        router.replace('/language');
-      }
-    }, 3000); // 3-second splash screen
-
-    return () => clearTimeout(timer);
+    // Check if onboarding is complete and redirect immediately
+    const onboardingComplete = localStorage.getItem('marigo_onboarding_complete');
+    if (onboardingComplete === 'true') {
+      router.replace('/home');
+    } else {
+      router.replace('/language');
+    }
   }, [router]);
 
   return (
