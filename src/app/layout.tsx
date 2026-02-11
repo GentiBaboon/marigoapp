@@ -4,6 +4,7 @@ import { Header } from '@/components/header';
 import { MobileNav } from '@/components/mobile-nav';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
+import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
   title: 'MarigoApp',
@@ -34,12 +35,14 @@ export default function RootLayout({
         />
       </head>
       <body className={cn('font-body antialiased')}>
-        <div className="relative flex min-h-screen flex-col">
-          <Header />
-          <main className="flex-1 pb-16 md:pb-0">{children}</main>
-          <MobileNav />
-        </div>
-        <Toaster />
+        <FirebaseClientProvider>
+          <div className="relative flex min-h-screen flex-col">
+            <Header />
+            <main className="flex-1 pb-16 md:pb-0">{children}</main>
+            <MobileNav />
+          </div>
+          <Toaster />
+        </FirebaseClientProvider>
       </body>
     </html>
   );
