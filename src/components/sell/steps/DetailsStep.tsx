@@ -31,7 +31,7 @@ import type { z } from 'zod';
 import { StepActions } from '@/components/sell/StepActions';
 import {
   productConditions,
-  categories,
+  productCategories,
   productMaterials,
   productColors,
   productPatterns,
@@ -55,6 +55,18 @@ export function DetailsStep() {
   const { toast } = useToast();
   const [proofFiles, setProofFiles] = useState<ProofFile[]>(formData.proofOfOrigin || []);
 
+  const getCategoryPath = React.useCallback((slug: string | undefined): string => {
+    if (!slug) return '';
+    for (const mainCategory of productCategories) {
+        for (const subCategory of mainCategory.subcategories) {
+            if (subCategory.slug === slug) {
+                return `${mainCategory.name} / ${subCategory.name}`;
+            }
+        }
+    }
+    return slug; // fallback
+  }, []);
+
   const form = useForm<Step2Values>({
     resolver: zodResolver(sellStep2Schema),
     defaultValues: {
@@ -71,9 +83,28 @@ export function DetailsStep() {
 
   const selectedSizeStandard = form.watch('sizeStandard');
 
-  const isClothing = ['women', 'men', 'children'].includes(formData.category || '');
-  const isShoes = formData.category === 'shoes';
-  const isSizingApplicable = isClothing || isShoes;
+  // Corrected logic to determine if sizing is applicable
+  const { isClothing, isShoes, isSizingApplicable } = React.useMemo(() => {
+    const selectedSubCategorySlug = formData.category;
+    if (!selectedSubCategorySlug) {
+      return { isClothing: false, isShoes: false, isSizingApplicable: false };
+    }
+    
+    let parentCategoryName = '';
+    for (const category of productCategories) {
+        if (category.subcategories.some(sub => sub.slug === selectedSubCategorySlug)) {
+            parentCategoryName = category.name;
+            break;
+        }
+    }
+
+    const isClothing = parentCategoryName === 'Clothing';
+    const isShoes = parentCategoryName === 'Shoes';
+    const isSizingApplicable = isClothing || isShoes;
+
+    return { isClothing, isShoes, isSizingApplicable };
+  }, [formData.category]);
+  
 
   const sizeValues = React.useMemo(() => {
     if (!isSizingApplicable) return [];
@@ -146,7 +177,7 @@ export function DetailsStep() {
         <FormItem>
           <FormLabel>Category</FormLabel>
           <FormControl>
-            <Input readOnly value={formData.category ? categories.find(c => c.slug === formData.category)?.name : ''} />
+            <Input readOnly value={getCategoryPath(formData.category)} />
           </FormControl>
         </FormItem>
 
