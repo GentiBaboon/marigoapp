@@ -40,3 +40,16 @@ export const forgotPasswordSchema = z.object({
 });
 
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
+
+// --- Checkout Schemas ---
+
+export const addressSchema = z.object({
+  fullName: z.string().min(2, "Full name is required."),
+  phone: z.string().min(6, "A valid phone number is required."),
+  address: z.string().min(5, "Street address is required."),
+  city: z.string().min(2, "City is required."),
+  postal: z.string().min(3, "Postal code is required."),
+  country: z.string().min(2, "Country is required."),
+});
+
+export type AddressFormValues = z.infer<typeof addressSchema>;

@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -156,7 +155,9 @@ export default function CartPage() {
                     <span>Total</span>
                     <span>{currencyFormatter.format(total)}</span>
                 </div>
-                <Button className="w-full" size="lg">Continue to Checkout</Button>
+                <Button className="w-full" size="lg" asChild>
+                  <Link href="/checkout">Continue to Checkout</Link>
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -168,7 +169,9 @@ export default function CartPage() {
                  <span className="font-bold text-lg">Total</span>
                  <span className="font-bold text-lg">{currencyFormatter.format(total)}</span>
              </div>
-             <Button className="w-full" size="lg">Continue to Checkout</Button>
+             <Button className="w-full" size="lg" asChild>
+               <Link href="/checkout">Continue to Checkout</Link>
+             </Button>
          </div>
        )}
     </div>

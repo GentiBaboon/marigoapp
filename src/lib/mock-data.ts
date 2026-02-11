@@ -198,3 +198,26 @@ export const cartItems: CartProduct[] = [
     quantity: 1,
   },
 ];
+
+export const savedAddresses = [
+  {
+    id: 'addr-1',
+    fullName: 'Jane Doe',
+    address: 'Rruga e Kavajes, Nd 5, H 3',
+    city: 'Tirana',
+    postal: '1001',
+    country: 'Albania',
+    phone: '+355 69 123 4567',
+    isDefault: true,
+  },
+  {
+    id: 'addr-2',
+    fullName: 'John Doe',
+    address: 'Via del Corso 10',
+    city: 'Rome',
+    postal: '00186',
+    country: 'Italy',
+    phone: '+39 06 1234567',
+    isDefault: false,
+  },
+];
