@@ -1,10 +1,10 @@
 'use server';
 
-import { suggestPrice, SuggestPriceInput } from '@/ai/flows/ai-suggest-price';
+import { suggestPrice, SuggestPriceInput, SuggestPriceOutput } from '@/ai/flows/ai-suggest-price';
 import type { SellFormValues } from '@/lib/types';
 
 
-export async function getPriceSuggestion(data: SuggestPriceInput) {
+export async function getPriceSuggestion(data: SuggestPriceInput): Promise<{ success: boolean; data?: SuggestPriceOutput, error?: string; }> {
   try {
     const result = await suggestPrice(data);
     return { success: true, data: result };

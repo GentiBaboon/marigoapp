@@ -89,6 +89,24 @@
       "description": "A chain wallet bag",
       "imageUrl": "https://images.unsplash.com/photo-1767392060677-9e13bcb85ca8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8Y2hhaW4lMjB3YWxsZXR8ZW58MHx8fHwxNzcwODI2MDg4fDA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "chain wallet"
+    },
+    {
+      "id": "similar-1",
+      "description": "Red handbag",
+      "imageUrl": "https://images.unsplash.com/photo-1649544284889-2c30c3267013?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxyZWQlMjBoYW5kYmFnfGVufDB8fHx8MTc3MDg0NTM4MHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "red handbag"
+    },
+    {
+      "id": "similar-2",
+      "description": "Black handbag",
+      "imageUrl": "https://images.unsplash.com/photo-1758542988969-39a10168b2ce?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxibGFjayUyMGhhbmRiYWd8ZW58MHx8fHwxNzcwODQ1MzgwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "black handbag"
+    },
+    {
+      "id": "similar-3",
+      "description": "Pink handbag",
+      "imageUrl": "https://images.unsplash.com/photo-1683921590274-a83862cb11c3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxwaW5rJTIwaGFuZGJhZ3xlbnwwfHx8fDE3NzA3MzcxNTR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pink handbag"
     }
   ]
 }

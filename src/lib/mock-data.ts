@@ -12,6 +12,15 @@ export type Product = {
   color?: string;
 };
 
+export type SimilarSoldItem = {
+    id: string;
+    brand: string;
+    title: string;
+    price: number;
+    image: ImagePlaceholder['id'];
+    soldDate: string;
+}
+
 export type CartProduct = Product & {
   selectedSize: string;
   quantity: number;
@@ -46,6 +55,7 @@ export const brands = [
     { name: 'Saint Laurent', slug: 'saint-laurent' },
     { name: 'Fendi', slug: 'fendi' },
     { name: 'Celine', slug: 'celine' },
+    { name: 'Lacoste', slug: 'lacoste' },
 ];
 
 export const productConditions = [
@@ -220,4 +230,10 @@ export const savedAddresses = [
     phone: '+39 06 1234567',
     isDefault: false,
   },
+];
+
+export const similarSoldItems: SimilarSoldItem[] = [
+    { id: 'similar-1', brand: 'Lacoste', title: 'Cashmere handbag', price: 32, image: 'similar-1', soldDate: 'Sold 2 years ago' },
+    { id: 'similar-2', brand: 'Lacoste', title: 'Cashmere handbag', price: 29, image: 'similar-2', soldDate: 'Sold 2 years ago' },
+    { id: 'similar-3', brand: 'Lacoste', title: 'Handbag', price: 26, image: 'similar-3', soldDate: 'Sold last year' },
 ];

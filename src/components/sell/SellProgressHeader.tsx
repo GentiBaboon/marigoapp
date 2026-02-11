@@ -7,7 +7,8 @@ import { categories } from '@/lib/mock-data';
 export function SellProgressHeader() {
   const { formData, currentStep, totalSteps } = useSellForm();
   
-  const steps = Array.from({ length: totalSteps }, (_, i) => i + 1);
+  // The pricing step is now the 5th and final interactive step before review.
+  const visualSteps = Array.from({ length: 5 }, (_, i) => i + 1);
 
   const getCategoryName = (slug: string | undefined) => {
     if (!slug) return '';
@@ -19,6 +20,14 @@ export function SellProgressHeader() {
     return gender.charAt(0).toUpperCase() + gender.slice(1);
   }
 
+  const stepLabels: { [key: number]: string } = {
+    1: 'Category',
+    2: 'Details',
+    3: 'Photos',
+    4: 'Description',
+    5: 'Price',
+  };
+
   return (
     <div className="text-center space-y-4">
         <div>
@@ -26,19 +35,22 @@ export function SellProgressHeader() {
             <p className="text-muted-foreground">{`${getGenderName(formData.gender)}, ${getCategoryName(formData.category)}`}</p>
         </div>
         <div className="flex justify-center items-center gap-4">
-            {steps.map(step => {
+            {visualSteps.map(step => {
                 const isCompleted = currentStep > step;
                 const isActive = currentStep === step;
                 return (
-                    <div key={step} className="flex flex-col items-center gap-2">
+                    <div key={step} className="flex flex-col items-center gap-2 relative">
                         <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center border-2 font-semibold",
-                            isActive && "bg-black border-black text-white",
+                            "w-8 h-8 rounded-full flex items-center justify-center border-2 font-semibold transition-all",
+                            isActive && "bg-black border-black text-white scale-110",
                             isCompleted && "bg-white border-black text-black",
                             !isActive && !isCompleted && "bg-white border-gray-300 text-gray-400"
                         )}>
                            {isCompleted ? <Check className="h-5 w-5" /> : step}
                         </div>
+                        {isActive && (
+                            <span className="text-xs font-semibold absolute -bottom-5">{stepLabels[step]}</span>
+                        )}
                     </div>
                 )
             })}
