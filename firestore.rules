@@ -95,7 +95,7 @@ service cloud.firestore {
     // --------------------------------------------------------------------
     match /orders/{orderId} {
       allow get, update: if isSignedIn() && (isOwner(resource.data.buyerId) || isSellerInOrder() || isAdmin());
-      allow list: if false; // Use specific queries with security rules instead of general list
+      allow list: if isSignedIn();
       allow create: if isSignedIn() && isCorrectOwnerInRequestData('buyerId');
     }
 
