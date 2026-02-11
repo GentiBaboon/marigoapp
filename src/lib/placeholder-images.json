@@ -5,6 +5,24 @@
       "description": "Luxury fashion items on display",
       "imageUrl": "https://images.unsplash.com/photo-1591884807235-1dc6c2e148b1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxsdXh1cnklMjBmYXNoaW9ufGVufDB8fHx8MTc3MDczMDY2Mnww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "luxury fashion"
+    },
+    {
+      "id": "welcome-1",
+      "description": "A stylish person browsing luxury items",
+      "imageUrl": "https://images.unsplash.com/photo-1567967455389-e432b1ca1404?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxmYXNoaW9uJTIwc2hvcHBpbmd8ZW58MHx8fHwxNzcwODI1NDkyfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "fashion shopping"
+    },
+    {
+      "id": "welcome-2",
+      "description": "Hands exchanging a luxury handbag",
+      "imageUrl": "https://images.unsplash.com/photo-1542992015-8b34590ec327?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxidXklMjBzZWxsfGVufDB8fHx8MTc3MDgyNTQ5MXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "buy sell"
+    },
+    {
+      "id": "welcome-3",
+      "description": "A diverse group of fashionable people",
+      "imageUrl": "https://images.unsplash.com/flagged/photo-1561645157-4bfc50a803bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxmYXNoaW9uJTIwY29tbXVuaXR5fGVufDB8fHx8MTc3MDgyNTQ5MXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "fashion community"
     }
   ]
 }
