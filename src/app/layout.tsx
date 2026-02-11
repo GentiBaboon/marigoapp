@@ -6,8 +6,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Marigo Luxe',
-  description: 'A luxury fashion marketplace for the Albanian/EU market.',
+  title: 'MarigoApp',
+  description: 'The luxury fashion marketplace for Albania and the EU.',
 };
 
 export default function RootLayout({

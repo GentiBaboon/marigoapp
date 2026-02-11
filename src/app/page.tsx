@@ -13,23 +13,23 @@ export default function Home() {
           <main className="text-5xl md:text-6xl font-bold font-headline">
             <h1 className="inline">
               Discover
-              <span className="inline bg-gradient-to-r from-primary via-accent to-primary text-transparent bg-clip-text">
+              <span className="inline bg-gradient-to-r from-primary to-purple-400 text-transparent bg-clip-text">
                 {' '}
                 Luxury{' '}
               </span>
-              Fashion
+              Fashion,
             </h1>{' '}
-            Reimagined
+            Reimagined.
           </main>
 
           <p className="text-xl text-muted-foreground md:w-10/12 mx-auto lg:mx-0">
-            Join the exclusive C2C marketplace for high-end fashion in Albania
-            and the EU. Buy and sell with confidence.
+            The premier C2C marketplace for luxury fashion in Albania and the
+            EU. Buy, sell, and discover unique pieces.
           </p>
 
           <div className="space-y-4 md:space-y-0 md:space-x-4">
             <Button asChild className="w-full md:w-auto" size="lg">
-              <Link href="/sell">Sell an Item</Link>
+              <Link href="/browse">Shop Now</Link>
             </Button>
             <Button
               asChild
@@ -37,14 +37,14 @@ export default function Home() {
               className="w-full md:w-auto"
               size="lg"
             >
-              <Link href="/browse">Browse Listings</Link>
+              <Link href="/sell">Sell an Item</Link>
             </Button>
           </div>
         </div>
 
         {heroImage && (
           <div className="hidden lg:block">
-            <div className="shadow-2xl rounded-lg overflow-hidden border-2 border-accent/20">
+            <div className="shadow-2xl rounded-lg overflow-hidden border">
               <Image
                 src={heroImage.imageUrl}
                 data-ai-hint={heroImage.imageHint}
