@@ -1,4 +1,5 @@
 import type { ImagePlaceholder } from './placeholder-images';
+import { FirestoreConversation, FirestoreMessage } from './types';
 
 export type Product = {
   id: string;
@@ -361,3 +362,45 @@ export const similarSoldItems: SimilarSoldItem[] = [
     { id: 'similar-2', brand: 'Lacoste', title: 'Cashmere handbag', price: 29, image: 'similar-2', soldDate: 'Sold 2 years ago' },
     { id: 'similar-3', brand: 'Lacoste', title: 'Handbag', price: 26, image: 'similar-3', soldDate: 'Sold last year' },
 ];
+
+export const mockConversations = [
+    {
+        id: 'convo-1',
+        participants: ['user-A', 'seller-1'],
+        participantDetails: [
+            { userId: 'user-A', name: 'You', avatar: 'https://picsum.photos/seed/userA/100/100' },
+            { userId: 'seller-1', name: 'Luxury Finds', avatar: 'https://picsum.photos/seed/seller1/100/100' },
+        ],
+        productId: '1',
+        productTitle: 'Classic Flap Bag',
+        productImage: 'product-1',
+        lastMessage: 'Is this still available?',
+        lastMessageAt: { seconds: Date.now() / 1000 - 3600, nanoseconds: 0 },
+        unreadCount: { 'user-A': 0, 'seller-1': 1 }
+    },
+    {
+        id: 'convo-2',
+        participants: ['user-A', 'seller-2'],
+        participantDetails: [
+            { userId: 'user-A', name: 'You', avatar: 'https://picsum.photos/seed/userA/100/100' },
+            { userId: 'seller-2', name: 'Bertolino', avatar: 'https://picsum.photos/seed/seller2/100/100' },
+        ],
+        productId: '5',
+        productTitle: 'Neverfull MM',
+        productImage: 'product-5',
+        lastMessage: 'Ok, thank you!',
+        lastMessageAt: { seconds: Date.now() / 1000 - 86400, nanoseconds: 0 },
+        unreadCount: { 'user-A': 0, 'seller-2': 0 }
+    }
+] as FirestoreConversation[];
+
+export const mockMessages = {
+    'convo-1': [
+        { id: 'msg-1', senderId: 'seller-1', content: 'Yes, it is!', createdAt: { seconds: Date.now() / 1000 - 3610, nanoseconds: 0 } },
+        { id: 'msg-2', senderId: 'user-A', content: 'Is this still available?', createdAt: { seconds: Date.now() / 1000 - 3600, nanoseconds: 0 } },
+    ],
+    'convo-2': [
+        { id: 'msg-3', senderId: 'seller-2', content: 'I can ship it tomorrow morning.', createdAt: { seconds: Date.now() / 1000 - 86410, nanoseconds: 0 } },
+        { id: 'msg-4', senderId: 'user-A', content: 'Ok, thank you!', createdAt: { seconds: Date.now() / 1000 - 86400, nanoseconds: 0 } },
+    ]
+} as Record<string, FirestoreMessage[]>;

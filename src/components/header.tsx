@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { Button } from './ui/button';
-import { Bell, Search, ShoppingCart } from 'lucide-react';
+import { Bell, Search, ShoppingCart, MessageSquare } from 'lucide-react';
 import { UserNav } from '@/components/user-nav';
 import { useCart } from '@/context/CartContext';
 
@@ -26,6 +26,11 @@ export function Header() {
             <Button asChild variant="ghost" size="icon" aria-label="Search">
               <Link href="/search">
                 <Search className="h-5 w-5" />
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="icon" aria-label="Messages">
+              <Link href="/messages">
+                <MessageSquare className="h-5 w-5" />
               </Link>
             </Button>
             <Button variant="ghost" size="icon" aria-label="Notifications">

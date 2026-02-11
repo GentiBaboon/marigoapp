@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { Home, Search, ShoppingCart, Heart, User } from 'lucide-react';
+import { Home, MessageSquare, ShoppingCart, Heart, User } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 
 export function MobileNav() {
@@ -18,12 +18,12 @@ export function MobileNav() {
           </span>
         </Link>
         <Link
-          href="/search"
+          href="/messages"
           className="inline-flex flex-col items-center justify-center px-5 hover:bg-muted group"
         >
-          <Search className="w-5 h-5 mb-1 text-muted-foreground group-hover:text-primary" />
+          <MessageSquare className="w-5 h-5 mb-1 text-muted-foreground group-hover:text-primary" />
           <span className="text-xs text-muted-foreground group-hover:text-primary">
-            Search
+            Messages
           </span>
         </Link>
         <Link

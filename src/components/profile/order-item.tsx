@@ -49,52 +49,49 @@ export function OrderItem({ order, userRole }: OrderItemProps) {
 
   return (
     <div className="flex flex-col gap-4 rounded-lg border p-4">
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <div>
-            <span className="font-semibold text-foreground">Order #{order.orderNumber}</span>
-            <span className="mx-2">|</span>
-            <span>{format(new Date(order.createdAt.seconds * 1000), 'PPP')}</span>
+       <Link href={`/profile/orders/${order.id}`} className="flex flex-col gap-4">
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div>
+                <span className="font-semibold text-foreground">Order #{order.orderNumber}</span>
+                <span className="mx-2">|</span>
+                <span>{format(new Date(order.createdAt.seconds * 1000), 'PPP')}</span>
+            </div>
+            <Badge className={cn(statusVariant)}>{getStatusLabel(order.status)}</Badge>
         </div>
-        <Badge className={cn(statusVariant)}>{getStatusLabel(order.status)}</Badge>
-      </div>
-      <div className="flex items-center gap-4">
-        <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-md bg-muted">
-          <Image
-            src={imageUrl}
-            alt={imageAlt}
-            fill
-            className="object-cover"
-            sizes="96px"
-          />
+        <div className="flex items-start gap-4">
+            <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-md bg-muted">
+            <Image
+                src={imageUrl}
+                alt={imageAlt}
+                fill
+                className="object-cover"
+                sizes="96px"
+            />
+            </div>
+            <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">{firstItem.brand}</p>
+                <h3 className="font-semibold text-foreground leading-tight">{firstItem.title}</h3>
+                {order.items.length > 1 && (
+                    <p className="text-sm text-muted-foreground">+ {order.items.length - 1} more item(s)</p>
+                )}
+                <p className="font-bold text-lg">{currencyFormatter.format(order.totalAmount)}</p>
+            </div>
         </div>
-        <div className="flex-1 space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{firstItem.brand}</p>
-            <h3 className="font-semibold text-foreground leading-tight">{firstItem.title}</h3>
-            {order.items.length > 1 && (
-                <p className="text-sm text-muted-foreground">+ {order.items.length - 1} more item(s)</p>
-            )}
-            <p className="font-bold text-lg">{currencyFormatter.format(order.totalAmount)}</p>
-        </div>
-        <div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/profile/orders/${order.id}`}>View Order Details</Link>
-              </DropdownMenuItem>
-              {order.status === 'shipped' && (
-                <DropdownMenuItem>
-                    <Truck className="mr-2 h-4 w-4" />
-                    Track Shipment
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      </Link>
+      <div className="flex justify-end gap-2 border-t pt-4">
+        {userRole === 'seller' && order.status === 'processing' && (
+            <Button size="sm">Confirm Shipment</Button>
+        )}
+        {userRole === 'buyer' && order.status === 'delivered' && (
+             <Button size="sm" asChild>
+                <Link href={`/profile/orders/${order.id}#review`}>Leave Review</Link>
+            </Button>
+        )}
+        <Button size="sm" variant="outline" asChild>
+          <Link href={`/profile/orders/${order.id}`}>
+            View Details
+          </Link>
+        </Button>
       </div>
     </div>
   );

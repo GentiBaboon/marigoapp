@@ -155,7 +155,7 @@ export const firestoreProductSchema = z.object({
   material: z.string().optional().nullable(),
   gender: z.enum(["women", "men", "children", "unisex"]).optional().nullable(),
   images: z.array(productImageSchema),
-  status: z.enum(["draft", "pending_review", "active", "sold", "removed", "expired"]),
+  status: z.enum(["draft", "pending_review", "active", "sold", "removed", "expired", "delivered"]),
   views: z.number().default(0),
   wishlistCount: z.number().default(0),
   isFeatured: z.boolean().default(false),
@@ -202,3 +202,45 @@ export const firestoreOrderSchema = z.object({
 });
 
 export type FirestoreOrder = z.infer<typeof firestoreOrderSchema> & { id: string };
+
+
+// --- Messaging Schemas ---
+export const firestoreMessageSchema = z.object({
+  senderId: z.string(),
+  content: z.string(),
+  createdAt: z.any(),
+  type: z.enum(["text", "image"]).default("text"),
+  imageUrl: z.string().optional(),
+  read: z.boolean().default(false),
+});
+export type FirestoreMessage = z.infer<typeof firestoreMessageSchema> & { id: string };
+
+
+export const firestoreConversationSchema = z.object({
+  participants: z.array(z.string()),
+  participantDetails: z.array(z.object({
+    userId: z.string(),
+    name: z.string(),
+    avatar: z.string().optional(),
+  })),
+  productId: z.string(),
+  productTitle: z.string(),
+  productImage: z.string(),
+  lastMessage: z.string().optional(),
+  lastMessageAt: z.any(),
+  unreadCount: z.record(z.string(), z.number()).default({}), // E.g. { userId1: 2, userId2: 0 }
+});
+export type FirestoreConversation = z.infer<typeof firestoreConversationSchema> & { id: string };
+
+// --- Review Schema ---
+export const firestoreReviewSchema = z.object({
+  orderId: z.string(),
+  productId: z.string(),
+  reviewerId: z.string(), // The one writing the review (buyer)
+  revieweeId: z.string(), // The one being reviewed (seller)
+  rating: z.number().min(1).max(5),
+  title: z.string().optional(),
+  content: z.string().min(10, "Review must be at least 10 characters long."),
+  createdAt: z.any(),
+});
+export type FirestoreReview = z.infer<typeof firestoreReviewSchema> & { id: string };
