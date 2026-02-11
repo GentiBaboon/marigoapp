@@ -3,14 +3,14 @@
 import React, { useState, useMemo } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useCart, type ShippingMethod } from '@/context/CartContext';
 import { useUser, useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { sellers as mockSellers } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronDown, Edit, Info, ShieldCheck, Truck, Loader2, ShoppingCart } from 'lucide-react';
+import { ChevronDown, Edit, Info, ShieldCheck, Truck, Loader2, ShoppingCart, Lock, RefreshCcw, MessageSquare, CreditCard, Check } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -23,10 +23,19 @@ import Link from 'next/link';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AddressForm } from '@/components/profile/address-form';
+import { Input } from '@/components/ui/input';
 
 const currencyFormatter = (value: number) => {
     return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
 };
+
+const PayPalIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" className="h-6 w-auto">
+        <path fill="#003087" d="M20.344 6.258c-.297-1.332-1.309-2.22-2.613-2.22H9.27c-.52 0-1.041.34-1.218.846l-3.08 9.539c-.115.356.035.753.39.868l2.969.957c.355.114.753-.035.868-.39l.235-.729a.63.63 0 0 1 .602-.45h.063l4.05-1.236c.356-.115.506-.513.39-.868l-.99-3.06a.63.63 0 0 1 .374-.75l.11-.035c.42-.14.72-.51.68-.96l-.23-1.44c-.03-.2.07-.4.25-.52z"/>
+        <path fill="#009cde" d="M21.11 8.358c-.28-1.33-1.25-2.2-2.48-2.2H8.38c-.5 0-1 .32-1.16.8l-1.92 5.95c-.11.34.03.72.37.83l2.84.9c.34.11.72-.04.83-.38l.38-1.16a.6.6 0 0 1 .57-.42h.06l4.2-1.28c.34-.11.48-.5.37-.83l-.94-2.9a.6.6 0 0 1 .35-.7l.11-.04c.4-.13.68-.48.65-.9l-.22-1.38c-.03-.18.06-.38.24-.5z"/>
+        <path fill="#012169" d="M12.445 13.118l-3.328 1.018a.63.63 0 0 0-.45.602l.236.729c.115.355.494.558.868.45l2.969-.957a.63.63 0 0 0 .45-.602l-.745-2.24z"/>
+    </svg>
+)
 
 export default function CheckoutPage() {
     const cart = useCart();
@@ -36,6 +45,7 @@ export default function CheckoutPage() {
     const { toast } = useToast();
     const [step, setStep] = useState(1);
     const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('credit_card');
     
     const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
     const [editingAddress, setEditingAddress] = useState<FirestoreAddress | null>(null);
@@ -87,7 +97,7 @@ export default function CheckoutPage() {
             authenticationPrice: cart.totalAuthentication,
             totalAmount: cart.grandTotal,
             paymentStatus: 'pending',
-            paymentMethod: 'credit_card', // Placeholder
+            paymentMethod: selectedPaymentMethod,
             status: 'processing',
             shippingAddress,
             createdAt: serverTimestamp(),
@@ -304,13 +314,106 @@ export default function CheckoutPage() {
                             </Card>
                          )}
 
-                        <div className={cn(step < 3 && "hidden")}>
-                            {/* Payment and Final summary would go here */}
-                             <Button className="w-full bg-foreground text-background hover:bg-foreground/90" size="lg" disabled={isPlacingOrder} onClick={handlePlaceOrder}>
-                                {isPlacingOrder && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                                Place order
-                            </Button>
-                        </div>
+                        {step === 3 && (
+                             <div className="space-y-6">
+                                <Card>
+                                    <CardHeader>
+                                        <h2 className="text-lg font-semibold">3. Payment</h2>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <RadioGroup value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
+                                            <Label className="flex items-center gap-4 rounded-md border p-3 cursor-pointer has-[:checked]:border-foreground">
+                                                <RadioGroupItem value="credit_card" id="credit_card" />
+                                                <p className="font-semibold flex-1">Credit Card</p>
+                                                <div className="flex items-center gap-1">
+                                                    <div className="w-8 h-5 bg-[#1a1f71] rounded-sm text-white flex items-center justify-center text-xs font-bold">VISA</div>
+                                                    <div className="w-8 h-5 bg-black rounded-sm text-white flex items-center justify-center">
+                                                        <div className="h-3.5 w-3.5 rounded-full bg-red-600 opacity-90"></div>
+                                                        <div className="h-3.5 w-3.5 rounded-full bg-yellow-500 opacity-90 -ml-2"></div>
+                                                    </div>
+                                                    <div className="border rounded-sm w-8 h-5 text-muted-foreground text-xs flex items-center justify-center">+4</div>
+                                                </div>
+                                            </Label>
+                                            <Label className="flex items-center gap-4 rounded-md border p-3 cursor-pointer has-[:checked]:border-foreground">
+                                                <RadioGroupItem value="paypal" id="paypal" />
+                                                <p className="font-semibold flex-1">PayPal</p>
+                                                <PayPalIcon />
+                                            </Label>
+                                        </RadioGroup>
+                                    </CardContent>
+                                </Card>
+
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Order Summary</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <Accordion type="single" collapsible>
+                                            <AccordionItem value="item-1" className="border-b-0">
+                                                <AccordionTrigger className="font-medium">Price details ({cart.totalItems} items)</AccordionTrigger>
+                                                <AccordionContent className="space-y-2">
+                                                    <div className="flex justify-between">
+                                                        <p className="text-muted-foreground">Products price</p>
+                                                        <p>{currencyFormatter(cart.subtotal)}</p>
+                                                    </div>
+                                                     <div className="flex justify-between">
+                                                        <p className="text-muted-foreground">Authentication</p>
+                                                        <p>{currencyFormatter(cart.totalAuthentication)}</p>
+                                                    </div>
+                                                </AccordionContent>
+                                            </AccordionItem>
+                                        </Accordion>
+                                        <div className="flex justify-between font-medium">
+                                            <p>Promo code <span className="text-muted-foreground">(optional)</span></p>
+                                            <Input className="max-w-xs" placeholder="Enter promo code" />
+                                        </div>
+                                         <Accordion type="single" collapsible defaultValue="item-1">
+                                            <AccordionItem value="item-1" className="border-b-0">
+                                                <AccordionTrigger className="font-medium">Shipping</AccordionTrigger>
+                                                <AccordionContent>
+                                                    <p className="text-muted-foreground">{currencyFormatter(cart.totalShipping)}</p>
+                                                </AccordionContent>
+                                            </AccordionItem>
+                                        </Accordion>
+                                        <Separator />
+                                         <div className="flex justify-between text-lg font-bold">
+                                            <p>Total including fees & taxes</p>
+                                            <p>{currencyFormatter(cart.grandTotal)}</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                <Button className="w-full bg-foreground text-background hover:bg-foreground/90" size="lg" disabled={isPlacingOrder} onClick={handlePlaceOrder}>
+                                    {isPlacingOrder && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                                    Place order
+                                </Button>
+                                <p className="text-xs text-center text-muted-foreground">Total includes buyer service fee and currency conversion fee (if applicable). By placing your order, you agree to our <Link href="#" className="underline">Buyer Terms & Conditions</Link>.</p>
+                                
+                                <div className="space-y-4 pt-4">
+                                    <div className="flex items-start gap-4">
+                                        <Lock className="h-6 w-6 text-muted-foreground flex-shrink-0" />
+                                        <div>
+                                            <p className="font-semibold">Guaranteed delivery</p>
+                                            <p className="text-sm text-muted-foreground">It ships safely, or your money back</p>
+                                        </div>
+                                    </div>
+                                     <div className="flex items-start gap-4">
+                                        <RefreshCcw className="h-6 w-6 text-muted-foreground flex-shrink-0" />
+                                        <div>
+                                            <p className="font-semibold">Free relist</p>
+                                            <p className="text-sm text-muted-foreground">Instantly relist within 72h of delivery</p>
+                                        </div>
+                                    </div>
+                                     <div className="flex items-start gap-4">
+                                        <MessageSquare className="h-6 w-6 text-muted-foreground flex-shrink-0" />
+                                        <div>
+                                            <p className="font-semibold">Customer support</p>
+                                            <p className="text-sm text-muted-foreground">Chat or email, we're here for you</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                         )}
                     </div>
                 )}
             </div>
@@ -332,4 +435,6 @@ export default function CheckoutPage() {
         </div>
     );
 }
+    
+
     
