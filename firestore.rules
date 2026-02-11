@@ -1,0 +1,321 @@
+/**
+ * Core Philosophy: This ruleset enforces a security model tailored for a marketplace application.
+ * It combines strict user-ownership for private data with a public-read/owner-write model for shared
+ * marketplace listings like products. It also supports collaborative data (conversations between two users)
+ * and a global admin role for managing site-wide content like categories and brands.
+ *
+ * Data Structure:
+ * - /users/{userId}/*: All private user data (profile, addresses, payment methods, wishlist) is nested under
+ *   a user-specific path, ensuring strict ownership and preventing data leakage.
+ * - /products/{productId}: A top-level collection for product listings, allowing public browsing while
+ *   restricting write access to the product's seller.
+ * - /conversations/{conversationId}: A top-level collection for private messages. Access is restricted to
+ *   the two designated participants in the conversation.
+ * - /categories & /brands: Public, read-only collections for application metadata. Writes are restricted to admins.
+ * - /roles_admin/{userId}: A simple lookup collection where the existence of a document grants a user admin privileges.
+ *
+ * Key Security Decisions:
+ * - Default Deny: All paths are closed by default. Access must be explicitly granted.
+ * - User Privacy: Users can only access their own data within their /users/{userId} document tree.
+ *   Listing all users or their private subcollections is disallowed.
+ * - Listing Protection: Listing operations on top-level collections containing sensitive, multi-user data
+ *   (like /orders and /conversations) are disabled to prevent inadvertent data exposure. Client applications
+ *   are expected to construct specific, targeted queries (e.g., where('userId', '==', auth.uid)) which these
+ *   rules will then authorize on a per-document read basis.
+ * - Admin Roles: A separate `/roles_admin` collection is used for role management. This is more secure
+ *   and performant than checking a field on a user's public profile, as it is not readable by other users.
+ *
+ * Denormalization for Authorization:
+ * - Products have a `sellerId` field denormalized onto the document, allowing for simple and fast
+ *   ownership checks without needing extra database reads.
+ * - Conversations have `participant1Id` and `participant2Id` fields, which are used to grant access to
+ *   both users involved in a discussion.
+ * - The rules for offers and bids require a `get()` call to the parent product document to check the
+ *   `sellerId`. This is a necessary and efficient way to grant the product owner access to the subcollection data.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --------------------------------------------------------------------
+    // Helper Functions
+    // --------------------------------------------------------------------
+
+    /**
+     * Verifies that a user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user's UID matches the provided userId.
+     * This is the primary function for enforcing document ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks if the document being accessed already exists.
+     * CRITICAL for all update and delete operations.
+     */
+    function isExistingDoc() {
+      return resource != null;
+    }
+
+    /**
+     * A convenience function that combines an ownership check with an existence check.
+     * Used for secure update and delete operations.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && isExistingDoc();
+    }
+
+    /**
+     * Checks if the authenticated user has an admin role by looking for
+     * a document with their UID in the roles_admin collection.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * Validates that the owner ID within a new document matches the user creating it.
+     * Used on create to enforce relational integrity.
+     */
+    function isCorrectOwnerInRequestData(ownerFieldName) {
+      return request.resource.data[ownerFieldName] == request.auth.uid;
+    }
+
+    /**
+     * Validates that an ownership field has not been changed during an update.
+     * Used on update to enforce immutability of core relational fields.
+     */
+    function isOwnerFieldUnchanged(ownerFieldName) {
+      return request.resource.data[ownerFieldName] == resource.data[ownerFieldName];
+    }
+
+
+    // --------------------------------------------------------------------
+    // User Data Collections
+    // --------------------------------------------------------------------
+
+    /**
+     * @description Controls access to a user's primary profile document.
+     * @path /users/{userId}
+     * @allow (create) A new user (auth.uid: 'user_abc') can create their own profile at `/users/user_abc`.
+     * @deny (get) A user ('user_xyz') cannot read the profile of another user ('user_abc').
+     * @principle Restricts access to a user's own data tree and allows self-creation of a profile.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Disallow listing all users for privacy.
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to a user's saved addresses.
+     * @path /users/{userId}/addresses/{addressId}
+     * @allow (create) A user (auth.uid: 'user_abc') can create a new address in their own subcollection.
+     * @deny (list) A user ('user_xyz') cannot list the addresses of another user ('user_abc').
+     * @principle Enforces strict ownership for sensitive user subcollections.
+     */
+    match /users/{userId}/addresses/{addressId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && isOwnerFieldUnchanged('userId');
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to a user's saved payment methods.
+     * @path /users/{userId}/paymentMethods/{paymentMethodId}
+     * @allow (update) A user (auth.uid: 'user_abc') can update their own payment method.
+     * @deny (get) A user ('user_xyz') cannot read the payment methods of another user ('user_abc').
+     * @principle Enforces strict ownership for sensitive user subcollections.
+     */
+    match /users/{userId}/paymentMethods/{paymentMethodId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && isOwnerFieldUnchanged('userId');
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to a user's wishlist.
+     * @path /users/{userId}/wishlist/{wishlistId}
+     * @allow (get) A user (auth.uid: 'user_abc') can read their own wishlist.
+     * @deny (create) A user ('user_xyz') cannot create a wishlist for another user ('user_abc').
+     * @principle Enforces strict ownership for sensitive user subcollections.
+     */
+    match /users/{userId}/wishlist/{wishlistId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && isOwnerFieldUnchanged('userId');
+      allow delete: if isExistingOwner(userId);
+    }
+
+
+    // --------------------------------------------------------------------
+    // Marketplace Collections
+    // --------------------------------------------------------------------
+
+    /**
+     * @description Controls access to product listings. Products are public to read, but only the seller can modify them.
+     * @path /products/{productId}
+     * @allow (get) Any user, signed in or not, can view a product.
+     * @deny (update) A user ('user_xyz') cannot update a product owned by another seller ('user_abc').
+     * @principle Implements a "Public Read with Owner-Only Writes" security model.
+     */
+    match /products/{productId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && isCorrectOwnerInRequestData('sellerId');
+      allow update: if isExistingDoc() && isOwner(resource.data.sellerId) && isOwnerFieldUnchanged('sellerId');
+      allow delete: if isExistingDoc() && isOwner(resource.data.sellerId);
+    }
+
+    /**
+     * @description Controls access to offers on a product. Readable by the product seller and the offer creator.
+     * @path /products/{productId}/offers/{offerId}
+     * @allow (get) The product seller ('seller_abc') can read an offer made by 'buyer_xyz'.
+     * @deny (list) A potential buyer ('buyer_xyz') cannot list all offers on a product to see competitor bids.
+     * @principle Secures a subcollection based on ownership defined in the parent document.
+     */
+    match /products/{productId}/offers/{offerId} {
+      function isProductSeller() {
+        return get(/databases/$(database)/documents/products/$(productId)).data.sellerId == request.auth.uid;
+      }
+      allow get: if isSignedIn() && (isProductSeller() || isOwner(resource.data.buyerId));
+      allow list: if isSignedIn() && isProductSeller(); // Only the seller can list all offers.
+      allow create: if isSignedIn() && isCorrectOwnerInRequestData('buyerId');
+      allow update: if false; // Offers are typically immutable; create a new one instead.
+      allow delete: if isExistingDoc() && (isProductSeller() || isOwner(resource.data.buyerId));
+    }
+
+    /**
+     * @description Controls access to bids on a product. Readable by the product seller and the bid creator.
+     * @path /products/{productId}/bids/{bidId}
+     * @allow (create) An authenticated user ('bidder_xyz') can place a bid on a product.
+     * @deny (get) A bidder ('bidder_xyz') cannot read a bid placed by another bidder ('bidder_abc').
+     * @principle Secures a subcollection based on ownership defined in the parent document.
+     */
+    match /products/{productId}/bids/{bidId} {
+      function isProductSeller() {
+        return get(/databases/$(database)/documents/products/$(productId)).data.sellerId == request.auth.uid;
+      }
+      allow get: if isSignedIn() && (isProductSeller() || isOwner(resource.data.bidderId));
+      allow list: if isSignedIn() && isProductSeller(); // Only the seller can list all bids.
+      allow create: if isSignedIn() && isCorrectOwnerInRequestData('bidderId');
+      allow update: if false; // Bids are immutable.
+      allow delete: if isExistingDoc() && (isProductSeller() || isOwner(resource.data.bidderId));
+    }
+
+    /**
+     * @description Controls access to orders. Only the buyer can access their own order.
+     * @path /orders/{orderId}
+     * @allow (get) A user ('user_abc') can read their own order document.
+     * @deny (list) No user can list all orders in the system.
+     * @principle Enforces document ownership using an internal 'userId' field. Listing is disabled for security.
+     */
+    match /orders/{orderId} {
+      // NOTE: For a seller to access an order, their sellerId would need to be denormalized onto this document.
+      allow get: if isOwner(resource.data.userId);
+      allow list: if false; // Critical: Prevents listing all orders. Client must query by userId.
+      allow create: if isSignedIn() && isCorrectOwnerInRequestData('userId');
+      allow update: if isExistingDoc() && isOwner(resource.data.userId) && isOwnerFieldUnchanged('userId');
+      allow delete: if false; // Orders should not be deleted by users.
+    }
+
+
+    // --------------------------------------------------------------------
+    // Communication Collections
+    // --------------------------------------------------------------------
+
+    /**
+     * @description Controls access to conversations. Only the two participants can access the document.
+     * @path /conversations/{conversationId}
+     * @allow (get) A user ('user_abc') can read a conversation if they are participant1Id or participant2Id.
+     * @deny (get) A user ('user_xyz') cannot read a conversation between 'user_abc' and 'user_def'.
+     * @principle Implements a "Shared Access" model for collaborative data.
+     */
+    match /conversations/{conversationId} {
+      function isParticipant() {
+        return request.auth.uid == resource.data.participant1Id || request.auth.uid == resource.data.participant2Id;
+      }
+      allow get: if isSignedIn() && isParticipant();
+      allow list: if false; // Critical: Prevents listing all conversations.
+      allow create: if isSignedIn() && (request.resource.data.participant1Id == request.auth.uid || request.resource.data.participant2Id == request.auth.uid);
+      allow update: if isExistingDoc() && isParticipant();
+      allow delete: if false; // Conversations should not be user-deletable.
+    }
+
+    /**
+     * @description Controls access to messages within a conversation. Inherits access from the parent conversation.
+     * @path /conversations/{conversationId}/messages/{messageId}
+     * @allow (create) A user ('user_abc') who is a participant in conversation 'conv_123' can create a message in it.
+     * @deny (list) A user ('user_xyz') cannot list messages in a conversation they are not part of.
+     * @principle Secures a subcollection by checking permissions on its parent document.
+     */
+    match /conversations/{conversationId}/messages/{messageId} {
+      function isConversationParticipant() {
+        let conversation = get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+        return request.auth.uid == conversation.participant1Id || request.auth.uid == conversation.participant2Id;
+      }
+      allow get, list: if isSignedIn() && isConversationParticipant();
+      allow create: if isSignedIn() && isConversationParticipant() && isCorrectOwnerInRequestData('senderId');
+      allow update: if isExistingDoc() && isOwner(resource.data.senderId); // Allow sender to edit their message.
+      allow delete: if false;
+    }
+
+
+    // --------------------------------------------------------------------
+    // Public Metadata Collections
+    // --------------------------------------------------------------------
+
+    /**
+     * @description Controls access to product categories. Publicly readable, but only writable by admins.
+     * @path /categories/{categoryId}
+     * @allow (list) Any user, signed in or not, can list all categories.
+     * @deny (create) A regular user cannot create a new category.
+     * @principle Enforces a "Public Read with Role-Based Writes" model for site-wide data.
+     */
+    match /categories/{categoryId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Controls access to product brands. Publicly readable, but only writable by admins.
+     * @path /brands/{brandId}
+     * @allow (get) Any user, signed in or not, can read a specific brand document.
+     * @deny (update) A regular user cannot update an existing brand.
+     * @principle Enforces a "Public Read with Role-Based Writes" model for site-wide data.
+     */
+    match /brands/{brandId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+
+    // --------------------------------------------------------------------
+    // Admin and Role Collections
+    // --------------------------------------------------------------------
+
+    /**
+     * @description Controls access to the admin role documents. Existence of a doc grants admin rights.
+     * @path /roles_admin/{userId}
+     * @allow (get) An admin user ('admin_abc') can check their own role document.
+     * @deny (create) A regular user ('user_xyz') cannot create a role document to make themselves an admin.
+     * @principle Restricts modification of authorization roles to other administrators.
+     */
+    match /roles_admin/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+  }
+}

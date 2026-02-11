@@ -1,0 +1,690 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user in the MarigoApp marketplace.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "role": {
+          "type": "string",
+          "description": "User's role (buyer, seller, or admin).",
+          "format": "string"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Preferred currency (EUR or ALL).",
+          "format": "string"
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User's display name.",
+          "format": "string"
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "URL of the user's profile photo.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "currency"
+      ]
+    },
+    "Address": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Address",
+      "type": "object",
+      "description": "Represents a user's address.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Address entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Address)"
+        },
+        "street": {
+          "type": "string",
+          "description": "Street address."
+        },
+        "city": {
+          "type": "string",
+          "description": "City."
+        },
+        "postalCode": {
+          "type": "string",
+          "description": "Postal code."
+        },
+        "country": {
+          "type": "string",
+          "description": "Country."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "street",
+        "city",
+        "postalCode",
+        "country"
+      ]
+    },
+    "PaymentMethod": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PaymentMethod",
+      "type": "object",
+      "description": "Represents a user's payment method.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the PaymentMethod entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N PaymentMethod)"
+        },
+        "cardType": {
+          "type": "string",
+          "description": "Type of card (e.g., Visa, MasterCard)."
+        },
+        "cardNumber": {
+          "type": "string",
+          "description": "Card number (masked for security)."
+        },
+        "expirationDate": {
+          "type": "string",
+          "description": "Card expiration date (MM/YY)."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "cardType",
+        "cardNumber",
+        "expirationDate"
+      ]
+    },
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product listed on the marketplace.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Product entity."
+        },
+        "sellerId": {
+          "type": "string",
+          "description": "Reference to User (Seller). (Relationship: User 1:N Product)"
+        },
+        "listingType": {
+          "type": "string",
+          "description": "Listing type (fixed or auction)."
+        },
+        "status": {
+          "type": "string",
+          "description": "Product status (active or sold)."
+        },
+        "price": {
+          "type": "number",
+          "description": "Product price."
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency of the product price."
+        },
+        "images": {
+          "type": "array",
+          "description": "Array of image URLs for the product.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to Category. (Relationship: Category 1:N Product)"
+        },
+        "brandId": {
+          "type": "string",
+          "description": "Reference to Brand. (Relationship: Brand 1:N Product)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the product"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the product"
+        }
+      },
+      "required": [
+        "id",
+        "sellerId",
+        "listingType",
+        "status",
+        "price",
+        "currency",
+        "images",
+        "categoryId",
+        "brandId"
+      ]
+    },
+    "Order": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Order",
+      "type": "object",
+      "description": "Represents an order placed by a buyer.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Order entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Order)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Order status (paid, shipped, delivered)."
+        },
+        "tracking": {
+          "type": "string",
+          "description": "Tracking information for the order."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N Order)"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "status",
+        "productId"
+      ]
+    },
+    "Conversation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Conversation",
+      "type": "object",
+      "description": "Represents a conversation between two users.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Conversation entity."
+        },
+        "participant1Id": {
+          "type": "string",
+          "description": "Reference to User (Participant 1). (Relationship: User 1:N Conversation)"
+        },
+        "participant2Id": {
+          "type": "string",
+          "description": "Reference to User (Participant 2). (Relationship: User 1:N Conversation)"
+        },
+        "lastMessage": {
+          "type": "string",
+          "description": "The last message sent between the participants",
+          "format": "string"
+        }
+      },
+      "required": [
+        "id",
+        "participant1Id",
+        "participant2Id"
+      ]
+    },
+    "Message": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Message",
+      "type": "object",
+      "description": "Represents a message within a conversation.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Message entity."
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Reference to Conversation. (Relationship: Conversation 1:N Message)"
+        },
+        "senderId": {
+          "type": "string",
+          "description": "Reference to User (Sender). (Relationship: User 1:N Message)"
+        },
+        "content": {
+          "type": "string",
+          "description": "Message content."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of the message.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "conversationId",
+        "senderId",
+        "content",
+        "timestamp"
+      ]
+    },
+    "Category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Category",
+      "type": "object",
+      "description": "Represents a category of products.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Category entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Category name."
+        },
+        "slug": {
+          "type": "string",
+          "description": "Category slug (for URL)."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "slug"
+      ]
+    },
+    "Brand": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Brand",
+      "type": "object",
+      "description": "Represents a brand of products.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Brand entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Brand name."
+        },
+        "slug": {
+          "type": "string",
+          "description": "Brand slug (for URL)."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "slug"
+      ]
+    },
+    "Wishlist": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Wishlist",
+      "type": "object",
+      "description": "Represents a user's wishlist.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Wishlist entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Wishlist)"
+        },
+        "productIds": {
+          "type": "array",
+          "description": "References to Products. (Relationship: Wishlist 1:N Product)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "productIds"
+      ]
+    },
+    "Offer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Offer",
+      "type": "object",
+      "description": "Represents an offer made on a product.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Offer entity."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N Offer)"
+        },
+        "buyerId": {
+          "type": "string",
+          "description": "Reference to User (Buyer). (Relationship: User 1:N Offer)"
+        },
+        "price": {
+          "type": "number",
+          "description": "Offer price."
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency of the offer."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of the offer.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "productId",
+        "buyerId",
+        "price",
+        "currency",
+        "timestamp"
+      ]
+    },
+    "Bid": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Bid",
+      "type": "object",
+      "description": "Represents a bid placed on a product.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Bid entity."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N Bid)"
+        },
+        "bidderId": {
+          "type": "string",
+          "description": "Reference to User (Bidder). (Relationship: User 1:N Bid)"
+        },
+        "price": {
+          "type": "number",
+          "description": "Bid price."
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency of the bid."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of the bid.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "productId",
+        "bidderId",
+        "price",
+        "currency",
+        "timestamp"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/addresses/{addressId}",
+        "definition": {
+          "entityName": "Address",
+          "schema": {
+            "$ref": "#/backend/entities/Address"
+          },
+          "description": "Stores user addresses. Path-based ownership (User 1:N Address).",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "addressId",
+              "description": "The unique identifier for the address."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/paymentMethods/{paymentMethodId}",
+        "definition": {
+          "entityName": "PaymentMethod",
+          "schema": {
+            "$ref": "#/backend/entities/PaymentMethod"
+          },
+          "description": "Stores user payment methods. Path-based ownership (User 1:N PaymentMethod).",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "paymentMethodId",
+              "description": "The unique identifier for the payment method."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/wishlist/{wishlistId}",
+        "definition": {
+          "entityName": "Wishlist",
+          "schema": {
+            "$ref": "#/backend/entities/Wishlist"
+          },
+          "description": "Stores user wishlists. Path-based ownership (User 1:N Wishlist).",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "wishlistId",
+              "description": "The unique identifier for the wishlist."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product information. 'sellerId' field establishes ownership.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique identifier for the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/products/{productId}/offers/{offerId}",
+        "definition": {
+          "entityName": "Offer",
+          "schema": {
+            "$ref": "#/backend/entities/Offer"
+          },
+          "description": "Stores offers made on a product.  Product 1:N Offer.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique identifier for the product."
+            },
+            {
+              "name": "offerId",
+              "description": "The unique identifier for the offer."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/products/{productId}/bids/{bidId}",
+        "definition": {
+          "entityName": "Bid",
+          "schema": {
+            "$ref": "#/backend/entities/Bid"
+          },
+          "description": "Stores bids placed on a product.  Product 1:N Bid.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique identifier for the product."
+            },
+            {
+              "name": "bidId",
+              "description": "The unique identifier for the bid."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/orders/{orderId}",
+        "definition": {
+          "entityName": "Order",
+          "schema": {
+            "$ref": "#/backend/entities/Order"
+          },
+          "description": "Stores order information.",
+          "params": [
+            {
+              "name": "orderId",
+              "description": "The unique identifier for the order."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/conversations/{conversationId}",
+        "definition": {
+          "entityName": "Conversation",
+          "schema": {
+            "$ref": "#/backend/entities/Conversation"
+          },
+          "description": "Stores conversation information. Includes 'participant1Id' and 'participant2Id' for identifying participants.",
+          "params": [
+            {
+              "name": "conversationId",
+              "description": "The unique identifier for the conversation."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/conversations/{conversationId}/messages/{messageId}",
+        "definition": {
+          "entityName": "Message",
+          "schema": {
+            "$ref": "#/backend/entities/Message"
+          },
+          "description": "Stores messages within a conversation.  Conversation 1:N Message.",
+          "params": [
+            {
+              "name": "conversationId",
+              "description": "The unique identifier for the conversation."
+            },
+            {
+              "name": "messageId",
+              "description": "The unique identifier for the message."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "Stores product categories.",
+          "params": [
+            {
+              "name": "categoryId",
+              "description": "The unique identifier for the category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/brands/{brandId}",
+        "definition": {
+          "entityName": "Brand",
+          "schema": {
+            "$ref": "#/backend/entities/Brand"
+          },
+          "description": "Stores product brands.",
+          "params": [
+            {
+              "name": "brandId",
+              "description": "The unique identifier for the brand."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores admin user roles.  Existence of a document grants admin rights.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure Authorization Independence and support QAPs (Rules are not Filters). Authorization Independence is achieved through denormalization of authorization data where needed, avoiding the use of `get()` calls in security rules. QAPs are supported by using structural segregation (homogeneous security posture) and membership maps for collaborative data.\n\n*   **Users:** User data is stored in `/users/{userId}`, providing path-based ownership. Addresses, PaymentMethods, and Wishlists are stored as subcollections to maintain the `User 1:N` relationship.\n*   **Products:** Products are stored in `/products/{productId}`.  The `sellerId` field establishes ownership. Offers and Bids are stored as subcollections.\n*   **Orders:** Orders are stored in `/orders/{orderId}`.\n*   **Conversations:** Conversations are stored in `/conversations/{conversationId}`. The `participant1Id` and `participant2Id` fields are used to identify the participants. Messages are stored as subcollections.\n*   **Categories/Brands:** Categories and Brands are stored as top-level collections (`/categories` and `/brands`) to allow efficient listing and querying.\n*   **Global Roles:** Admin roles are managed via the `/roles_admin/{userId}` collection. The *existence* of a document grants admin rights.\n\n**Denormalization for Authorization Independence:**\n\n*   Consider denormalizing user roles (buyer, seller, admin) directly into product documents if product access depends on user roles. This would avoid `get()` calls to the `/users/{userId}` document in security rules when accessing products.\n*   Conversation access is determined by the participants. If frequent queries based on participation are needed, consider a denormalized `participants` array within the conversation document to avoid complex collection group queries. Alternatively, store the participant IDs in an array `participants: [uid1, uid2]` inside the `Conversation` document, enabling simple `array-contains` queries.\n\n**Security Rules (Illustrative Examples):**\n\n*   `/users/{userId}`: `allow read, update, delete: if request.auth.uid == userId;`\n*   `/users/{userId}/addresses/{addressId}`: `allow read, create, update, delete: if request.auth.uid == userId;`\n*   `/products/{productId}`: `allow read: if true; allow create: if request.auth.uid == request.resource.data.sellerId; allow update, delete: if request.auth.uid == resource.data.sellerId;`\n*   `/roles_admin/{userId}`: `allow read: if request.auth.uid == userId; allow create: if request.auth.uid != null && <admin check>; allow delete: if request.auth.uid != null && <admin check>;`\n*   `/conversations/{conversationId}`: `allow read, update, delete: if request.auth.uid in resource.data.participants`\n\nThis structure prioritizes security, scalability, and maintainability by adhering to the principles of Authorization Independence, Structural Segregation, and Access Modeling."
+  }
+}
