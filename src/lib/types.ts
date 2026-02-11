@@ -64,6 +64,8 @@ export const sellStep1Schema = z.object({
 
 export const sellStep2Schema = z.object({
   condition: z.enum(['new', 'like_new', 'good', 'fair'], { required_error: 'Please select a condition.' }),
+  sizeStandard: z.string().optional(),
+  sizeValue: z.string().optional(),
   material: z.string().min(1, 'Material is required.'),
   color: z.string().min(1, 'Color is required.'),
   pattern: z.string().optional(),
@@ -78,7 +80,6 @@ export const sellStep3Schema = z.object({
 export const sellStep4Schema = z.object({
     title: z.string().min(10, 'Title must be at least 10 characters.').max(70, 'Title must be 70 characters or less.'),
     description: z.string().min(20, 'Description must be at least 20 characters.').max(500, 'Description cannot exceed 500 characters.'),
-    size: z.string().min(1, 'Please select a size.'),
     origin: z.enum(['direct', 'private', 'vestiaire', 'other']).optional(),
     yearOfPurchase: z.string().optional(),
     serialNumber: z.string().optional(),

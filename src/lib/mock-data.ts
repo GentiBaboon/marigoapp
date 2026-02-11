@@ -89,6 +89,24 @@ export const productMaterials = ['Leather', 'Cotton', 'Denim', 'Silk', 'Wool', '
 
 export const productPatterns = ['Plain', 'Striped', 'Checked', 'Dotted', 'Floral', 'Animal Print', 'Geometric', 'Paisley', 'Houndstooth', 'Plaid'];
 
+export const sizeStandards = [
+    { value: 'eu', label: 'EU' },
+    { value: 'uk', label: 'UK' },
+    { value: 'us', label: 'US' },
+    { value: 'it', label: 'IT' },
+    { value: 'kr', label: 'KR' },
+];
+
+export const shoeSizes = {
+    eu: Array.from({length: 12}, (_, i) => String(35 + i)), // 35-46
+    uk: Array.from({length: 12}, (_, i) => String(2 + i)), // 2-13
+    us: Array.from({length: 12}, (_, i) => String(4 + i)), // 4-15
+    it: Array.from({length: 12}, (_, i) => String(35 + i)), // 35-46
+    kr: Array.from({length: 9}, (_, i) => String(220 + i*10)), // 220-300
+};
+
+export const clothingSizes = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'One Size'];
+
 
 export const newArrivals: Product[] = [
   {

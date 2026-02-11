@@ -26,7 +26,6 @@ import { StepActions } from '@/components/sell/StepActions';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { productSizes } from '@/lib/mock-data';
 import { Separator } from '@/components/ui/separator';
 import {
   Select,
@@ -65,7 +64,6 @@ export function DescriptionStep() {
     defaultValues: {
       title: formData.title || '',
       description: formData.description || '',
-      size: formData.size,
       origin: formData.origin,
       yearOfPurchase: formData.yearOfPurchase,
       serialNumber: formData.serialNumber || '',
@@ -119,40 +117,7 @@ export function DescriptionStep() {
                 </FormItem>
               )}
             />
-             <FormField
-              control={form.control}
-              name="size"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Size</FormLabel>
-                   <FormControl>
-                     <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-wrap gap-2"
-                      >
-                        {productSizes.map((size) => (
-                           <FormItem key={size} className="flex items-center">
-                             <FormControl>
-                                <RadioGroupItem value={size} id={`size-${size}`} className="sr-only" />
-                             </FormControl>
-                             <Label
-                              htmlFor={`size-${size}`}
-                              className={cn(
-                                "flex items-center justify-center rounded-md border text-sm font-medium p-2 h-9 w-12 cursor-pointer hover:bg-accent hover:text-accent-foreground",
-                                field.value === size && "bg-primary text-primary-foreground hover:bg-primary/90"
-                              )}
-                             >
-                               {size}
-                             </Label>
-                           </FormItem>
-                        ))}
-                      </RadioGroup>
-                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            
             <Separator />
 
             <FormField

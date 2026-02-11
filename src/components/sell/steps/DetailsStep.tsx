@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useDropzone } from 'react-dropzone';
 import Image from 'next/image';
+import * as React from 'react';
 
 import {
   Form,
@@ -22,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { sellStep2Schema } from '@/lib/types';
@@ -33,6 +35,9 @@ import {
   productMaterials,
   productColors,
   productPatterns,
+  sizeStandards,
+  shoeSizes,
+  clothingSizes,
 } from '@/lib/mock-data';
 import { FileText, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -54,6 +59,8 @@ export function DetailsStep() {
     resolver: zodResolver(sellStep2Schema),
     defaultValues: {
       condition: formData.condition,
+      sizeStandard: formData.sizeStandard,
+      sizeValue: formData.sizeValue,
       material: formData.material || '',
       color: formData.color || '',
       pattern: formData.pattern || '',
@@ -61,6 +68,26 @@ export function DetailsStep() {
       proofOfOrigin: formData.proofOfOrigin || [],
     },
   });
+
+  const selectedSizeStandard = form.watch('sizeStandard');
+
+  const isClothing = ['women', 'men', 'children'].includes(formData.category || '');
+  const isShoes = formData.category === 'shoes';
+  const isSizingApplicable = isClothing || isShoes;
+
+  const sizeValues = React.useMemo(() => {
+    if (!isSizingApplicable) return [];
+    if (isClothing) return clothingSizes;
+    if (isShoes) {
+      if (!selectedSizeStandard) return [];
+      return shoeSizes[selectedSizeStandard as keyof typeof shoeSizes] || [];
+    }
+    return [];
+  }, [isSizingApplicable, isClothing, isShoes, selectedSizeStandard]);
+
+  useEffect(() => {
+    form.setValue('sizeValue', undefined);
+  }, [selectedSizeStandard, form]);
 
   const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
     if (rejectedFiles.length > 0) {
@@ -97,6 +124,16 @@ export function DetailsStep() {
 
 
   const onSubmit = (data: Step2Values) => {
+    if (isSizingApplicable) {
+        if (!data.sizeStandard) {
+            form.setError('sizeStandard', {type: 'manual', message: 'Standard is required.'});
+            return;
+        }
+        if (!data.sizeValue) {
+            form.setError('sizeValue', {type: 'manual', message: 'Value is required.'});
+            return;
+        }
+    }
     setFormData(data);
     nextStep();
   };
@@ -183,6 +220,58 @@ export function DetailsStep() {
             </FormItem>
           )}
         />
+
+        {isSizingApplicable && (
+          <div className="space-y-2">
+              <Label className="text-sm font-medium">Size</Label>
+              <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                      control={form.control}
+                      name="sizeStandard"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel className="text-sm text-muted-foreground">Standard</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                      <SelectTrigger>
+                                          <SelectValue placeholder="Choose" />
+                                      </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                      {sizeStandards.map(std => (
+                                          <SelectItem key={std.value} value={std.value}>{std.label}</SelectItem>
+                                      ))}
+                                  </SelectContent>
+                              </Select>
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                  />
+                    <FormField
+                      control={form.control}
+                      name="sizeValue"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel className="text-sm text-muted-foreground">Value</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value} disabled={!selectedSizeStandard && !isClothing}>
+                                  <FormControl>
+                                      <SelectTrigger>
+                                          <SelectValue placeholder="Choose" />
+                                      </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                      {sizeValues.map(val => (
+                                          <SelectItem key={val} value={val}>{val}</SelectItem>
+                                      ))}
+                                  </SelectContent>
+                              </Select>
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                  />
+              </div>
+          </div>
+        )}
 
         <FormField
           control={form.control}
