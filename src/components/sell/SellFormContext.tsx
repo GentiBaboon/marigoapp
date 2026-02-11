@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, createContext, useContext, ReactNode, useEffect } from 'react';
+import React, { useState, createContext, useContext, ReactNode, useEffect, useCallback } from 'react';
 import type { SellFormValues } from '@/lib/types';
 
 interface SellFormContextType {
@@ -50,23 +50,23 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [formData, currentStep, isInitialized]);
 
 
-  const setFormData = (newData: Partial<SellFormValues>) => {
+  const setFormData = useCallback((newData: Partial<SellFormValues>) => {
     setFormDataState((prev) => ({ ...prev, ...newData }));
-  };
+  }, []);
   
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setFormDataState({});
     setCurrentStep(1);
     localStorage.removeItem('sell_form_draft');
-  };
+  }, []);
 
-  const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, totalSteps + 1));
-  const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
-  const goToStep = (step: number) => {
+  const nextStep = useCallback(() => setCurrentStep((prev) => Math.min(prev + 1, totalSteps + 1)), [totalSteps]);
+  const prevStep = useCallback(() => setCurrentStep((prev) => Math.max(prev - 1, 1)), []);
+  const goToStep = useCallback((step: number) => {
     if (step > 0 && step <= totalSteps + 1) {
       setCurrentStep(step);
     }
-  };
+  }, [totalSteps]);
 
   return (
     <SellFormContext.Provider value={{ formData, setFormData, currentStep, nextStep, prevStep, goToStep, resetForm, totalSteps }}>
