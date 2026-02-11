@@ -81,9 +81,9 @@ export default function CheckoutPage() {
                 price: item.price,
                 quantity: item.quantity,
                 size: item.selectedSize || null,
-                shippingMethod: item.shippingMethod,
-                shippingFee: item.shippingMethod === 'direct' ? item.directShippingFee : item.authShippingFee,
-                authenticationFee: item.shippingMethod === 'authentication' ? item.authenticationFee : 0,
+                shippingMethod: 'direct',
+                shippingFee: item.directShippingFee,
+                authenticationFee: 0,
             };
         });
 
@@ -178,7 +178,6 @@ export default function CheckoutPage() {
                                     <CardContent className="p-4 space-y-4">
                                         {items.map((item, index) => {
                                             const productImage = PlaceHolderImages.find(p => p.id === item.image);
-                                            const hasDirectShipping = item.price < 1000;
                                             return (
                                                 <React.Fragment key={item.id}>
                                                     <div className="flex gap-4">
@@ -194,31 +193,15 @@ export default function CheckoutPage() {
                                                             <p className="text-sm text-muted-foreground">Size: {item.selectedSize || 'M'}</p>
                                                         </div>
                                                     </div>
-                                                    <RadioGroup value={item.shippingMethod} onValueChange={(val) => cart.updateShippingMethod(item.id, val as ShippingMethod)}>
-                                                        {hasDirectShipping && (
-                                                            <Label className="flex items-start gap-4 rounded-md border p-3 cursor-pointer has-[:checked]:border-foreground">
-                                                                <RadioGroupItem value="direct" id={`direct-${item.id}`}/>
-                                                                <div className="w-full">
-                                                                    <div className="flex items-center justify-between">
-                                                                        <p className="font-semibold flex items-center gap-2"><Truck className="h-5 w-5"/>Direct Shipping</p>
-                                                                        <p className="font-semibold">{currencyFormatter(item.directShippingFee)}</p>
-                                                                    </div>
-                                                                    <p className="text-sm text-muted-foreground ml-7">Shipping fee</p>
-                                                                </div>
-                                                            </Label>
-                                                        )}
-                                                         <Label className="flex items-start gap-4 rounded-md border p-3 cursor-pointer has-[:checked]:border-foreground">
-                                                            <RadioGroupItem value="authentication" id={`auth-${item.id}`}/>
+                                                    <RadioGroup value="direct">
+                                                        <Label className="flex items-start gap-4 rounded-md border p-3 border-foreground">
+                                                            <RadioGroupItem value="direct" id={`direct-${item.id}`}/>
                                                             <div className="w-full">
-                                                                <p className="font-semibold flex items-center gap-2"><ShieldCheck className="h-5 w-5"/>Authentication & quality control</p>
-                                                                <div className="flex items-center justify-between ml-7">
-                                                                    <p className="text-sm text-muted-foreground">Authentication & quality control</p>
-                                                                    <p className="text-sm font-semibold">{item.authenticationFee > 0 ? currencyFormatter(item.authenticationFee) : 'Included'}</p>
+                                                                <div className="flex items-center justify-between">
+                                                                    <p className="font-semibold flex items-center gap-2"><Truck className="h-5 w-5"/>Direct Shipping</p>
+                                                                    <p className="font-semibold">{currencyFormatter(item.directShippingFee)}</p>
                                                                 </div>
-                                                                <div className="flex items-center justify-between ml-7">
-                                                                    <p className="text-sm text-muted-foreground">Shipping fee</p>
-                                                                    <p className="text-sm font-semibold">{currencyFormatter(item.authShippingFee)}</p>
-                                                                </div>
+                                                                <p className="text-sm text-muted-foreground ml-7">Shipping fee</p>
                                                             </div>
                                                         </Label>
                                                     </RadioGroup>

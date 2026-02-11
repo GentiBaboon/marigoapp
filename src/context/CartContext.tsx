@@ -21,7 +21,6 @@ interface CartContextType {
     addToCart: (product: Product, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => void;
     removeFromCart: (itemId: string) => void;
     updateQuantity: (itemId: string, quantity: number) => void;
-    updateShippingMethod: (itemId: string, method: ShippingMethod) => void;
     clearCart: () => void;
     subtotal: number;
     totalItems: number;
@@ -40,7 +39,13 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     useEffect(() => {
         const savedCart = localStorage.getItem('marigo_cart');
         if (savedCart) {
-            setItems(JSON.parse(savedCart));
+            // When loading from storage, enforce direct shipping
+            const parsedItems: CartItem[] = JSON.parse(savedCart);
+            const correctedItems = parsedItems.map(item => ({
+                ...item,
+                shippingMethod: 'direct' as ShippingMethod,
+            }));
+            setItems(correctedItems);
         }
     }, []);
 
@@ -64,10 +69,10 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     ...product,
                     quantity,
                     ...options,
-                    shippingMethod: product.price >= 1000 ? 'authentication' : 'direct', // Default based on price
-                    authenticationFee: product.price < 1000 ? 15 : 0, // 15 for items < 1000, 0 (included) otherwise
-                    directShippingFee: 10.90, // Example fee
-                    authShippingFee: product.price < 1000 ? 10.90 : 20, // Example fee
+                    shippingMethod: 'direct', // Always direct shipping
+                    authenticationFee: 0, 
+                    directShippingFee: 10.90, 
+                    authShippingFee: 0,
                 };
                 return [...prevItems, newItem];
             }
@@ -94,14 +99,6 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }, [removeFromCart]);
     
-    const updateShippingMethod = useCallback((itemId: string, method: ShippingMethod) => {
-        setItems(prevItems =>
-            prevItems.map(item =>
-                item.id === itemId ? { ...item, shippingMethod: method } : item
-            )
-        );
-    }, []);
-
     const clearCart = useCallback(() => {
         setItems([]);
     }, []);
@@ -110,14 +107,10 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const totalItems = useMemo(() => items.reduce((acc, item) => acc + item.quantity, 0), [items]);
     
     const totalShipping = useMemo(() => items.reduce((acc, item) => {
-        const fee = item.shippingMethod === 'direct' ? item.directShippingFee : item.authShippingFee;
-        return acc + fee;
+        return acc + item.directShippingFee;
     }, 0), [items]);
 
-    const totalAuthentication = useMemo(() => items.reduce((acc, item) => {
-        const fee = item.shippingMethod === 'authentication' ? item.authenticationFee : 0;
-        return acc + fee;
-    }, 0), [items]);
+    const totalAuthentication = useMemo(() => 0, []);
 
     const grandTotal = useMemo(() => subtotal + totalShipping + totalAuthentication, [subtotal, totalShipping, totalAuthentication]);
 
@@ -134,7 +127,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 
     return (
-        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, updateShippingMethod, clearCart, subtotal, totalItems, totalShipping, totalAuthentication, grandTotal, sellers }}>
+        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, clearCart, subtotal, totalItems, totalShipping, totalAuthentication, grandTotal, sellers }}>
             {children}
         </CartContext.Provider>
     );
