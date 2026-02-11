@@ -41,7 +41,7 @@ export function DetailsStep() {
   const form = useForm<Step2Values>({
     resolver: zodResolver(sellStep2Schema),
     defaultValues: {
-      brand: formData.brand,
+      brand: formData.brand || '',
       condition: formData.condition,
       color: formData.color,
       material: formData.material || ''
@@ -68,12 +68,16 @@ export function DetailsStep() {
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Brand</FormLabel>
-                  <Combobox
-                     items={brands.map(b => ({ value: b.slug, label: b.name }))}
-                     placeholder="Select brand"
-                     searchPlaceholder="Search for a brand..."
-                     emptyPlaceholder="No brand found."
-                  />
+                  <FormControl>
+                    <Combobox
+                       items={brands.map(b => ({ value: b.slug, label: b.name }))}
+                       placeholder="Select brand"
+                       searchPlaceholder="Search for a brand..."
+                       emptyPlaceholder="No brand found."
+                       value={field.value}
+                       onValueChange={field.onChange}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
