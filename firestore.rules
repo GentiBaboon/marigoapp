@@ -32,6 +32,10 @@ service cloud.firestore {
     function isOwnerFieldUnchanged(ownerFieldName) {
       return request.resource.data[ownerFieldName] == resource.data[ownerFieldName];
     }
+    
+    function isSellerInOrder() {
+      return request.auth.uid in resource.data.sellerIds;
+    }
 
     // --------------------------------------------------------------------
     // User Data Collections (/users/{userId}/*)
@@ -90,8 +94,8 @@ service cloud.firestore {
     // Transactional Collections (/orders, /reviews, /deliveries)
     // --------------------------------------------------------------------
     match /orders/{orderId} {
-      allow get, update: if isSignedIn() && (isOwner(resource.data.buyerId) || isOwner(resource.data.sellerId) || isAdmin());
-      allow list: if false;
+      allow get, update: if isSignedIn() && (isOwner(resource.data.buyerId) || isSellerInOrder() || isAdmin());
+      allow list: if false; // Use specific queries with security rules instead of general list
       allow create: if isSignedIn() && isCorrectOwnerInRequestData('buyerId');
     }
 

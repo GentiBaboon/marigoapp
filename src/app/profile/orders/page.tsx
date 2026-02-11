@@ -3,10 +3,10 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
+import { collection, query, where, getDocs, or } from 'firebase/firestore';
 
-import { useUser, useFirestore } from '@/firebase';
-import type { FirestoreOrder, FirestoreProduct } from '@/lib/types';
+import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import type { FirestoreOrder } from '@/lib/types';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -73,23 +73,16 @@ function EmptyState({ role }: { role: 'buyer' | 'seller' }) {
     )
 }
 
-function OrderList({ orders, products, role }: { orders: FirestoreOrder[], products: FirestoreProduct[], role: 'buyer' | 'seller' }) {
+function OrderList({ orders, role }: { orders: FirestoreOrder[], role: 'buyer' | 'seller' }) {
     if (orders.length === 0) {
         return <EmptyState role={role} />;
     }
 
-    const productsById = new Map(products.map(p => [p.id, p]));
-
     return (
         <div className="space-y-4">
-            {orders.map(order => {
-                const product = productsById.get(order.productId);
-                if (!product) {
-                    // This can happen if a product is deleted but orders remain.
-                    return null; 
-                }
-                return <OrderItem key={order.id} order={order} product={product} userRole={role} />;
-            })}
+            {orders.map(order => (
+                <OrderItem key={order.id} order={order} userRole={role} />
+            ))}
         </div>
     );
 }
@@ -100,7 +93,6 @@ export default function OrdersPage() {
   const firestore = useFirestore();
   const [buyingOrders, setBuyingOrders] = React.useState<FirestoreOrder[]>([]);
   const [sellingOrders, setSellingOrders] = React.useState<FirestoreOrder[]>([]);
-  const [products, setProducts] = React.useState<FirestoreProduct[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -111,7 +103,7 @@ export default function OrdersPage() {
         return;
     };
 
-    const fetchOrdersAndProducts = async () => {
+    const fetchOrders = async () => {
         setIsLoading(true);
         try {
             // Fetch buying orders
@@ -121,24 +113,11 @@ export default function OrdersPage() {
             setBuyingOrders(buyingData);
 
             // Fetch selling orders
-            const sellingQuery = query(collection(firestore, 'orders'), where('sellerId', '==', user.uid));
+            const sellingQuery = query(collection(firestore, 'orders'), where('sellerIds', 'array-contains', user.uid));
             const sellingSnapshot = await getDocs(sellingQuery);
             const sellingData = sellingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreOrder));
             setSellingOrders(sellingData);
-            
-            const allOrders = [...buyingData, ...sellingData];
-            if (allOrders.length > 0) {
-                const productIds = [...new Set(allOrders.map(o => o.productId))];
-                
-                // Firestore 'in' query is limited to 30 items in the array.
-                // For a real production app with many orders, we might need to batch this.
-                if (productIds.length > 0) {
-                    const productsQuery = query(collection(firestore, 'products'), where(documentId(), 'in', productIds));
-                    const productsSnapshot = await getDocs(productsQuery);
-                    const productsData = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreProduct));
-                    setProducts(productsData);
-                }
-            }
+
         } catch (error) {
             console.error("Error fetching orders:", error);
         } finally {
@@ -146,7 +125,7 @@ export default function OrdersPage() {
         }
     };
     
-    fetchOrdersAndProducts();
+    fetchOrders();
 
   }, [user, firestore, isUserLoading]);
 
@@ -199,12 +178,12 @@ export default function OrdersPage() {
                 </TabsList>
                 <TabsContent value="buying" className="mt-6">
                     {areDataLoading ? <OrdersSkeleton /> : 
-                        <OrderList orders={buyingOrders} products={products} role="buyer" />
+                        <OrderList orders={buyingOrders} role="buyer" />
                     }
                 </TabsContent>
                 <TabsContent value="selling" className="mt-6">
                      {areDataLoading ? <OrdersSkeleton /> : 
-                        <OrderList orders={sellingOrders} products={products} role="seller" />
+                        <OrderList orders={sellingOrders} role="seller" />
                     }
                 </TabsContent>
               </Tabs>

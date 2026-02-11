@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { MoreVertical, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 
-import type { FirestoreOrder, FirestoreProduct } from '@/lib/types';
+import type { FirestoreOrder } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,13 +33,13 @@ const statusStyles: { [key: string]: string } = {
 
 type OrderItemProps = {
   order: FirestoreOrder;
-  product: FirestoreProduct;
   userRole: 'buyer' | 'seller';
 };
 
-export function OrderItem({ order, product, userRole }: OrderItemProps) {
-  const imageUrl = product.images?.[0]?.url || PlaceHolderImages.find(p => p.id === 'product-1')?.imageUrl || '/placeholder.png';
-  const imageAlt = product.title || 'Product image';
+export function OrderItem({ order, userRole }: OrderItemProps) {
+  const firstItem = order.items[0];
+  const imageUrl = firstItem.image;
+  const imageAlt = firstItem.title;
 
   const getStatusLabel = (status: string) => {
     return status.charAt(0).toUpperCase() + status.slice(1);
@@ -53,7 +53,7 @@ export function OrderItem({ order, product, userRole }: OrderItemProps) {
         <div>
             <span className="font-semibold text-foreground">Order #{order.orderNumber}</span>
             <span className="mx-2">|</span>
-            <span>{format(order.createdAt.toDate(), 'PPP')}</span>
+            <span>{format(new Date(order.createdAt.seconds * 1000), 'PPP')}</span>
         </div>
         <Badge className={cn(statusVariant)}>{getStatusLabel(order.status)}</Badge>
       </div>
@@ -68,8 +68,11 @@ export function OrderItem({ order, product, userRole }: OrderItemProps) {
           />
         </div>
         <div className="flex-1 space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{product.brandId}</p>
-            <h3 className="font-semibold text-foreground leading-tight">{product.title}</h3>
+            <p className="text-sm font-medium text-muted-foreground">{firstItem.brand}</p>
+            <h3 className="font-semibold text-foreground leading-tight">{firstItem.title}</h3>
+            {order.items.length > 1 && (
+                <p className="text-sm text-muted-foreground">+ {order.items.length - 1} more item(s)</p>
+            )}
             <p className="font-bold text-lg">{currencyFormatter.format(order.totalAmount)}</p>
         </div>
         <div>

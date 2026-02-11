@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { Separator } from '../ui/separator';
 
 type PaymentStepProps = {
-  onNextStep: () => void;
+  onNextStep: (paymentMethod: string) => void;
   onPrevStep: () => void;
 };
 
@@ -84,7 +84,7 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
           <Button
             size="lg"
             className="w-full"
-            onClick={onNextStep}
+            onClick={() => onNextStep(selectedMethod)}
             disabled={!selectedMethod}
           >
             Continue to Review

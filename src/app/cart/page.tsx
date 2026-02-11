@@ -7,8 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { cartItems } from '@/lib/mock-data';
-import type { CartProduct } from '@/lib/mock-data';
+import { useCart } from '@/context/CartContext';
 import { Trash2, ShoppingCart } from 'lucide-react';
 import {
   Select,
@@ -19,18 +18,13 @@ import {
 } from '@/components/ui/select';
 
 export default function CartPage() {
-  // In a real app, this would come from a state management solution
-  const items: CartProduct[] = cartItems;
+  const { items, updateQuantity, removeFromCart, subtotal } = useCart();
 
   const currencyFormatter = new Intl.NumberFormat('de-DE', {
     style: 'currency',
     currency: 'EUR',
   });
 
-  const subtotal = items.reduce(
-    (acc, item) => acc + item.price * item.quantity,
-    0
-  );
   const savings = items.reduce(
     (acc, item) =>
       acc +
@@ -87,7 +81,7 @@ export default function CartPage() {
                       </p>
                       <h3 className="font-medium text-foreground">{item.title}</h3>
                       <p className="text-sm text-muted-foreground">
-                        Size: {item.selectedSize}
+                        Size: {item.selectedSize || 'One Size'}
                       </p>
                     </div>
                     <div className="flex items-end justify-between mt-2">
@@ -102,7 +96,10 @@ export default function CartPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                         <Select defaultValue={String(item.quantity)}>
+                         <Select 
+                            value={String(item.quantity)} 
+                            onValueChange={(value) => updateQuantity(item.id, parseInt(value))}
+                          >
                             <SelectTrigger className="h-8 w-[70px]">
                                 <SelectValue placeholder="Qty" />
                             </SelectTrigger>
@@ -112,7 +109,7 @@ export default function CartPage() {
                                 ))}
                             </SelectContent>
                         </Select>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => removeFromCart(item.id)}>
                             <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

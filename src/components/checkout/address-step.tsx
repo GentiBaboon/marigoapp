@@ -18,45 +18,66 @@ import {
 } from '@/components/ui/accordion';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { savedAddresses } from '@/lib/mock-data';
-import { addressSchema, type AddressFormValues } from '@/lib/types';
+import { addressSchema, type AddressFormValues, type FirestoreAddress } from '@/lib/types';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
+  Form
 } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Home, Plus } from 'lucide-react';
+import { AddressForm } from '@/components/profile/address-form';
+import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '../ui/skeleton';
 
 type AddressStepProps = {
-  onNextStep: () => void;
+  onNextStep: (address: FirestoreAddress) => void;
 };
 
 export function AddressStep({ onNextStep }: AddressStepProps) {
-  const [selectedAddress, setSelectedAddress] = useState(
-    savedAddresses.find((a) => a.isDefault)?.id
-  );
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const [selectedAddressId, setSelectedAddressId] = useState<string | undefined>();
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const addressesCollection = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, 'users', user.uid, 'addresses');
+  }, [user, firestore]);
+
+  const { data: addresses, isLoading: areAddressesLoading } = useCollection<FirestoreAddress>(addressesCollection);
+
+  const defaultAddress = addresses?.find(a => a.isDefault);
+
+  useState(() => {
+    if (defaultAddress) {
+        setSelectedAddressId(defaultAddress.id);
+    }
+  });
 
   const form = useForm<AddressFormValues>({
     resolver: zodResolver(addressSchema),
-    defaultValues: {
-      fullName: '',
-      phone: '',
-      address: '',
-      city: '',
-      postal: '',
-      country: '',
-    },
   });
 
-  function onSubmit(data: AddressFormValues) {
-    console.log('New address submitted:', data);
-    // Here you would typically save the new address and then proceed
-    onNextStep();
+  const handleContinue = () => {
+    const selectedAddress = addresses?.find(a => a.id === selectedAddressId);
+    if (selectedAddress) {
+        onNextStep(selectedAddress);
+    }
+  };
+
+  if (areAddressesLoading) {
+      return (
+          <Card>
+              <CardHeader>
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-4 w-64 mt-2" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+              </CardContent>
+          </Card>
+      )
   }
 
   return (
@@ -69,17 +90,17 @@ export function AddressStep({ onNextStep }: AddressStepProps) {
       </CardHeader>
       <CardContent className="space-y-6">
         <RadioGroup
-          value={selectedAddress}
-          onValueChange={setSelectedAddress}
+          value={selectedAddressId}
+          onValueChange={setSelectedAddressId}
           className="space-y-4"
         >
-          {savedAddresses.map((addr) => (
+          {addresses?.map((addr) => (
             <Label
               key={addr.id}
               htmlFor={addr.id}
               className={cn(
                 'flex items-start space-x-4 rounded-md border p-4 cursor-pointer transition-colors',
-                selectedAddress === addr.id && 'border-primary ring-1 ring-primary'
+                selectedAddressId === addr.id && 'border-primary ring-1 ring-primary'
               )}
             >
               <RadioGroupItem value={addr.id} id={addr.id} className="mt-1" />
@@ -96,7 +117,7 @@ export function AddressStep({ onNextStep }: AddressStepProps) {
           ))}
         </RadioGroup>
 
-        <Accordion type="single" collapsible>
+        <Accordion type="single" collapsible onValueChange={(value) => setIsFormOpen(value === 'new-address')}>
           <AccordionItem value="new-address" className="border-b-0">
             <AccordionTrigger>
                 <div className="flex items-center gap-2 text-primary">
@@ -106,107 +127,26 @@ export function AddressStep({ onNextStep }: AddressStepProps) {
             </AccordionTrigger>
             <AccordionContent className="pt-4">
               <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(onSubmit)}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={form.control}
-                    name="fullName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Street Address</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="city"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>City</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="postal"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Postal Code</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <FormField
-                      control={form.control}
-                      name="country"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Country</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  <Button type="submit" className="w-full md:w-auto">Save and Continue</Button>
-                </form>
+                {user && (
+                    <AddressForm userId={user.uid} onSave={() => setIsFormOpen(false)} />
+                )}
               </Form>
             </AccordionContent>
           </AccordionItem>
         </Accordion>
         
-        <div className="pt-4">
-          <Button
-            size="lg"
-            className="w-full"
-            onClick={onNextStep}
-            disabled={!selectedAddress}
-          >
-            Continue to Payment
-          </Button>
-        </div>
+        {!isFormOpen && (
+            <div className="pt-4">
+            <Button
+                size="lg"
+                className="w-full"
+                onClick={handleContinue}
+                disabled={!selectedAddressId}
+            >
+                Continue to Payment
+            </Button>
+            </div>
+        )}
       </CardContent>
     </Card>
   );

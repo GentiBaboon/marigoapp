@@ -7,6 +7,7 @@ export type Product = {
   price: number;
   originalPrice?: number;
   image: ImagePlaceholder['id'];
+  sellerId: string;
   condition?: 'new' | 'like_new' | 'good' | 'fair';
   size?: string;
   color?: string;
@@ -184,6 +185,7 @@ export const newArrivals: Product[] = [
     price: 8200,
     originalPrice: 9000,
     image: 'product-1',
+    sellerId: 'seller-1'
   },
   {
     id: '2',
@@ -191,6 +193,7 @@ export const newArrivals: Product[] = [
     title: 'Horsebit 1955 Shoulder Bag',
     price: 2500,
     image: 'product-2',
+    sellerId: 'seller-2'
   },
   {
     id: '3',
@@ -198,6 +201,7 @@ export const newArrivals: Product[] = [
     title: 'Re-Nylon Bucket Hat',
     price: 550,
     image: 'product-3',
+    sellerId: 'seller-1'
   },
   {
     id: '4',
@@ -206,6 +210,7 @@ export const newArrivals: Product[] = [
     price: 990,
     originalPrice: 1100,
     image: 'product-4',
+    sellerId: 'seller-3'
   },
 ];
 
@@ -216,8 +221,9 @@ export const trendingProducts: Product[] = [
     title: 'Neverfull MM',
     price: 1800,
     image: 'product-5',
+    sellerId: 'seller-2'
   },
-  { id: '6', brand: 'Hermès', title: 'Oran Sandal', price: 660, image: 'product-6' },
+  { id: '6', brand: 'Hermès', title: 'Oran Sandal', price: 660, image: 'product-6', sellerId: 'seller-3' },
   {
     id: '7',
     brand: 'Bottega Veneta',
@@ -225,6 +231,7 @@ export const trendingProducts: Product[] = [
     price: 2100,
     originalPrice: 2500,
     image: 'product-7',
+    sellerId: 'seller-1'
   },
   {
     id: '8',
@@ -232,6 +239,7 @@ export const trendingProducts: Product[] = [
     title: 'Kate Chain Wallet',
     price: 1550,
     image: 'product-8',
+    sellerId: 'seller-2'
   },
 ];
 
@@ -243,6 +251,7 @@ export const outletProducts: Product[] = [
     price: 750,
     originalPrice: 1100,
     image: 'product-4',
+    sellerId: 'seller-3'
   },
   {
     id: '7',
@@ -251,6 +260,7 @@ export const outletProducts: Product[] = [
     price: 1800,
     originalPrice: 2500,
     image: 'product-7',
+    sellerId: 'seller-1'
   },
   {
     id: '1',
@@ -259,6 +269,7 @@ export const outletProducts: Product[] = [
     price: 7000,
     originalPrice: 9000,
     image: 'product-1',
+    sellerId: 'seller-1'
   },
   {
     id: '5',
@@ -267,6 +278,7 @@ export const outletProducts: Product[] = [
     price: 1500,
     originalPrice: 1900,
     image: 'product-5',
+    sellerId: 'seller-2'
   },
 ];
 
@@ -280,6 +292,7 @@ export const cartItems: CartProduct[] = [
     image: 'product-1',
     selectedSize: 'Medium',
     quantity: 1,
+    sellerId: 'seller-1'
   },
   {
     id: '4',
@@ -290,6 +303,7 @@ export const cartItems: CartProduct[] = [
     image: 'product-4',
     selectedSize: '38',
     quantity: 1,
+    sellerId: 'seller-3'
   },
   {
     id: '7',
@@ -300,6 +314,7 @@ export const cartItems: CartProduct[] = [
     image: 'product-7',
     selectedSize: 'Mini',
     quantity: 1,
+    sellerId: 'seller-1'
   },
 ];
 

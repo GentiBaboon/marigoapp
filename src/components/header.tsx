@@ -1,10 +1,15 @@
+
+'use client';
+
 import Link from 'next/link';
 import { Button } from './ui/button';
 import { Bell, Search, ShoppingCart } from 'lucide-react';
 import { UserNav } from '@/components/user-nav';
+import { useCart } from '@/context/CartContext';
 
 
 export function Header() {
+  const { totalItems } = useCart();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur-sm">
@@ -26,8 +31,13 @@ export function Header() {
             <Button variant="ghost" size="icon" aria-label="Notifications">
               <Bell className="h-5 w-5" />
             </Button>
-            <Button asChild variant="ghost" size="icon" aria-label="Shopping Cart">
+            <Button asChild variant="ghost" size="icon" aria-label="Shopping Cart" className="relative">
               <Link href="/cart">
+                {totalItems > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    {totalItems}
+                  </span>
+                )}
                 <ShoppingCart className="h-5 w-5" />
               </Link>
             </Button>

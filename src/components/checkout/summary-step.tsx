@@ -1,4 +1,6 @@
 'use client';
+import { useState } from 'react';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -9,31 +11,112 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle, MapPin, CreditCard } from 'lucide-react';
+import { MapPin, CreditCard, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { useCart } from '@/context/CartContext';
+import { useUser, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
+import type { FirestoreAddress } from '@/lib/types';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 type SummaryStepProps = {
   onPrevStep: () => void;
+  shippingAddress: FirestoreAddress | null;
+  paymentMethod: string | null;
 };
 
-export function SummaryStep({ onPrevStep }: SummaryStepProps) {
+export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: SummaryStepProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const { items, subtotal, clearCart } = useCart();
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const shipping = 15;
+  const total = subtotal + shipping;
+
   const currencyFormatter = new Intl.NumberFormat('de-DE', {
     style: 'currency',
     currency: 'EUR',
   });
-  const total = 11355; // Mock total for display
+  
+  const handlePay = async () => {
+    if (!user || !firestore || !shippingAddress || !paymentMethod) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Missing required information to place order.',
+        });
+        return;
+    }
 
-  const handlePay = () => {
-    toast({
-      title: 'Order Placed!',
-      description: 'Thank you for your purchase. Your order is being processed.',
-      variant: 'success',
+    setIsLoading(true);
+    
+    const orderItems = items.map(item => {
+        const imageUrl = PlaceHolderImages.find(p => p.id === item.image)?.imageUrl || item.image;
+        return {
+            productId: item.id,
+            sellerId: item.sellerId,
+            title: item.title,
+            brand: item.brand,
+            image: imageUrl,
+            price: item.price,
+            quantity: item.quantity,
+            size: item.selectedSize || null,
+        }
     });
-    router.push('/home');
+    
+    const sellerIds = [...new Set(items.map(item => item.sellerId))];
+
+    const newOrder = {
+        orderNumber: `MRG-${Date.now()}`,
+        buyerId: user.uid,
+        sellerIds,
+        items: orderItems,
+        shippingPrice: shipping,
+        totalAmount: total,
+        paymentStatus: 'pending',
+        paymentMethod,
+        status: 'processing',
+        shippingAddress,
+        createdAt: serverTimestamp(),
+    };
+
+    try {
+        const docRef = await addDoc(collection(firestore, 'orders'), newOrder);
+        toast({
+          title: 'Order Placed!',
+          description: 'Thank you for your purchase. Your order is being processed.',
+          variant: 'success',
+        });
+        clearCart();
+        router.push('/profile/orders');
+    } catch (error) {
+        console.error("Error placing order:", error);
+        const permissionError = new FirestorePermissionError({
+            path: 'orders',
+            operation: 'create',
+            requestResourceData: newOrder,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        toast({
+          variant: 'destructive',
+          title: 'Uh oh! Something went wrong.',
+          description: 'Could not place your order. Please try again.',
+        });
+    } finally {
+        setIsLoading(false);
+    }
   }
+
+  const paymentMethodLabels: { [key: string]: string } = {
+    cod: 'Cash on Delivery',
+    applepay: 'Apple Pay',
+    card: 'Saved Card (Visa **** 4242)',
+    paypal: 'PayPal',
+    'new-card': 'New Credit/Debit Card',
+  };
 
   return (
     <Card>
@@ -49,18 +132,22 @@ export function SummaryStep({ onPrevStep }: SummaryStepProps) {
                 <MapPin className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
                 <div>
                     <h4 className="font-semibold">Shipping Address</h4>
-                    <p className="text-sm text-muted-foreground">Jane Doe, Rruga e Kavajes, Nd 5, H 3, Tirana, 1001, Albania</p>
+                    {shippingAddress ? (
+                        <p className="text-sm text-muted-foreground">{shippingAddress.fullName}, {shippingAddress.address}, {shippingAddress.city} {shippingAddress.postal}, {shippingAddress.country}</p>
+                    ) : (
+                        <p className="text-sm text-destructive">No address selected.</p>
+                    )}
                 </div>
-                <Button variant="link" size="sm" className="ml-auto">Change</Button>
+                <Button variant="link" size="sm" className="ml-auto" onClick={onPrevStep}>Change</Button>
             </div>
             <Separator />
             <div className="flex items-start gap-4">
                 <CreditCard className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
                 <div>
                     <h4 className="font-semibold">Payment Method</h4>
-                    <p className="text-sm text-muted-foreground">Cash on Delivery</p>
+                    <p className="text-sm text-muted-foreground">{paymentMethod ? paymentMethodLabels[paymentMethod] : 'No payment method selected'}</p>
                 </div>
-                <Button variant="link" size="sm" className="ml-auto">Change</Button>
+                <Button variant="link" size="sm" className="ml-auto" onClick={onPrevStep}>Change</Button>
             </div>
         </div>
         
@@ -75,6 +162,7 @@ export function SummaryStep({ onPrevStep }: SummaryStepProps) {
             variant="outline"
             className="w-full"
             onClick={onPrevStep}
+            disabled={isLoading}
           >
             Back to Payment
           </Button>
@@ -82,7 +170,9 @@ export function SummaryStep({ onPrevStep }: SummaryStepProps) {
             size="lg"
             className="w-full"
             onClick={handlePay}
+            disabled={isLoading || !shippingAddress || !paymentMethod}
           >
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Pay Now - {currencyFormatter.format(total)}
           </Button>
       </CardFooter>

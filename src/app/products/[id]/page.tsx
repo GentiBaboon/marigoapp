@@ -1,4 +1,4 @@
-'use client'; // For state management (size, color, carousel)
+'use client'; 
 
 import * as React from 'react';
 import Image from 'next/image';
@@ -17,7 +17,6 @@ import {
   Store,
   ChevronRight,
 } from 'lucide-react';
-
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -33,6 +32,8 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { useCart } from '@/context/CartContext';
+import { useToast } from '@/hooks/use-toast';
 
 // Mock product data for a single product. In a real app, this would be fetched.
 const product = {
@@ -41,10 +42,12 @@ const product = {
   title: 'Classic Medium Double Flap Bag',
   price: 8200,
   originalPrice: 9000,
+  sellerId: 'seller-1',
+  image: 'product-1',
   images: ['product-1', 'banner-3', 'product-7'],
   description:
     'The epitome of timeless elegance, the Chanel Classic Flap bag is a must-have for any luxury connoisseur. Crafted from exquisite quilted lambskin with polished hardware, this iconic piece transitions seamlessly from day to night.',
-  condition: 'like_new',
+  condition: 'like_new' as const,
 };
 
 // Mock seller data
@@ -63,6 +66,12 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [selectedColor, setSelectedColor] = React.useState<string | null>(
     productColors[0]?.name || null
   );
+  const { addToCart } = useCart();
+  const { toast } = useToast();
+
+  const handleAddToCart = () => {
+    addToCart(product, { selectedSize: selectedSize || undefined, selectedColor: selectedColor || undefined });
+  };
 
   const currencyFormatter = new Intl.NumberFormat('de-DE', {
     style: 'currency',
@@ -192,7 +201,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           
           {/* Action Buttons */}
           <div className="flex flex-col gap-3">
-            <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90">Add to Cart</Button>
+            <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90" onClick={handleAddToCart}>Add to Cart</Button>
             <Button size="lg" variant="outline" className="w-full">Make an Offer</Button>
           </div>
           

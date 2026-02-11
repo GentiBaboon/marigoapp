@@ -1,22 +1,18 @@
 'use client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { cartItems } from '@/lib/mock-data';
+import { useCart } from '@/context/CartContext';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export function OrderSummary() {
-  const items = cartItems; // In a real app, this comes from state/context
+  const { items, subtotal } = useCart();
 
   const currencyFormatter = new Intl.NumberFormat('de-DE', {
     style: 'currency',
     currency: 'EUR',
   });
 
-  const subtotal = items.reduce(
-    (acc, item) => acc + item.price * item.quantity,
-    0
-  );
   const shipping = 15; // Example shipping cost
   const total = subtotal + shipping;
 

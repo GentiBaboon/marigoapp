@@ -129,7 +129,7 @@ export interface SellDraft {
 }
 
 
-// --- Product Schemas ---
+// --- Product & Cart Schemas ---
 
 export const productImageSchema = z.object({
   url: z.string(),
@@ -137,7 +137,6 @@ export const productImageSchema = z.object({
   position: z.number().optional(),
 });
 export type ProductImage = z.infer<typeof productImageSchema>;
-
 
 export const firestoreProductSchema = z.object({
   sellerId: z.string(),
@@ -167,18 +166,33 @@ export const firestoreProductSchema = z.object({
 
 export type FirestoreProduct = z.infer<typeof firestoreProductSchema> & { id: string };
 
+export type CartItem = FirestoreProduct & {
+  quantity: number;
+  selectedSize?: string;
+};
+
+
 // --- Order Schemas ---
+const orderItemSchema = z.object({
+  productId: z.string(),
+  sellerId: z.string(),
+  title: z.string(),
+  brand: z.string(),
+  image: z.string(),
+  price: z.number(),
+  quantity: z.number(),
+  size: z.string().optional().nullable(),
+});
+
 export const firestoreOrderSchema = z.object({
   orderNumber: z.string(),
   buyerId: z.string(),
-  sellerId: z.string(),
-  productId: z.string(),
-  itemPrice: z.number(),
-  commissionRate: z.number().optional().nullable(),
-  commissionAmount: z.number().optional().nullable(),
+  sellerIds: z.array(z.string()),
+  items: z.array(orderItemSchema),
   shippingPrice: z.number(),
   totalAmount: z.number(),
   paymentStatus: z.string(),
+  paymentMethod: z.string(),
   paymentIntentId: z.string().optional().nullable(),
   status: z.string(),
   shippingAddress: addressSchema,
