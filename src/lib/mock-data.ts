@@ -44,6 +44,74 @@ export const categories: Category[] = [
   { id: '9', name: 'Art', slug: 'art' },
 ];
 
+export type ProductCategory = {
+  name: string;
+  subcategories: {
+    name: string;
+    slug: string;
+  }[];
+};
+
+export const productCategories: ProductCategory[] = [
+    {
+        name: 'Bags',
+        subcategories: [
+            { name: 'Handbags', slug: 'handbags' },
+            { name: 'Clutch bags', slug: 'clutch-bags' },
+            { name: 'Backpacks', slug: 'backpacks' },
+            { name: 'Travel bags', slug: 'travel-bags' }
+        ]
+    },
+    {
+        name: 'Shoes',
+        subcategories: [
+            { name: 'Boots', slug: 'boots' },
+            { name: 'Trainers', slug: 'trainers' },
+            { name: 'Flats', slug: 'flats' },
+            { name: 'Ballet flats', slug: 'ballet-flats' },
+            { name: 'Sandals', slug: 'sandals' },
+            { name: 'Mules & Clogs', slug: 'mules-clogs' },
+            { name: 'Lace ups', slug: 'lace-ups' },
+            { name: 'Heels', slug: 'heels' },
+            { name: 'Ankle boots', slug: 'ankle-boots' },
+            { name: 'Espadrilles', slug: 'espadrilles' }
+        ]
+    },
+    {
+        name: 'Clothing',
+        subcategories: [
+            { name: 'Knitwear', slug: 'knitwear' },
+            { name: 'Tops', slug: 'tops' },
+            { name: 'Dresses', slug: 'dresses' },
+            { name: 'Skirts', slug: 'skirts' },
+            { name: 'Trousers', slug: 'trousers' },
+            { name: 'Shorts', slug: 'shorts' },
+            { name: 'Jumpsuits', slug: 'jumpsuits' },
+            { name: 'Jeans', slug: 'jeans' },
+            { name: 'Jackets', slug: 'jackets' },
+            { name: 'Coats', slug: 'coats' },
+            { name: 'Leather jackets', slug: 'leather-jackets' },
+            { name: 'Trench coats', slug: 'trench-coats' },
+            { name: 'Lingerie', slug: 'lingerie' },
+            { name: 'Swimwear', slug: 'swimwear' }
+        ]
+    },
+    {
+        name: 'Accessories',
+        subcategories: [
+            { name: 'Sunglasses', slug: 'sunglasses' },
+            { name: 'Wallets', slug: 'wallets' },
+            { name: 'Belts', slug: 'belts' },
+            { name: 'Silk handkerchief', slug: 'silk-handkerchief' },
+            { name: 'Hats', slug: 'hats' },
+            { name: 'Scarves', slug: 'scarves' },
+            { name: 'Purses, wallets & cases', slug: 'purses-wallets-cases' },
+            { name: 'Watches', slug: 'watches' },
+            { name: 'Gloves', slug: 'gloves' }
+        ]
+    }
+];
+
 export const brands = [
     { name: 'Chanel', slug: 'chanel' },
     { name: 'Gucci', slug: 'gucci' },

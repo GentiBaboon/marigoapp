@@ -10,18 +10,11 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { sellStep1Schema } from '@/lib/types';
 import type { z } from 'zod';
-import { categories } from '@/lib/mock-data';
+import { productCategories } from '@/lib/mock-data';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
@@ -29,6 +22,11 @@ import { brands } from '@/lib/mock-data';
 import { StepActions } from '../StepActions';
 
 type Step1Values = z.infer<typeof sellStep1Schema>;
+
+const categoryItems = productCategories.map(group => ({
+    heading: group.name,
+    items: group.subcategories.map(item => ({ value: item.slug, label: item.name })),
+}));
 
 export function CategoryStep() {
   const { formData, setFormData, nextStep } = useSellForm();
@@ -94,22 +92,18 @@ export function CategoryStep() {
           control={form.control}
           name="category"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className="flex flex-col">
               <FormLabel className="font-semibold">Category</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select item type" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.slug}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+               <FormControl>
+                <Combobox
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    items={categoryItems}
+                    placeholder="Select item type"
+                    searchPlaceholder="Search categories..."
+                    emptyPlaceholder="No category found."
+                  />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
