@@ -22,11 +22,11 @@ import { useSellForm } from '@/components/sell/SellFormContext';
 import { sellStep1Schema } from '@/lib/types';
 import type { z } from 'zod';
 import { categories } from '@/lib/mock-data';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { Search } from 'lucide-react';
+import { Combobox } from '@/components/ui/combobox';
+import { brands } from '@/lib/mock-data';
+import { StepActions } from '../StepActions';
 
 type Step1Values = z.infer<typeof sellStep1Schema>;
 
@@ -38,7 +38,7 @@ export function CategoryStep() {
     defaultValues: {
       gender: formData.gender,
       category: formData.category,
-      brand: formData.brand || '',
+      brand: formData.brand,
     },
   });
 
@@ -122,19 +122,24 @@ export function CategoryStep() {
             <FormItem className="flex flex-col">
               <FormLabel className="font-semibold">Brand</FormLabel>
                <FormControl>
-                <div className="relative">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                   <Input placeholder="Brand Name" {...field} className="pl-10" />
-                </div>
+                <Combobox
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    items={brands.map((brand) => ({
+                      value: brand.name,
+                      label: brand.name,
+                    }))}
+                    placeholder="Select brand"
+                    searchPlaceholder="Search brands..."
+                    emptyPlaceholder="No brand found."
+                  />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <Button type="submit" size="lg" className="w-full">
-          Continue
-        </Button>
+        <StepActions onNext={form.handleSubmit(onSubmit)} hideBack />
       </form>
     </Form>
   );
