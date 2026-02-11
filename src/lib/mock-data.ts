@@ -22,6 +22,19 @@ export type SimilarSoldItem = {
     soldDate: string;
 }
 
+export type Seller = {
+  id: string;
+  username: string;
+  avatar: string;
+};
+
+export const sellers: Seller[] = [
+    { id: 'seller-1', username: 'smoke_laughter_gigi', avatar: 'https://picsum.photos/seed/seller1/40/40' },
+    { id: 'seller-2', username: 'bertolino34307352', avatar: 'https://picsum.photos/seed/seller2/40/40' },
+    { id: 'seller-3', username: 'fashion_maven', avatar: 'https://picsum.photos/seed/seller3/40/40' },
+];
+
+
 export type CartProduct = Product & {
   selectedSize: string;
   quantity: number;
@@ -125,6 +138,8 @@ export const brands = [
     { name: 'Fendi', slug: 'fendi' },
     { name: 'Celine', slug: 'celine' },
     { name: 'Lacoste', slug: 'lacoste' },
+    { name: 'VETEMENTS', slug: 'vetements' },
+    { name: 'LORO PIANA', slug: 'loro-piana' },
 ];
 
 export const productConditions = [

@@ -166,12 +166,6 @@ export const firestoreProductSchema = z.object({
 
 export type FirestoreProduct = z.infer<typeof firestoreProductSchema> & { id: string };
 
-export type CartItem = FirestoreProduct & {
-  quantity: number;
-  selectedSize?: string;
-};
-
-
 // --- Order Schemas ---
 const orderItemSchema = z.object({
   productId: z.string(),
@@ -182,6 +176,9 @@ const orderItemSchema = z.object({
   price: z.number(),
   quantity: z.number(),
   size: z.string().optional().nullable(),
+  shippingMethod: z.string(),
+  shippingFee: z.number(),
+  authenticationFee: z.number(),
 });
 
 export const firestoreOrderSchema = z.object({
@@ -189,7 +186,9 @@ export const firestoreOrderSchema = z.object({
   buyerId: z.string(),
   sellerIds: z.array(z.string()),
   items: z.array(orderItemSchema),
+  itemsPrice: z.number(),
   shippingPrice: z.number(),
+  authenticationPrice: z.number(),
   totalAmount: z.number(),
   paymentStatus: z.string(),
   paymentMethod: z.string(),
