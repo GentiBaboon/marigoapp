@@ -2,94 +2,107 @@
 
 import * as React from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
+  type CarouselApi,
 } from '@/components/ui/carousel';
 import {
   Heart,
-  Share2,
-  Star,
   MessageSquare,
-  Store,
-  ChevronRight,
+  Info,
+  MapPin
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProductCard } from '@/components/product-card';
-import {
-  productSizes,
-  productColors,
-  trendingProducts,
-  newArrivals,
-} from '@/lib/mock-data';
+import { trendingProducts, newArrivals } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
 
-// Mock product data for a single product. In a real app, this would be fetched.
+// Mock product data to match the new design
 const product = {
-  id: '1',
-  brand: 'Chanel',
-  title: 'Classic Medium Double Flap Bag',
-  price: 8200,
-  originalPrice: 9000,
-  sellerId: 'seller-1',
-  image: 'product-1',
-  images: ['product-1', 'banner-3', 'product-7'],
-  description:
-    'The epitome of timeless elegance, the Chanel Classic Flap bag is a must-have for any luxury connoisseur. Crafted from exquisite quilted lambskin with polished hardware, this iconic piece transitions seamlessly from day to night.',
-  condition: 'like_new' as const,
+  id: 'polo-1',
+  brand: 'Lacoste',
+  title: 'Polo shirt',
+  price: 41,
+  sellerId: 'seller-constance',
+  images: ['product-polo', 'product-polo-2', 'product-polo-3'],
+  description: 'A classic Lacoste polo shirt in black cotton. A versatile wardrobe staple, perfect for any casual occasion. In very good condition with minimal signs of wear.',
+  condition: 'good' as const,
+  size: 'XXL International',
+  color: 'Black',
+  material: 'Cotton',
+  sellerLocation: 'France'
 };
 
 // Mock seller data
 const seller = {
-  name: 'Luxury Finds Boutique',
-  rating: 4.9,
-  reviews: 124,
-  avatar: 'https://picsum.photos/seed/seller/100/100',
+  id: 'seller-constance',
+  name: 'Constance',
+  avatar: 'https://picsum.photos/seed/constance/100/100',
+  location: 'France'
 };
 
 // Mock related products
 const relatedProducts = [...trendingProducts, ...newArrivals].slice(0, 4);
 
+const PayPalIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" className="h-8 w-auto flex-shrink-0">
+        <path fill="#003087" d="M20.344 6.258c-.297-1.332-1.309-2.22-2.613-2.22H9.27c-.52 0-1.041.34-1.218.846l-3.08 9.539c-.115.356.035.753.39.868l2.969.957c.355.114.753-.035.868-.39l.235-.729a.63.63 0 0 1 .602-.45h.063l4.05-1.236c.356-.115.506-.513.39-.868l-.99-3.06a.63.63 0 0 1 .374-.75l.11-.035c.42-.14.72-.51.68-.96l-.23-1.44c-.03-.2.07-.4.25-.52z"/>
+        <path fill="#009cde" d="M21.11 8.358c-.28-1.33-1.25-2.2-2.48-2.2H8.38c-.5 0-1 .32-1.16.8l-1.92 5.95c-.11.34.03.72.37.83l2.84.9c.34.11.72-.04.83-.38l.38-1.16a.6.6 0 0 1 .57-.42h.06l4.2-1.28c.34-.11.48-.5.37-.83l-.94-2.9a.6.6 0 0 1 .35-.7l.11-.04c.4-.13.68-.48.65-.9l-.22-1.38c-.03-.18.06-.38.24-.5z"/>
+        <path fill="#012169" d="M12.445 13.118l-3.328 1.018a.63.63 0 0 0-.45.602l.236.729c.115.355.494.558.868.45l2.969-.957a.63.63 0 0 0 .45-.602l-.745-2.24z"/>
+    </svg>
+);
+
 export default function ProductDetailPage({ params }: { params: { id: string } }) {
-  const [selectedSize, setSelectedSize] = React.useState<string | null>(null);
-  const [selectedColor, setSelectedColor] = React.useState<string | null>(
-    productColors[0]?.name || null
-  );
   const { addToCart } = useCart();
   const { toast } = useToast();
+  
+  const [api, setApi] = React.useState<CarouselApi>();
+  const [current, setCurrent] = React.useState(0);
+  const [count, setCount] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!api) return;
+    setCount(api.scrollSnapList().length);
+    setCurrent(api.selectedScrollSnap() + 1);
+    api.on('select', () => setCurrent(api.selectedScrollSnap() + 1));
+  }, [api]);
 
   const handleAddToCart = () => {
-    addToCart(product, { selectedSize: selectedSize || undefined, selectedColor: selectedColor || undefined });
+    addToCart({
+      ...product,
+      image: product.images[0]
+    });
   };
 
-  const currencyFormatter = new Intl.NumberFormat('de-DE', {
+  const currencyFormatter = (value: number) => new Intl.NumberFormat('de-DE', {
     style: 'currency',
     currency: 'EUR',
-  });
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+
+  const conditionLabel = product.condition === 'good' ? 'Very good condition' : product.condition.replace('_', ' ');
 
   return (
-    <div className="container mx-auto max-w-6xl px-4 py-6 md:py-10">
+    <div className="container mx-auto max-w-4xl px-0 md:px-4 py-6 md:py-10">
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
         {/* Image Carousel */}
-        <div className="md:sticky md:top-24 self-start">
-           <Carousel className="w-full">
+        <div className="flex flex-col items-center">
+           <Carousel setApi={setApi} className="w-full">
             <CarouselContent>
               {product.images.map((imgId, index) => {
                 const imageData = PlaceHolderImages.find((p) => p.id === imgId);
                 return (
                   <CarouselItem key={index}>
-                    <div className="aspect-square relative bg-muted rounded-lg overflow-hidden">
+                    <div className="aspect-[3/4] relative bg-muted rounded-lg overflow-hidden">
                       {imageData && (
                         <Image
                           src={imageData.imageUrl}
@@ -97,6 +110,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                           fill
                           className="object-cover"
                           sizes="(max-width: 768px) 100vw, 50vw"
+                          priority={index === 0}
                         />
                       )}
                     </div>
@@ -104,153 +118,68 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 );
               })}
             </CarouselContent>
-            <CarouselPrevious className="absolute left-4 hidden md:flex" />
-            <CarouselNext className="absolute right-4 hidden md:flex" />
           </Carousel>
+          <div className="flex items-center space-x-2 mt-4">
+            {Array.from({ length: count }).map((_, index) => (
+              <div
+                key={index}
+                className={cn('h-2 w-2 rounded-full transition-colors', 
+                  index + 1 === current ? 'bg-foreground' : 'bg-muted'
+                )}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Product Details */}
-        <div className="flex flex-col gap-6">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-muted-foreground">
-                {product.brand}
-              </h2>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon">
-                  <Share2 className="h-5 w-5" />
-                  <span className="sr-only">Share</span>
-                </Button>
-                <Button variant="ghost" size="icon">
-                  <Heart className="h-5 w-5" />
-                  <span className="sr-only">Add to wishlist</span>
-                </Button>
-              </div>
-            </div>
-            <h1 className="text-3xl font-bold font-headline tracking-tight">
-              {product.title}
-            </h1>
-            <div className="flex items-baseline gap-3">
-              <span className="text-3xl font-bold text-destructive">
-                {currencyFormatter.format(product.price)}
-              </span>
-              {product.originalPrice && (
-                <span className="text-xl text-muted-foreground line-through">
-                  {currencyFormatter.format(product.originalPrice)}
-                </span>
-              )}
-            </div>
-            <Badge variant="outline" className="capitalize">
-              Condition: {product.condition.replace('_', ' ')}
-            </Badge>
+        <div className="flex flex-col gap-6 px-4 md:px-0">
+          <div className="space-y-1">
+            <h1 className="text-4xl font-headline text-foreground">{product.brand}</h1>
+            <p className="text-lg text-muted-foreground">{product.title}</p>
           </div>
 
-          <Separator />
-
-          {/* Color Selector */}
-          <div>
-            <h3 className="text-sm font-medium mb-2">Color: <span className="font-normal text-muted-foreground">{selectedColor}</span></h3>
-            <div className="flex flex-wrap gap-2">
-              {productColors.map((color) => (
-                <Button
-                  key={color.name}
-                  variant="outline"
-                  size="icon"
-                  className={cn('rounded-full h-8 w-8', {
-                    'ring-2 ring-primary ring-offset-2':
-                      selectedColor === color.name,
-                  })}
-                  onClick={() => setSelectedColor(color.name)}
-                >
-                  <div
-                    className="h-6 w-6 rounded-full border"
-                    style={{ backgroundColor: color.hex }}
-                  ></div>
-                  <span className="sr-only">{color.name}</span>
-                </Button>
-              ))}
+          <div className="flex items-start justify-between">
+            <div className="space-y-1 text-sm">
+                <p className="text-2xl font-bold flex items-center">{currencyFormatter(product.price)} <Info className="h-4 w-4 ml-2 text-muted-foreground"/></p>
+                <p>{product.size} <Link href="#" className="underline text-muted-foreground">Size guide</Link></p>
+                <p>{conditionLabel} <Link href="#" className="underline text-muted-foreground">More info</Link></p>
+                <p>{product.color}, {product.material}</p>
             </div>
+             <Avatar className="h-12 w-12">
+                <AvatarImage src={seller.avatar} alt={seller.name} />
+                <AvatarFallback>{seller.name.charAt(0)}</AvatarFallback>
+            </Avatar>
           </div>
 
-          {/* Size Selector */}
-          <div>
-            <h3 className="text-sm font-medium mb-2">Size</h3>
-             <RadioGroup
-              value={selectedSize || ''}
-              onValueChange={setSelectedSize}
-              className="flex flex-wrap gap-2"
-            >
-              {productSizes.map((size) => (
-                 <div key={size} className="flex items-center">
-                   <RadioGroupItem value={size} id={`size-${size}`} className="sr-only" />
-                   <Label
-                    htmlFor={`size-${size}`}
-                    className={cn(
-                      "flex items-center justify-center rounded-md border text-sm font-medium p-2 h-9 w-12 cursor-pointer hover:bg-accent hover:text-accent-foreground",
-                      selectedSize === size && "bg-primary text-primary-foreground hover:bg-primary/90"
-                    )}
-                   >
-                     {size}
-                   </Label>
-                 </div>
-              ))}
-            </RadioGroup>
+          <div className="flex items-center gap-4 rounded-lg bg-gray-100 p-3">
+              <PayPalIcon />
+              <p className="text-sm text-gray-800">
+                  Pay in 3 interest-free payments of €13,67. <Link href="#" className="underline font-semibold">Learn more</Link>
+              </p>
           </div>
           
-          <Separator />
-          
-          {/* Action Buttons */}
           <div className="flex flex-col gap-3">
-            <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90" onClick={handleAddToCart}>Add to Cart</Button>
-            <Button size="lg" variant="outline" className="w-full">Make an Offer</Button>
-          </div>
-          
-          <Separator />
-
-          {/* Description */}
-          <div>
-            <h3 className="font-bold text-lg mb-2 font-headline">Description</h3>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              {product.description}
-            </p>
+            <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90 h-12 text-base" onClick={handleAddToCart}>Add to bag</Button>
+            <Button size="lg" variant="outline" className="w-full h-12 text-base">Make an offer</Button>
+             <Button size="lg" variant="outline" className="w-full h-12 text-base">
+                <MessageSquare className="mr-2 h-5 w-5"/> Chat
+            </Button>
           </div>
           
           <Separator />
           
-          {/* Seller Card */}
-          <div className="rounded-lg border bg-card text-card-foreground">
-            <div className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                     <Avatar>
-                        <AvatarImage src={seller.avatar} alt={seller.name} />
-                        <AvatarFallback>{seller.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="grid gap-0.5">
-                        <p className="font-semibold">{seller.name}</p>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Star className="w-4 h-4 fill-accent stroke-accent" />
-                            <span>{seller.rating} ({seller.reviews} reviews)</span>
-                        </div>
-                    </div>
-                </div>
-                <Button variant="ghost" size="icon">
-                    <ChevronRight className="h-5 w-5" />
-                </Button>
-            </div>
-             <div className="border-t p-4 flex justify-around">
-                <Button variant="outline" className="flex-1 mr-2">
-                    <Store className="mr-2 h-4 w-4"/> Visit Store
-                </Button>
-                 <Button variant="outline" className="flex-1 ml-2">
-                    <MessageSquare className="mr-2 h-4 w-4"/> Contact Seller
-                </Button>
-            </div>
+          <div className="text-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <MapPin className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <p>{product.sellerLocation}, from the seller {seller.name} <Link href="#" className="underline text-muted-foreground">More info</Link></p>
+              </div>
+              <p className="text-muted-foreground">{product.description}</p>
           </div>
         </div>
       </div>
 
       {/* Suggested Products */}
-      <div className="mt-16">
+      <div className="mt-16 px-4 md:px-0">
         <h2 className="text-2xl font-bold font-headline mb-6">
           You Might Also Like
         </h2>
