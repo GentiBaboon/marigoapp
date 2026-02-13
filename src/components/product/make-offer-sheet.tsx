@@ -109,13 +109,9 @@ export function MakeOfferSheet({ isOpen, onOpenChange, product }: MakeOfferSheet
 
     try {
       const offersCollection = collection(firestore, 'products', product.id, 'offers');
-      await addDoc(offersCollection, offerData);
-      toast({
-        title: 'Offer Sent!',
-        description: `Your offer of ${currencyFormatter(selectedOffer)} has been sent to the seller.`,
-        variant: 'success',
-      });
+      const docRef = await addDoc(offersCollection, offerData);
       onOpenChange(false);
+      router.push(`/products/${product.id}/offers/${docRef.id}`);
     } catch (error) {
       console.error('Error sending offer:', error);
       errorEmitter.emit('permission-error', new FirestorePermissionError({

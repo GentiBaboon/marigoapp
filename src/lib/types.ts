@@ -166,6 +166,18 @@ export const firestoreProductSchema = z.object({
 
 export type FirestoreProduct = z.infer<typeof firestoreProductSchema> & { id: string };
 
+export const firestoreOfferSchema = z.object({
+  buyerId: z.string(),
+  amount: z.number(),
+  message: z.string().optional(),
+  status: z.enum(['pending', 'accepted', 'rejected', 'countered', 'expired']),
+  counterAmount: z.number().optional(),
+  expiresAt: z.any().optional(),
+  createdAt: z.any(),
+});
+export type FirestoreOffer = z.infer<typeof firestoreOfferSchema> & { id: string };
+
+
 // --- Order Schemas ---
 const orderItemSchema = z.object({
   productId: z.string(),
