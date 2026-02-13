@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { Home, Heart, Plus, User, Search } from 'lucide-react';
+import { Home, Heart, Plus, User, SlidersHorizontal } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/firebase';
@@ -13,7 +13,7 @@ export function MobileNav() {
 
     const navItems = [
         { href: '/home', label: 'Home', icon: Home, requiresAuth: false },
-        { href: '/search', label: 'Shop', icon: Search, requiresAuth: false },
+        { href: '/browse', label: 'Shop', icon: SlidersHorizontal, requiresAuth: false },
         { href: '/sell', label: 'Sell', icon: Plus, requiresAuth: true },
         { href: '/favorites', label: 'Favorites', icon: Heart, requiresAuth: true },
         { href: '/profile', label: 'Me', icon: User, requiresAuth: true },

@@ -603,4 +603,35 @@ export const mockMessages = {
     ]
 } as Record<string, FirestoreMessage[]>;
 
+
+export const browseCategories = {
+  women: [
+    { name: "Women's Homepage", href: "/browse/women" },
+    { name: "Bags", href: "/browse/women/bags" },
+    { name: "Clothing", href: "/browse/women/clothing" },
+    { name: "Shoes", href: "/browse/women/shoes" },
+    { name: "Jewellery", href: "/browse/women/jewellery" },
+    { name: "Watches", href: "/browse/women/watches" },
+    { name: "Accessories", href: "/browse/women/accessories" },
+  ],
+  men: [
+    { name: "Men's Homepage", href: "/browse/men" },
+    { name: "Clothing", href: "/browse/men/clothing" },
+    { name: "Shoes", href: "/browse/men/shoes" },
+    { name: "Accessories", href: "/browse/men/accessories" },
+    { name: "Watches", href: "/browse/men/watches" },
+  ],
+  children: [
+    { name: "Children's Homepage", href: "/browse/children" },
+    { name: "Girls", href: "/browse/children/girls" },
+    { name: "Boys", href: "/browse/children/boys" },
+    { name: "Baby", href: "/browse/children/baby" },
+  ],
+};
+
+export const browseBanners = [
+    { id: 'new-arrivals', title: 'New Arrivals for You', description: 'A daily drop, personalized for you', image: 'banner-new-arrivals', href: '/browse/new-arrivals' },
+    { id: 'designers', title: 'Designers', description: 'A-Z of brands and official partners', image: 'banner-designers', href: '/browse/designers' },
+    { id: 'we-love', title: 'We Love', description: '', image: 'banner-we-love', href: '/browse/we-love' }
+];
     
