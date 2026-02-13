@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase';
 import { CartProvider } from '@/context/CartContext';
+import { ShoppingPreferenceModal } from '@/components/home/ShoppingPreferenceModal';
 
 export const metadata: Metadata = {
   title: 'MarigoApp',
@@ -42,6 +43,7 @@ export default function RootLayout({
               <Header />
               <main className="flex-1 pb-16 md:pb-0">{children}</main>
               <MobileNav />
+              <ShoppingPreferenceModal />
             </div>
             <Toaster />
           </CartProvider>

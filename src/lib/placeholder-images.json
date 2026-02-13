@@ -221,6 +221,18 @@
       "description": "A yellow polo knitwear shirt",
       "imageUrl": "https://images.unsplash.com/photo-1621217036499-158a434254ad?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx5ZWxsb3clMjBwb2xvfGVufDB8fHx8MTc3MDkyNTc3NHww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "yellow polo"
+    },
+    {
+      "id": "preference-women",
+      "description": "A woman wearing a stylish beige blazer",
+      "imageUrl": "https://images.unsplash.com/photo-1551873418-500a127265ea?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHx3b21hbiUyMGluJTIwYmxhemVyfGVufDB8fHx8MTc3MDk5OTg0OXww&ixlib=rb-4.1.0&q=80&w=400",
+      "imageHint": "woman blazer"
+    },
+    {
+      "id": "preference-men",
+      "description": "A man wearing a cream colored sweater with a small heart logo",
+      "imageUrl": "https://images.unsplash.com/photo-1574297500578-afae55026ff2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxtYW4lMjBpbiUyMHN3ZWF0ZXJ8ZW58MHx8fHwxNzcwOTk5ODQ5fDA&ixlib=rb-4.1.0&q=80&w=400",
+      "imageHint": "man sweater"
     }
   ]
 }

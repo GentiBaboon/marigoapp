@@ -7,13 +7,9 @@ export default function SplashPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Check if onboarding is complete and redirect immediately
-    const onboardingComplete = localStorage.getItem('marigo_onboarding_complete');
-    if (onboardingComplete === 'true') {
-      router.replace('/home');
-    } else {
-      router.replace('/language');
-    }
+    // For this new flow, we always go to the home page.
+    // The shopping preference popup will be handled there.
+    router.replace('/home');
   }, [router]);
 
   return (
