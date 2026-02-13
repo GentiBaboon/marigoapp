@@ -24,6 +24,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
+import { MakeOfferSheet } from '@/components/product/make-offer-sheet';
 
 // Mock product data to match the new design
 const product = {
@@ -67,6 +68,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [api, setApi] = React.useState<CarouselApi>();
   const [current, setCurrent] = React.useState(0);
   const [count, setCount] = React.useState(0);
+  const [isOfferSheetOpen, setIsOfferSheetOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!api) return;
@@ -160,7 +162,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           
           <div className="flex flex-col gap-3">
             <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90 h-12 text-base" onClick={handleAddToCart}>Add to bag</Button>
-            <Button size="lg" variant="outline" className="w-full h-12 text-base">Make an offer</Button>
+            <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={() => setIsOfferSheetOpen(true)}>Make an offer</Button>
              <Button size="lg" variant="outline" className="w-full h-12 text-base">
                 <MessageSquare className="mr-2 h-5 w-5"/> Chat
             </Button>
@@ -189,6 +191,12 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           ))}
         </div>
       </div>
+
+      <MakeOfferSheet
+        isOpen={isOfferSheetOpen}
+        onOpenChange={setIsOfferSheetOpen}
+        product={product}
+      />
     </div>
   );
 }
