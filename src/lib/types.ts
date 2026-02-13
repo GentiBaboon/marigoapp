@@ -248,11 +248,12 @@ export type FirestoreReview = z.infer<typeof firestoreReviewSchema> & { id: stri
 // --- Notification Schema ---
 export const firestoreNotificationSchema = z.object({
   userId: z.string(),
-  type: z.enum(['offer_received', 'item_sold', 'new_message', 'order_update', 'review_received', 'welcome']),
+  type: z.enum(['offer_received', 'item_sold', 'new_message', 'order_update', 'review_received', 'welcome', 'listing_suggestion', 'price_drop_suggestion', 'item_liked', 'order_reminder']),
   title: z.string(),
   message: z.string(),
   data: z.object({
     link: z.string().optional(),
+    imageUrl: z.string().optional(),
   }).optional(),
   read: z.boolean().default(false),
   createdAt: z.any(),

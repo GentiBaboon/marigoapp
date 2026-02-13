@@ -7,25 +7,18 @@ import {
   query,
   where,
   orderBy,
-  doc,
-  writeBatch,
 } from 'firebase/firestore';
-
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import type { FirestoreNotification } from '@/lib/types';
+import type { FirestoreNotification, FirestoreConversation } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
-import { useToast } from '@/hooks/use-toast';
-
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { formatDistanceToNowStrict } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ConversationListItem, ConversationSkeleton } from '@/components/messages/conversation-list-item';
+import Image from 'next/image';
+import { MarigoVIcon } from '@/components/icons/MarigoVIcon';
 import {
   Bell,
   Tag,
@@ -33,9 +26,10 @@ import {
   Package,
   Star,
   PartyPopper,
-  BellOff,
-  Check,
+  X,
+  BellOff
 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const notificationIcons: Record<string, React.ElementType> = {
   offer_received: Tag,
@@ -44,33 +38,60 @@ const notificationIcons: Record<string, React.ElementType> = {
   order_update: Package,
   review_received: Star,
   welcome: PartyPopper,
+  listing_suggestion: MarigoVIcon,
+  default: Bell,
 };
 
-function NotificationSkeleton() {
+function formatShortDistanceToNow(date: Date) {
+    const distance = formatDistanceToNowStrict(date);
+    // Simplified mapping
+    const replacements: Record<string, string> = {
+        ' seconds': 's',
+        ' second': 's',
+        ' minutes': 'm',
+        ' minute': 'm',
+        ' hours': 'h',
+        ' hour': 'h',
+        ' days': 'd',
+        ' day': 'd',
+        ' weeks': 'w',
+        ' week': 'w',
+        ' months': 'mo',
+        ' month': 'mo',
+        ' years': 'y',
+        ' year': 'y',
+    };
+    for (const key in replacements) {
+        if (distance.endsWith(key)) {
+            return distance.replace(key, replacements[key]);
+        }
+    }
+    return distance;
+}
+
+function UpdatesSkeleton() {
   return (
     <div className="space-y-4 p-4">
-      {[...Array(3)].map((_, i) => (
-        <div key={i} className="flex items-start space-x-4">
-          <Skeleton className="h-8 w-8 rounded-full mt-1" />
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="flex items-center space-x-4">
+          <Skeleton className="h-10 w-10 rounded-md" />
           <div className="space-y-2 flex-1">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="h-3 w-1/4 mt-1" />
           </div>
+          <Skeleton className="h-4 w-12" />
         </div>
       ))}
     </div>
   );
 }
 
-function EmptyState() {
+function EmptyState({ title, message }: { title: string, message: string}) {
   return (
-    <div className="text-center py-20 px-4">
+    <div className="text-center py-20 px-4 flex flex-col items-center justify-center h-full">
       <BellOff className="mx-auto h-16 w-16 text-muted-foreground" />
-      <h2 className="mt-6 text-xl font-semibold">No notifications yet</h2>
-      <p className="mt-2 text-muted-foreground">
-        Important updates about your activity will appear here.
-      </p>
+      <h2 className="mt-6 text-xl font-semibold">{title}</h2>
+      <p className="mt-2 text-muted-foreground">{message}</p>
     </div>
   );
 }
@@ -78,8 +99,8 @@ function EmptyState() {
 export default function NotificationsPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
-  const { toast } = useToast();
 
+  // --- Data Fetching ---
   const notificationsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return query(
@@ -91,28 +112,31 @@ export default function NotificationsPage() {
 
   const { data: notifications, isLoading: areNotificationsLoading } =
     useCollection<FirestoreNotification>(notificationsQuery);
-    
-  const isLoading = isUserLoading || areNotificationsLoading;
 
-  const handleMarkAllAsRead = async () => {
-    if (!firestore || !user || !notifications) return;
-    const unreadNotifications = notifications.filter(n => !n.read);
-    if (unreadNotifications.length === 0) return;
+  const conversationsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(
+        collection(firestore, 'conversations'),
+        where('participants', 'array-contains', user.uid),
+        orderBy('lastMessageAt', 'desc')
+    );
+  }, [user, firestore]);
 
-    const batch = writeBatch(firestore);
-    unreadNotifications.forEach(notif => {
-        const notifRef = doc(firestore, 'notifications', notif.id);
-        batch.update(notifRef, { read: true });
-    });
+  const { data: conversations, isLoading: areConversationsLoading } = useCollection<FirestoreConversation>(conversationsQuery);
+  
+  const isLoading = isUserLoading || areNotificationsLoading || areConversationsLoading;
 
-    try {
-        await batch.commit();
-        toast({ title: "All notifications marked as read." });
-    } catch (e) {
-        console.error("Failed to mark all notifications as read", e);
-        toast({ variant: 'destructive', title: "Error", description: "Could not mark all as read." });
-    }
-  };
+  // --- Unread Counts ---
+  const unreadUpdatesCount = React.useMemo(() => {
+      return notifications?.filter(n => !n.read).length || 0;
+  }, [notifications]);
+
+  const unreadMessagesCount = React.useMemo(() => {
+      if (!conversations || !user) return 0;
+      return conversations.reduce((acc, convo) => {
+          return acc + (convo.unreadCount?.[user.uid] || 0);
+      }, 0);
+  }, [conversations, user]);
 
 
   if (!user && !isUserLoading) {
@@ -134,66 +158,93 @@ export default function NotificationsPage() {
       </div>
     );
   }
-  
-  const hasUnread = notifications?.some(n => !n.read);
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-3xl">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="font-headline text-3xl">Notifications</CardTitle>
-              <CardDescription>
-                Your latest updates from the marketplace.
-              </CardDescription>
-            </div>
-            <Button variant="ghost" onClick={handleMarkAllAsRead} disabled={!hasUnread || isLoading}>
-                <Check className="mr-2 h-4 w-4"/>
-                Mark all as read
+    <div className="h-screen bg-background flex flex-col">
+        <header className="flex items-center justify-between p-4 border-b">
+            <h1 className="text-xl font-bold">Notifications</h1>
+            <Button asChild variant="ghost" size="icon">
+                <Link href="/home">
+                    <X className="h-5 w-5" />
+                    <span className="sr-only">Close</span>
+                </Link>
             </Button>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <NotificationSkeleton />
-          ) : notifications && notifications.length > 0 ? (
-            <div className="divide-y">
-              {notifications.map((notification) => {
-                const Icon = notificationIcons[notification.type] || Bell;
-                const content = (
-                    <div className={cn("flex items-start gap-4 p-4", !notification.read && "bg-primary/5")}>
-                        <div className="relative">
-                            <Icon className="h-6 w-6 text-muted-foreground mt-1" />
-                            {!notification.read && (
-                                <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-                                </span>
-                            )}
+        </header>
+
+        <Tabs defaultValue="updates" className="flex-1 flex flex-col">
+            <TabsList className="grid w-full grid-cols-2 rounded-none h-auto p-0 bg-background border-b">
+                <TabsTrigger value="updates" className="h-12 rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary text-base text-muted-foreground gap-2">
+                    Updates {unreadUpdatesCount > 0 && <Badge className="h-5 px-2">{unreadUpdatesCount}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="messages" className="h-12 rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary text-base text-muted-foreground gap-2">
+                    Messages {unreadMessagesCount > 0 && <Badge className="h-5 px-2">{unreadMessagesCount}</Badge>}
+                </TabsTrigger>
+            </TabsList>
+            
+            <div className="flex-1 overflow-y-auto">
+                <TabsContent value="updates" className="m-0">
+                    {isLoading ? (
+                        <UpdatesSkeleton />
+                    ) : notifications && notifications.length > 0 ? (
+                        <div className="divide-y">
+                            {notifications.map((notification) => {
+                                const Icon = notificationIcons[notification.type] || notificationIcons.default;
+                                const content = (
+                                    <div className={cn("flex items-center gap-4 p-4")}>
+                                        <div className="relative h-10 w-10 flex-shrink-0 flex items-center justify-center">
+                                            {notification.data?.imageUrl ? (
+                                                <Image src={notification.data.imageUrl} alt={notification.title} fill sizes="40px" className="rounded-md object-cover" />
+                                            ) : (
+                                                <Icon className="h-8 w-8 text-muted-foreground"/>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 space-y-0.5">
+                                            <p className="text-sm font-medium leading-tight">{notification.title}</p>
+                                            <p className="text-sm text-muted-foreground leading-tight">{notification.message}</p>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1 self-start">
+                                            <p className="text-xs text-muted-foreground whitespace-nowrap">
+                                                {formatShortDistanceToNow(new Date(notification.createdAt.seconds * 1000))}
+                                            </p>
+                                            {!notification.read && (
+                                                <span className="h-2 w-2 rounded-full bg-red-500 mt-1"></span>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                                
+                                return notification.data?.link ? (
+                                    <Link key={notification.id} href={notification.data.link} className="block hover:bg-muted/50 transition-colors">
+                                        {content}
+                                    </Link>
+                                ) : (
+                                    <div key={notification.id}>{content}</div>
+                                )
+                            })}
                         </div>
-                        <div className="flex-1 space-y-1">
-                            <p className="font-medium">{notification.title}</p>
-                            <p className="text-sm text-muted-foreground">{notification.message}</p>
-                            <p className="text-xs text-muted-foreground pt-1">
-                                {formatDistanceToNow(new Date(notification.createdAt.seconds * 1000), { addSuffix: true })}
-                            </p>
+                    ) : (
+                        <EmptyState title="No updates" message="Updates about your items and orders will appear here."/>
+                    )}
+                </TabsContent>
+                <TabsContent value="messages" className="m-0">
+                     {isLoading ? (
+                        <div className="space-y-2 border-t">
+                            <ConversationSkeleton />
+                            <ConversationSkeleton />
+                            <ConversationSkeleton />
                         </div>
-                    </div>
-                );
-                
-                return notification.data?.link ? (
-                    <Link key={notification.id} href={notification.data.link} className="block hover:bg-muted/50 transition-colors">
-                        {content}
-                    </Link>
-                ) : (
-                    <div key={notification.id}>{content}</div>
-                )
-              })}
+                    ) : conversations && conversations.length > 0 ? (
+                        <div className="border-t">
+                            {conversations.map(convo => (
+                                <ConversationListItem key={convo.id} conversation={convo} currentUserId={user.uid} />
+                            ))}
+                        </div>
+                    ) : (
+                        <EmptyState title="No messages" message="Your conversations with other members will appear here." />
+                    )}
+                </TabsContent>
             </div>
-          ) : (
-            <EmptyState />
-          )}
-        </CardContent>
-      </Card>
+        </Tabs>
     </div>
   );
 }
