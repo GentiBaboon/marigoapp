@@ -43,20 +43,12 @@ export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
 export const firestoreUserSchema = z.object({
   id: z.string(),
-  email: z.string().email().optional(),
   name: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  role: z.enum(["buyer", "seller", "courier", "admin"]).optional(),
-  profileImage: z.string().url().optional().nullable(),
-  bio: z.string().optional().nullable(),
-  language: z.enum(["sq", "en", "it"]).optional(),
-  currency: z.enum(["EUR", "ALL", "USD"]).optional(),
-  stripeCustomerId: z.string().optional().nullable(),
-  stripeAccountId: z.string().optional().nullable(),
-  rating: z.number().optional().nullable(),
-  reviewCount: z.number().optional().nullable(),
+  email: z.string().email().optional(),
+  shoppingPreference: z.enum(["womenswear", "menswear"]).optional(),
+  hasAcceptedChatRules: z.boolean().optional(),
+  isSeller: z.boolean().optional(),
   createdAt: z.any().optional(),
-  lastLoginAt: z.any().optional().nullable(),
 });
 export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
 
@@ -291,3 +283,5 @@ export const firestoreNotificationSchema = z.object({
   createdAt: z.any(),
 });
 export type FirestoreNotification = z.infer<typeof firestoreNotificationSchema> & { id: string };
+
+    

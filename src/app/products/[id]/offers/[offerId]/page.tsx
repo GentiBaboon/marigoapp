@@ -70,7 +70,7 @@ function OfferTimeline({ offer, product, buyer, seller }: { offer: FirestoreOffe
             {history.map((item, index) => (
                 <div key={index} className="flex items-start gap-3">
                     <Avatar className="h-8 w-8">
-                        <AvatarImage src={item.actor?.profileImage || undefined} />
+                        <AvatarImage src={undefined} />
                         <AvatarFallback>{item.actor?.name?.[0] || 'U'}</AvatarFallback>
                     </Avatar>
                     <div>
@@ -265,3 +265,5 @@ export default function OfferDetailsPage({ params }: { params: { id: string; off
       </div>
     );
 }
+
+    

@@ -5,22 +5,41 @@
       "type": "object",
       "description": "Represents a user in the MarigoApp marketplace.",
       "properties": {
-        "email": { "type": "string", "format": "email" },
-        "name": { "type": "string" },
-        "phone": { "type": "string" },
-        "role": { "type": "string", "enum": ["buyer", "seller", "courier", "admin"] },
-        "profileImage": { "type": "string", "format": "uri" },
-        "bio": { "type": "string" },
-        "language": { "type": "string", "enum": ["sq", "en", "it"] },
-        "currency": { "type": "string", "enum": ["EUR", "ALL", "USD"] },
-        "stripeCustomerId": { "type": "string" },
-        "stripeAccountId": { "type": "string" },
-        "rating": { "type": "number" },
-        "reviewCount": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "lastLoginAt": { "type": "string", "format": "date-time" }
+        "name": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "shoppingPreference": {
+          "type": "string",
+          "enum": [
+            "womenswear",
+            "menswear"
+          ],
+          "description": "The user's preferred shopping category."
+        },
+        "hasAcceptedChatRules": {
+          "type": "boolean",
+          "description": "Whether the user has accepted the chat rules."
+        },
+        "isSeller": {
+          "type": "boolean",
+          "description": "Whether the user is a seller."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of user creation."
+        }
       },
-      "required": ["email", "role", "language", "currency", "createdAt"]
+      "required": [
+        "email",
+        "createdAt"
+      ]
     },
     "Address": {
       "title": "Address",
@@ -280,3 +299,5 @@
     ]
   }
 }
+
+    
