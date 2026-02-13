@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import type { FirestoreConversation } from '@/lib/types';
@@ -8,6 +9,7 @@ import { MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { ChatRulesDialog } from '@/components/messages/chat-rules-dialog';
 
 function EmptyState() {
     return (
@@ -27,6 +29,31 @@ function EmptyState() {
 export default function MessagesPage() {
     const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
+    const [showRules, setShowRules] = React.useState(false);
+
+    React.useEffect(() => {
+        // We only check for this on the client-side
+        if (typeof window !== 'undefined') {
+            const rulesAccepted = localStorage.getItem('marigo_chat_rules_accepted');
+            if (!rulesAccepted) {
+                setShowRules(true);
+            }
+        }
+    }, []);
+
+    const handleAcceptRules = () => {
+        localStorage.setItem('marigo_chat_rules_accepted', 'true');
+        setShowRules(false);
+    };
+
+    const handleOpenChange = (isOpen: boolean) => {
+        // Prevent closing the dialog until rules are accepted
+        if (!isOpen && !localStorage.getItem('marigo_chat_rules_accepted')) {
+            return;
+        }
+        setShowRules(isOpen);
+    };
+
 
     const conversationsQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -62,27 +89,36 @@ export default function MessagesPage() {
   }
 
     return (
-        <Card className="h-full">
-            <CardHeader>
-                <CardTitle className="text-2xl font-bold">Messages</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 h-[calc(100%-4rem)] overflow-y-auto">
-                {isLoading ? (
-                     <div className="space-y-2 p-4">
-                        <ConversationSkeleton />
-                        <ConversationSkeleton />
-                        <ConversationSkeleton />
-                    </div>
-                ) : conversations && conversations.length > 0 ? (
-                    <div className="border-t">
-                        {conversations.map(convo => (
-                            <ConversationListItem key={convo.id} conversation={convo} currentUserId={user.uid} />
-                        ))}
-                    </div>
-                ) : (
-                    <EmptyState />
-                )}
-            </CardContent>
-        </Card>
+        <>
+            {user && (
+                <ChatRulesDialog 
+                    isOpen={showRules} 
+                    onAccept={handleAcceptRules}
+                    onOpenChange={handleOpenChange}
+                />
+            )}
+            <Card className="h-full">
+                <CardHeader>
+                    <CardTitle className="text-2xl font-bold">Messages</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0 h-[calc(100%-4rem)] overflow-y-auto">
+                    {isLoading ? (
+                        <div className="space-y-2 p-4">
+                            <ConversationSkeleton />
+                            <ConversationSkeleton />
+                            <ConversationSkeleton />
+                        </div>
+                    ) : conversations && conversations.length > 0 ? (
+                        <div className="border-t">
+                            {conversations.map(convo => (
+                                <ConversationListItem key={convo.id} conversation={convo} currentUserId={user.uid} />
+                            ))}
+                        </div>
+                    ) : (
+                        <EmptyState />
+                    )}
+                </CardContent>
+            </Card>
+        </>
     )
 }
