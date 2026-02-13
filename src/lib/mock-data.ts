@@ -90,9 +90,12 @@ export const productCategories: ProductCategory[] = [
         name: 'Bags',
         subcategories: [
             { name: 'Handbags', slug: 'handbags' },
+            { name: 'Crossbody bags', slug: 'crossbody-bags' },
+            { name: 'Shoulder Bags', slug: 'shoulder-bags' },
+            { name: 'Tote bags', slug: 'tote-bags' },
             { name: 'Clutch bags', slug: 'clutch-bags' },
+            { name: 'Travel bags', slug: 'travel-bags' },
             { name: 'Backpacks', slug: 'backpacks' },
-            { name: 'Travel bags', slug: 'travel-bags' }
         ]
     },
     {
