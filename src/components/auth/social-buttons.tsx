@@ -6,7 +6,8 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/firebase';
 import { signInWithGoogle, signInWithApple } from '@/firebase/auth/actions';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
+import { Button, type ButtonProps } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -32,7 +33,7 @@ const AppleIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export function SocialButtons() {
+export function SocialButtons({ variant = 'outline', className }: { variant?: ButtonProps['variant'], className?: string}) {
   const [loading, setLoading] = useState<null | 'google' | 'apple'>(null);
   const router = useRouter();
   const auth = useAuth();
@@ -59,22 +60,9 @@ export function SocialButtons() {
 
   return (
     <div className="space-y-4">
-      <Button
-        variant="outline"
-        className="w-full"
-        onClick={() => handleSocialLogin('google')}
-        disabled={!!loading}
-      >
-        {loading === 'google' ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
-          <GoogleIcon className="mr-2 h-4 w-4" />
-        )}
-        Continue with Google
-      </Button>
-      <Button
-        variant="outline"
-        className="w-full"
+       <Button
+        variant={variant}
+        className={cn("w-full", className)}
         onClick={() => handleSocialLogin('apple')}
         disabled={!!loading}
       >
@@ -84,6 +72,19 @@ export function SocialButtons() {
           <AppleIcon className="mr-2 h-4 w-4 fill-current" />
         )}
         Continue with Apple
+      </Button>
+      <Button
+        variant={variant}
+        className={cn("w-full", className)}
+        onClick={() => handleSocialLogin('google')}
+        disabled={!!loading}
+      >
+        {loading === 'google' ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <GoogleIcon className="mr-2 h-4 w-4" />
+        )}
+        Continue with Google
       </Button>
     </div>
   );

@@ -1,73 +1,73 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LoginForm } from '@/components/auth/login-form';
-import { SignupForm } from '@/components/auth/signup-form';
-import { SocialButtons } from '@/components/auth/social-buttons';
-import { Separator } from '@/components/ui/separator';
+'use client';
+import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { SocialButtons } from '@/components/auth/social-buttons';
+import { useUser } from '@/firebase';
+import { useEffect } from 'react';
 
-export default function AuthenticationPage() {
-  return (
-    <Card>
-      <CardHeader className="text-center">
-        <Link href="/" className="flex items-center justify-center space-x-2">
-            <span className="inline-block font-logo font-bold text-3xl bg-gradient-to-r from-primary to-purple-400 text-transparent bg-clip-text">
-              marigo
-            </span>
-          </Link>
-        <CardTitle className="font-headline text-2xl pt-4">
-          Welcome to the Marketplace
-        </CardTitle>
-        <CardDescription>
-          Sign in to continue or create an account to get started.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Sign In</TabsTrigger>
-            <TabsTrigger value="signup">Sign Up</TabsTrigger>
-          </TabsList>
-          <TabsContent value="login" className="space-y-6">
-            <div className="pt-6">
-              <LoginForm />
+export default function AuthGatePage() {
+    const router = useRouter();
+    const { user, isUserLoading } = useUser();
+    const bgImage = PlaceHolderImages.find(p => p.id === 'home-hero');
+
+    useEffect(() => {
+        if (!isUserLoading && user) {
+            router.replace('/home');
+        }
+    }, [user, isUserLoading, router]);
+
+
+    if (isUserLoading || user) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <div className="dot-flashing"></div>
             </div>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <Separator />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">
-                  Or continue with
-                </span>
-              </div>
+        );
+    }
+
+    return (
+        <div className="relative min-h-screen w-full text-white bg-black">
+            {bgImage && (
+                 <Image
+                    src={bgImage.imageUrl}
+                    alt="Fashion models"
+                    fill
+                    className="object-cover opacity-50"
+                    priority
+                    data-ai-hint="luxury fashion"
+                 />
+            )}
+            
+            <div className="absolute inset-0 flex flex-col justify-end p-8 space-y-5">
+                <div className="text-center mb-4">
+                    <h1 className="text-4xl font-bold font-logo">marigo</h1>
+                    <p className="mt-2 text-lg">Register today for a special discount off your first purchase.</p>
+                </div>
+                
+                <SocialButtons variant="default" className="bg-white text-black hover:bg-gray-200" />
+                
+                <Button asChild variant="outline" className="w-full border-white text-white bg-transparent hover:bg-white hover:text-black">
+                    <Link href="/auth/signup">
+                        Register with Email
+                    </Link>
+                </Button>
+                
+                <div className="text-center text-sm">
+                    Already have an account?{' '}
+                    <Link href="/auth/login" className="underline font-semibold">
+                        Log in
+                    </Link>
+                </div>
+
+                <div className="text-center">
+                    <Button variant="link" className="text-white/80 hover:text-white" onClick={() => router.replace('/home')}>
+                        Register later
+                    </Button>
+                </div>
             </div>
-            <SocialButtons />
-          </TabsContent>
-          <TabsContent value="signup" className="space-y-6">
-            <div className="pt-6">
-             <SignupForm />
-            </div>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <Separator />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-            <SocialButtons />
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
-  );
+        </div>
+    );
 }
