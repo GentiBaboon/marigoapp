@@ -13,7 +13,9 @@ import {
   Heart,
   MessageSquare,
   Info,
-  MapPin
+  MapPin,
+  Check,
+  ShieldCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -25,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { MakeOfferSheet } from '@/components/product/make-offer-sheet';
+import { Card, CardContent } from '@/components/ui/card';
 
 // Mock product data to match the new design
 const product = {
@@ -36,9 +39,9 @@ const product = {
   images: ['product-polo', 'product-polo-2', 'product-polo-3'],
   description: 'A classic Lacoste polo shirt in black cotton. A versatile wardrobe staple, perfect for any casual occasion. In very good condition with minimal signs of wear.',
   condition: 'good' as const,
-  size: 'XXL International',
+  size: 'Size 7',
   color: 'Black',
-  material: 'Cotton',
+  material: '100% cotton',
   sellerLocation: 'France'
 };
 
@@ -46,8 +49,16 @@ const product = {
 const seller = {
   id: 'seller-constance',
   name: 'Constance',
-  avatar: 'https://picsum.photos/seed/constance/100/100',
-  location: 'France'
+  handle: '@clarenceblade',
+  avatar: 'https://picsum.photos/seed/clarenceblade/100/100',
+  location: 'France',
+  isTrusted: true,
+  shippingTime: 1,
+  stats: {
+      sold: 5,
+      shipped: 5,
+      cancelled: 0,
+  }
 };
 
 // Mock related products
@@ -145,7 +156,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 <p className="text-2xl font-bold flex items-center">{currencyFormatter(product.price)} <Info className="h-4 w-4 ml-2 text-muted-foreground"/></p>
                 <p>{product.size} <Link href="#" className="underline text-muted-foreground">Size guide</Link></p>
                 <p>{conditionLabel} <Link href="#" className="underline text-muted-foreground">More info</Link></p>
-                <p>{product.color}, {product.material}</p>
             </div>
              <Avatar className="h-12 w-12">
                 <AvatarImage src={seller.avatar} alt={seller.name} />
@@ -167,17 +177,80 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 <MessageSquare className="mr-2 h-5 w-5"/> Chat
             </Button>
           </div>
-          
-          <Separator />
-          
-          <div className="text-sm space-y-4">
+        </div>
+      </div>
+      
+      <Separator className="my-8" />
+      
+      <div className="px-4 md:px-0">
+          <div className="text-sm space-y-4 mb-8">
               <div className="flex items-center gap-3">
                 <MapPin className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <p>{product.sellerLocation}, from the seller {seller.name} <Link href="#" className="underline text-muted-foreground">More info</Link></p>
               </div>
-              <p className="text-muted-foreground">{product.description}</p>
+               <div className="flex items-center gap-3">
+                <Check className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <p>Optional Authenticity and Quality control <Link href="#" className="underline text-muted-foreground">More info</Link></p>
+              </div>
           </div>
-        </div>
+          
+          <h2 className="font-serif text-3xl mb-4">Details</h2>
+          
+          <div className="mb-8">
+            <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-4">Seller</h3>
+            <Card>
+                <CardContent className="p-4">
+                    <div className="flex items-center gap-4 mb-4">
+                         <Avatar className="h-14 w-14">
+                            <AvatarImage src={seller.avatar} alt={seller.name} />
+                            <AvatarFallback>{seller.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                            <p className="font-bold">{seller.name}</p>
+                            <p className="text-sm text-muted-foreground">{seller.handle}</p>
+                        </div>
+                        <Button variant="outline">Follow</Button>
+                    </div>
+
+                    <div className="space-y-3 text-sm mb-4">
+                        {seller.isTrusted && (
+                             <div className="flex items-center gap-2 font-medium">
+                                <ShieldCheck className="h-5 w-5 text-green-600" />
+                                <span>Trusted Seller</span>
+                            </div>
+                        )}
+                        <p>Usually ships in <span className="font-bold">{seller.shippingTime} days</span></p>
+                    </div>
+
+                    <div className="grid grid-cols-3 text-center border-t pt-3">
+                        <div>
+                            <p className="font-bold">{seller.stats.sold}</p>
+                            <p className="text-xs text-muted-foreground">items sold</p>
+                        </div>
+                         <div>
+                            <p className="font-bold">{seller.stats.shipped}</p>
+                            <p className="text-xs text-muted-foreground">shipped</p>
+                        </div>
+                         <div>
+                            <p className="font-bold">{seller.stats.cancelled}</p>
+                            <p className="text-xs text-muted-foreground">cancelled</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+             <p className="text-xs text-muted-foreground mt-4">
+                This item is offered by an individual seller. Its price has been suggested by its seller.
+            </p>
+          </div>
+
+          <div>
+              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-4">Description</h3>
+              <div className="space-y-1">
+                <p>{product.size}</p>
+                <p>{product.material}</p>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">Translated by Google. <Link href="#" className="underline">See original</Link></p>
+          </div>
       </div>
 
       {/* Suggested Products */}
