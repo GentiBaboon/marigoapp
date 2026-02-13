@@ -41,6 +41,26 @@ export const forgotPasswordSchema = z.object({
 
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
+export const firestoreUserSchema = z.object({
+  id: z.string(),
+  email: z.string().email().optional(),
+  name: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  role: z.enum(["buyer", "seller", "courier", "admin"]).optional(),
+  profileImage: z.string().url().optional().nullable(),
+  bio: z.string().optional().nullable(),
+  language: z.enum(["sq", "en", "it"]).optional(),
+  currency: z.enum(["EUR", "ALL", "USD"]).optional(),
+  stripeCustomerId: z.string().optional().nullable(),
+  stripeAccountId: z.string().optional().nullable(),
+  rating: z.number().optional().nullable(),
+  reviewCount: z.number().optional().nullable(),
+  createdAt: z.any().optional(),
+  lastLoginAt: z.any().optional().nullable(),
+});
+export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
+
+
 // --- Checkout & Address Schemas ---
 
 export const addressSchema = z.object({

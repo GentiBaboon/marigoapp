@@ -83,7 +83,14 @@ service cloud.firestore {
 
       // Subcollections
       match /offers/{offerId} {
-        allow read, write: if isSignedIn() && (isOwner(request.resource.data.buyerId) || isOwner(get(/databases/$(database)/documents/products/$(productId)).data.sellerId));
+        function isProductSeller() {
+          return isOwner(get(/databases/$(database)/documents/products/$(productId)).data.sellerId);
+        }
+
+        allow read: if isProductSeller() || (isExistingDoc() && isOwner(resource.data.buyerId));
+        allow create: if isCorrectOwnerInRequestData('buyerId');
+        allow update: if isProductSeller();
+        allow delete: if false; 
       }
       match /bids/{bidId} {
          allow read, write: if isSignedIn() && (isOwner(request.resource.data.bidderId) || isOwner(get(/databases/$(database)/documents/products/$(productId)).data.sellerId));
