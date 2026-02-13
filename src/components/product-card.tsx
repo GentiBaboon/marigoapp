@@ -63,6 +63,9 @@ export function ProductCard({ product, className }: ProductCardProps) {
           <div className="text-sm">
             <p className="font-bold uppercase">{product.brand}</p>
             <p className="text-muted-foreground">{product.title}</p>
+            {product.size && (
+              <p className="text-muted-foreground">{product.size}</p>
+            )}
           </div>
           <Button
             variant="ghost"
