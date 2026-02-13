@@ -24,6 +24,7 @@ import {
   HelpCircle,
   Info,
   ChevronRight,
+  Handshake,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -39,6 +40,7 @@ const getInitials = (name: string | null | undefined) => {
 const menuItems = [
   { href: '/profile/orders', label: 'My Orders', icon: Package },
   { href: '/profile/listings', label: 'My Listings', icon: Tag },
+  { href: '/profile/offers', label: 'My Offers', icon: Handshake },
   { href: '/sell', label: 'Sell an Item', icon: null }, // special case
   { href: '/profile/addresses', label: 'My Addresses', icon: MapPin },
   { href: '/profile/payments', label: 'Payment Methods', icon: CreditCard },
@@ -133,6 +135,9 @@ export default function ProfilePage() {
                       </React.Fragment>
                     );
                   }
+                  
+                  const isLastItemBeforeSell = menuItems[index + 1]?.href === '/sell';
+
                   return (
                     <li key={item.href}>
                       <Link
@@ -147,10 +152,9 @@ export default function ProfilePage() {
                         </span>
                         <ChevronRight className="h-5 w-5 text-muted-foreground" />
                       </Link>
-                      {index < menuItems.length - 2 &&
-                        menuItems[index + 1].href !== '/sell' && (
+                      {!isLastItemBeforeSell && item.href !== '/sell' && index < menuItems.length - 1 && menuItems[index + 1]?.href !== '/sell' && (
                           <Separator className="ml-4" />
-                        )}
+                      )}
                     </li>
                   );
                 })}

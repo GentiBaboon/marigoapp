@@ -24,7 +24,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { OfferManagementSheet } from '@/components/product/OfferManagementSheet';
 
 const currencyFormatter = new Intl.NumberFormat('de-DE', {
   style: 'currency',
@@ -42,7 +41,6 @@ export function ListingItem({ product }: { product: FirestoreProduct }) {
   const imageUrl = product.images?.[0]?.url || PlaceHolderImages.find(p => p.id === 'product-1')?.imageUrl || '/placeholder.png';
   const imageAlt = product.title || 'Product image';
   const firestore = useFirestore();
-  const [isSheetOpen, setIsSheetOpen] = React.useState(false);
 
   const offersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -52,6 +50,7 @@ export function ListingItem({ product }: { product: FirestoreProduct }) {
   const { data: offers } = useCollection<FirestoreOffer>(offersQuery);
 
   const activeOfferCount = offers?.length || 0;
+  const firstPendingOffer = offers?.find(o => o.status === 'pending');
 
   const getStatusLabel = (status: FirestoreProduct['status']) => {
     switch (status) {
@@ -110,8 +109,12 @@ export function ListingItem({ product }: { product: FirestoreProduct }) {
               </div>
               
               <div className="flex items-center">
-                  {activeOfferCount > 0 && (
-                      <Button variant="outline" size="sm" onClick={() => setIsSheetOpen(true)}>View</Button>
+                  {activeOfferCount > 0 && firstPendingOffer && (
+                     <Button variant="outline" size="sm" asChild>
+                        <Link href={`/products/${product.id}/offers/${firstPendingOffer.id}`}>
+                            View Offer
+                        </Link>
+                    </Button>
                   )}
                   <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -142,14 +145,6 @@ export function ListingItem({ product }: { product: FirestoreProduct }) {
           </div>
         </div>
       </div>
-      {offers && (
-        <OfferManagementSheet 
-            isOpen={isSheetOpen}
-            onOpenChange={setIsSheetOpen}
-            product={product}
-            offers={offers}
-        />
-      )}
     </>
   );
 }

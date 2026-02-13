@@ -87,9 +87,12 @@ service cloud.firestore {
           return isOwner(get(/databases/$(database)/documents/products/$(productId)).data.sellerId);
         }
 
-        allow read: if isProductSeller() || (isExistingDoc() && isOwner(resource.data.buyerId));
+        allow get: if isProductSeller() || (isExistingDoc() && isOwner(resource.data.buyerId));
+        allow list: if isSignedIn();
         allow create: if isCorrectOwnerInRequestData('buyerId');
-        allow update: if isProductSeller();
+        allow update: if (isProductSeller() && (request.resource.data.status == 'accepted' || request.resource.data.status == 'rejected' || request.resource.data.status == 'countered'))
+              || (isOwner(resource.data.buyerId) && request.resource.data.status == 'withdrawn')
+              || (isOwner(resource.data.buyerId) && resource.data.status == 'countered' && (request.resource.data.status == 'accepted' || request.resource.data.status == 'rejected'));
         allow delete: if false; 
       }
       match /bids/{bidId} {

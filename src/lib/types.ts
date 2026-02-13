@@ -190,7 +190,7 @@ export const firestoreOfferSchema = z.object({
   buyerId: z.string(),
   amount: z.number(),
   message: z.string().optional(),
-  status: z.enum(['pending', 'accepted', 'rejected', 'countered', 'expired']),
+  status: z.enum(['pending', 'accepted', 'rejected', 'countered', 'expired', 'withdrawn']),
   counterAmount: z.number().optional(),
   expiresAt: z.any().optional(),
   createdAt: z.any(),
