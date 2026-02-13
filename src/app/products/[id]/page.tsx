@@ -28,6 +28,7 @@ import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { MakeOfferSheet } from '@/components/product/make-offer-sheet';
 import { Card, CardContent } from '@/components/ui/card';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 // Mock product data to match the new design
 const product = {
@@ -182,8 +183,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       
       <Separator className="my-8" />
       
-      <div className="px-4 md:px-0">
-          <div className="text-sm space-y-4 mb-8">
+      <div className="px-4 md:px-0 space-y-8">
+          <div className="text-sm space-y-4">
               <div className="flex items-center gap-3">
                 <MapPin className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <p>{product.sellerLocation}, from the seller {seller.name} <Link href="#" className="underline text-muted-foreground">More info</Link></p>
@@ -194,10 +195,56 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               </div>
           </div>
           
-          <h2 className="font-serif text-3xl mb-4">Details</h2>
+          <div className="space-y-4">
+              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">DETAILS</h3>
+              <p className="text-sm text-muted-foreground line-clamp-3">
+                {product.description}
+              </p>
+              <Button variant="outline" className="w-full">See more details</Button>
+              <Button variant="link" className="p-0 h-auto text-sm text-muted-foreground">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                A question ? Leave a comment for the seller
+              </Button>
+          </div>
           
-          <div className="mb-8">
-            <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-4">Seller</h3>
+          <div className="space-y-4">
+              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">MORE INFORMATION</h3>
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="item-1">
+                  <AccordionTrigger>Expert authentication</AccordionTrigger>
+                  <AccordionContent>
+                    Yes. Our team of experts will authenticate this item for you.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-2">
+                  <AccordionTrigger>Payment</AccordionTrigger>
+                  <AccordionContent>
+                    We accept all major credit cards and PayPal.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-3">
+                  <AccordionTrigger>Shipping</AccordionTrigger>
+                  <AccordionContent>
+                    Shipping costs are calculated at checkout.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-4">
+                  <AccordionTrigger>Returns</AccordionTrigger>
+                  <AccordionContent>
+                    You can return this item within 14 days of receipt.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-5">
+                  <AccordionTrigger>Help</AccordionTrigger>
+                  <AccordionContent>
+                    Contact our customer support for any questions.
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </div>
+
+          <div className="space-y-4">
+            <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Seller</h3>
             <Card>
                 <CardContent className="p-4">
                     <div className="flex items-center gap-4 mb-4">
@@ -241,15 +288,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
              <p className="text-xs text-muted-foreground mt-4">
                 This item is offered by an individual seller. Its price has been suggested by its seller.
             </p>
-          </div>
-
-          <div>
-              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-4">Description</h3>
-              <div className="space-y-1">
-                <p>{product.size}</p>
-                <p>{product.material}</p>
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">Translated by Google. <Link href="#" className="underline">See original</Link></p>
           </div>
       </div>
 
