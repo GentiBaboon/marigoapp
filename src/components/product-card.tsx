@@ -1,10 +1,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, Leaf } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Product } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 interface ProductCardProps {
   product: Product;
@@ -52,6 +53,9 @@ export function ProductCard({ product, className }: ProductCardProps) {
           ) : (
             <div className="aspect-square w-full bg-muted" />
           )}
+          {product.vintage && (
+             <Badge variant="outline" className="absolute top-2 left-2 bg-background/80 font-normal">VINTAGE</Badge>
+          )}
         </div>
       </Link>
       <div className="px-1">
@@ -59,7 +63,6 @@ export function ProductCard({ product, className }: ProductCardProps) {
           <div className="text-sm">
             <p className="font-bold uppercase">{product.brand}</p>
             <p className="text-muted-foreground">{product.title}</p>
-            <p className="text-muted-foreground">{product.size}</p>
           </div>
           <Button
             variant="ghost"
@@ -76,19 +79,16 @@ export function ProductCard({ product, className }: ProductCardProps) {
               {currencyFormatter(product.originalPrice)}
             </p>
           )}
-          <p className="font-semibold text-red-600">
+          <p className="font-semibold">
             {currencyFormatter(product.price)}
           </p>
           {product.sellerLocation && (
-            <div className="flex items-center text-sm text-muted-foreground mt-1">
-              <Leaf className="h-3 w-3 mr-1" />
-              <span>{product.sellerLocation}</span>
-            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              {product.sellerLocation}
+            </p>
           )}
         </div>
       </div>
     </div>
   );
 }
-
-    

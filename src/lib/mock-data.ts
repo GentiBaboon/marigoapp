@@ -13,6 +13,7 @@ export type Product = {
   size?: string;
   color?: string;
   sellerLocation?: string;
+  vintage?: boolean;
 };
 
 export type SimilarSoldItem = {
@@ -326,14 +327,13 @@ export const newArrivals: Product[] = [
   },
   {
     id: '1',
-    brand: 'Chanel',
-    title: 'Classic Flap Bag',
-    price: 8200,
-    originalPrice: 9000,
+    brand: 'CHANEL',
+    title: 'Executive leather tote',
+    price: 1610,
     image: 'product-1',
     sellerId: 'seller-1',
-    size: 'Medium',
-    sellerLocation: 'France'
+    sellerLocation: 'Netherlands',
+    vintage: true,
   },
   {
     id: '2',
@@ -448,14 +448,13 @@ export const outletProducts: Product[] = [
   },
   {
     id: '5',
-    brand: 'Louis Vuitton',
-    title: 'Neverfull MM',
-    price: 1500,
+    brand: 'LOUIS VUITTON',
+    title: 'Neverfull cloth tote',
+    price: 1145,
     originalPrice: 1900,
     image: 'product-5',
     sellerId: 'seller-2',
-    size: 'MM',
-    sellerLocation: 'France'
+    sellerLocation: 'Spain'
   },
 ];
 
@@ -637,4 +636,3 @@ export const browseBanners = [
     { id: 'designers', title: 'Designers', description: 'A-Z of brands and official partners', image: 'banner-designers', href: '/browse/designers' },
     { id: 'we-love', title: 'We Love', description: '', image: 'banner-we-love', href: '/browse/we-love' }
 ];
-    

@@ -1,13 +1,95 @@
 'use client';
 
-import { Input } from '@/components/ui/input';
+import * as React from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import Link from 'next/link';
-import { Bookmark, Search } from 'lucide-react';
+import { ProductCard } from '@/components/product-card';
+import { newArrivals, trendingProducts, outletProducts } from '@/lib/mock-data';
+import type { Product } from '@/lib/mock-data';
+import { ArrowLeft, Bookmark, SlidersHorizontal, ShoppingCart, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Search } from 'lucide-react';
 
-export default function SearchPage() {
+const allProducts = [...newArrivals, ...trendingProducts, ...outletProducts];
+
+function ProductListPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const category = searchParams.get('category') || 'Products';
+  
+  const categoryTitle = category.replace(/-/g, ' ').toUpperCase();
+
+  const productsToShow = React.useMemo(() => {
+    // Simple filter for demonstration. In a real app, you'd fetch filtered data.
+    if (category === 'tote-bags') {
+        return allProducts.filter(p => p.title.toLowerCase().includes('tote'));
+    }
+    return allProducts;
+  }, [category]);
+
+  return (
+    <div className="flex flex-col min-h-screen bg-background">
+        <header className="sticky top-0 z-40 w-full border-b bg-background">
+            <div className="container flex h-16 items-center gap-2 px-2 sm:px-4">
+                <Button variant="ghost" size="icon" onClick={() => router.back()}>
+                    <ArrowLeft />
+                </Button>
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search for items, members..." className="pl-9" />
+                </div>
+                <Button variant="ghost" size="icon" asChild>
+                    <Link href="/cart">
+                        <ShoppingCart />
+                    </Link>
+                </Button>
+            </div>
+        </header>
+
+        <main className="flex-1">
+            <div className="container px-4 py-4">
+                <div className="bg-secondary/50 p-3 rounded-lg flex justify-between items-center text-sm mb-4">
+                    <span>Use WELCOME15 for 15% off your first order over 100€ (app only).</span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+                
+                <div className="flex justify-between items-center mb-2">
+                    <div>
+                        <h1 className="text-xl font-bold">{categoryTitle}</h1>
+                        <p className="text-sm text-muted-foreground">999+ items</p>
+                    </div>
+                    <Button variant="ghost" className="text-sm font-semibold p-1 h-auto">
+                        <Bookmark className="mr-2 h-4 w-4" />
+                        Save this search
+                    </Button>
+                </div>
+
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-4 px-4">
+                    <Button variant="outline" className="border-2 border-foreground shrink-0">
+                        <SlidersHorizontal className="mr-2 h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" className="shrink-0">In Europe</Button>
+                    <Button variant="outline" className="shrink-0">Reduced prices</Button>
+                    <Button variant="outline" className="shrink-0">Brand</Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-8 mt-6">
+                    {productsToShow.map((product) => (
+                        <ProductCard key={product.id} product={product} />
+                    ))}
+                </div>
+            </div>
+        </main>
+    </div>
+  );
+}
+
+function SearchLandingPage() {
     const recentSearches = [
         {
             id: 1,
@@ -66,4 +148,25 @@ export default function SearchPage() {
             </Tabs>
         </div>
     );
+}
+
+// Main component that decides which view to render
+function SearchPageContents() {
+    const searchParams = useSearchParams();
+    const hasQuery = searchParams.toString().length > 0;
+
+    if (hasQuery) {
+        return <ProductListPage />;
+    }
+    
+    return <SearchLandingPage />;
+}
+
+
+export default function SearchPage() {
+    return (
+        <React.Suspense fallback={<div className="flex h-screen w-screen items-center justify-center bg-background"><div className="dot-flashing"></div></div>}>
+            <SearchPageContents />
+        </React.Suspense>
+    )
 }
