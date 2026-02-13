@@ -5,23 +5,14 @@ import { ProductCard } from '@/components/product-card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Product } from '@/lib/mock-data';
-import { HeartOff, ChevronDown } from 'lucide-react';
+import { HeartOff, ChevronDown, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { useWishlist } from '@/context/WishlistContext';
+import { newArrivals, trendingProducts, outletProducts, vintageGems, recentlyViewedProducts } from '@/lib/mock-data';
+import { useUser } from '@/firebase';
+import { useRouter } from 'next/navigation';
 
-// Let's create a new mock product that matches the image
-const bossBoots: Product = {
-  id: 'boss-boots-1',
-  brand: 'BOSS',
-  title: 'Boots',
-  price: 63,
-  originalPrice: 69,
-  image: 'product-10', // using a sneaker image for now as a placeholder
-  sellerId: 'seller-x',
-  size: '42 EU',
-  sellerLocation: 'Italy'
-};
-
-const favoriteProducts: Product[] = [bossBoots];
+const allProducts = [...newArrivals, ...trendingProducts, ...outletProducts, ...vintageGems, ...recentlyViewedProducts];
 
 
 const EmptyFavorites = () => (
@@ -55,15 +46,67 @@ const FilterButton = ({ label }: { label: string }) => (
 
 export default function FavoritesPage() {
     const [sortOption, setSortOption] = React.useState('newest');
+    const { user, isUserLoading } = useUser();
+    const { wishlistItems, isLoading: isWishlistLoading } = useWishlist();
+    const router = useRouter();
+    
+    React.useEffect(() => {
+        if (!isUserLoading && !user) {
+            router.replace('/auth');
+        }
+    }, [user, isUserLoading, router]);
 
-  return (
+    const favoriteProducts = React.useMemo(() => {
+        if (!wishlistItems) return [];
+        const productMap = new Map<string, Product>();
+        allProducts.forEach(p => productMap.set(p.id, p));
+
+        return wishlistItems
+            .map(item => {
+                const product = productMap.get(item.id);
+                return product ? { ...product, addedAt: item.addedAt } : null;
+            })
+            .filter((p): p is (Product & { addedAt: any }) => !!p);
+    }, [wishlistItems]);
+    
+    const sortedProducts = React.useMemo(() => {
+        const products = [...favoriteProducts];
+        switch(sortOption) {
+            case 'price_asc':
+                return products.sort((a,b) => a.price - b.price);
+            case 'price_desc':
+                return products.sort((a,b) => b.price - a.price);
+            case 'newest':
+            default:
+                if (products.every(p => p.addedAt?.seconds)) {
+                    return products.sort((a, b) => b.addedAt.seconds - a.addedAt.seconds);
+                }
+                return products;
+        }
+    }, [favoriteProducts, sortOption]);
+
+    const isLoading = isUserLoading || isWishlistLoading;
+    
+    if (isLoading) {
+        return (
+            <div className="flex h-[50vh] w-full items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
+
+    if (!user) {
+        return null; // Render nothing while redirecting
+    }
+
+    return (
     <div className="container mx-auto px-0 sm:px-4 py-4 md:py-8">
       <div className="flex justify-between items-center mb-4 px-4 sm:px-0">
         <div>
             <h1 className="text-lg font-bold uppercase tracking-wide">
             Favorites
             </h1>
-            <p className="text-sm text-muted-foreground">{favoriteProducts.length} item</p>
+            <p className="text-sm text-muted-foreground">{sortedProducts.length} item{sortedProducts.length !== 1 ? 's' : ''}</p>
         </div>
          <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -89,9 +132,9 @@ export default function FavoritesPage() {
       </div>
 
       <div className="mt-6 px-4 sm:px-0">
-        {favoriteProducts.length > 0 ? (
+        {sortedProducts.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
-            {favoriteProducts.map((product) => (
+            {sortedProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
@@ -100,5 +143,5 @@ export default function FavoritesPage() {
         )}
       </div>
     </div>
-  );
+    );
 }

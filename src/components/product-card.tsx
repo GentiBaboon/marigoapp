@@ -6,6 +6,8 @@ import type { Product } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { useWishlist } from '@/context/WishlistContext';
+import React from 'react';
 
 interface ProductCardProps {
   product: Product;
@@ -13,6 +15,9 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
+  const { isFavorite, addToWishlist, removeFromWishlist } = useWishlist();
+  const favorite = isFavorite(product.id);
+
   const currencyFormatter = (value: number) =>
     new Intl.NumberFormat('de-DE', {
       style: 'currency',
@@ -35,6 +40,16 @@ export function ProductCard({ product, className }: ProductCardProps) {
       imageUrl = productImage.imageUrl;
       imageHint = productImage.imageHint;
     }
+  }
+  
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+      e.preventDefault(); // prevent navigation
+      e.stopPropagation();
+      if (favorite) {
+          removeFromWishlist(product.id);
+      } else {
+          addToWishlist(product.id);
+      }
   }
 
   return (
@@ -72,8 +87,9 @@ export function ProductCard({ product, className }: ProductCardProps) {
             size="icon"
             className="h-8 w-8 text-muted-foreground hover:text-destructive"
             aria-label="Add to wishlist"
+            onClick={handleToggleFavorite}
           >
-            <Heart className="h-5 w-5" />
+            <Heart className={cn("h-5 w-5", favorite && "fill-destructive text-destructive")} />
           </Button>
         </div>
         <div className="mt-2">

@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase';
 import { CartProvider } from '@/context/CartContext';
+import { WishlistProvider } from '@/context/WishlistContext';
 import { ShoppingPreferenceModal } from '@/components/home/ShoppingPreferenceModal';
 import { DownloadAppBanner } from '@/components/home/DownloadAppBanner';
 
@@ -40,14 +41,16 @@ export default function RootLayout({
       <body className={cn('font-body antialiased')}>
         <FirebaseClientProvider>
           <CartProvider>
-            <div className="relative flex min-h-screen flex-col">
-              <Header />
-              <main className="flex-1 pb-16 md:pb-0">{children}</main>
-              <MobileNav />
-              <ShoppingPreferenceModal />
-              <DownloadAppBanner />
-            </div>
-            <Toaster />
+            <WishlistProvider>
+              <div className="relative flex min-h-screen flex-col">
+                <Header />
+                <main className="flex-1 pb-16 md:pb-0">{children}</main>
+                <MobileNav />
+                <ShoppingPreferenceModal />
+                <DownloadAppBanner />
+              </div>
+              <Toaster />
+            </WishlistProvider>
           </CartProvider>
         </FirebaseClientProvider>
       </body>
