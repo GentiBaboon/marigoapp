@@ -1,18 +1,22 @@
 'use client';
 import Link from 'next/link';
 import { Home, Heart, Plus, User, Search } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useUser } from '@/firebase';
 
 
 export function MobileNav() {
     const pathname = usePathname();
+    const { user, isUserLoading } = useUser();
+    const router = useRouter();
+
     const navItems = [
-        { href: '/home', label: 'Home', icon: Home },
-        { href: '/search', label: 'Shop', icon: Search },
-        { href: '/sell', label: 'Sell', icon: Plus },
-        { href: '/favorites', label: 'Favorites', icon: Heart },
-        { href: '/profile', label: 'Me', icon: User },
+        { href: '/home', label: 'Home', icon: Home, requiresAuth: false },
+        { href: '/search', label: 'Shop', icon: Search, requiresAuth: false },
+        { href: '/sell', label: 'Sell', icon: Plus, requiresAuth: true },
+        { href: '/favorites', label: 'Favorites', icon: Heart, requiresAuth: true },
+        { href: '/profile', label: 'Me', icon: User, requiresAuth: true },
     ];
   
   return (
@@ -24,6 +28,12 @@ export function MobileNav() {
                 <Link
                     key={item.label}
                     href={item.href}
+                    onClick={(e) => {
+                        if (item.requiresAuth && !isUserLoading && !user) {
+                            e.preventDefault();
+                            router.push('/auth');
+                        }
+                    }}
                     className="inline-flex flex-col items-center justify-center px-1 text-center hover:bg-muted group"
                 >
                     <item.icon className={cn("w-6 h-6 mb-1 text-muted-foreground group-hover:text-primary", isActive && "text-primary")} />
@@ -37,5 +47,3 @@ export function MobileNav() {
     </div>
   );
 }
-
-    
