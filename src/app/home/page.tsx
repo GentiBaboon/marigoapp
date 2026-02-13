@@ -10,8 +10,7 @@ import {
   newArrivals,
 } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { Info } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ArrowRight } from 'lucide-react';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -46,17 +45,16 @@ export default function HomePage() {
   return (
     <div className="relative" onClick={handleClick}>
       <div className="flex flex-col bg-background">
-        <Alert className="w-full text-center rounded-none border-x-0 border-t-0 bg-amber-100 border-amber-200 text-amber-900">
-          <div className="container mx-auto flex items-center justify-center p-2 relative">
-            <div>
-              <AlertTitle className="font-bold">You've Earned 20% Off</AlertTitle>
-              <AlertDescription className="text-sm">
-                Save on orders 100€+ as a gift for selling with us. Code: FIRSTVC
-              </AlertDescription>
-            </div>
-            <Info className="h-4 w-4 absolute right-4 top-1/2 -translate-y-1/2" />
+        <div className="bg-background border-b">
+          <div className="container mx-auto px-4 py-6">
+            <h2 className="text-2xl font-serif mb-2">First Time?</h2>
+            <p className="text-muted-foreground">Shop: 15% off with code <span className="font-semibold text-foreground">WELCOME15</span>. Sell: No fees to start.*...</p>
+            <Link href="#" className="flex items-center mt-2 font-semibold text-sm group text-primary">
+              Get started
+              <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
           </div>
-        </Alert>
+        </div>
 
         <div className="container mx-auto px-4 py-8 md:py-12 space-y-12">
           <section>

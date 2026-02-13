@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { Home, Heart, PlusCircle, Bell, User } from 'lucide-react';
+import { Home, Heart, Plus, User, Search } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
@@ -9,9 +9,9 @@ export function MobileNav() {
     const pathname = usePathname();
     const navItems = [
         { href: '/home', label: 'Home', icon: Home },
-        { href: '/favorites', label: 'Favourites', icon: Heart },
-        { href: '/sell', label: 'Sell now', icon: PlusCircle },
-        { href: '/notifications', label: 'Notifications', icon: Bell },
+        { href: '/search', label: 'Shop', icon: Search },
+        { href: '/sell', label: 'Sell', icon: Plus },
+        { href: '/favorites', label: 'Favorites', icon: Heart },
         { href: '/profile', label: 'Me', icon: User },
     ];
   
@@ -19,7 +19,7 @@ export function MobileNav() {
     <div className="fixed bottom-0 left-0 z-50 w-full h-16 bg-background border-t md:hidden">
       <div className="grid h-full max-w-lg grid-cols-5 mx-auto">
         {navItems.map(item => {
-            const isActive = pathname === item.href;
+            const isActive = (item.href === '/home' && pathname === '/home') || (item.href !== '/home' && pathname.startsWith(item.href));
             return (
                 <Link
                     key={item.label}
