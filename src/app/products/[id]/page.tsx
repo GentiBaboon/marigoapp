@@ -95,7 +95,7 @@ export default function ProductDetailPage() {
     const router = useRouter();
     const productId = params.id as string;
     const firestore = useFirestore();
-    const { user } = useUser();
+    const { user, isUserLoading } = useUser();
 
     const productRef = useMemoFirebase(() => {
         if (!firestore || !productId) return null;
@@ -104,9 +104,9 @@ export default function ProductDetailPage() {
     const { data: product, isLoading: isProductLoading } = useDoc<FirestoreProduct>(productRef);
 
     const sellerRef = useMemoFirebase(() => {
-        if (!firestore || !product?.seller_id) return null;
-        return doc(firestore, 'users', product.seller_id);
-    }, [firestore, product?.seller_id]);
+        if (!firestore || !product?.sellerId) return null;
+        return doc(firestore, 'users', product.sellerId);
+    }, [firestore, product?.sellerId]);
     const { data: seller } = useDoc<FirestoreUser>(sellerRef);
     
     const { addToCart } = useCart();
@@ -119,7 +119,13 @@ export default function ProductDetailPage() {
     const [isChatLoading, setIsChatLoading] = React.useState(false);
     const { isFavorite, addToWishlist, removeFromWishlist } = useWishlist();
 
-    const isSeller = user?.uid === product?.seller_id;
+    React.useEffect(() => {
+        if (!isUserLoading && !user) {
+            router.replace('/auth');
+        }
+    }, [user, isUserLoading, router]);
+
+    const isSeller = user?.uid === product?.sellerId;
     const isSoldOrReserved = product?.status === 'sold' || product?.status === 'reserved';
 
     const relatedProductsQuery = useMemoFirebase(() => {
@@ -188,7 +194,7 @@ export default function ProductDetailPage() {
         setIsChatLoading(true);
 
         try {
-            const participants = [user.uid, product.seller_id].sort();
+            const participants = [user.uid, product.sellerId].sort();
             
             const conversationQuery = query(
                 collection(firestore, 'conversations'),
@@ -232,7 +238,7 @@ export default function ProductDetailPage() {
     };
 
 
-    if (isProductLoading) {
+    if (isProductLoading || isUserLoading || !user) {
         return <ProductPageSkeleton />;
     }
 
@@ -254,7 +260,7 @@ export default function ProductDetailPage() {
         brand: product.brand,
         title: product.title,
         price: product.price,
-        sellerId: product.seller_id,
+        sellerId: product.sellerId,
         image: product.images[0], // Use first image URL
         });
     };
@@ -507,7 +513,7 @@ export default function ProductDetailPage() {
                         title: p.title,
                         price: p.price,
                         image: p.images?.[0] || '', // Use first image URL as the string `image`
-                        sellerId: p.seller_id,
+                        sellerId: p.sellerId,
                         size: p.size,
                         condition: p.condition as any,
                         color: p.color,
@@ -525,7 +531,7 @@ export default function ProductDetailPage() {
               id: product.id,
               price: product.price,
               brand: product.brand,
-              seller_id: product.seller_id,
+              sellerId: product.sellerId,
           }}
         />
 
