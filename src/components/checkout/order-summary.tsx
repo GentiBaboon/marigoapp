@@ -6,15 +6,12 @@ import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export function OrderSummary() {
-  const { items, subtotal } = useCart();
+  const { items, subtotal, totalShipping, grandTotal } = useCart();
 
   const currencyFormatter = new Intl.NumberFormat('de-DE', {
     style: 'currency',
     currency: 'EUR',
   });
-
-  const shipping = 15; // Example shipping cost
-  const total = subtotal + shipping;
 
   return (
     <Card className="sticky top-24">
@@ -49,13 +46,13 @@ export function OrderSummary() {
           </div>
           <div className="flex justify-between">
             <span>Shipping</span>
-            <span>{currencyFormatter.format(shipping)}</span>
+            <span>{currencyFormatter.format(totalShipping)}</span>
           </div>
         </div>
         <Separator />
         <div className="flex justify-between font-bold text-lg">
           <span>Total</span>
-          <span>{currencyFormatter.format(total)}</span>
+          <span>{currencyFormatter.format(grandTotal)}</span>
         </div>
       </CardContent>
     </Card>

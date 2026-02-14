@@ -20,7 +20,7 @@ import type { FirestoreAddress } from '@/lib/types';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 type SummaryStepProps = {
-  onPrevStep: () => void;
+  onPrevStep: (step: number) => void;
   shippingAddress: FirestoreAddress | null;
   paymentMethod: string | null;
 };
@@ -28,13 +28,10 @@ type SummaryStepProps = {
 export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: SummaryStepProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const { items, subtotal, clearCart } = useCart();
+  const { items, subtotal, totalShipping, grandTotal, clearCart } = useCart();
   const { user } = useUser();
   const firestore = useFirestore();
   const [isLoading, setIsLoading] = useState(false);
-
-  const shipping = 15;
-  const total = subtotal + shipping;
 
   const currencyFormatter = new Intl.NumberFormat('de-DE', {
     style: 'currency',
@@ -64,7 +61,10 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             price: item.price,
             quantity: item.quantity,
             size: item.selectedSize || null,
-        }
+            shippingMethod: 'direct',
+            shippingFee: item.directShippingFee,
+            authenticationFee: 0,
+        };
     });
     
     const sellerIds = [...new Set(items.map(item => item.sellerId))];
@@ -74,8 +74,10 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
         buyerId: user.uid,
         sellerIds,
         items: orderItems,
-        shippingPrice: shipping,
-        totalAmount: total,
+        itemsPrice: subtotal,
+        shippingPrice: totalShipping,
+        authenticationPrice: 0,
+        totalAmount: grandTotal,
         paymentStatus: 'pending',
         paymentMethod,
         status: 'processing',
@@ -91,7 +93,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
           variant: 'success',
         });
         clearCart();
-        router.push('/profile/orders');
+        router.push(`/profile/orders/${docRef.id}`);
     } catch (error) {
         console.error("Error placing order:", error);
         const permissionError = new FirestorePermissionError({
@@ -112,10 +114,10 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
 
   const paymentMethodLabels: { [key: string]: string } = {
     cod: 'Cash on Delivery',
-    applepay: 'Apple Pay',
-    card: 'Saved Card (Visa **** 4242)',
+    apple_pay: 'Apple Pay',
+    saved_card: 'Saved Card (Visa **** 4242)',
+    new_card: 'New Credit/Debit Card',
     paypal: 'PayPal',
-    'new-card': 'New Credit/Debit Card',
   };
 
   return (
@@ -138,7 +140,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
                         <p className="text-sm text-destructive">No address selected.</p>
                     )}
                 </div>
-                <Button variant="link" size="sm" className="ml-auto" onClick={onPrevStep}>Change</Button>
+                <Button variant="link" size="sm" className="ml-auto" onClick={() => onPrevStep(1)}>Change</Button>
             </div>
             <Separator />
             <div className="flex items-start gap-4">
@@ -147,7 +149,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
                     <h4 className="font-semibold">Payment Method</h4>
                     <p className="text-sm text-muted-foreground">{paymentMethod ? paymentMethodLabels[paymentMethod] : 'No payment method selected'}</p>
                 </div>
-                <Button variant="link" size="sm" className="ml-auto" onClick={onPrevStep}>Change</Button>
+                <Button variant="link" size="sm" className="ml-auto" onClick={() => onPrevStep(2)}>Change</Button>
             </div>
         </div>
         
@@ -161,7 +163,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             size="lg"
             variant="outline"
             className="w-full"
-            onClick={onPrevStep}
+            onClick={() => onPrevStep(2)}
             disabled={isLoading}
           >
             Back to Payment
@@ -173,7 +175,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             disabled={isLoading || !shippingAddress || !paymentMethod}
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Pay Now - {currencyFormatter.format(total)}
+            Pay Now - {currencyFormatter.format(grandTotal)}
           </Button>
       </CardFooter>
     </Card>

@@ -10,6 +10,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import type { FirestoreAddress } from '@/lib/types';
 import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation';
+import { useUser } from '@/firebase';
 
 export default function CheckoutPage() {
   const [step, setStep] = React.useState(1);
@@ -17,12 +18,16 @@ export default function CheckoutPage() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<string | null>(null);
   const { items } = useCart();
   const router = useRouter();
+  const { user, isUserLoading } = useUser();
 
   React.useEffect(() => {
-    if (items.length === 0) {
+    if (isUserLoading) return;
+    if (!user) {
+      router.replace('/auth');
+    } else if (items.length === 0) {
       router.replace('/cart');
     }
-  }, [items, router]);
+  }, [items, router, user, isUserLoading]);
 
   const handleAddressNext = (address: FirestoreAddress) => {
     setSelectedAddress(address);
@@ -34,21 +39,29 @@ export default function CheckoutPage() {
     setStep(3);
   };
   
-  const handlePrevStep = () => setStep((prev) => prev - 1);
+  const handleGoToStep = (stepNumber: number) => {
+    if (stepNumber > 0 && stepNumber <= 3) {
+        setStep(stepNumber);
+    }
+  }
   
   const stepComponents = [
       <AddressStep key={1} onNextStep={handleAddressNext} />,
-      <PaymentStep key={2} onNextStep={handlePaymentNext} onPrevStep={handlePrevStep} />,
+      <PaymentStep key={2} onNextStep={handlePaymentNext} onPrevStep={() => handleGoToStep(1)} />,
       <SummaryStep 
         key={3} 
-        onPrevStep={handlePrevStep}
+        onPrevStep={handleGoToStep}
         shippingAddress={selectedAddress}
         paymentMethod={selectedPaymentMethod}
        />,
   ];
 
-  if (items.length === 0) {
-    return null; // or a loading spinner while redirecting
+  if (isUserLoading || !user || items.length === 0) {
+    return (
+        <div className="flex h-[calc(100vh-8rem)] w-screen items-center justify-center bg-background">
+            <div className="dot-flashing"></div>
+        </div>
+    );
   }
 
   return (
