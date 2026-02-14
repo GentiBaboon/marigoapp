@@ -148,23 +148,30 @@ export const firestoreProductSchema = z.object({
   title: z.string(),
   description: z.string(),
   price: z.number(),
-  categoryId: z.string(),
-  subcategoryId: z.string(),
+  category: z.string(),
+  subCategory: z.string(),
   images: z.array(z.string()),
-  status: z.enum(["active", "sold", "reserved", "draft", "pending_review", "removed", "expired", "delivered"]),
+  status: z.enum(["active", "sold", "reserved"]),
   createdAt: z.any(),
 });
 
 export type FirestoreProduct = z.infer<typeof firestoreProductSchema> & { id: string };
 
+const offerHistoryItemSchema = z.object({
+  action: z.string(),
+  amount: z.number(),
+  by_user: z.string(),
+  timestamp: z.any(),
+});
+
 export const firestoreOfferSchema = z.object({
   buyerId: z.string(),
+  sellerId: z.string(),
   amount: z.number(),
-  message: z.string().optional(),
-  status: z.enum(['pending', 'accepted', 'rejected', 'countered', 'expired', 'withdrawn']),
+  status: z.enum(['pending', 'accepted', 'declined', 'countered', 'expired', 'withdrawn']),
   counterAmount: z.number().optional(),
-  expiresAt: z.any().optional(),
   createdAt: z.any(),
+  history: z.array(offerHistoryItemSchema).optional(),
 });
 export type FirestoreOffer = z.infer<typeof firestoreOfferSchema> & { id: string };
 

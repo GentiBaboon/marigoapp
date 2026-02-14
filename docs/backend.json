@@ -115,13 +115,13 @@
         "title": { "type": "string" },
         "description": { "type": "string" },
         "price": { "type": "number" },
-        "categoryId": { "type": "string" },
-        "subcategoryId": { "type": "string" },
+        "category": { "type": "string" },
+        "subCategory": { "type": "string" },
         "images": { "type": "array", "items": { "type": "string", "format": "uri" } },
         "status": { "type": "string", "enum": ["active", "sold", "reserved"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["sellerId", "title", "price", "categoryId", "images", "status", "createdAt"]
+      "required": ["sellerId", "title", "price", "category", "images", "status", "createdAt"]
     },
     "Offer": {
       "title": "Offer",
@@ -129,13 +129,26 @@
       "description": "Represents an offer made on a product.",
       "properties": {
         "buyerId": { "type": "string" },
+        "sellerId": { "type": "string" },
         "amount": { "type": "number" },
-        "message": { "type": "string" },
-        "status": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined", "countered"] },
         "counterAmount": { "type": "number" },
-        "expiresAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "action": { "type": "string" },
+              "amount": { "type": "number" },
+              "by_user": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            },
+            "required": ["action", "amount", "by_user", "timestamp"]
+          }
+        }
       },
-      "required": ["buyerId", "amount", "status"]
+      "required": ["buyerId", "sellerId", "amount", "status", "createdAt"]
     },
     "Bid": {
       "title": "Bid",

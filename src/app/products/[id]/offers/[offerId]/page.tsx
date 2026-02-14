@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useUser, useFirestore, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import type { FirestoreProduct, FirestoreOffer, FirestoreUser } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,46 +46,44 @@ function OfferPageSkeleton() {
 }
 
 function OfferTimeline({ offer, product, buyer, seller }: { offer: FirestoreOffer, product: FirestoreProduct, buyer: FirestoreUser | null, seller: FirestoreUser | null}) {
-    // This is a simplified timeline. A real app might store a full history array.
-    const history = [];
+    if (!offer.history) return null; // Wait for history to be present
 
-    history.push({
-        actor: buyer,
-        action: 'Sent an offer',
-        amount: offer.amount,
-        timestamp: offer.createdAt,
-    });
-    
-    if (offer.status === 'countered' && offer.counterAmount) {
-         history.push({
-            actor: seller,
-            action: 'Countered with',
-            amount: offer.counterAmount,
-            timestamp: offer.createdAt, // Note: we don't have a timestamp for the counter
-        });
+    const getActionLabel = (action: string) => {
+        switch (action) {
+            case 'created': return 'Sent an offer';
+            case 'accepted': return 'Accepted offer';
+            case 'declined': return 'Declined offer';
+            case 'withdrawn': return 'Withdrew offer';
+            case 'countered': return 'Countered with';
+            default: return action;
+        }
     }
 
     return (
         <div className="space-y-4">
-            {history.map((item, index) => (
-                <div key={index} className="flex items-start gap-3">
-                    <Avatar className="h-8 w-8">
-                        <AvatarImage src={undefined} />
-                        <AvatarFallback>{item.actor?.displayName?.[0] || 'U'}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                        <p className="font-semibold text-sm">{item.actor?.displayName}</p>
-                        <p className="text-xs text-muted-foreground">{format(new Date(item.timestamp.seconds * 1000), 'dd/MM/yy, HH:mm')}</p>
+            {offer.history.map((item, index) => {
+                const actor = item.by_user === buyer?.id ? buyer : seller;
+                return (
+                    <div key={index} className="flex items-start gap-3">
+                        <Avatar className="h-8 w-8">
+                            <AvatarImage src={undefined} />
+                            <AvatarFallback>{actor?.displayName?.[0] || 'U'}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <p className="font-semibold text-sm">{actor?.displayName}</p>
+                            <p className="text-xs text-muted-foreground">{format(new Date(item.timestamp.seconds * 1000), 'dd/MM/yy, HH:mm')}</p>
+                        </div>
+                        <p className="ml-auto font-semibold text-sm underline text-right">{getActionLabel(item.action)}: {currencyFormatter(item.amount, 'EUR')}</p>
                     </div>
-                    <p className="ml-auto font-semibold text-sm underline text-right">{item.action}: {currencyFormatter(item.amount, 'EUR')}</p>
-                </div>
-            ))}
+                )
+            })}
         </div>
     )
 }
 
 function OfferActions({ offer, product, userRole }: { offer: FirestoreOffer, product: FirestoreProduct, userRole: 'buyer' | 'seller' | null }) {
     const { toast } = useToast();
+    const { user } = useUser();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = React.useState<string | null>(null);
     const [isCountering, setIsCountering] = React.useState(false);
@@ -94,12 +92,24 @@ function OfferActions({ offer, product, userRole }: { offer: FirestoreOffer, pro
     const offerRef = doc(firestore, 'products', product.id, 'offers', offer.id);
 
     const handleUpdateOffer = async (status: FirestoreOffer['status'], amount?: number) => {
+        if (!user) return;
         setIsLoading(status);
 
         let updateData: any = { status };
         if (status === 'countered' && amount) {
             updateData.counterAmount = amount;
         }
+
+        const historyAction = status === 'accepted' && offer.status === 'countered' ? 'accepted_counter' : status;
+        const historyAmount = amount || (offer.status === 'countered' ? offer.counterAmount : offer.amount);
+        
+        const historyEntry = {
+            action: historyAction,
+            amount: historyAmount,
+            by_user: user.uid,
+            timestamp: serverTimestamp()
+        };
+        updateData.history = arrayUnion(historyEntry);
 
         try {
             await updateDoc(offerRef, updateData);
@@ -133,8 +143,8 @@ function OfferActions({ offer, product, userRole }: { offer: FirestoreOffer, pro
                     <Button onClick={() => handleUpdateOffer('accepted')} disabled={!!isLoading}>
                         {isLoading === 'accepted' ? <Loader2 className="animate-spin" /> : `Accept ${currencyFormatter(offer.counterAmount!, 'EUR')}`}
                     </Button>
-                    <Button variant="outline" onClick={() => handleUpdateOffer('rejected')} disabled={!!isLoading}>
-                        {isLoading === 'rejected' ? <Loader2 className="animate-spin" /> : 'Decline'}
+                    <Button variant="outline" onClick={() => handleUpdateOffer('declined')} disabled={!!isLoading}>
+                        {isLoading === 'declined' ? <Loader2 className="animate-spin" /> : 'Decline'}
                     </Button>
                 </div>
             );
@@ -170,8 +180,8 @@ function OfferActions({ offer, product, userRole }: { offer: FirestoreOffer, pro
                 <Button onClick={() => handleUpdateOffer('accepted')} disabled={!!isLoading}>
                     {isLoading === 'accepted' ? <Loader2 className="animate-spin" /> : 'Accept'}
                 </Button>
-                <Button variant="outline" onClick={() => handleUpdateOffer('rejected')} disabled={!!isLoading}>
-                    {isLoading === 'rejected' ? <Loader2 className="animate-spin" /> : 'Decline'}
+                <Button variant="outline" onClick={() => handleUpdateOffer('declined')} disabled={!!isLoading}>
+                    {isLoading === 'declined' ? <Loader2 className="animate-spin" /> : 'Decline'}
                 </Button>
                 <Button variant="outline" className="col-span-2" onClick={() => setIsCountering(true)} disabled={!!isLoading}>
                     Make a counter offer
@@ -180,7 +190,8 @@ function OfferActions({ offer, product, userRole }: { offer: FirestoreOffer, pro
         );
     }
     
-    return <p className="text-sm text-center text-muted-foreground">This offer has been {offer.status}.</p>;
+    const finalStatus = offer.status === 'declined' ? 'declined' : offer.status;
+    return <p className="text-sm text-center text-muted-foreground">This offer has been {finalStatus}.</p>;
 }
 
 

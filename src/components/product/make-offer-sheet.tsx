@@ -26,6 +26,7 @@ interface MakeOfferSheetProps {
     id: string;
     price: number;
     brand: string;
+    sellerId: string;
   };
 }
 
@@ -100,11 +101,19 @@ export function MakeOfferSheet({ isOpen, onOpenChange, product }: MakeOfferSheet
 
     setIsLoading(true);
 
+    const now = serverTimestamp();
     const offerData = {
       buyerId: user.uid,
+      sellerId: product.sellerId,
       amount: selectedOffer,
       status: 'pending',
-      createdAt: serverTimestamp(),
+      createdAt: now,
+      history: [{
+          action: 'created',
+          amount: selectedOffer,
+          by_user: user.uid,
+          timestamp: now
+      }]
     };
 
     try {

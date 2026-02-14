@@ -89,10 +89,15 @@ service cloud.firestore {
 
         allow get: if isProductSeller() || (isExistingDoc() && isOwner(resource.data.buyerId));
         allow list: if isSignedIn();
-        allow create: if isCorrectOwnerInRequestData('buyerId');
-        allow update: if (isProductSeller() && (request.resource.data.status == 'accepted' || request.resource.data.status == 'rejected' || request.resource.data.status == 'countered'))
-              || (isOwner(resource.data.buyerId) && request.resource.data.status == 'withdrawn')
-              || (isOwner(resource.data.buyerId) && resource.data.status == 'countered' && (request.resource.data.status == 'accepted' || request.resource.data.status == 'rejected'));
+        allow create: if isCorrectOwnerInRequestData('buyerId') && request.resource.data.sellerId == get(/databases/$(database)/documents/products/$(productId)).data.sellerId;
+        
+        // Allow buyer to withdraw
+        // Allow seller to accept, decline, or counter a pending offer
+        // Allow buyer to accept or decline a countered offer from the seller
+        allow update: if (isOwner(resource.data.buyerId) && request.resource.data.status == 'withdrawn')
+                    || (isProductSeller() && resource.data.status == 'pending' && (request.resource.data.status in ['accepted', 'declined', 'countered']))
+                    || (isOwner(resource.data.buyerId) && resource.data.status == 'countered' && (request.resource.data.status in ['accepted', 'declined']));
+
         allow delete: if false; 
       }
       match /bids/{bidId} {
