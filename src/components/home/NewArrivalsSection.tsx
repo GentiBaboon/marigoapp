@@ -88,7 +88,7 @@ export function NewListingsSection() {
                         variant="outline"
                         className="rounded-full px-12"
                     >
-                        <Link href="/browse?section=new-arrivals">View all</Link>
+                        <Link href="/search?section=new-arrivals">View all</Link>
                     </Button>
                 </div>
             </>

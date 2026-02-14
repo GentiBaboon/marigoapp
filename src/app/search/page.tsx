@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, orderBy, type QueryConstraint } from 'firebase/firestore';
 import type { FirestoreProduct } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 
@@ -39,24 +39,31 @@ function ProductListPage() {
   let title = 'Products';
   if (category) title = category.replace(/-/g, ' ');
   if (brand) title = brand.replace(/-/g, ' ');
-  if (section) title = section.replace(/-/g, ' ');
+  if (section === 'new-arrivals') {
+    title = 'New Arrivals';
+  } else if (section) {
+    title = section.replace(/-/g, ' ');
+  }
 
 
   const productsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    let q = query(collection(firestore, 'products'), where('status', '==', 'active'));
+
+    const baseQuery = collection(firestore, 'products');
+    const queryConstraints: QueryConstraint[] = [where('status', '==', 'active')];
     
     if (category) {
-      q = query(q, where('category', '==', category));
+      queryConstraints.push(where('category', '==', category));
     }
     if (brand) {
-      q = query(q, where('brand', '==', brand));
+      queryConstraints.push(where('brand', '==', brand));
     }
-    // 'section' could map to more complex queries, e.g. based on creation date for 'new-arrivals'
-    // For now, we'll just filter client-side as an example if needed.
+    if (section === 'new-arrivals') {
+        queryConstraints.push(orderBy('listing_created', 'desc'));
+    }
 
-    return q;
-  }, [firestore, category, brand]);
+    return query(baseQuery, ...queryConstraints);
+  }, [firestore, category, brand, section]);
 
   const { data: products, isLoading } = useCollection<FirestoreProduct>(productsQuery);
 
@@ -68,7 +75,7 @@ function ProductListPage() {
         title: p.title,
         price: p.price,
         image: p.images?.[0] || '',
-        sellerId: p.sellerId,
+        sellerId: p.seller_id,
         size: p.size,
         condition: p.condition as any,
         color: p.color,
