@@ -82,6 +82,13 @@ function ProductPageSkeleton() {
     );
 }
 
+const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-right">{value}</span>
+    </>
+);
+
 export default function ProductDetailPage() {
     const params = useParams();
     const productId = params.id as string;
@@ -180,7 +187,7 @@ export default function ProductDetailPage() {
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
           {/* Image Carousel */}
           <div className="flex flex-col items-center">
-             <Carousel setApi={setApi} className="w-full">
+             <Carousel setApi={setApi} className="w-full relative">
               <CarouselContent>
                 {product.images.map((imgUrl, index) => (
                     <CarouselItem key={index}>
@@ -197,17 +204,12 @@ export default function ProductDetailPage() {
                     </CarouselItem>
                   ))}
               </CarouselContent>
+               {count > 1 && (
+                <div className="absolute bottom-4 right-4 bg-black/50 text-white text-xs font-semibold rounded-full px-3 py-1.5">
+                    {current} / {count}
+                </div>
+              )}
             </Carousel>
-            <div className="flex items-center space-x-2 mt-4">
-              {Array.from({ length: count }).map((_, index) => (
-                <div
-                  key={index}
-                  className={cn('h-2 w-2 rounded-full transition-colors', 
-                    index + 1 === current ? 'bg-foreground' : 'bg-muted'
-                  )}
-                />
-              ))}
-            </div>
           </div>
   
           {/* Product Details */}
@@ -264,17 +266,27 @@ export default function ProductDetailPage() {
                 </div>
             </div>
             
-            <div className="space-y-4">
-                <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">DETAILS</h3>
-                <p className="text-sm text-muted-foreground line-clamp-3">
-                  {product.description}
-                </p>
-                <Button variant="outline" className="w-full">See more details</Button>
-                <Button variant="link" className="p-0 h-auto text-sm text-muted-foreground">
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  A question ? Leave a comment for the seller
-                </Button>
-            </div>
+            <Accordion type="single" collapsible className="w-full" defaultValue="description">
+              <AccordionItem value="description">
+                <AccordionTrigger className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Description & Details</AccordionTrigger>
+                <AccordionContent className="pt-4 space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    {product.description}
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm pt-2">
+                    {product.condition && <DetailRow label="Condition" value={conditionLabel} />}
+                    {product.color && <DetailRow label="Color" value={product.color} />}
+                    {product.material && <DetailRow label="Material" value={product.material} />}
+                    {product.pattern && <DetailRow label="Pattern" value={product.pattern} />}
+                    {product.vintage && <DetailRow label="Vintage" value="Yes" />}
+                  </div>
+                  <Button variant="link" className="p-0 h-auto text-sm text-muted-foreground">
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    A question ? Leave a comment for the seller
+                  </Button>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
             
             <div className="space-y-4">
                 <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">MORE INFORMATION</h3>
