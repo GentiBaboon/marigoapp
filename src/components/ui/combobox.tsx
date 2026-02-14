@@ -48,7 +48,7 @@ export function Combobox({ items, placeholder, searchPlaceholder, emptyPlacehold
   [items]);
   
   const selectedLabel = value
-    ? flatItems.find((item) => item.value === value)?.label
+    ? flatItems.find((item) => item.value.toLowerCase() === value.toLowerCase())?.label
     : placeholder;
 
   return (
@@ -85,7 +85,7 @@ export function Combobox({ items, placeholder, searchPlaceholder, emptyPlacehold
                                 <Check
                                     className={cn(
                                     "mr-2 h-4 w-4",
-                                    value === item.value ? "opacity-100" : "opacity-0"
+                                    value?.toLowerCase() === item.value.toLowerCase() ? "opacity-100" : "opacity-0"
                                     )}
                                 />
                                 {item.label}
@@ -107,7 +107,7 @@ export function Combobox({ items, placeholder, searchPlaceholder, emptyPlacehold
                         <Check
                             className={cn(
                             "mr-2 h-4 w-4",
-                            value === item.value ? "opacity-100" : "opacity-0"
+                            value?.toLowerCase() === item.value.toLowerCase() ? "opacity-100" : "opacity-0"
                             )}
                         />
                         {item.label}

@@ -66,7 +66,7 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
   React.useEffect(() => {
     if (addressToEdit) {
       form.reset(addressToEdit);
-      const country = countries.find(c => c.name === addressToEdit.country);
+      const country = countries.find(c => c.name.toLowerCase() === addressToEdit.country.toLowerCase());
       setSelectedCountry(country);
       
       const foundCountry = sortedCountriesByPhoneCode.find(c => addressToEdit.phone.startsWith(c.phone));
@@ -119,7 +119,7 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
   }
 
   const handleCountryChange = (countryName: string) => {
-    const country = countries.find(c => c.name === countryName);
+    const country = countries.find(c => c.name.toLowerCase() === countryName.toLowerCase());
     setSelectedCountry(country);
     form.setValue('country', countryName, { shouldValidate: true });
     form.setValue('city', '', { shouldValidate: true }); // Reset city
