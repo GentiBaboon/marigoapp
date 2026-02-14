@@ -119,6 +119,8 @@ export default function ProductDetailPage() {
     const [isChatLoading, setIsChatLoading] = React.useState(false);
     const { isFavorite, addToWishlist, removeFromWishlist } = useWishlist();
 
+    const isSeller = user?.uid === product?.seller_id;
+
     const relatedProductsQuery = useMemoFirebase(() => {
         if (!firestore || !product?.category) return null;
         return query(
@@ -149,7 +151,7 @@ export default function ProductDetailPage() {
             router.push('/auth');
             return;
         }
-        if (!product || !seller || user.uid === product.seller_id) {
+        if (!product || !seller || isSeller) {
             toast({
                 variant: 'destructive',
                 title: "Can't start chat",
@@ -308,16 +310,25 @@ export default function ProductDetailPage() {
             </div>
             
             <div className="hidden md:flex flex-col gap-3">
-                <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90 h-12 text-base" onClick={handleAddToCart} disabled={!user || user.uid === product.seller_id}>Add to bag</Button>
-                <div className="grid grid-cols-2 gap-3">
-                    <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={handleChat} disabled={isChatLoading || !user || user.uid === product.seller_id}>
-                        {isChatLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
-                        Chat
-                    </Button>
-                    <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={() => setIsOfferSheetOpen(true)} disabled={!user || user.uid === product.seller_id}>
-                        Make an offer
-                    </Button>
-                </div>
+                {isSeller ? (
+                    <div className="grid grid-cols-2 gap-3">
+                        <Button size="lg" variant="outline" className="w-full h-12 text-base">Edit Product</Button>
+                        <Button size="lg" className="w-full h-12 text-base">Manage Offers</Button>
+                    </div>
+                ) : (
+                    <>
+                        <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90 h-12 text-base" onClick={handleAddToCart} disabled={!user}>Add to bag</Button>
+                        <div className="grid grid-cols-2 gap-3">
+                            <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={handleChat} disabled={isChatLoading || !user}>
+                                {isChatLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                                Chat
+                            </Button>
+                            <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={() => setIsOfferSheetOpen(true)} disabled={!user}>
+                                Make an offer
+                            </Button>
+                        </div>
+                    </>
+                )}
             </div>
           </div>
         </div>
@@ -481,16 +492,25 @@ export default function ProductDetailPage() {
         {/* Mobile Floating Action Bar */}
         <div className="md:hidden fixed bottom-16 left-0 w-full bg-background/95 backdrop-blur-sm border-t p-2 flex items-center gap-2 z-40">
             <div className="container flex items-center gap-2 px-4">
-                <Button variant="outline" size="icon" className="h-12 w-12" onClick={handleChat} disabled={isChatLoading || !user || user.uid === product.seller_id}>
-                    {isChatLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : <MessageSquare className="h-6 w-6" />}
-                    <span className="sr-only">Chat</span>
-                </Button>
-                <Button size="lg" variant="outline" className="flex-1 h-12 text-base" onClick={() => setIsOfferSheetOpen(true)} disabled={!user || user.uid === product.seller_id}>
-                    Make an offer
-                </Button>
-                <Button size="lg" className="flex-1 h-12 text-base bg-foreground text-background" onClick={handleAddToCart} disabled={!user || user.uid === product.seller_id}>
-                    Add to bag
-                </Button>
+                {isSeller ? (
+                    <>
+                        <Button variant="outline" size="lg" className="flex-1 h-12 text-base">Edit Product</Button>
+                        <Button size="lg" className="flex-1 h-12 text-base">Manage Offers</Button>
+                    </>
+                ) : (
+                    <>
+                        <Button variant="outline" size="icon" className="h-12 w-12" onClick={handleChat} disabled={isChatLoading || !user}>
+                            {isChatLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : <MessageSquare className="h-6 w-6" />}
+                            <span className="sr-only">Chat</span>
+                        </Button>
+                        <Button size="lg" variant="outline" className="flex-1 h-12 text-base" onClick={() => setIsOfferSheetOpen(true)} disabled={!user}>
+                            Make an offer
+                        </Button>
+                        <Button size="lg" className="flex-1 h-12 text-base bg-foreground text-background" onClick={handleAddToCart} disabled={!user}>
+                            Add to bag
+                        </Button>
+                    </>
+                )}
             </div>
         </div>
       </div>
