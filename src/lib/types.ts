@@ -119,6 +119,10 @@ export const sellStep4Schema = z.object({
 });
 
 export const sellStep5Schema = z.object({
+  shippingFromAddressId: z.string({ required_error: 'Please select a shipping address.' }).min(1, 'Please select a shipping address.'),
+});
+
+export const sellStep6Schema = z.object({
     price: z.preprocess(
         (a) => {
             if (typeof a === 'string' && a.trim() !== '') return parseFloat(a);
@@ -130,7 +134,12 @@ export const sellStep5Schema = z.object({
     currency: z.enum(['EUR', 'ALL'], { required_error: 'A currency is required.' }),
 });
 
-export const sellFormSchema = sellStep1Schema.merge(sellStep2Schema).merge(sellStep3Schema).merge(sellStep4Schema).merge(sellStep5Schema);
+export const sellFormSchema = sellStep1Schema
+  .merge(sellStep2Schema)
+  .merge(sellStep3Schema)
+  .merge(sellStep4Schema)
+  .merge(sellStep5Schema)
+  .merge(sellStep6Schema);
 
 export type SellFormValues = z.infer<typeof sellFormSchema> & { sellerEarning?: number };
 

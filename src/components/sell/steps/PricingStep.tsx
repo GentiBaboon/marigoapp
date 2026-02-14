@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/tooltip"
 import { Input } from '@/components/ui/input';
 import { useSellForm } from '@/components/sell/SellFormContext';
-import { sellStep5Schema } from '@/lib/types';
+import { sellStep6Schema } from '@/lib/types';
 import type { z } from 'zod';
 import { StepActions } from '@/components/sell/StepActions';
 import { getPriceSuggestion } from '@/app/sell/actions';
@@ -44,7 +44,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
-type Step5Values = z.infer<typeof sellStep5Schema>;
+type Step6Values = z.infer<typeof sellStep6Schema>;
 
 const COMMISSION_RATE = 0.20;
 const FIXED_FEE = 5;
@@ -74,8 +74,8 @@ export function PricingStep() {
   const [earning, setEarning] = useState<number>(0);
   const { toast } = useToast();
 
-  const form = useForm<Step5Values>({
-    resolver: zodResolver(sellStep5Schema),
+  const form = useForm<Step6Values>({
+    resolver: zodResolver(sellStep6Schema),
     defaultValues: {
       price: formData.price,
       currency: formData.currency || 'EUR',
@@ -95,7 +95,7 @@ export function PricingStep() {
   }, [priceValue]);
 
 
-  const onSubmit = (data: Step5Values) => {
+  const onSubmit = (data: Step6Values) => {
     setFormData({ ...data, sellerEarning: earning });
     nextStep();
   };

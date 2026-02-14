@@ -7,8 +7,7 @@ import { categories } from '@/lib/mock-data';
 export function SellProgressHeader() {
   const { formData, currentStep, totalSteps } = useSellForm();
   
-  // The pricing step is now the 5th and final interactive step before review.
-  const visualSteps = Array.from({ length: 5 }, (_, i) => i + 1);
+  const visualSteps = Array.from({ length: 6 }, (_, i) => i + 1);
 
   const getCategoryName = (slug: string | undefined) => {
     if (!slug) return '';
@@ -25,7 +24,8 @@ export function SellProgressHeader() {
     2: 'Details',
     3: 'Photos',
     4: 'Description',
-    5: 'Price',
+    5: 'Address',
+    6: 'Price',
   };
 
   return (

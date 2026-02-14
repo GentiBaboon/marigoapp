@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { Separator } from '@/components/ui/separator';
@@ -11,9 +11,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { categories, productConditions } from '@/lib/mock-data';
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useUser, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { FirestoreProduct } from '@/lib/types';
+import { FirestoreProduct, FirestoreAddress } from '@/lib/types';
 
 // Helper component for each review section
 const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode; }) => (
@@ -45,6 +45,22 @@ export function ReviewStep() {
   const router = useRouter();
   const { user } = useUser();
   const firestore = useFirestore();
+  const [selectedAddress, setSelectedAddress] = useState<FirestoreAddress | null>(null);
+
+  const addressesCollection = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, 'users', user.uid, 'addresses');
+  }, [user, firestore]);
+
+  const { data: addresses } = useCollection<FirestoreAddress>(addressesCollection);
+
+  useEffect(() => {
+    if (addresses && formData.shippingFromAddressId) {
+      const addr = addresses.find(a => a.id === formData.shippingFromAddressId);
+      setSelectedAddress(addr || null);
+    }
+  }, [addresses, formData.shippingFromAddressId]);
+
 
   const handlePublish = async () => {
     if (!user || !firestore) {
@@ -173,7 +189,20 @@ export function ReviewStep() {
 
             <Separator/>
 
-            <ReviewSection title="Price" onEdit={() => goToStep(5)}>
+            <ReviewSection title="Address" onEdit={() => goToStep(5)}>
+                 {selectedAddress ? (
+                    <>
+                        <p className="font-medium">{selectedAddress.fullName}</p>
+                        <p className="text-muted-foreground">{selectedAddress.address}, {selectedAddress.city} {selectedAddress.postal}, {selectedAddress.country}</p>
+                    </>
+                 ) : (
+                    <p className="text-muted-foreground">No address selected.</p>
+                 )}
+            </ReviewSection>
+            
+            <Separator/>
+
+            <ReviewSection title="Price" onEdit={() => goToStep(6)}>
                 <p className="font-semibold text-lg">{currencyFormatter(formData.price || 0)} (you earn {currencyFormatter(formData.sellerEarning || 0)})</p>
                 <p className="text-sm text-muted-foreground flex items-center">
                     Buyer service fee not included
@@ -193,12 +222,6 @@ export function ReviewStep() {
             </ReviewSection>
 
             <Separator/>
-
-            {/* In a real app, this would come from the user's profile */}
-            <ReviewSection title="Address" onEdit={() => alert('Address editing is not implemented in this step.')}>
-                 <p className="font-medium">Genti Dhimitri</p>
-                 <p className="text-muted-foreground">Via Malvolta, 19, 40137 Bologna</p>
-            </ReviewSection>
         </div>
         
         <div className="space-y-4 pt-4">

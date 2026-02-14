@@ -5,6 +5,7 @@ import { CategoryStep } from '@/components/sell/steps/CategoryStep';
 import { DetailsStep } from '@/components/sell/steps/DetailsStep';
 import { PhotosStep } from '@/components/sell/steps/PhotosStep';
 import { DescriptionStep } from '@/components/sell/steps/DescriptionStep';
+import { AddressStep } from '@/components/sell/steps/AddressStep';
 import { PricingStep } from '@/components/sell/steps/PricingStep';
 import { ReviewStep } from '@/components/sell/steps/ReviewStep';
 import { SuccessStep } from '@/components/sell/steps/SuccessStep';
@@ -82,9 +83,10 @@ export default function SellPage() {
     <DetailsStep key={2} />,
     <PhotosStep key={3} />,
     <DescriptionStep key={4} />,
-    <PricingStep key={5} />,
-    <ReviewStep key={6} />,
-    <SuccessStep key={7} />,
+    <AddressStep key={5} />,
+    <PricingStep key={6} />,
+    <ReviewStep key={7} />,
+    <SuccessStep key={8} />,
   ]
 
   if (!isClient) {

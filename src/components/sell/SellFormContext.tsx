@@ -26,7 +26,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [drafts, setDrafts] = useState<SellDraft[]>([]);
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const totalSteps = 6;
+  const totalSteps = 7;
 
   // Load drafts from localStorage on initial mount
   useEffect(() => {
