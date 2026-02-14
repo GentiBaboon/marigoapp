@@ -2,11 +2,12 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { MoreVertical, Truck } from 'lucide-react';
+import { MoreVertical, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
-import type { FirestoreOrder } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
+import type { FirestoreOrder, FirestoreUser } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -14,85 +15,97 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const currencyFormatter = new Intl.NumberFormat('de-DE', {
   style: 'currency',
   currency: 'EUR',
 });
 
-const statusStyles: { [key: string]: string } = {
-  pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  processing: 'bg-blue-100 text-blue-800 border-blue-200',
-  shipped: 'bg-blue-100 text-blue-800 border-blue-200',
-  delivered: 'bg-green-100 text-green-800 border-green-200',
-  cancelled: 'bg-red-100 text-red-800 border-red-200',
-  default: 'bg-gray-100 text-gray-800 border-gray-200',
+// A new sub-component to fetch and display the seller's name
+const SellerInfo = ({ sellerId }: { sellerId: string }) => {
+    const firestore = useFirestore();
+    // Memoize the document reference
+    const sellerRef = useMemoFirebase(() => 
+        firestore ? doc(firestore, 'users', sellerId) : null,
+        [firestore, sellerId]
+    );
+    const { data: seller, isLoading } = useDoc<FirestoreUser>(sellerRef);
+
+    if (isLoading) {
+        return <Skeleton className="h-4 w-24 mt-1" />;
+    }
+
+    if (!seller) {
+        return <p className="text-sm text-muted-foreground">Sold by: an unknown seller</p>;
+    }
+    
+    // The image shows "Genti", which seems to be the display name.
+    return (
+        <p className="text-sm text-muted-foreground">
+            Sold by: <Link href={`/profile/${seller.id}`} onClick={(e) => e.stopPropagation()} className="underline text-foreground hover:text-primary">{seller.displayName}</Link>
+        </p>
+    );
 };
+
 
 type OrderItemProps = {
   order: FirestoreOrder;
-  userRole: 'buyer' | 'seller';
 };
 
-export function OrderItem({ order, userRole }: OrderItemProps) {
+export function OrderItem({ order }: OrderItemProps) {
   const firstItem = order.items[0];
   const imageUrl = firstItem.image;
   const imageAlt = firstItem.title;
-
-  const getStatusLabel = (status: string) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
-  };
-  
-  const statusVariant = statusStyles[order.status] || statusStyles.default;
+  // Assuming a single seller for simplicity as per the current data model for items.
+  const sellerId = firstItem.sellerId; 
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border p-4">
-       <Link href={`/profile/orders/${order.id}`} className="flex flex-col gap-4">
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+    <div className="py-4 border-b">
+        <div className="flex justify-between items-center mb-3">
             <div>
-                <span className="font-semibold text-foreground">Order #{order.orderNumber}</span>
-                <span className="mx-2">|</span>
-                <span>{format(new Date(order.createdAt.seconds * 1000), 'PPP')}</span>
+                <h2 className="font-semibold text-lg">Order #{order.orderNumber}</h2>
+                <p className="text-sm text-muted-foreground">
+                    Purchase date: {format(new Date(order.createdAt.seconds * 1000), 'd MMM yyyy')}
+                </p>
             </div>
-            <Badge className={cn(statusVariant)}>{getStatusLabel(order.status)}</Badge>
+             <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="h-5 w-5" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem>Track Order</DropdownMenuItem>
+                    <DropdownMenuItem>Contact Seller</DropdownMenuItem>
+                    <DropdownMenuItem>View Invoice</DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
-        <div className="flex items-start gap-4">
-            <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-md bg-muted">
-            <Image
-                src={imageUrl}
-                alt={imageAlt}
-                fill
-                className="object-cover"
-                sizes="96px"
-            />
+
+        <Link href={`/profile/orders/${order.id}`} className="block mb-3 group">
+            <div className="flex items-center gap-4">
+                <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md bg-muted">
+                    <Image
+                        src={imageUrl}
+                        alt={imageAlt}
+                        fill
+                        className="object-cover"
+                        sizes="64px"
+                    />
+                </div>
+                <div className="flex-1 space-y-0.5">
+                    <h3 className="font-bold text-lg uppercase">{firstItem.brand}</h3>
+                    <p className="text-sm text-muted-foreground">{firstItem.title}</p>
+                    {sellerId && <SellerInfo sellerId={sellerId} />}
+                </div>
+                <ChevronRight className="h-6 w-6 text-muted-foreground transition-transform group-hover:translate-x-1" />
             </div>
-            <div className="flex-1 space-y-1">
-                <p className="text-sm font-medium text-muted-foreground">{firstItem.brand}</p>
-                <h3 className="font-semibold text-foreground leading-tight">{firstItem.title}</h3>
-                {order.items.length > 1 && (
-                    <p className="text-sm text-muted-foreground">+ {order.items.length - 1} more item(s)</p>
-                )}
-                <p className="font-bold text-lg">{currencyFormatter.format(order.totalAmount)}</p>
-            </div>
+        </Link>
+        
+        <div className="font-semibold text-lg">
+            Order value: {currencyFormatter.format(order.totalAmount)}
         </div>
-      </Link>
-      <div className="flex justify-end gap-2 border-t pt-4">
-        {userRole === 'seller' && order.status === 'processing' && (
-            <Button size="sm">Confirm Shipment</Button>
-        )}
-        {userRole === 'buyer' && order.status === 'delivered' && (
-             <Button size="sm" asChild>
-                <Link href={`/profile/orders/${order.id}#review`}>Leave Review</Link>
-            </Button>
-        )}
-        <Button size="sm" variant="outline" asChild>
-          <Link href={`/profile/orders/${order.id}`}>
-            View Details
-          </Link>
-        </Button>
-      </div>
     </div>
   );
 }

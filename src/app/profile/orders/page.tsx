@@ -2,10 +2,10 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { collection, query, where, getDocs, or } from 'firebase/firestore';
+import { ArrowLeft, User, HelpCircle } from 'lucide-react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
-import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
 import type { FirestoreOrder } from '@/lib/types';
 
 import { Button } from '@/components/ui/button';
@@ -17,82 +17,55 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OrderItem } from '@/components/profile/order-item';
 
 function OrdersSkeleton() {
     return (
-        <div className="space-y-4">
-            <div className="space-y-4 rounded-lg border p-4">
-                <div className="flex items-center justify-between">
-                    <Skeleton className="h-5 w-1/3" />
-                    <Skeleton className="h-6 w-20" />
-                </div>
-                <div className="flex items-center space-x-4">
-                    <Skeleton className="h-24 w-24 rounded-md" />
-                    <div className="space-y-2 flex-1">
-                        <Skeleton className="h-4 w-1/4" />
-                        <Skeleton className="h-5 w-3/4" />
-                        <Skeleton className="h-5 w-1/3" />
+        <div className="space-y-4 px-4">
+            {[...Array(3)].map((_, i) => (
+                <div key={i} className="py-4 border-b">
+                    <div className="flex justify-between items-center mb-3">
+                        <div className="space-y-2">
+                            <Skeleton className="h-5 w-40" />
+                            <Skeleton className="h-4 w-48" />
+                        </div>
+                        <Skeleton className="h-8 w-8 rounded-full" />
                     </div>
-                </div>
-            </div>
-             <div className="space-y-4 rounded-lg border p-4">
-                <div className="flex items-center justify-between">
-                    <Skeleton className="h-5 w-1/3" />
-                    <Skeleton className="h-6 w-20" />
-                </div>
-                <div className="flex items-center space-x-4">
-                    <Skeleton className="h-24 w-24 rounded-md" />
-                    <div className="space-y-2 flex-1">
-                        <Skeleton className="h-4 w-1/4" />
-                        <Skeleton className="h-5 w-3/4" />
-                        <Skeleton className="h-5 w-1/3" />
+                    <div className="flex items-center gap-4 mb-3">
+                        <Skeleton className="h-16 w-16 rounded-md" />
+                        <div className="flex-1 space-y-2">
+                             <Skeleton className="h-5 w-20" />
+                             <Skeleton className="h-4 w-32" />
+                             <Skeleton className="h-4 w-28" />
+                        </div>
+                         <Skeleton className="h-6 w-6" />
                     </div>
+                    <Skeleton className="h-6 w-36" />
                 </div>
-            </div>
-        </div>
-    );
-}
-
-function EmptyState({ role }: { role: 'buyer' | 'seller' }) {
-    return (
-        <div className="text-center py-10">
-            <h3 className="text-lg font-semibold">No orders found</h3>
-            <p className="text-muted-foreground mt-2">
-                {role === 'buyer' 
-                    ? "You haven't bought any items yet." 
-                    : "You haven't sold any items yet."}
-            </p>
-            {role === 'buyer' && (
-                <Button asChild className="mt-4">
-                    <Link href="/home">Start Shopping</Link>
-                </Button>
-            )}
-        </div>
-    )
-}
-
-function OrderList({ orders, role }: { orders: FirestoreOrder[], role: 'buyer' | 'seller' }) {
-    if (orders.length === 0) {
-        return <EmptyState role={role} />;
-    }
-
-    return (
-        <div className="space-y-4">
-            {orders.map(order => (
-                <OrderItem key={order.id} order={order} userRole={role} />
             ))}
         </div>
     );
 }
 
 
+function EmptyState() {
+    return (
+        <div className="text-center py-20">
+            <h3 className="text-lg font-semibold">No orders yet</h3>
+            <p className="text-muted-foreground mt-2">
+                You haven't bought any items yet.
+            </p>
+            <Button asChild className="mt-4">
+                <Link href="/home">Start Shopping</Link>
+            </Button>
+        </div>
+    )
+}
+
 export default function OrdersPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
-  const [buyingOrders, setBuyingOrders] = React.useState<FirestoreOrder[]>([]);
-  const [sellingOrders, setSellingOrders] = React.useState<FirestoreOrder[]>([]);
+  const [orders, setOrders] = React.useState<FirestoreOrder[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -106,18 +79,12 @@ export default function OrdersPage() {
     const fetchOrders = async () => {
         setIsLoading(true);
         try {
-            // Fetch buying orders
-            const buyingQuery = query(collection(firestore, 'orders'), where('buyerId', '==', user.uid));
-            const buyingSnapshot = await getDocs(buyingQuery);
-            const buyingData = buyingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreOrder));
-            setBuyingOrders(buyingData);
-
-            // Fetch selling orders
-            const sellingQuery = query(collection(firestore, 'orders'), where('sellerIds', 'array-contains', user.uid));
-            const sellingSnapshot = await getDocs(sellingQuery);
-            const sellingData = sellingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreOrder));
-            setSellingOrders(sellingData);
-
+            const ordersQuery = query(collection(firestore, 'orders'), where('buyerId', '==', user.uid));
+            const querySnapshot = await getDocs(ordersQuery);
+            const fetchedOrders = querySnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as FirestoreOrder))
+                .sort((a, b) => b.createdAt.seconds - a.createdAt.seconds); // Sort by newest first
+            setOrders(fetchedOrders);
         } catch (error) {
             console.error("Error fetching orders:", error);
         } finally {
@@ -129,7 +96,6 @@ export default function OrdersPage() {
 
   }, [user, firestore, isUserLoading]);
 
-  
   const areDataLoading = isUserLoading || isLoading;
   
   if (!user && !isUserLoading) {
@@ -153,42 +119,40 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-        <div className="max-w-3xl mx-auto">
-            <div className="mb-4">
-                 <Button asChild variant="outline">
+     <div className="container mx-auto max-w-lg p-0">
+        <div className="flex items-center justify-between p-2 md:p-4 border-b bg-background sticky top-16 md:top-0 z-10">
+            <Button variant="ghost" size="icon" asChild>
+                <Link href="/profile">
+                    <ArrowLeft className="h-6 w-6" />
+                </Link>
+            </Button>
+            <h1 className="text-xl font-bold">Orders</h1>
+            <div className="flex items-center gap-0.5">
+                <Button variant="ghost" size="icon" asChild>
                     <Link href="/profile">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Profile
+                         <User className="h-6 w-6" />
                     </Link>
-                 </Button>
+                </Button>
+                <Button variant="ghost" size="icon" asChild>
+                     <Link href="/help">
+                        <HelpCircle className="h-6 w-6" />
+                    </Link>
+                </Button>
             </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>My Orders</CardTitle>
-              <CardDescription>
-                Manage your buying and selling history.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="buying" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="buying">Buying ({buyingOrders.length})</TabsTrigger>
-                  <TabsTrigger value="selling">Selling ({sellingOrders.length})</TabsTrigger>
-                </TabsList>
-                <TabsContent value="buying" className="mt-6">
-                    {areDataLoading ? <OrdersSkeleton /> : 
-                        <OrderList orders={buyingOrders} role="buyer" />
-                    }
-                </TabsContent>
-                <TabsContent value="selling" className="mt-6">
-                     {areDataLoading ? <OrdersSkeleton /> : 
-                        <OrderList orders={sellingOrders} role="seller" />
-                    }
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+        </div>
+
+        <div>
+            {areDataLoading ? (
+                <OrdersSkeleton />
+            ) : orders.length > 0 ? (
+                <div className="px-4">
+                    {orders.map(order => (
+                        <OrderItem key={order.id} order={order} />
+                    ))}
+                </div>
+            ) : (
+                <EmptyState />
+            )}
         </div>
     </div>
   );
