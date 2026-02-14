@@ -8,11 +8,10 @@ import type { Product } from '@/lib/mock-data';
 import { HeartOff, ChevronDown, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useWishlist } from '@/context/WishlistContext';
-import { newArrivals, trendingProducts, outletProducts, vintageGems, recentlyViewedProducts } from '@/lib/mock-data';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
 import { useRouter } from 'next/navigation';
-
-const allProducts = [...newArrivals, ...trendingProducts, ...outletProducts, ...vintageGems, ...recentlyViewedProducts];
+import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
+import type { FirestoreProduct } from '@/lib/types';
 
 
 const EmptyFavorites = () => (
@@ -49,6 +48,9 @@ export default function FavoritesPage() {
     const { user, isUserLoading } = useUser();
     const { wishlistItems, isLoading: isWishlistLoading } = useWishlist();
     const router = useRouter();
+    const firestore = useFirestore();
+    const [favoriteProducts, setFavoriteProducts] = React.useState<(Product & { addedAt: any })[]>([]);
+    const [isProductsLoading, setIsProductsLoading] = React.useState(true);
     
     React.useEffect(() => {
         if (!isUserLoading && !user) {
@@ -56,18 +58,62 @@ export default function FavoritesPage() {
         }
     }, [user, isUserLoading, router]);
 
-    const favoriteProducts = React.useMemo(() => {
-        if (!wishlistItems) return [];
-        const productMap = new Map<string, Product>();
-        allProducts.forEach(p => productMap.set(p.id, p));
+    React.useEffect(() => {
+      if (isWishlistLoading || !firestore) return;
+      
+      if (wishlistItems.length === 0) {
+        setIsProductsLoading(false);
+        setFavoriteProducts([]);
+        return;
+      }
 
-        return wishlistItems
-            .map(item => {
-                const product = productMap.get(item.id);
-                return product ? { ...product, addedAt: item.addedAt } : null;
-            })
-            .filter((p): p is (Product & { addedAt: any }) => !!p);
-    }, [wishlistItems]);
+      const fetchProducts = async () => {
+        setIsProductsLoading(true);
+        const productIds = wishlistItems.map(item => item.id);
+        const productsData: (Product & { addedAt: any })[] = [];
+        
+        // Firestore 'in' query is limited to 10 items per query.
+        const chunks: string[][] = [];
+        for (let i = 0; i < productIds.length; i += 10) {
+            chunks.push(productIds.slice(i, i + 10));
+        }
+        
+        try {
+          for (const chunk of chunks) {
+            if (chunk.length > 0) {
+              const q = query(collection(firestore, 'products'), where(documentId(), 'in', chunk));
+              const querySnapshot = await getDocs(q);
+              querySnapshot.forEach((doc) => {
+                const firestoreProduct = { id: doc.id, ...doc.data() } as FirestoreProduct;
+                const wishlistItem = wishlistItems.find(item => item.id === doc.id);
+                if (wishlistItem) {
+                  productsData.push({
+                    id: firestoreProduct.id,
+                    brand: firestoreProduct.brand,
+                    title: firestoreProduct.title,
+                    price: firestoreProduct.price,
+                    image: firestoreProduct.images?.[0] || '',
+                    sellerId: firestoreProduct.sellerId,
+                    size: firestoreProduct.size,
+                    condition: firestoreProduct.condition as any,
+                    color: firestoreProduct.color,
+                    vintage: firestoreProduct.vintage,
+                    addedAt: wishlistItem.addedAt,
+                  });
+                }
+              });
+            }
+          }
+          setFavoriteProducts(productsData);
+        } catch (error) {
+          console.error("Error fetching favorite products:", error);
+        } finally {
+          setIsProductsLoading(false);
+        }
+      };
+
+      fetchProducts();
+    }, [wishlistItems, isWishlistLoading, firestore]);
     
     const sortedProducts = React.useMemo(() => {
         const products = [...favoriteProducts];
@@ -85,7 +131,7 @@ export default function FavoritesPage() {
         }
     }, [favoriteProducts, sortOption]);
 
-    const isLoading = isUserLoading || isWishlistLoading;
+    const isLoading = isUserLoading || isProductsLoading;
     
     if (isLoading) {
         return (

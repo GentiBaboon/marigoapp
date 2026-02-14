@@ -4,31 +4,77 @@ import * as React from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/product-card';
-import { newArrivals, trendingProducts, outletProducts } from '@/lib/mock-data';
 import type { Product } from '@/lib/mock-data';
-import { ArrowLeft, Bookmark, SlidersHorizontal, ShoppingCart, X } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Bookmark, SlidersHorizontal, ShoppingCart, X, Search } from 'lucide-react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
+import type { FirestoreProduct } from '@/lib/types';
+import { Badge } from '@/components/ui/badge';
 
-const allProducts = [...newArrivals, ...trendingProducts, ...outletProducts];
+function ProductCardSkeleton() {
+    return (
+        <div className="space-y-2">
+            <Skeleton className="aspect-[3/4] w-full" />
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-5 w-1/3" />
+        </div>
+    )
+}
+
 
 function ProductListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const category = searchParams.get('category') || 'Products';
+  const firestore = useFirestore();
   
-  const categoryTitle = category.replace(/-/g, ' ').toUpperCase();
+  const category = searchParams.get('category');
+  const brand = searchParams.get('brand');
+  const section = searchParams.get('section');
+  
+  let title = 'Products';
+  if (category) title = category.replace(/-/g, ' ');
+  if (brand) title = brand.replace(/-/g, ' ');
+  if (section) title = section.replace(/-/g, ' ');
 
-  const productsToShow = React.useMemo(() => {
-    // Simple filter for demonstration. In a real app, you'd fetch filtered data.
-    if (category === 'tote-bags') {
-        return allProducts.filter(p => p.title.toLowerCase().includes('tote'));
+
+  const productsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    let q = query(collection(firestore, 'products'), where('status', '==', 'active'));
+    
+    if (category) {
+      q = query(q, where('category', '==', category));
     }
-    return allProducts;
-  }, [category]);
+    if (brand) {
+      q = query(q, where('brand', '==', brand));
+    }
+    // 'section' could map to more complex queries, e.g. based on creation date for 'new-arrivals'
+    // For now, we'll just filter client-side as an example if needed.
+
+    return q;
+  }, [firestore, category, brand]);
+
+  const { data: products, isLoading } = useCollection<FirestoreProduct>(productsQuery);
+
+  const productsToShow: Product[] = React.useMemo(() => {
+    if (!products) return [];
+    return products.map(p => ({
+        id: p.id,
+        brand: p.brand,
+        title: p.title,
+        price: p.price,
+        image: p.images?.[0] || '',
+        sellerId: p.sellerId,
+        size: p.size,
+        condition: p.condition as any,
+        color: p.color,
+        vintage: p.vintage,
+    }));
+  }, [products]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -51,38 +97,34 @@ function ProductListPage() {
 
         <main className="flex-1">
             <div className="container px-4 py-4">
-                <div className="bg-secondary/50 p-3 rounded-lg flex justify-between items-center text-sm mb-4">
-                    <span>Use WELCOME15 for 15% off your first order over 100€ (app only).</span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6">
-                        <X className="h-4 w-4" />
-                    </Button>
-                </div>
                 
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex justify-between items-center mb-4">
                     <div>
-                        <h1 className="text-xl font-bold">{categoryTitle}</h1>
-                        <p className="text-sm text-muted-foreground">999+ items</p>
+                        <h1 className="text-xl font-bold uppercase">{ isLoading ? 'Loading...' : title }</h1>
+                        { !isLoading && <p className="text-sm text-muted-foreground">{productsToShow.length}+ items</p> }
                     </div>
-                    <Button variant="ghost" className="text-sm font-semibold p-1 h-auto">
-                        <Bookmark className="mr-2 h-4 w-4" />
-                        Save this search
-                    </Button>
-                </div>
-
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-4 px-4">
-                    <Button variant="outline" className="border-2 border-foreground shrink-0">
+                     <Button variant="outline" className="shrink-0">
                         <SlidersHorizontal className="mr-2 h-4 w-4" />
+                        Filters
                     </Button>
-                    <Button variant="outline" className="shrink-0">In Europe</Button>
-                    <Button variant="outline" className="shrink-0">Reduced prices</Button>
-                    <Button variant="outline" className="shrink-0">Brand</Button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-x-4 gap-y-8 mt-6">
-                    {productsToShow.map((product) => (
-                        <ProductCard key={product.id} product={product} />
-                    ))}
-                </div>
+                {isLoading ? (
+                     <div className="grid grid-cols-2 gap-x-4 gap-y-8 mt-6">
+                        {[...Array(4)].map((_, i) => <ProductCardSkeleton key={i} />)}
+                    </div>
+                ) : productsToShow.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-8 mt-6">
+                        {productsToShow.map((product) => (
+                            <ProductCard key={product.id} product={product} />
+                        ))}
+                    </div>
+                ) : (
+                     <div className="text-center py-20">
+                        <h2 className="text-xl font-semibold">No products found</h2>
+                        <p className="mt-2 text-muted-foreground">Try adjusting your search or filters.</p>
+                    </div>
+                )}
             </div>
         </main>
     </div>
@@ -153,7 +195,7 @@ function SearchLandingPage() {
 // Main component that decides which view to render
 function SearchPageContents() {
     const searchParams = useSearchParams();
-    const hasQuery = searchParams.toString().length > 0;
+    const hasQuery = Array.from(searchParams.keys()).length > 0;
 
     if (hasQuery) {
         return <ProductListPage />;
