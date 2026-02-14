@@ -71,13 +71,13 @@ function OfferTimeline({ offer, product, buyer, seller }: { offer: FirestoreOffe
                 <div key={index} className="flex items-start gap-3">
                     <Avatar className="h-8 w-8">
                         <AvatarImage src={undefined} />
-                        <AvatarFallback>{item.actor?.name?.[0] || 'U'}</AvatarFallback>
+                        <AvatarFallback>{item.actor?.displayName?.[0] || 'U'}</AvatarFallback>
                     </Avatar>
                     <div>
-                        <p className="font-semibold text-sm">{item.actor?.name}</p>
+                        <p className="font-semibold text-sm">{item.actor?.displayName}</p>
                         <p className="text-xs text-muted-foreground">{format(new Date(item.timestamp.seconds * 1000), 'dd/MM/yy, HH:mm')}</p>
                     </div>
-                    <p className="ml-auto font-semibold text-sm underline text-right">{item.action}: {currencyFormatter(item.amount, product.currency)}</p>
+                    <p className="ml-auto font-semibold text-sm underline text-right">{item.action}: {currencyFormatter(item.amount, 'EUR')}</p>
                 </div>
             ))}
         </div>
@@ -131,7 +131,7 @@ function OfferActions({ offer, product, userRole }: { offer: FirestoreOffer, pro
             return (
                 <div className="grid grid-cols-2 gap-3">
                     <Button onClick={() => handleUpdateOffer('accepted')} disabled={!!isLoading}>
-                        {isLoading === 'accepted' ? <Loader2 className="animate-spin" /> : `Accept ${currencyFormatter(offer.counterAmount!, product.currency)}`}
+                        {isLoading === 'accepted' ? <Loader2 className="animate-spin" /> : `Accept ${currencyFormatter(offer.counterAmount!, 'EUR')}`}
                     </Button>
                     <Button variant="outline" onClick={() => handleUpdateOffer('rejected')} disabled={!!isLoading}>
                         {isLoading === 'rejected' ? <Loader2 className="animate-spin" /> : 'Decline'}
@@ -222,8 +222,7 @@ export default function OfferDetailsPage({ params }: { params: { id: string; off
         );
     }
     
-    const productImageData = product.images?.[0]?.url ? PlaceHolderImages.find((p) => p.id === product.images[0].url) : null;
-    const imageUrl = productImageData?.imageUrl || 'https://placehold.co/80x80/E2E8F0/A0AEC0?text=MARIGO';
+    const imageUrl = product.images?.[0] || 'https://placehold.co/80x80/E2E8F0/A0AEC0?text=MARIGO';
 
     return (
       <div className="container mx-auto max-w-lg px-4 py-8 space-y-6">
@@ -243,9 +242,9 @@ export default function OfferDetailsPage({ params }: { params: { id: string; off
                     <Image src={imageUrl} alt={product.title} fill sizes="64px" className="object-cover" />
                 </div>
                 <div>
-                    <p className="font-bold">{product.brandId}</p>
+                    <p className="font-bold">{product.title}</p>
                     <p>{product.title}</p>
-                    <p className="text-muted-foreground">Listed for: {currencyFormatter(product.price, product.currency)}</p>
+                    <p className="text-muted-foreground">Listed for: {currencyFormatter(product.price, 'EUR')}</p>
                 </div>
             </div>
             <Button variant="outline" className="w-full">

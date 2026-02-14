@@ -23,8 +23,7 @@ const statusStyles: { [key: string]: string } = {
 
 export function OfferListItem({ offer }: { offer: OfferWithProduct }) {
     const { product } = offer;
-    const productImageData = product.images?.[0]?.url ? PlaceHolderImages.find((p) => p.id === product.images[0].url) : null;
-    const imageUrl = productImageData?.imageUrl || 'https://placehold.co/96x96/E2E8F0/A0AEC0?text=MARIGO';
+    const imageUrl = product.images?.[0] || 'https://placehold.co/96x96/E2E8F0/A0AEC0?text=MARIGO';
     const imageAlt = product.title;
 
     const getStatusLabel = (status: string) => {
@@ -38,7 +37,7 @@ export function OfferListItem({ offer }: { offer: OfferWithProduct }) {
             <div className="flex flex-col gap-4 rounded-lg border p-4 hover:bg-muted/50 transition-colors">
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <div>
-                        <span className="font-semibold text-foreground">Offer for {product.brandId} {product.title}</span>
+                        <span className="font-semibold text-foreground">Offer for {product.title}</span>
                     </div>
                     <Badge className={cn(statusVariant)}>{getStatusLabel(offer.status)}</Badge>
                 </div>

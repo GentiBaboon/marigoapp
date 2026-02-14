@@ -5,7 +5,7 @@
       "type": "object",
       "description": "Represents a user in the MarigoApp marketplace.",
       "properties": {
-        "name": {
+        "displayName": {
           "type": "string",
           "description": "The user's display name."
         },
@@ -14,7 +14,7 @@
           "format": "email",
           "description": "The user's email address."
         },
-        "shoppingPreference": {
+        "macroCategoryPreference": {
           "type": "string",
           "enum": [
             "womenswear",
@@ -111,31 +111,17 @@
       "type": "object",
       "description": "Represents a product listed on the marketplace.",
       "properties": {
-        "sellerId": { "type": "string" },
+        "sellerId": { "type": "string", "description": "Reference to the user who is selling the item." },
         "title": { "type": "string" },
         "description": { "type": "string" },
+        "price": { "type": "number" },
         "categoryId": { "type": "string" },
         "subcategoryId": { "type": "string" },
-        "brandId": { "type": "string" },
-        "condition": { "type": "string", "enum": ["new", "like_new", "good", "fair"] },
-        "listingType": { "type": "string", "enum": ["fixed_price", "auction"] },
-        "price": { "type": "number" },
-        "originalPrice": { "type": "number" },
-        "currency": { "type": "string", "enum": ["EUR", "ALL", "USD"] },
-        "size": { "type": "string" },
-        "color": { "type": "string" },
-        "material": { "type": "string" },
-        "gender": { "type": "string", "enum": ["women", "men", "children", "unisex"] },
-        "images": { "type": "array", "items": { "type": "object", "properties": { "url": { "type": "string" }, "thumbnailUrl": { "type": "string" }, "position": { "type": "number" } } } },
-        "status": { "type": "string", "enum": ["draft", "pending_review", "active", "sold", "removed", "expired"] },
-        "views": { "type": "number" },
-        "wishlistCount": { "type": "number" },
-        "isFeatured": { "type": "boolean" },
-        "isAuthenticated": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "images": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "status": { "type": "string", "enum": ["active", "sold", "reserved"] },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["sellerId", "title", "categoryId", "brandId", "condition", "listingType", "price", "currency", "images", "status", "createdAt"]
+      "required": ["sellerId", "title", "price", "categoryId", "images", "status", "createdAt"]
     },
     "Offer": {
       "title": "Offer",
@@ -299,5 +285,3 @@
     ]
   }
 }
-
-    

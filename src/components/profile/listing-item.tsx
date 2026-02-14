@@ -38,7 +38,7 @@ const statusStyles = {
 };
 
 export function ListingItem({ product }: { product: FirestoreProduct }) {
-  const imageUrl = product.images?.[0]?.url || PlaceHolderImages.find(p => p.id === 'product-1')?.imageUrl || '/placeholder.png';
+  const imageUrl = product.images?.[0] || PlaceHolderImages.find(p => p.id === 'product-1')?.imageUrl || '/placeholder.png';
   const imageAlt = product.title || 'Product image';
   const firestore = useFirestore();
 
@@ -71,7 +71,7 @@ export function ListingItem({ product }: { product: FirestoreProduct }) {
     return 'inactive';
   }
 
-  const statusVariant = getStatusVariant(product.status);
+  const statusVariant = getStatusVariant(product.status as keyof typeof statusStyles);
 
   return (
     <>
@@ -88,7 +88,7 @@ export function ListingItem({ product }: { product: FirestoreProduct }) {
         <div className="flex-1 space-y-1">
           <div className="flex items-start justify-between">
               <div>
-                  <p className="text-sm font-medium text-muted-foreground">{product.brandId}</p>
+                  <p className="text-sm font-medium text-muted-foreground">{product.categoryId}</p>
                   <h3 className="font-semibold text-foreground leading-tight">{product.title}</h3>
               </div>
               <Badge className={cn(statusStyles[statusVariant])}>
@@ -99,10 +99,6 @@ export function ListingItem({ product }: { product: FirestoreProduct }) {
           <div className="flex items-end justify-between">
               <div>
                    <p className="font-bold text-lg">{currencyFormatter.format(product.price)}</p>
-                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>{product.views} views</span>
-                      <span>{product.wishlistCount} favorites</span>
-                   </div>
                    {activeOfferCount > 0 && (
                        <p className="text-sm font-semibold text-primary mt-1">{activeOfferCount} active offer(s)</p>
                    )}
