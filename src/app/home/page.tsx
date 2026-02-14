@@ -3,17 +3,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { ProductCard } from '@/components/product-card';
-import {
-  recentlyViewedProducts,
-  vintageGems,
-} from '@/lib/mock-data';
+import { vintageGems } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { ArrowRight } from 'lucide-react';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { NewListingsSection } from '@/components/home/NewArrivalsSection';
+import { RecentlyViewedSection } from '@/components/home/RecentlyViewedSection';
 
 export default function HomePage() {
   const { user, isUserLoading } = useUser();
@@ -57,16 +54,7 @@ export default function HomePage() {
         </div>
 
         <div className="container mx-auto px-4 py-8 md:py-12 space-y-12">
-          <section>
-            <h2 className="text-xl md:text-2xl font-serif mb-6">
-              Recently Viewed
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-8">
-              {recentlyViewedProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          </section>
+          <RecentlyViewedSection />
 
           <section>
             <h2 className="text-xl md:text-2xl font-serif mb-6">

@@ -147,6 +147,29 @@ export default function ProductDetailPage() {
         }
     }, [product]);
 
+    React.useEffect(() => {
+        if (product && productId) {
+            try {
+                const savedIdsString = localStorage.getItem('marigo_recently_viewed');
+                let savedIds: string[] = savedIdsString ? JSON.parse(savedIdsString) : [];
+
+                // Remove the current product ID if it already exists to move it to the front
+                savedIds = savedIds.filter(id => id !== productId);
+
+                // Add the current product ID to the beginning of the array
+                savedIds.unshift(productId);
+
+                // Keep only the 6 most recent items
+                const updatedIds = savedIds.slice(0, 6);
+                
+                localStorage.setItem('marigo_recently_viewed', JSON.stringify(updatedIds));
+
+            } catch (error) {
+                console.error("Failed to update recently viewed items:", error);
+            }
+        }
+    }, [product, productId]);
+
     const handleChat = async () => {
         if (!user) {
             router.push('/auth');
