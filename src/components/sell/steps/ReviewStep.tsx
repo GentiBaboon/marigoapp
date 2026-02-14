@@ -141,10 +141,25 @@ export function ReviewStep() {
     return condition ? `${condition.label} condition` : value;
   }
   
-  const currencyFormatter = (value: number) => {
-    // The image shows 37$
-    return `${value}$`;
-  }
+  const currencyFormatter = (value: number | undefined) => {
+    if (value === undefined) return '';
+    const currency = formData.currency || 'EUR';
+    let locale = 'de-DE';
+    if (currency === 'ALL') {
+      locale = 'sq-AL';
+    }
+
+    try {
+      return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(value);
+    } catch (e) {
+      return `${value} ${currency}`;
+    }
+  };
   
   return (
     <div className="space-y-8">
@@ -203,7 +218,7 @@ export function ReviewStep() {
             <Separator/>
 
             <ReviewSection title="Price" onEdit={() => goToStep(6)}>
-                <p className="font-semibold text-lg">{currencyFormatter(formData.price || 0)} (you earn {currencyFormatter(formData.sellerEarning || 0)})</p>
+                <p className="font-semibold text-lg">{currencyFormatter(formData.price)} (you earn {currencyFormatter(formData.sellerEarning)})</p>
                 <p className="text-sm text-muted-foreground flex items-center">
                     Buyer service fee not included
                     <TooltipProvider>
