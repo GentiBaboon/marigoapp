@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, User, HelpCircle } from 'lucide-react';
+import { User, HelpCircle } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
 import { useUser, useFirestore } from '@/firebase';
@@ -119,33 +119,17 @@ export default function OrdersPage() {
   }
 
   return (
-     <div className="container mx-auto max-w-lg p-0">
-        <div className="flex items-center justify-between p-2 md:p-4 border-b bg-background sticky top-16 md:top-0 z-10">
-            <Button variant="ghost" size="icon" asChild>
-                <Link href="/profile">
-                    <ArrowLeft className="h-6 w-6" />
-                </Link>
-            </Button>
-            <h1 className="text-xl font-bold">Orders</h1>
-            <div className="flex items-center gap-0.5">
-                <Button variant="ghost" size="icon" asChild>
-                    <Link href="/profile">
-                         <User className="h-6 w-6" />
-                    </Link>
-                </Button>
-                <Button variant="ghost" size="icon" asChild>
-                     <Link href="/help">
-                        <HelpCircle className="h-6 w-6" />
-                    </Link>
-                </Button>
-            </div>
+     <div className="container mx-auto max-w-lg p-0 md:p-4">
+        <div className="px-4 pt-4 md:pt-0">
+            <h1 className="text-2xl font-bold">My Orders</h1>
+            <p className="text-muted-foreground">Track and manage your purchases.</p>
         </div>
 
-        <div>
+        <div className="mt-4">
             {areDataLoading ? (
                 <OrdersSkeleton />
             ) : orders.length > 0 ? (
-                <div className="px-4">
+                <div className="px-4 md:px-0">
                     {orders.map(order => (
                         <OrderItem key={order.id} order={order} />
                     ))}

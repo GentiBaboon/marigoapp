@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/product-card';
 import type { Product } from '@/lib/mock-data';
-import { Bookmark, SlidersHorizontal, X, Search } from 'lucide-react';
+import { Bookmark, SlidersHorizontal, Search } from 'lucide-react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -130,22 +130,17 @@ function SearchLandingPage() {
     ];
 
     return (
-        <div className="flex flex-col h-screen bg-background">
-            <header className="flex items-center p-2 md:p-4 border-b">
-                <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input 
-                        placeholder="Search for items, members..." 
-                        className="pl-11 h-11 rounded-full text-base"
-                        autoFocus
-                    />
-                </div>
-                <Button variant="ghost" asChild className="ml-2">
-                    <Link href="/home">Close</Link>
-                </Button>
-            </header>
+        <div className="flex flex-col h-full bg-background p-4">
+            <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input 
+                    placeholder="Search for items, members..." 
+                    className="pl-11 h-11 rounded-full text-base"
+                    autoFocus
+                />
+            </div>
             
-            <Tabs defaultValue="items" className="w-full">
+            <Tabs defaultValue="items" className="w-full mt-4 flex flex-col flex-1">
                 <TabsList className="grid w-full grid-cols-2 rounded-none bg-background border-b h-12">
                     <TabsTrigger value="items" className="text-base h-full rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary">Items</TabsTrigger>
                     <TabsTrigger value="members" className="text-base h-full rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary">Members</TabsTrigger>

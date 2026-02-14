@@ -3,7 +3,6 @@
 import * as React from 'react';
 import Link from 'next/link';
 import {
-  ArrowLeft,
   Home,
   MoreVertical,
   Plus,
@@ -175,16 +174,9 @@ export default function AddressesPage() {
     <div className="container mx-auto py-8 px-4">
       <div className="max-w-3xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="icon">
-              <Link href="/profile">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">My Addresses</h1>
-              <p className="text-muted-foreground">Manage your shipping addresses.</p>
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold">My Addresses</h1>
+            <p className="text-muted-foreground">Manage your shipping addresses.</p>
           </div>
           <Button onClick={handleAdd}>
             <Plus className="mr-2 h-4 w-4" />

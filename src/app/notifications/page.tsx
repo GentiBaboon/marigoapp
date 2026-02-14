@@ -26,7 +26,6 @@ import {
   Package,
   Star,
   PartyPopper,
-  X,
   BellOff
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -161,18 +160,11 @@ export default function NotificationsPage() {
 
   return (
     <div className="h-screen bg-background flex flex-col">
-        <header className="flex items-center justify-between p-4 border-b">
-            <h1 className="text-xl font-bold">Notifications</h1>
-            <Button asChild variant="ghost" size="icon">
-                <Link href="/home">
-                    <X className="h-5 w-5" />
-                    <span className="sr-only">Close</span>
-                </Link>
-            </Button>
-        </header>
-
         <Tabs defaultValue="updates" className="flex-1 flex flex-col">
-            <TabsList className="grid w-full grid-cols-2 rounded-none h-auto p-0 bg-background border-b">
+            <div className="px-4 pt-4">
+                <h1 className="text-xl font-bold">Notifications</h1>
+            </div>
+            <TabsList className="grid w-full grid-cols-2 rounded-none h-auto p-0 bg-background border-b mt-4">
                 <TabsTrigger value="updates" className="h-12 rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary text-base text-muted-foreground gap-2">
                     Updates {unreadUpdatesCount > 0 && <Badge className="h-5 px-2">{unreadUpdatesCount}</Badge>}
                 </TabsTrigger>
