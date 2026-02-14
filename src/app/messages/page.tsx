@@ -1,15 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
-import type { FirestoreConversation } from '@/lib/types';
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, query, where, orderBy, doc, updateDoc } from 'firebase/firestore';
+import type { FirestoreConversation, FirestoreUser } from '@/lib/types';
 import { ConversationListItem, ConversationSkeleton } from '@/components/messages/conversation-list-item';
 import { MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { ChatRulesDialog } from '@/components/messages/chat-rules-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 function EmptyState() {
     return (
@@ -29,31 +30,39 @@ function EmptyState() {
 export default function MessagesPage() {
     const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
-    const [showRules, setShowRules] = React.useState(false);
+    const { toast } = useToast();
+    const [isAccepting, setIsAccepting] = React.useState(false);
 
-    React.useEffect(() => {
-        // We only check for this on the client-side
-        if (typeof window !== 'undefined') {
-            const rulesAccepted = localStorage.getItem('marigo_chat_rules_accepted');
-            if (!rulesAccepted) {
-                setShowRules(true);
-            }
+    const userDocRef = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return doc(firestore, 'users', user.uid);
+    }, [user, firestore]);
+
+    const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<FirestoreUser>(userDocRef);
+    
+    const showRules = !isUserLoading && !isUserProfileLoading && !!userProfile && !userProfile.has_accepted_chat_rules;
+
+    const handleAcceptRules = async () => {
+        if (!userDocRef) return;
+        setIsAccepting(true);
+        try {
+            await updateDoc(userDocRef, { has_accepted_chat_rules: true });
+        } catch (error) {
+            console.error("Failed to update chat rules acceptance:", error);
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: userDocRef.path,
+                operation: 'update',
+                requestResourceData: { has_accepted_chat_rules: true },
+            }));
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Could not save your preference. Please try again.',
+            });
+        } finally {
+            setIsAccepting(false);
         }
-    }, []);
-
-    const handleAcceptRules = () => {
-        localStorage.setItem('marigo_chat_rules_accepted', 'true');
-        setShowRules(false);
     };
-
-    const handleOpenChange = (isOpen: boolean) => {
-        // Prevent closing the dialog until rules are accepted
-        if (!isOpen && !localStorage.getItem('marigo_chat_rules_accepted')) {
-            return;
-        }
-        setShowRules(isOpen);
-    };
-
 
     const conversationsQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -66,7 +75,7 @@ export default function MessagesPage() {
 
     const { data: conversations, isLoading: areConversationsLoading } = useCollection<FirestoreConversation>(conversationsQuery);
     
-    const isLoading = isUserLoading || areConversationsLoading;
+    const isLoading = isUserLoading || areConversationsLoading || isUserProfileLoading;
 
     if (!user && !isUserLoading) {
     return (
@@ -94,7 +103,7 @@ export default function MessagesPage() {
                 <ChatRulesDialog 
                     isOpen={showRules} 
                     onAccept={handleAcceptRules}
-                    onOpenChange={handleOpenChange}
+                    isAccepting={isAccepting}
                 />
             )}
             <Card className="h-full">

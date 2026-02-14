@@ -9,14 +9,16 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2 } from 'lucide-react';
 
 interface ChatRulesDialogProps {
   isOpen: boolean;
   onAccept: () => void;
-  onOpenChange: (isOpen: boolean) => void;
+  onOpenChange?: (isOpen: boolean) => void;
+  isAccepting?: boolean;
 }
 
-export function ChatRulesDialog({ isOpen, onAccept, onOpenChange }: ChatRulesDialogProps) {
+export function ChatRulesDialog({ isOpen, onAccept, onOpenChange, isAccepting }: ChatRulesDialogProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -69,7 +71,8 @@ export function ChatRulesDialog({ isOpen, onAccept, onOpenChange }: ChatRulesDia
           </Alert>
         </div>
         <DialogFooter>
-          <Button type="button" className="w-full bg-black text-white hover:bg-black/90" onClick={onAccept}>
+          <Button type="button" className="w-full bg-black text-white hover:bg-black/90" onClick={onAccept} disabled={isAccepting}>
+            {isAccepting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Accept rules
           </Button>
         </DialogFooter>
