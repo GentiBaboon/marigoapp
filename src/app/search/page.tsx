@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/product-card';
 import type { Product } from '@/lib/mock-data';
-import { ArrowLeft, Bookmark, SlidersHorizontal, ShoppingCart, X, Search } from 'lucide-react';
+import { Bookmark, SlidersHorizontal, X, Search } from 'lucide-react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,7 +28,6 @@ function ProductCardSkeleton() {
 
 
 function ProductListPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const firestore = useFirestore();
   
@@ -85,14 +84,6 @@ function ProductListPage() {
 
   return (
     <div className="flex flex-col bg-background">
-        <header className="sticky top-16 z-30 w-full border-b bg-background">
-            <div className="container flex h-16 items-center gap-2 px-2 sm:px-4">
-                <Button variant="ghost" size="icon" onClick={() => router.back()}>
-                    <ArrowLeft />
-                </Button>
-            </div>
-        </header>
-
         <main className="flex-1">
             <div className="container px-4 py-4">
                 

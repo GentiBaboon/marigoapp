@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { productCategories, brands } from '@/lib/mock-data';
@@ -51,17 +51,12 @@ export default function CategoryDetailPage() {
   const categoryName = categoryData.name;
   
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem-4rem)] md:h-[calc(100vh-4rem)]">
-       <header className="flex items-center p-2 md:p-4 border-b sticky top-16 bg-background z-10">
-        <Button asChild variant="ghost" size="icon">
-          <Link href="/browse">
-            <ArrowLeft className="h-6 w-6" />
-          </Link>
-        </Button>
-        <h1 className="text-lg font-semibold mx-auto pr-8">{categoryName}</h1>
-      </header>
+    <div className="flex flex-col h-full">
+       <div className="container px-4 py-6 border-b">
+        <h1 className="text-2xl font-bold">{categoryName}</h1>
+      </div>
 
-      <ScrollArea className="flex-1 pb-16 md:pb-0">
+      <ScrollArea className="flex-1">
          <ul className="bg-background">
           <ListItem href={`/search?gender=${gender}&category=${categorySlug}`}>
             All {genderName}'s {categoryName}

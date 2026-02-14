@@ -1,23 +1,36 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { Button } from './ui/button';
-import { Bell, Search, ShoppingCart } from 'lucide-react';
+import { Bell, Search, ShoppingCart, ArrowLeft } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 
 export function Header() {
   const { totalItems } = useCart();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // Show back arrow on category and search pages.
+  // The main search page will now also have a back button, which is acceptable UX.
+  const isSubPage = pathname.startsWith('/browse/') || pathname.startsWith('/search');
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background">
       <div className="container grid h-16 grid-cols-3 items-center px-4">
-        {/* Left: Search Icon */}
+        {/* Left: Search or Back Icon */}
         <div className="flex justify-start">
-          <Button asChild variant="ghost" size="icon" aria-label="Search">
-            <Link href="/search">
-              <Search className="h-6 w-6" />
-            </Link>
-          </Button>
+          {isSubPage ? (
+            <Button variant="ghost" size="icon" aria-label="Go back" onClick={() => router.back()}>
+              <ArrowLeft className="h-6 w-6" />
+            </Button>
+          ) : (
+            <Button asChild variant="ghost" size="icon" aria-label="Search">
+              <Link href="/search">
+                <Search className="h-6 w-6" />
+              </Link>
+            </Button>
+          )}
         </div>
 
         {/* Center: Logo */}
