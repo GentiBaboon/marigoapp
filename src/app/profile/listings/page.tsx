@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { collection, query, where } from 'firebase/firestore';
 
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import type { FirestoreProduct } from '@/lib/types';
+import type { FirestoreProduct, FirestoreOrder } from '@/lib/types';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -65,16 +65,23 @@ export default function ListingsPage() {
   
   const { data: listings, isLoading: areListingsLoading } = useCollection<FirestoreProduct>(productsQuery);
 
+  const salesQuery = useMemoFirebase(() => {
+      if (!user || !firestore) return null;
+      return query(collection(firestore, 'orders'), where('sellerIds', 'array-contains', user.uid));
+  }, [user, firestore]);
+
+  const { data: sales, isLoading: areSalesLoading } = useCollection<FirestoreOrder>(salesQuery);
+
   const { active, sold, inactive } = React.useMemo(() => {
     const listingsData = listings || [];
     return {
       active: listingsData.filter(l => l.status === 'active'),
-      sold: listingsData.filter(l => l.status === 'sold'),
+      sold: sales || [], // Use sales for the sold tab
       inactive: listingsData.filter(l => !['active', 'sold'].includes(l.status)),
     };
-  }, [listings]);
+  }, [listings, sales]);
 
-  const isLoading = isUserLoading || areListingsLoading;
+  const isLoading = isUserLoading || areListingsLoading || areSalesLoading;
   
   if (!user && !isUserLoading) {
      return (
@@ -126,7 +133,7 @@ export default function ListingsPage() {
                      {isLoading ? <ListingsSkeleton /> : 
                         sold.length > 0 ? (
                             <div className="space-y-4">
-                                {sold.map(product => <ListingItem key={product.id} product={product} />)}
+                                {sold.map(order => <ListingItem key={order.id} order={order} />)}
                             </div>
                         ) : <EmptyState />
                     }
