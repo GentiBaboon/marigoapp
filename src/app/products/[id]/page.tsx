@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useParams, notFound } from 'next/navigation';
+import { useParams, notFound, useRouter } from 'next/navigation';
 import {
   Carousel,
   CarouselContent,
@@ -17,6 +17,7 @@ import {
   MapPin,
   Check,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -30,8 +31,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import type { FirestoreProduct, FirestoreUser } from '@/lib/types';
 import { useWishlist } from '@/context/WishlistContext';
-import { useCollection, useDoc, useMemoFirebase, useFirestore } from '@/firebase';
-import { collection, query, where, limit, doc } from 'firebase/firestore';
+import { useCollection, useDoc, useMemoFirebase, useFirestore, useUser } from '@/firebase';
+import { collection, query, where, limit, doc, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const PayPalIcon = () => (
@@ -91,8 +92,10 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
 
 export default function ProductDetailPage() {
     const params = useParams();
+    const router = useRouter();
     const productId = params.id as string;
     const firestore = useFirestore();
+    const { user } = useUser();
 
     const productRef = useMemoFirebase(() => {
         if (!firestore || !productId) return null;
@@ -113,6 +116,7 @@ export default function ProductDetailPage() {
     const [current, setCurrent] = React.useState(0);
     const [count, setCount] = React.useState(0);
     const [isOfferSheetOpen, setIsOfferSheetOpen] = React.useState(false);
+    const [isChatLoading, setIsChatLoading] = React.useState(false);
     const { isFavorite, addToWishlist, removeFromWishlist } = useWishlist();
 
     const relatedProductsQuery = useMemoFirebase(() => {
@@ -139,6 +143,67 @@ export default function ProductDetailPage() {
             document.title = `${product.brand} ${product.title} | Marigo`;
         }
     }, [product]);
+
+    const handleChat = async () => {
+        if (!user) {
+            router.push('/auth');
+            return;
+        }
+        if (!product || !seller || user.uid === product.seller_id) {
+            toast({
+                variant: 'destructive',
+                title: "Can't start chat",
+                description: "You cannot start a chat with yourself.",
+            });
+            return;
+        }
+
+        setIsChatLoading(true);
+
+        try {
+            const participants = [user.uid, product.seller_id].sort();
+            
+            const conversationQuery = query(
+                collection(firestore, 'conversations'),
+                where('productId', '==', product.id),
+                where('participants', '==', participants)
+            );
+
+            const querySnapshot = await getDocs(conversationQuery);
+
+            if (!querySnapshot.empty) {
+                const conversation = querySnapshot.docs[0];
+                router.push(`/messages/${conversation.id}`);
+            } else {
+                const newConversationData = {
+                    participants,
+                    participantDetails: [
+                        { userId: user.uid, name: user.displayName || 'User', avatar: user.photoURL || '' },
+                        { userId: seller.id, name: seller.displayName || 'Seller', avatar: seller.photoURL || '' }
+                    ],
+                    productId: product.id,
+                    productTitle: product.title,
+                    productImage: product.images[0] || '',
+                    lastMessage: 'Conversation started.',
+                    lastMessageAt: serverTimestamp(),
+                    unreadCount: {}
+                };
+
+                const docRef = await addDoc(collection(firestore, 'conversations'), newConversationData);
+                router.push(`/messages/${docRef.id}`);
+            }
+        } catch (error) {
+            console.error("Error handling chat:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Could not initiate chat. Please try again.',
+            });
+        } finally {
+            setIsChatLoading(false);
+        }
+    };
+
 
     if (isProductLoading) {
         return <ProductPageSkeleton />;
@@ -183,7 +248,7 @@ export default function ProductDetailPage() {
     const sellerStats = { sold: 5, shipped: 5, cancelled: 0 };
   
     return (
-      <div className="container mx-auto max-w-4xl px-0 md:px-4 py-6 md:py-10">
+      <div className="container mx-auto max-w-4xl px-0 md:px-4 py-6 md:py-10 pb-32 md:pb-10">
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
           {/* Image Carousel */}
           <div className="flex flex-col items-center">
@@ -242,12 +307,17 @@ export default function ProductDetailPage() {
                 </p>
             </div>
             
-            <div className="flex flex-col gap-3">
-              <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90 h-12 text-base" onClick={handleAddToCart}>Add to bag</Button>
-              <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={() => setIsOfferSheetOpen(true)}>Make an offer</Button>
-               <Button size="lg" variant="outline" className="w-full h-12 text-base">
-                  <MessageSquare className="mr-2 h-5 w-5"/> Chat
-              </Button>
+            <div className="hidden md:flex flex-col gap-3">
+                <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90 h-12 text-base" onClick={handleAddToCart} disabled={!user || user.uid === product.seller_id}>Add to bag</Button>
+                <div className="grid grid-cols-2 gap-3">
+                    <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={handleChat} disabled={isChatLoading || !user || user.uid === product.seller_id}>
+                        {isChatLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                        Chat
+                    </Button>
+                    <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={() => setIsOfferSheetOpen(true)} disabled={!user || user.uid === product.seller_id}>
+                        Make an offer
+                    </Button>
+                </div>
             </div>
           </div>
         </div>
@@ -385,8 +455,12 @@ export default function ProductDetailPage() {
                         brand: p.brand,
                         title: p.title,
                         price: p.price,
+                        image: p.images?.[0] || '', // Use first image URL as the string `image`
                         sellerId: p.seller_id,
-                        image: p.images?.[0] || '',
+                        size: p.size,
+                        condition: p.condition as any,
+                        color: p.color,
+                        vintage: p.vintage,
                     }} />
                 ))}
                 </div>
@@ -403,6 +477,22 @@ export default function ProductDetailPage() {
               sellerId: product.seller_id,
           }}
         />
+
+        {/* Mobile Floating Action Bar */}
+        <div className="md:hidden fixed bottom-16 left-0 w-full bg-background/95 backdrop-blur-sm border-t p-2 flex items-center gap-2 z-40">
+            <div className="container flex items-center gap-2 px-4">
+                <Button variant="outline" size="icon" className="h-12 w-12" onClick={handleChat} disabled={isChatLoading || !user || user.uid === product.seller_id}>
+                    {isChatLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : <MessageSquare className="h-6 w-6" />}
+                    <span className="sr-only">Chat</span>
+                </Button>
+                <Button size="lg" variant="outline" className="flex-1 h-12 text-base" onClick={() => setIsOfferSheetOpen(true)} disabled={!user || user.uid === product.seller_id}>
+                    Make an offer
+                </Button>
+                <Button size="lg" className="flex-1 h-12 text-base bg-foreground text-background" onClick={handleAddToCart} disabled={!user || user.uid === product.seller_id}>
+                    Add to bag
+                </Button>
+            </div>
+        </div>
       </div>
     );
 }
