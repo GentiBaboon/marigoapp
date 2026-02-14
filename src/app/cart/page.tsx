@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,7 +39,7 @@ const PayPalIcon = () => (
 
 export default function CheckoutPage() {
     const cart = useCart();
-    const { user } = useUser();
+    const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
     const router = useRouter();
     const { toast } = useToast();
@@ -49,6 +49,12 @@ export default function CheckoutPage() {
     
     const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
     const [editingAddress, setEditingAddress] = useState<FirestoreAddress | null>(null);
+
+    useEffect(() => {
+        if (!isUserLoading && !user) {
+            router.replace('/auth');
+        }
+    }, [user, isUserLoading, router]);
 
     const addressesCollection = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -137,6 +143,14 @@ export default function CheckoutPage() {
     const handleAddAddress = () => {
         setEditingAddress(null);
         setIsAddressModalOpen(true);
+    }
+
+    if (isUserLoading || !user) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <div className="dot-flashing"></div>
+            </div>
+        );
     }
 
     if (cart.items.length === 0 && !isPlacingOrder) {
@@ -418,6 +432,3 @@ export default function CheckoutPage() {
         </div>
     );
 }
-    
-
-    
