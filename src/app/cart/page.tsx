@@ -10,7 +10,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase, errorEmitter, Fi
 import { sellers as mockSellers } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronDown, Edit, Info, ShieldCheck, Truck, Loader2, ShoppingCart, Lock, RefreshCcw, MessageSquare, CreditCard, Check, Wallet } from 'lucide-react';
+import { ChevronDown, Edit, Info, ShieldCheck, Truck, Loader2, ShoppingCart, Lock, RefreshCcw, MessageSquare, CreditCard, Wallet } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -365,7 +365,7 @@ export default function CheckoutPage() {
                                                 </AccordionContent>
                                             </AccordionItem>
                                         </Accordion>
-                                        <div className="flex justify-between font-medium">
+                                        <div className="flex justify-between font-medium items-center gap-4">
                                             <p>Promo code <span className="text-muted-foreground">(optional)</span></p>
                                             <Input className="max-w-xs" placeholder="Enter promo code" />
                                         </div>
