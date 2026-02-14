@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useParams, notFound, useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   Carousel,
   CarouselContent,
@@ -213,7 +213,15 @@ export default function ProductDetailPage() {
     }
 
     if (!product) {
-        notFound();
+        return (
+             <div className="container mx-auto max-w-4xl px-4 py-8 text-center">
+                <h1 className="text-xl font-bold">Product not found</h1>
+                <p className="text-muted-foreground">The requested product could not be found. It may have been recently removed or there was a temporary issue.</p>
+                <Button asChild variant="link" className="mt-4">
+                    <Link href="/home">Go to Homepage</Link>
+                </Button>
+            </div>
+        );
     }
   
     const handleAddToCart = () => {
