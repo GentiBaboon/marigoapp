@@ -38,7 +38,10 @@ const statusStyles = {
 };
 
 export function ListingItem({ product }: { product: FirestoreProduct }) {
-  const imageUrl = product.images?.[0] || PlaceHolderImages.find(p => p.id === 'product-1')?.imageUrl || '/placeholder.png';
+  const primaryImage = product.images?.[0];
+  const imageUrl = primaryImage && primaryImage.length > 0
+    ? primaryImage
+    : PlaceHolderImages.find(p => p.id === 'product-1')?.imageUrl || '/placeholder.png';
   const imageAlt = product.title || 'Product image';
   const firestore = useFirestore();
 
