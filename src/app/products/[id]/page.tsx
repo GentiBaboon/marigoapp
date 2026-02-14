@@ -120,6 +120,7 @@ export default function ProductDetailPage() {
     const { isFavorite, addToWishlist, removeFromWishlist } = useWishlist();
 
     const isSeller = user?.uid === product?.seller_id;
+    const isSoldOrReserved = product?.status === 'sold' || product?.status === 'reserved';
 
     const relatedProductsQuery = useMemoFirebase(() => {
         if (!firestore || !product?.category) return null;
@@ -267,6 +268,13 @@ export default function ProductDetailPage() {
                           sizes="(max-width: 768px) 100vw, 50vw"
                           priority={index === 0}
                         />
+                        {isSoldOrReserved && (
+                            <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                                <div className="border-2 border-foreground py-2 px-6 transform -rotate-12">
+                                    <p className="text-3xl font-bold uppercase tracking-widest text-foreground">{product.status}</p>
+                                </div>
+                            </div>
+                        )}
                       </div>
                     </CarouselItem>
                   ))}
@@ -317,13 +325,13 @@ export default function ProductDetailPage() {
                     </div>
                 ) : (
                     <>
-                        <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90 h-12 text-base" onClick={handleAddToCart} disabled={!user}>Add to bag</Button>
+                        <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90 h-12 text-base" onClick={handleAddToCart} disabled={!user || isSoldOrReserved}>Add to bag</Button>
                         <div className="grid grid-cols-2 gap-3">
-                            <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={handleChat} disabled={isChatLoading || !user}>
+                            <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={handleChat} disabled={isChatLoading || !user || isSoldOrReserved}>
                                 {isChatLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
                                 Chat
                             </Button>
-                            <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={() => setIsOfferSheetOpen(true)} disabled={!user}>
+                            <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={() => setIsOfferSheetOpen(true)} disabled={!user || isSoldOrReserved}>
                                 Make an offer
                             </Button>
                         </div>
@@ -499,14 +507,14 @@ export default function ProductDetailPage() {
                     </>
                 ) : (
                     <>
-                        <Button variant="outline" size="icon" className="h-12 w-12" onClick={handleChat} disabled={isChatLoading || !user}>
+                        <Button variant="outline" size="icon" className="h-12 w-12" onClick={handleChat} disabled={isChatLoading || !user || isSoldOrReserved}>
                             {isChatLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : <MessageSquare className="h-6 w-6" />}
                             <span className="sr-only">Chat</span>
                         </Button>
-                        <Button size="lg" variant="outline" className="flex-1 h-12 text-base" onClick={() => setIsOfferSheetOpen(true)} disabled={!user}>
+                        <Button size="lg" variant="outline" className="flex-1 h-12 text-base" onClick={() => setIsOfferSheetOpen(true)} disabled={!user || isSoldOrReserved}>
                             Make an offer
                         </Button>
-                        <Button size="lg" className="flex-1 h-12 text-base bg-foreground text-background" onClick={handleAddToCart} disabled={!user}>
+                        <Button size="lg" className="flex-1 h-12 text-base bg-foreground text-background" onClick={handleAddToCart} disabled={!user || isSoldOrReserved}>
                             Add to bag
                         </Button>
                     </>
