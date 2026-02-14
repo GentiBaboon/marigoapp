@@ -116,15 +116,15 @@
       "type": "object",
       "description": "Represents a product listed on the marketplace.",
       "properties": {
-        "seller_id": { "type": "string", "description": "Reference to the user who is selling the item." },
+        "sellerId": { "type": "string", "description": "Reference to the user who is selling the item." },
         "title": { "type": "string" },
         "description": { "type": "string" },
         "price": { "type": "number" },
         "category": { "type": "string" },
-        "sub_category": { "type": "string" },
+        "subCategory": { "type": "string" },
         "images": { "type": "array", "items": { "type": "string", "format": "uri" } },
         "status": { "type": "string", "enum": ["active", "sold", "reserved"] },
-        "listing_created": { "type": "string", "format": "date-time" },
+        "listingCreated": { "type": "string", "format": "date-time" },
         "keywords": { "type": "array", "items": { "type": "string" }, "description": "Keywords for search." },
         "brand": { "type": "string" },
         "size": { "type": "string" },
@@ -134,22 +134,22 @@
         "pattern": { "type": "string" },
         "vintage": { "type": "boolean" }
       },
-      "required": ["seller_id", "title", "price", "category", "images", "status", "listing_created"]
+      "required": ["sellerId", "title", "price", "category", "images", "status", "listingCreated"]
     },
     "Offer": {
       "title": "Offer",
       "type": "object",
       "description": "Represents an offer made on a product.",
       "properties": {
-        "product_id": { "type": "string", "$ref": "#/entities/Product" },
-        "buyer_id": { "type": "string", "$ref": "#/entities/User" },
-        "seller_id": { "type": "string", "$ref": "#/entities/User" },
-        "original_listing_price": { "type": "number" },
-        "offer_amount": { "type": "number" },
-        "offer_type": { "type": "string", "enum": ["preset_1", "preset_2", "preset_3", "custom"] },
+        "productId": { "type": "string", "$ref": "#/entities/Product" },
+        "buyerId": { "type": "string", "$ref": "#/entities/User" },
+        "sellerId": { "type": "string", "$ref": "#/entities/User" },
+        "originalListingPrice": { "type": "number" },
+        "offerAmount": { "type": "number" },
+        "offerType": { "type": "string", "enum": ["preset_1", "preset_2", "preset_3", "custom"] },
         "status": { "type": "string", "enum": ["pending", "accepted", "declined", "countered"] },
-        "counter_offer_amount": { "type": "number" },
-        "created_at": { "type": "string", "format": "date-time" },
+        "counterOfferAmount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
         "history": {
           "type": "array",
           "items": {
@@ -157,14 +157,14 @@
             "properties": {
               "action": { "type": "string" },
               "amount": { "type": "number" },
-              "by_user": { "type": "string" },
+              "byUser": { "type": "string" },
               "timestamp": { "type": "string", "format": "date-time" }
             },
-            "required": ["action", "amount", "by_user", "timestamp"]
+            "required": ["action", "amount", "byUser", "timestamp"]
           }
         }
       },
-      "required": ["product_id", "buyer_id", "seller_id", "offer_amount", "status", "created_at"]
+      "required": ["productId", "buyerId", "sellerId", "offerAmount", "status", "createdAt"]
     },
     "Bid": {
       "title": "Bid",
@@ -294,23 +294,69 @@
     "providers": ["password", "google.com", "apple.com"]
   },
   "firestore": {
-    "structure": [
-      { "path": "/users/{userId}", "definition": { "schema": { "$ref": "#/entities/User" } } },
-      { "path": "/users/{userId}/addresses/{addressId}", "definition": { "schema": { "$ref": "#/entities/Address" } } },
-      { "path": "/users/{userId}/paymentMethods/{methodId}", "definition": { "schema": { "$ref": "#/entities/PaymentMethod" } } },
-      { "path": "/users/{userId}/wishlist/{productId}", "definition": { "schema": { "$ref": "#/entities/WishlistItem" } } },
-      { "path": "/categories/{categoryId}", "definition": { "schema": { "$ref": "#/entities/Category" } } },
-      { "path": "/brands/{brandId}", "definition": { "schema": { "$ref": "#/entities/Brand" } } },
-      { "path": "/products/{productId}", "definition": { "schema": { "$ref": "#/entities/Product" } } },
-      { "path": "/products/{productId}/offers/{offerId}", "definition": { "schema": { "$ref": "#/entities/Offer" } } },
-      { "path": "/products/{productId}/bids/{bidId}", "definition": { "schema": { "$ref": "#/entities/Bid" } } },
-      { "path": "/orders/{orderId}", "definition": { "schema": { "$ref": "#/entities/Order" } } },
-      { "path": "/conversations/{conversationId}", "definition": { "schema": { "$ref": "#/entities/Conversation" } } },
-      { "path": "/conversations/{conversationId}/messages/{messageId}", "definition": { "schema": { "$ref": "#/entities/Message" } } },
-      { "path": "/reviews/{reviewId}", "definition": { "schema": { "$ref": "#/entities/Review" } } },
-      { "path": "/notifications/{notificationId}", "definition": { "schema": { "$ref": "#/entities/Notification" } } },
-      { "path": "/deliveries/{deliveryId}", "definition": { "schema": { "$ref": "#/entities/Delivery" } } },
-      { "path": "/roles_admin/{userId}", "definition": { "schema": { "type": "object", "properties": {} }, "description": "Stores admin user roles." } }
-    ]
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles and core information."
+    },
+    "/users/{userId}/addresses/{addressId}": {
+      "schema": { "$ref": "#/entities/Address" },
+      "description": "Subcollection for a user's shipping addresses."
+    },
+    "/users/{userId}/paymentMethods/{methodId}": {
+      "schema": { "$ref": "#/entities/PaymentMethod" },
+      "description": "Subcollection for a user's payment methods."
+    },
+    "/users/{userId}/wishlist/{productId}": {
+      "schema": { "$ref": "#/entities/WishlistItem" },
+      "description": "Subcollection for a user's wishlist/favorites."
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Top-level collection for product categories."
+    },
+    "/brands/{brandId}": {
+      "schema": { "$ref": "#/entities/Brand" },
+      "description": "Top-level collection for product brands."
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Top-level collection for all product listings."
+    },
+    "/products/{productId}/offers/{offerId}": {
+      "schema": { "$ref": "#/entities/Offer" },
+      "description": "Subcollection for offers made on a specific product."
+    },
+    "/products/{productId}/bids/{bidId}": {
+      "schema": { "$ref": "#/entities/Bid" },
+      "description": "Subcollection for bids on an auction product."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Top-level collection for all completed orders."
+    },
+    "/conversations/{conversationId}": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "Top-level collection for conversations between users."
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Subcollection for messages within a conversation."
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Top-level collection for all reviews."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Top-level collection for user notifications."
+    },
+    "/deliveries/{deliveryId}": {
+      "schema": { "$ref": "#/entities/Delivery" },
+      "description": "Top-level collection for delivery assignments."
+    },
+    "/roles_admin/{userId}": {
+      "schema": { "type": "object", "properties": {} },
+      "description": "Stores admin user roles for access control."
+    }
   }
 }
