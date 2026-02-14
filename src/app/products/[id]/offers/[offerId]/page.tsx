@@ -100,7 +100,7 @@ function OfferActions({ offer, product, userRole }: { offer: FirestoreOffer, pro
             updateData.counterAmount = amount;
         }
 
-        const historyAction = status === 'accepted' && offer.status === 'countered' ? 'accepted_counter' : status;
+        const historyAction = status;
         const historyAmount = amount || (offer.status === 'countered' ? offer.counterAmount : offer.amount);
         
         const historyEntry = {
