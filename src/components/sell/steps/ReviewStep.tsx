@@ -57,16 +57,19 @@ export function ReviewStep() {
     }
     setIsLoading(true);
 
-    const listingData: Partial<Omit<FirestoreProduct, 'id'>> & { createdAt: any } = {
-      sellerId: user.uid,
+    const keywords = Array.from(new Set((formData.title || '').toLowerCase().split(' ').filter(Boolean)));
+
+    const listingData: Partial<Omit<FirestoreProduct, 'id'>> & { listing_created: any } = {
+      seller_id: user.uid,
       title: formData.title || '',
       description: formData.description || '',
       price: formData.price || 0,
       category: formData.category || '',
-      subCategory: formData.category || '',
+      sub_category: formData.category || '',
       images: formData.images?.map((img) => img.preview) || [],
       status: 'active',
-      createdAt: serverTimestamp(),
+      listing_created: serverTimestamp(),
+      keywords: keywords,
       brand: formData.brand,
       size: formData.sizeValue ? `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() : undefined,
       condition: formData.condition,

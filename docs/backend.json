@@ -22,7 +22,7 @@
           ],
           "description": "The user's preferred shopping category."
         },
-        "hasAcceptedChatRules": {
+        "has_accepted_chat_rules": {
           "type": "boolean",
           "description": "Whether the user has accepted the chat rules."
         },
@@ -111,15 +111,16 @@
       "type": "object",
       "description": "Represents a product listed on the marketplace.",
       "properties": {
-        "sellerId": { "type": "string", "description": "Reference to the user who is selling the item." },
+        "seller_id": { "type": "string", "description": "Reference to the user who is selling the item." },
         "title": { "type": "string" },
         "description": { "type": "string" },
         "price": { "type": "number" },
         "category": { "type": "string" },
-        "subCategory": { "type": "string" },
+        "sub_category": { "type": "string" },
         "images": { "type": "array", "items": { "type": "string", "format": "uri" } },
-        "status": { "type": "string", "enum": ["active", "sold", "reserved", "pending_review", "removed", "expired", "draft"] },
-        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["active", "sold", "reserved"] },
+        "listing_created": { "type": "string", "format": "date-time" },
+        "keywords": { "type": "array", "items": { "type": "string" }, "description": "Keywords for search." },
         "brand": { "type": "string" },
         "size": { "type": "string" },
         "condition": { "type": "string" },
@@ -128,19 +129,22 @@
         "pattern": { "type": "string" },
         "vintage": { "type": "boolean" }
       },
-      "required": ["sellerId", "title", "price", "category", "images", "status", "createdAt", "brand", "condition", "material", "color"]
+      "required": ["seller_id", "title", "price", "category", "images", "status", "listing_created"]
     },
     "Offer": {
       "title": "Offer",
       "type": "object",
       "description": "Represents an offer made on a product.",
       "properties": {
-        "buyerId": { "type": "string" },
-        "sellerId": { "type": "string" },
-        "amount": { "type": "number" },
+        "product_id": { "type": "string", "$ref": "#/entities/Product" },
+        "buyer_id": { "type": "string", "$ref": "#/entities/User" },
+        "seller_id": { "type": "string", "$ref": "#/entities/User" },
+        "original_listing_price": { "type": "number" },
+        "offer_amount": { "type": "number" },
+        "offer_type": { "type": "string", "enum": ["preset_1", "preset_2", "preset_3", "custom"] },
         "status": { "type": "string", "enum": ["pending", "accepted", "declined", "countered"] },
-        "counterAmount": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" },
+        "counter_offer_amount": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" },
         "history": {
           "type": "array",
           "items": {
@@ -155,7 +159,7 @@
           }
         }
       },
-      "required": ["buyerId", "sellerId", "amount", "status", "createdAt"]
+      "required": ["product_id", "buyer_id", "seller_id", "offer_amount", "status", "created_at"]
     },
     "Bid": {
       "title": "Bid",

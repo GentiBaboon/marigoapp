@@ -43,12 +43,12 @@ export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
 export const firestoreUserSchema = z.object({
   id: z.string(),
-  displayName: z.string().optional().nullable(),
+  display_name: z.string().optional().nullable(),
   email: z.string().email().optional(),
-  macroCategoryPreference: z.enum(["womenswear", "menswear"]).optional(),
-  hasAcceptedChatRules: z.boolean().optional(),
-  isSeller: z.boolean().optional(),
-  createdAt: z.any().optional(),
+  macro_category_preference: z.enum(["womenswear", "menswear"]).optional(),
+  has_accepted_chat_rules: z.boolean().optional(),
+  is_seller: z.boolean().optional(),
+  created_at: z.any().optional(),
 });
 export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
 
@@ -144,19 +144,20 @@ export interface SellDraft {
 // --- Product & Cart Schemas ---
 
 export const firestoreProductSchema = z.object({
-  sellerId: z.string(),
+  seller_id: z.string(),
   title: z.string(),
   brand: z.string(),
   description: z.string(),
   price: z.number(),
   category: z.string(),
-  subCategory: z.string(),
+  sub_category: z.string(),
   images: z.array(z.string()),
-  status: z.enum(["active", "sold", "reserved", "pending_review", "removed", "expired", "draft"]),
-  createdAt: z.any(),
-  condition: z.string(),
-  material: z.string(),
-  color: z.string(),
+  status: z.enum(["active", "sold", "reserved"]),
+  listing_created: z.any(),
+  keywords: z.array(z.string()).optional(),
+  condition: z.string().optional(),
+  material: z.string().optional(),
+  color: z.string().optional(),
   size: z.string().optional(),
   pattern: z.string().optional(),
   vintage: z.boolean().optional(),
@@ -172,12 +173,15 @@ const offerHistoryItemSchema = z.object({
 });
 
 export const firestoreOfferSchema = z.object({
-  buyerId: z.string(),
-  sellerId: z.string(),
-  amount: z.number(),
-  status: z.enum(['pending', 'accepted', 'declined', 'countered', 'expired', 'withdrawn']),
-  counterAmount: z.number().optional(),
-  createdAt: z.any(),
+  product_id: z.string(),
+  buyer_id: z.string(),
+  seller_id: z.string(),
+  original_listing_price: z.number(),
+  offer_amount: z.number(),
+  offer_type: z.enum(["preset_1", "preset_2", "preset_3", "custom"]),
+  status: z.enum(['pending', 'accepted', 'declined', 'countered']),
+  counter_offer_amount: z.number().optional(),
+  created_at: z.any(),
   history: z.array(offerHistoryItemSchema).optional(),
 });
 export type FirestoreOffer = z.infer<typeof firestoreOfferSchema> & { id: string };

@@ -30,7 +30,7 @@ export function NewListingsSection() {
     return query(
       collection(firestore, 'products'),
       where('status', '==', 'active'),
-      orderBy('createdAt', 'desc'),
+      orderBy('listing_created', 'desc'),
       limit(10)
     );
   }, [firestore]);
@@ -66,7 +66,7 @@ export function NewListingsSection() {
                                 title: p.title,
                                 price: p.price,
                                 image: p.images?.[0] || '', // Use first image URL as the string `image`
-                                sellerId: p.sellerId,
+                                sellerId: p.seller_id,
                                 size: p.size,
                                 condition: p.condition as any,
                                 color: p.color,
