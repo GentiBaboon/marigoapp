@@ -524,7 +524,7 @@ export default function ProductDetailPage() {
               id: product.id,
               price: product.price,
               brand: product.brand,
-              sellerId: product.seller_id,
+              seller_id: product.seller_id,
           }}
         />
 

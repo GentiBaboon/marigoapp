@@ -26,7 +26,7 @@ interface MakeOfferSheetProps {
     id: string;
     price: number;
     brand: string;
-    sellerId: string;
+    seller_id: string;
   };
 }
 
@@ -103,17 +103,20 @@ export function MakeOfferSheet({ isOpen, onOpenChange, product }: MakeOfferSheet
 
     const now = serverTimestamp();
     const offerData = {
-      buyerId: user.uid,
-      sellerId: product.sellerId,
-      amount: selectedOffer,
+      buyer_id: user.uid,
+      seller_id: product.seller_id,
+      offer_amount: selectedOffer,
       status: 'pending',
-      createdAt: now,
+      created_at: now,
       history: [{
           action: 'created',
           amount: selectedOffer,
           by_user: user.uid,
           timestamp: now
-      }]
+      }],
+      product_id: product.id,
+      original_listing_price: product.price,
+      offer_type: customOffer !== '' ? 'custom' : 'preset_1', // This is a guess but reasonable.
     };
 
     try {
