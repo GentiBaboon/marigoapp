@@ -127,6 +127,7 @@ export default function ProductDetailPage() {
         return query(
         collection(firestore, 'products'),
         where('category', '==', product.category),
+        where('status', '==', 'active'),
         where('__name__', '!=', product.id),
         limit(4)
         );

@@ -76,9 +76,8 @@ service cloud.firestore {
     match /products/{productId} {
       // Public can view active products. Sellers can view their own products.
       allow get: if (resource.data.status == 'active') || (isSignedIn() && resource.data.seller_id == request.auth.uid) || isAdmin();
-      // Signed-in users can perform queries (e.g., for their own products, or for active products).
-      // The `get` rule above provides the document-level security.
-      allow list: if isSignedIn();
+      // Public can perform queries (e.g., for new listings, related items).
+      allow list: if true;
       allow create: if isSignedIn() && isCorrectOwnerInRequestData('seller_id');
       allow update, delete: if isExistingDoc() && isOwner(resource.data.seller_id);
 
