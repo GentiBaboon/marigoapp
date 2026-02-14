@@ -10,7 +10,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase, errorEmitter, Fi
 import { sellers as mockSellers } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronDown, Edit, Info, ShieldCheck, Truck, Loader2, ShoppingCart, Lock, RefreshCcw, MessageSquare, CreditCard, Check } from 'lucide-react';
+import { ChevronDown, Edit, Info, ShieldCheck, Truck, Loader2, ShoppingCart, Lock, RefreshCcw, MessageSquare, CreditCard, Check, Wallet } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -45,7 +45,7 @@ export default function CheckoutPage() {
     const { toast } = useToast();
     const [step, setStep] = useState(1);
     const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('credit_card');
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cod');
     
     const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
     const [editingAddress, setEditingAddress] = useState<FirestoreAddress | null>(null);
@@ -318,7 +318,12 @@ export default function CheckoutPage() {
                                         <h2 className="text-lg font-semibold">3. Payment</h2>
                                     </CardHeader>
                                     <CardContent>
-                                        <RadioGroup value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
+                                        <RadioGroup value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod} className="space-y-3">
+                                            <Label className="flex items-center gap-4 rounded-md border p-3 cursor-pointer has-[:checked]:border-foreground">
+                                                <RadioGroupItem value="cod" id="cod" />
+                                                <p className="font-semibold flex-1">Cash on Delivery</p>
+                                                <Wallet className="h-6 w-6 text-muted-foreground" />
+                                            </Label>
                                             <Label className="flex items-center gap-4 rounded-md border p-3 cursor-pointer has-[:checked]:border-foreground">
                                                 <RadioGroupItem value="credit_card" id="credit_card" />
                                                 <p className="font-semibold flex-1">Credit Card</p>
