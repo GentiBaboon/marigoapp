@@ -63,13 +63,12 @@ export default function CartPage() {
 
             <div className="space-y-6">
                 {items.map((item, index) => {
-                    const productImage = PlaceHolderImages.find(p => p.id === item.image);
                     return (
                         <React.Fragment key={item.id}>
                             <Card className="overflow-hidden">
                                 <CardContent className="p-4 flex gap-4">
                                     <div className="relative h-32 w-28 flex-shrink-0">
-                                        {productImage && <Image src={productImage.imageUrl} alt={item.title} fill className="object-cover rounded-md" sizes="112px" />}
+                                        {item.image && <Image src={item.image} alt={item.title} fill className="object-cover rounded-md" sizes="112px" />}
                                     </div>
                                     <div className="flex-1 space-y-1">
                                         <div className="flex justify-between">
