@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -19,8 +20,9 @@ function ListItem({ href, children }: { href: string; children: React.ReactNode 
   );
 }
 
-export default function CategoryDetailPage({ params }: { params: { slug: string[] } }) {
-  const [gender, categorySlug] = params.slug || [];
+export default function CategoryDetailPage() {
+  const params = useParams();
+  const [gender, categorySlug] = (params.slug as string[]) || [];
   
   const categoryData = React.useMemo(() => {
     return productCategories.find(c => c.name.toLowerCase() === categorySlug?.toLowerCase());
