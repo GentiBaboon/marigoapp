@@ -93,7 +93,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
           variant: 'success',
         });
         clearCart();
-        router.push(`/profile/orders/${docRef.id}`);
+        router.push(`/checkout/success/${docRef.id}`);
     } catch (error) {
         console.error("Error placing order:", error);
         const permissionError = new FirestorePermissionError({
