@@ -75,7 +75,7 @@ function ProductListPage() {
         title: p.title,
         price: p.price,
         image: p.images?.[0] || '',
-        sellerId: p.seller_id,
+        sellerId: p.sellerId,
         size: p.size,
         condition: p.condition as any,
         color: p.color,
@@ -84,20 +84,11 @@ function ProductListPage() {
   }, [products]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-        <header className="sticky top-0 z-40 w-full border-b bg-background">
+    <div className="flex flex-col bg-background">
+        <header className="sticky top-16 z-30 w-full border-b bg-background">
             <div className="container flex h-16 items-center gap-2 px-2 sm:px-4">
                 <Button variant="ghost" size="icon" onClick={() => router.back()}>
                     <ArrowLeft />
-                </Button>
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search for items, members..." className="pl-9" />
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                    <Link href="/cart">
-                        <ShoppingCart />
-                    </Link>
                 </Button>
             </div>
         </header>
