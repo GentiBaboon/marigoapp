@@ -7,13 +7,13 @@ import { ProductCard } from '@/components/product-card';
 import {
   recentlyViewedProducts,
   vintageGems,
-  newArrivals,
 } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { ArrowRight } from 'lucide-react';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { NewListingsSection } from '@/components/home/NewArrivalsSection';
 
 export default function HomePage() {
   const { user, isUserLoading } = useUser();
@@ -104,26 +104,7 @@ export default function HomePage() {
             </div>
           </section>
 
-          <section>
-            <h2 className="text-xl md:text-2xl font-serif mb-6">
-              New Arrivals
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-8">
-              {newArrivals.slice(0, 6).map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-            <div className="text-center mt-8">
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="rounded-full px-12"
-              >
-                <Link href="/browse?section=new-arrivals">View all</Link>
-              </Button>
-            </div>
-          </section>
+          <NewListingsSection />
         </div>
       </div>
        {shouldShowOverlay && (

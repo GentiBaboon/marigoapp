@@ -1,14 +1,98 @@
 'use client';
 
+import * as React from 'react';
+import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import type { FirestoreProduct } from '@/lib/types';
+import type { Product } from '@/lib/mock-data';
 import { ProductCard } from '@/components/product-card';
-import { newArrivals } from '@/lib/mock-data';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import Link from 'next/link';
+import { Button } from '../ui/button';
 
-export function NewArrivalsSection() {
+function ProductCardSkeleton() {
+    return (
+        <div className="space-y-2">
+            <Skeleton className="aspect-[3/4] w-full" />
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-5 w-1/3" />
+        </div>
+    )
+}
+
+export function NewListingsSection() {
+  const firestore = useFirestore();
+
+  const productsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(
+      collection(firestore, 'products'),
+      where('status', '==', 'active'),
+      orderBy('createdAt', 'desc'),
+      limit(10)
+    );
+  }, [firestore]);
+
+  const { data: products, isLoading } = useCollection<FirestoreProduct>(productsQuery);
+
+  if (!isLoading && (!products || products.length === 0)) {
+    return null; // Hide the block if no new products exist
+  }
+
   return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-          {newArrivals.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-      </div>
+    <section>
+        <h2 className="text-xl md:text-2xl font-serif mb-6">
+            New Listings
+        </h2>
+
+        {isLoading ? (
+            <div className="flex space-x-4 pb-4">
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className="w-48 flex-shrink-0">
+                        <ProductCardSkeleton />
+                    </div>
+                ))}
+            </div>
+        ) : (
+             <>
+                <ScrollArea>
+                    <div className="flex space-x-4 pb-4">
+                        {products?.map((p) => {
+                            const productForCard: Product = {
+                                id: p.id,
+                                brand: p.brand,
+                                title: p.title,
+                                price: p.price,
+                                image: p.images?.[0] || '', // Use first image URL as the string `image`
+                                sellerId: p.sellerId,
+                                size: p.size,
+                                condition: p.condition as any,
+                                color: p.color,
+                                vintage: p.vintage,
+                            };
+                            return (
+                                <div key={p.id} className="w-48 flex-shrink-0">
+                                    <ProductCard product={productForCard} />
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+                <div className="text-center mt-8">
+                    <Button
+                        asChild
+                        size="lg"
+                        variant="outline"
+                        className="rounded-full px-12"
+                    >
+                        <Link href="/browse?section=new-arrivals">View all</Link>
+                    </Button>
+                </div>
+            </>
+        )}
+    </section>
   );
 }

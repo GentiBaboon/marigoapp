@@ -118,10 +118,17 @@
         "category": { "type": "string" },
         "subCategory": { "type": "string" },
         "images": { "type": "array", "items": { "type": "string", "format": "uri" } },
-        "status": { "type": "string", "enum": ["active", "sold", "reserved"] },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "status": { "type": "string", "enum": ["active", "sold", "reserved", "pending_review", "removed", "expired", "draft"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "brand": { "type": "string" },
+        "size": { "type": "string" },
+        "condition": { "type": "string" },
+        "material": { "type": "string" },
+        "color": { "type": "string" },
+        "pattern": { "type": "string" },
+        "vintage": { "type": "boolean" }
       },
-      "required": ["sellerId", "title", "price", "category", "images", "status", "createdAt"]
+      "required": ["sellerId", "title", "price", "category", "images", "status", "createdAt", "brand", "condition", "material", "color"]
     },
     "Offer": {
       "title": "Offer",

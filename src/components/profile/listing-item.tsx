@@ -88,7 +88,7 @@ export function ListingItem({ product }: { product: FirestoreProduct }) {
         <div className="flex-1 space-y-1">
           <div className="flex items-start justify-between">
               <div>
-                  <p className="text-sm font-medium text-muted-foreground">{product.categoryId}</p>
+                  <p className="text-sm font-medium text-muted-foreground">{product.category}</p>
                   <h3 className="font-semibold text-foreground leading-tight">{product.title}</h3>
               </div>
               <Badge className={cn(statusStyles[statusVariant])}>

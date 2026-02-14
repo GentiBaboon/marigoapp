@@ -146,13 +146,20 @@ export interface SellDraft {
 export const firestoreProductSchema = z.object({
   sellerId: z.string(),
   title: z.string(),
+  brand: z.string(),
   description: z.string(),
   price: z.number(),
   category: z.string(),
   subCategory: z.string(),
   images: z.array(z.string()),
-  status: z.enum(["active", "sold", "reserved"]),
+  status: z.enum(["active", "sold", "reserved", "pending_review", "removed", "expired", "draft"]),
   createdAt: z.any(),
+  condition: z.string(),
+  material: z.string(),
+  color: z.string(),
+  size: z.string().optional(),
+  pattern: z.string().optional(),
+  vintage: z.boolean().optional(),
 });
 
 export type FirestoreProduct = z.infer<typeof firestoreProductSchema> & { id: string };

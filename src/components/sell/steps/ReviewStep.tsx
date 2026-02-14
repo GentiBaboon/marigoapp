@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { FirestoreProduct } from '@/lib/types';
 
 // Helper component for each review section
 const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode; }) => (
@@ -56,17 +57,28 @@ export function ReviewStep() {
     }
     setIsLoading(true);
 
-    const listingData = {
+    const listingData: Partial<Omit<FirestoreProduct, 'id'>> & { createdAt: any } = {
       sellerId: user.uid,
       title: formData.title || '',
       description: formData.description || '',
       price: formData.price || 0,
-      categoryId: formData.category || '',
-      subcategoryId: formData.category || '',
+      category: formData.category || '',
+      subCategory: formData.category || '',
       images: formData.images?.map((img) => img.preview) || [],
       status: 'active',
       createdAt: serverTimestamp(),
+      brand: formData.brand,
+      size: formData.sizeValue ? `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() : undefined,
+      condition: formData.condition,
+      material: formData.material,
+      color: formData.color,
+      pattern: formData.pattern,
+      vintage: formData.vintage,
     };
+
+    // Remove undefined fields
+    Object.keys(listingData).forEach(key => listingData[key as keyof typeof listingData] === undefined && delete listingData[key as keyof typeof listingData]);
+
 
     addDoc(collection(firestore, "products"), listingData)
         .then(docRef => {
