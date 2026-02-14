@@ -40,19 +40,19 @@ export default function MessagesPage() {
 
     const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<FirestoreUser>(userDocRef);
     
-    const showRules = !isUserLoading && !isUserProfileLoading && !!userProfile && !userProfile.has_accepted_chat_rules;
+    const showRules = !isUserLoading && !isUserProfileLoading && !!userProfile && !userProfile.hasAcceptedChatRules;
 
     const handleAcceptRules = async () => {
         if (!userDocRef) return;
         setIsAccepting(true);
         try {
-            await updateDoc(userDocRef, { has_accepted_chat_rules: true });
+            await updateDoc(userDocRef, { hasAcceptedChatRules: true });
         } catch (error) {
             console.error("Failed to update chat rules acceptance:", error);
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: userDocRef.path,
                 operation: 'update',
-                requestResourceData: { has_accepted_chat_rules: true },
+                requestResourceData: { hasAcceptedChatRules: true },
             }));
             toast({
                 variant: 'destructive',

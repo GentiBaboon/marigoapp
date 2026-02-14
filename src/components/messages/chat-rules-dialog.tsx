@@ -14,14 +14,13 @@ import { Loader2 } from 'lucide-react';
 interface ChatRulesDialogProps {
   isOpen: boolean;
   onAccept: () => void;
-  onOpenChange?: (isOpen: boolean) => void;
   isAccepting?: boolean;
 }
 
-export function ChatRulesDialog({ isOpen, onAccept, onOpenChange, isAccepting }: ChatRulesDialogProps) {
+export function ChatRulesDialog({ isOpen, onAccept, isAccepting }: ChatRulesDialogProps) {
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-center">Chat rules</DialogTitle>

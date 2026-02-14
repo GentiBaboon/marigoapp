@@ -43,12 +43,13 @@ export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
 export const firestoreUserSchema = z.object({
   id: z.string(),
-  display_name: z.string().optional().nullable(),
-  email: z.string().email().optional(),
-  macro_category_preference: z.enum(["womenswear", "menswear"]).optional(),
-  has_accepted_chat_rules: z.boolean().optional(),
-  is_seller: z.boolean().optional(),
-  created_at: z.any().optional(),
+  displayName: z.string().optional().nullable(),
+  email: z.string().email().optional().nullable(),
+  photoURL: z.string().url().optional().nullable(),
+  macroCategoryPreference: z.enum(["womenswear", "menswear"]).optional(),
+  hasAcceptedChatRules: z.boolean().optional(),
+  isSeller: z.boolean().optional(),
+  createdAt: z.any().optional(),
 });
 export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
 

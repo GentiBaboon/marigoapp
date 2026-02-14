@@ -14,6 +14,11 @@
           "format": "email",
           "description": "The user's email address."
         },
+        "photoURL": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL of the user's profile picture."
+        },
         "macroCategoryPreference": {
           "type": "string",
           "enum": [
@@ -22,7 +27,7 @@
           ],
           "description": "The user's preferred shopping category."
         },
-        "has_accepted_chat_rules": {
+        "hasAcceptedChatRules": {
           "type": "boolean",
           "description": "Whether the user has accepted the chat rules."
         },
