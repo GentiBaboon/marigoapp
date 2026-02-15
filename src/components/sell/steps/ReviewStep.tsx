@@ -75,16 +75,16 @@ export function ReviewStep() {
 
     const keywords = Array.from(new Set((formData.title || '').toLowerCase().split(' ').filter(Boolean)));
 
-    const listingData: Partial<Omit<FirestoreProduct, 'id'>> & { listing_created: any } = {
-      seller_id: user.uid,
+    const listingData: Partial<Omit<FirestoreProduct, 'id'>> & { listingCreated: any } = {
+      sellerId: user.uid,
       title: formData.title || '',
       description: formData.description || '',
       price: formData.price || 0,
       category: formData.category || '',
-      sub_category: formData.category || '',
+      subCategory: formData.category || '',
       images: formData.images?.map((img) => img.preview) || [],
       status: 'active',
-      listing_created: serverTimestamp(),
+      listingCreated: serverTimestamp(),
       keywords: keywords,
       brand: formData.brand,
       size: formData.sizeValue ? `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() : undefined,

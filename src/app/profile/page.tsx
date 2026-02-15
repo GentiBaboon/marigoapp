@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { useUser, useAuth } from '@/firebase';
+import { useUser, useAuth, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { signOutUser } from '@/firebase/auth/actions';
 import {
   Settings,
@@ -25,8 +25,11 @@ import {
   Info,
   ChevronRight,
   Handshake,
+  Landmark
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import type { FirestoreUser } from '@/lib/types';
+import { doc } from 'firebase/firestore';
 
 const getInitials = (name: string | null | undefined) => {
   if (!name) return 'U';
@@ -37,26 +40,15 @@ const getInitials = (name: string | null | undefined) => {
   return name.substring(0, 2).toUpperCase();
 };
 
-const menuItems = [
-  { href: '/profile/orders', label: 'My Orders', icon: Package },
-  { href: '/profile/listings', label: 'My Listings', icon: Tag },
-  { href: '/profile/offers', label: 'My Offers', icon: Handshake },
-  { href: '/sell', label: 'Sell an Item', icon: null }, // special case
-  { href: '/profile/addresses', label: 'My Addresses', icon: MapPin },
-  { href: '/profile/payments', label: 'Payment Methods', icon: CreditCard },
-  { href: '/profile/settings', label: 'Settings', icon: Settings },
-];
-
-const helpMenuItems = [
-  { href: '/help', label: 'Help Center', icon: HelpCircle },
-  { href: '/about', label: 'About Marigo', icon: Info },
-];
-
 export default function ProfilePage() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+  
+  const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const { data: firestoreUser } = useDoc<FirestoreUser>(userRef);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -80,6 +72,22 @@ export default function ProfilePage() {
       });
     }
   };
+
+  const menuItems = [
+    { href: '/profile/orders', label: 'My Orders', icon: Package },
+    { href: '/profile/listings', label: 'My Listings', icon: Tag },
+    { href: '/profile/offers', label: 'My Offers', icon: Handshake },
+    ...(firestoreUser?.isSeller ? [{ href: '/profile/stripe-onboarding', label: 'Setup Payouts', icon: Landmark }] : []),
+    { href: '/sell', label: 'Sell an Item', icon: null, special: true },
+    { href: '/profile/addresses', label: 'My Addresses', icon: MapPin },
+    { href: '/profile/payments', label: 'Payment Methods', icon: CreditCard },
+    { href: '/profile/settings', label: 'Settings', icon: Settings },
+  ];
+
+  const helpMenuItems = [
+    { href: '/help', label: 'Help Center', icon: HelpCircle },
+    { href: '/about', label: 'About Marigo', icon: Info },
+  ];
 
   if (isUserLoading || !user) {
     return (
@@ -118,7 +126,7 @@ export default function ProfilePage() {
             <nav>
               <ul>
                 {menuItems.map((item, index) => {
-                  if (item.href === '/sell') {
+                  if (item.special) {
                     return (
                       <React.Fragment key={item.href}>
                         <Separator />
@@ -136,8 +144,6 @@ export default function ProfilePage() {
                     );
                   }
                   
-                  const isLastItemBeforeSell = menuItems[index + 1]?.href === '/sell';
-
                   return (
                     <li key={item.href}>
                       <Link
@@ -152,7 +158,7 @@ export default function ProfilePage() {
                         </span>
                         <ChevronRight className="h-5 w-5 text-muted-foreground" />
                       </Link>
-                      {!isLastItemBeforeSell && item.href !== '/sell' && index < menuItems.length - 1 && menuItems[index + 1]?.href !== '/sell' && (
+                      {index < menuItems.length - 1 && !menuItems[index + 1]?.special && (
                           <Separator className="ml-4" />
                       )}
                     </li>

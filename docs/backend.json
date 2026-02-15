@@ -35,6 +35,14 @@
           "type": "boolean",
           "description": "Whether the user is a seller."
         },
+        "stripeAccountId": {
+          "type": "string",
+          "description": "The user's Stripe Connected Account ID."
+        },
+        "stripeOnboardingComplete": {
+            "type": "boolean",
+            "description": "Whether the user has completed Stripe onboarding."
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",

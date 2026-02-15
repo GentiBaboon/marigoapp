@@ -50,6 +50,8 @@ export const firestoreUserSchema = z.object({
   hasAcceptedChatRules: z.boolean().optional(),
   isSeller: z.boolean().optional(),
   createdAt: z.any().optional(),
+  stripeAccountId: z.string().optional().nullable(),
+  stripeOnboardingComplete: z.boolean().optional(),
 });
 export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
 
@@ -154,16 +156,16 @@ export interface SellDraft {
 // --- Product & Cart Schemas ---
 
 export const firestoreProductSchema = z.object({
-  seller_id: z.string(),
+  sellerId: z.string(),
   title: z.string(),
   brand: z.string(),
   description: z.string(),
   price: z.number(),
   category: z.string(),
-  sub_category: z.string(),
+  subCategory: z.string(),
   images: z.array(z.string()),
   status: z.enum(["active", "sold", "reserved"]),
-  listing_created: z.any(),
+  listingCreated: z.any(),
   keywords: z.array(z.string()).optional(),
   condition: z.string().optional(),
   material: z.string().optional(),
@@ -178,20 +180,20 @@ export type FirestoreProduct = z.infer<typeof firestoreProductSchema> & { id: st
 const offerHistoryItemSchema = z.object({
   action: z.string(),
   amount: z.number(),
-  by_user: z.string(),
+  byUser: z.string(),
   timestamp: z.any(),
 });
 
 export const firestoreOfferSchema = z.object({
-  product_id: z.string(),
-  buyer_id: z.string(),
-  seller_id: z.string(),
-  original_listing_price: z.number(),
-  offer_amount: z.number(),
-  offer_type: z.enum(["preset_1", "preset_2", "preset_3", "custom"]),
+  productId: z.string(),
+  buyerId: z.string(),
+  sellerId: z.string(),
+  originalListingPrice: z.number(),
+  offerAmount: z.number(),
+  offerType: z.enum(["preset_1", "preset_2", "preset_3", "custom"]),
   status: z.enum(['pending', 'accepted', 'declined', 'countered']),
-  counter_offer_amount: z.number().optional(),
-  created_at: z.any(),
+  counterOfferAmount: z.number().optional(),
+  createdAt: z.any(),
   history: z.array(offerHistoryItemSchema).optional(),
 });
 export type FirestoreOffer = z.infer<typeof firestoreOfferSchema> & { id: string };
@@ -207,9 +209,6 @@ const orderItemSchema = z.object({
   price: z.number(),
   quantity: z.number(),
   size: z.string().optional().nullable(),
-  shippingMethod: z.string(),
-  shippingFee: z.number(),
-  authenticationFee: z.number(),
 });
 
 export const firestoreOrderSchema = z.object({
@@ -217,15 +216,12 @@ export const firestoreOrderSchema = z.object({
   buyerId: z.string(),
   sellerIds: z.array(z.string()),
   items: z.array(orderItemSchema),
-  itemsPrice: z.number(),
-  shippingPrice: z.number(),
-  authenticationPrice: z.number(),
   totalAmount: z.number(),
-  paymentStatus: z.string(),
+  paymentStatus: z.string().optional(),
   paymentMethod: z.string(),
   paymentIntentId: z.string().optional().nullable(),
   status: z.string(),
-  shippingAddress: addressSchema,
+  shippingAddress: addressSchema.optional(),
   trackingNumber: z.string().optional().nullable(),
   courierCompany: z.string().optional().nullable(),
   deliveredAt: z.any().optional().nullable(),
