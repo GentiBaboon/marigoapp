@@ -41,6 +41,12 @@ export const forgotPasswordSchema = z.object({
 
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
+export const editProfileSchema = z.object({
+  displayName: z.string().min(2, "Name must be at least 2 characters.").max(50, "Name must be 50 characters or less."),
+});
+export type EditProfileValues = z.infer<typeof editProfileSchema>;
+
+
 export const firestoreUserSchema = z.object({
   id: z.string(),
   displayName: z.string().optional().nullable(),

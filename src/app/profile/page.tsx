@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -12,6 +12,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { useUser, useAuth, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { signOutUser } from '@/firebase/auth/actions';
@@ -30,6 +37,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import type { FirestoreUser } from '@/lib/types';
 import { doc } from 'firebase/firestore';
+import { EditProfileForm } from '@/components/profile/edit-profile-form';
 
 const getInitials = (name: string | null | undefined) => {
   if (!name) return 'U';
@@ -46,6 +54,7 @@ export default function ProfilePage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
   const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: firestoreUser } = useDoc<FirestoreUser>(userRef);
@@ -115,9 +124,19 @@ export default function ProfilePage() {
               </CardTitle>
               <CardDescription>{user.email}</CardDescription>
             </div>
-            <Button variant="outline" className="sm:ml-auto w-full sm:w-auto">
-              Edit Profile
-            </Button>
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button variant="outline" className="sm:ml-auto w-full sm:w-auto">
+                      Edit Profile
+                    </Button>
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Profile</DialogTitle>
+                    </DialogHeader>
+                    <EditProfileForm onSuccess={() => setIsEditDialogOpen(false)} />
+                </DialogContent>
+            </Dialog>
           </CardHeader>
         </Card>
 
