@@ -81,6 +81,9 @@ export async function signInWithGoogle(auth: Auth): Promise<AuthResult> {
   const provider = new GoogleAuthProvider();
   provider.addScope('profile');
   provider.addScope('email');
+  provider.setCustomParameters({
+    prompt: 'select_account'
+  });
   try {
     const result = await signInWithPopup(auth, provider);
     return { success: true, user: result.user };
