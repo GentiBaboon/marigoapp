@@ -44,7 +44,7 @@ export function SignupForm() {
     setLoading(true);
     const result = await signUpWithEmail(auth, data.email, data.password, data.name);
     if (result.success && result.user) {
-      router.push('/auth/verify-email');
+      router.push('/home');
     } else {
       toast({
         variant: 'destructive',

@@ -10,7 +10,6 @@ import {
   OAuthProvider,
   signInWithPopup,
   signOut,
-  sendEmailVerification,
   updateProfile,
 } from 'firebase/auth';
 
@@ -55,7 +54,6 @@ export async function signUpWithEmail(
       password
     );
     await updateProfile(userCredential.user, { displayName: name });
-    await sendEmailVerification(userCredential.user);
     return { success: true, user: userCredential.user };
   } catch (error: any) {
     return { success: false, error: getErrorMessage(error) };
