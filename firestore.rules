@@ -95,10 +95,8 @@ service cloud.firestore {
     // Transactional Collections (/orders, /reviews, /deliveries)
     // --------------------------------------------------------------------
     match /orders/{orderId} {
-      allow get: if isSignedIn() && (isOwner(resource.data.buyerId) || isSellerInOrder()) || isAdmin();
-      allow list: if isAdmin();
-      allow create: if isSignedIn() && isCorrectOwnerInRequestData('buyerId');
-      allow update: if isAdmin() || (isSignedIn() && (isOwner(resource.data.buyerId) || isSellerInOrder()));
+      // Only admins can read and write to orders
+      allow read, write: if isAdmin();
     }
 
     match /reviews/{reviewId} {
