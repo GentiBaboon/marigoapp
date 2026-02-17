@@ -69,8 +69,7 @@ service cloud.firestore {
     // --------------------------------------------------------------------
     match /products/{productId} {
       allow get, list: if true;
-      // Any signed-in user can create a product, as long as they set themselves as the seller.
-      allow create: if isSignedIn() && isCorrectOwnerInRequestData('sellerId');
+      allow create: if isSignedIn();
       // Only the seller or an admin can update/delete.
       allow update, delete: if (isExistingDoc() && isOwner(resource.data.sellerId)) || isAdmin();
 
