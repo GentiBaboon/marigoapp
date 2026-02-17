@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import {
   Card,
   CardContent,
@@ -10,28 +11,106 @@ import {
 } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Shield, MessageSquare, Star, Trash2, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, User, Shield, MessageSquare, Star, Trash2, ShieldAlert, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where, doc, updateDoc } from 'firebase/firestore';
+import type { FirestoreReport, FirestoreProduct, FirestoreUser, FirestoreMessage, FirestoreReview } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
-// Mock Data - Replace with real data from Firestore later
-const mockReports = [
-    { id: 'report-prod-1', type: 'product', itemId: 'prod-123', reason: 'Counterfeit item', status: 'pending', reporter: 'Jane Doe', details: { title: 'Luxury Handbag', image: 'https://picsum.photos/seed/product1/200/200' } },
-    { id: 'report-user-1', type: 'user', itemId: 'user-456', reason: 'Harassment and spam', status: 'pending', reporter: 'John Smith', details: { name: 'SpammyUser123', avatar: 'https://picsum.photos/seed/user1/40/40' } },
-    { id: 'report-msg-1', type: 'message', itemId: 'msg-789', reason: 'Inappropriate language', status: 'pending', reporter: 'Alice', details: { content: 'This is an example of a very rude message...', author: 'RudeUser' } },
-    { id: 'report-rev-1', type: 'review', itemId: 'rev-101', reason: 'False information', status: 'pending', reporter: 'Bob', details: { content: 'This review is completely fake and manipulative.', rating: 1, author: 'FakeReviewer' } },
-];
 
-const ReportCard = ({ report }: { report: (typeof mockReports)[0] }) => {
+const ReportItem = ({ report }: { report: FirestoreReport }) => {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [isActing, setIsActing] = React.useState(false);
+
+    const itemRef = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return doc(firestore, `${report.type}s`, report.itemId);
+    }, [firestore, report.type, report.itemId]);
+
+    const { data: itemData, isLoading } = useDoc<FirestoreProduct | FirestoreUser | FirestoreMessage | FirestoreReview>(itemRef);
+
+    const reporterRef = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return doc(firestore, 'users', report.reporterId);
+    }, [firestore, report.reporterId]);
+
+    const { data: reporter } = useDoc<FirestoreUser>(reporterRef);
+
     const icons = {
         product: <Shield className="h-4 w-4" />,
         user: <User className="h-4 w-4" />,
         message: <MessageSquare className="h-4 w-4" />,
         review: <Star className="h-4 w-4" />,
     };
+
+    const handleResolve = async (action: 'dismiss' | 'remove') => {
+        setIsActing(true);
+        try {
+            const reportRef = doc(firestore, 'reports', report.id);
+            await updateDoc(reportRef, { status: 'resolved' });
+            // In a real app, 'remove' would also delete the content and log the action
+            toast({ title: `Report resolved`, description: `The report has been marked as resolved.` });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not resolve the report.' });
+        } finally {
+            setIsActing(false);
+        }
+    }
+    
+    const renderContent = () => {
+        if (isLoading) {
+            return <Skeleton className="h-20 w-full" />
+        }
+        if (!itemData) {
+            return <p className="text-sm text-muted-foreground">The reported item could not be found.</p>
+        }
+
+        switch (report.type) {
+            case 'product':
+                const product = itemData as FirestoreProduct;
+                return (
+                     <div className="flex items-center gap-3">
+                        <Image src={product.images?.[0] || ''} alt={product.title} width={64} height={64} className="rounded-md bg-background" />
+                        <div>
+                            <p className="font-semibold">{product.title}</p>
+                            <p className="text-sm text-muted-foreground">Item ID: {report.itemId}</p>
+                        </div>
+                    </div>
+                );
+            case 'user':
+                 const user = itemData as FirestoreUser;
+                 return (
+                    <div className="flex items-center gap-3">
+                        <Avatar>
+                            <AvatarImage src={user.photoURL || undefined} />
+                            <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <p className="font-semibold">{user.displayName}</p>
+                            <p className="text-sm text-muted-foreground">User ID: {report.itemId}</p>
+                        </div>
+                    </div>
+                );
+             case 'message':
+             case 'review':
+                const contentItem = itemData as FirestoreMessage | FirestoreReview;
+                return (
+                     <blockquote className="border-l-4 pl-4 italic">
+                        "{contentItem.content}"
+                    </blockquote>
+                )
+            default:
+                return null;
+        }
+    }
+
 
     return (
         <Card>
@@ -49,48 +128,21 @@ const ReportCard = ({ report }: { report: (typeof mockReports)[0] }) => {
             </CardHeader>
             <CardContent>
                 <div className="bg-muted/50 p-3 rounded-lg space-y-3">
-                    {report.type === 'product' && (
-                         <div className="flex items-center gap-3">
-                            <Image src={report.details.image!} alt={report.details.title!} width={64} height={64} className="rounded-md bg-background" />
-                            <div>
-                                <p className="font-semibold">{report.details.title}</p>
-                                <p className="text-sm text-muted-foreground">Item ID: {report.itemId}</p>
-                            </div>
-                        </div>
-                    )}
-                    {report.type === 'user' && (
-                        <div className="flex items-center gap-3">
-                            <Avatar>
-                                <AvatarImage src={report.details.avatar} />
-                                <AvatarFallback>{report.details.name?.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <p className="font-semibold">{report.details.name}</p>
-                                <p className="text-sm text-muted-foreground">User ID: {report.itemId}</p>
-                            </div>
-                        </div>
-                    )}
-                    {(report.type === 'message' || report.type === 'review') && (
-                        <blockquote className="border-l-4 pl-4 italic">
-                            "{report.details.content}"
-                            <footer className="text-sm text-muted-foreground mt-1">— {report.details.author}</footer>
-                        </blockquote>
-                    )}
+                   {renderContent()}
                 </div>
                  <Separator className="my-4" />
-                 <p className="text-sm text-muted-foreground">Reported by: <span className="font-medium text-foreground">{report.reporter}</span></p>
+                 <p className="text-sm text-muted-foreground">Reported by: <span className="font-medium text-foreground">{reporter?.displayName || '...'}</span></p>
 
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
-                <Button variant="ghost">Dismiss</Button>
-                <Button variant="outline">Warn User</Button>
-                <Button variant="destructive">
+                <Button variant="ghost" onClick={() => handleResolve('dismiss')} disabled={isActing}>
+                    {isActing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Dismiss
+                </Button>
+                <Button variant="destructive" onClick={() => handleResolve('remove')} disabled={isActing}>
+                    {isActing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     <Trash2 className="mr-2 h-4 w-4" />
                     Remove Content
-                </Button>
-                 <Button variant="destructive" className="bg-red-700 hover:bg-red-800">
-                    <ShieldAlert className="mr-2 h-4 w-4" />
-                    Ban User
                 </Button>
             </CardFooter>
         </Card>
@@ -98,6 +150,15 @@ const ReportCard = ({ report }: { report: (typeof mockReports)[0] }) => {
 }
 
 export default function AdminModerationPage() {
+  const firestore = useFirestore();
+  const reportsQuery = useMemoFirebase(
+    () => query(collection(firestore, 'reports'), where('status', '==', 'pending')),
+    [firestore]
+  );
+  const { data: reports, isLoading } = useCollection<FirestoreReport>(reportsQuery);
+
+  const reportsByType = (type: string) => reports?.filter(r => r.type === type) || [];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
@@ -116,32 +177,36 @@ export default function AdminModerationPage() {
       
       <Tabs defaultValue="products">
         <TabsList className="grid grid-cols-4 max-w-lg">
-            <TabsTrigger value="products">Products ({mockReports.filter(r => r.type === 'product').length})</TabsTrigger>
-            <TabsTrigger value="users">Users ({mockReports.filter(r => r.type === 'user').length})</TabsTrigger>
-            <TabsTrigger value="messages">Messages ({mockReports.filter(r => r.type === 'message').length})</TabsTrigger>
-            <TabsTrigger value="reviews">Reviews ({mockReports.filter(r => r.type === 'review').length})</TabsTrigger>
+            <TabsTrigger value="products">Products ({reportsByType('product').length})</TabsTrigger>
+            <TabsTrigger value="users">Users ({reportsByType('user').length})</TabsTrigger>
+            <TabsTrigger value="messages">Messages ({reportsByType('message').length})</TabsTrigger>
+            <TabsTrigger value="reviews">Reviews ({reportsByType('review').length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="products" className="mt-4">
-            <div className="space-y-4">
-                {mockReports.filter(r => r.type === 'product').map(report => <ReportCard key={report.id} report={report} />)}
-            </div>
-        </TabsContent>
-         <TabsContent value="users" className="mt-4">
-            <div className="space-y-4">
-                {mockReports.filter(r => r.type === 'user').map(report => <ReportCard key={report.id} report={report} />)}
-            </div>
-        </TabsContent>
-         <TabsContent value="messages" className="mt-4">
-            <div className="space-y-4">
-                {mockReports.filter(r => r.type === 'message').map(report => <ReportCard key={report.id} report={report} />)}
-            </div>
-        </TabsContent>
-        <TabsContent value="reviews" className="mt-4">
-            <div className="space-y-4">
-                {mockReports.filter(r => r.type === 'review').map(report => <ReportCard key={report.id} report={report} />)}
-            </div>
-        </TabsContent>
+        {isLoading ? <p>Loading reports...</p> : (
+            <>
+                <TabsContent value="products" className="mt-4">
+                    <div className="space-y-4">
+                        {reportsByType('product').map(report => <ReportItem key={report.id} report={report} />)}
+                    </div>
+                </TabsContent>
+                <TabsContent value="users" className="mt-4">
+                    <div className="space-y-4">
+                        {reportsByType('user').map(report => <ReportItem key={report.id} report={report} />)}
+                    </div>
+                </TabsContent>
+                <TabsContent value="messages" className="mt-4">
+                    <div className="space-y-4">
+                        {reportsByType('message').map(report => <ReportItem key={report.id} report={report} />)}
+                    </div>
+                </TabsContent>
+                <TabsContent value="reviews" className="mt-4">
+                    <div className="space-y-4">
+                        {reportsByType('review').map(report => <ReportItem key={report.id} report={report} />)}
+                    </div>
+                </TabsContent>
+            </>
+        )}
       </Tabs>
     </div>
   );

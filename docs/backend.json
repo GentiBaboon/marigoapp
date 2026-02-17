@@ -47,6 +47,12 @@
           "type": "string",
           "format": "date-time",
           "description": "Timestamp of user creation."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "banned"],
+          "default": "active",
+          "description": "The user's account status."
         }
       },
       "required": [
@@ -318,7 +324,7 @@
         "properties": {
             "adminId": { "type": "string" },
             "adminName": { "type": "string" },
-            "actionType": { "type": "string", "enum": ["product_approved", "product_rejected", "user_banned", "user_role_changed", "order_status_updated", "setting_changed"] },
+            "actionType": { "type": "string", "enum": ["product_approved", "product_rejected", "user_banned", "user_unbanned", "user_role_changed", "order_status_updated", "setting_changed"] },
             "details": { "type": "string" },
             "targetId": { "type": "string" },
             "timestamp": { "type": "string", "format": "date-time" }

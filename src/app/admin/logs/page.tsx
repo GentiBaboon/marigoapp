@@ -4,22 +4,23 @@ import Link from 'next/link';
 import { ArrowLeft, Archive } from 'lucide-react';
 import { DataTable } from '@/components/admin/logs/data-table';
 import { columns } from '@/components/admin/logs/columns';
-import { FirestoreAdminLog } from '@/lib/types';
-import { subDays } from 'date-fns';
-
-const mockLogs: FirestoreAdminLog[] = [
-  { id: 'log-1', adminId: '2C81RVoXZWZuSWXEEueehqbHkMu1', adminName: 'Genti Selenica', actionType: 'user_banned', details: 'Banned user "SpammyUser123" for spam.', targetId: 'user-456', timestamp: { toDate: () => subDays(new Date(), 1) } },
-  { id: 'log-2', adminId: '2C81RVoXZWZuSWXEEueehqbHkMu1', adminName: 'Genti Selenica', actionType: 'product_rejected', details: 'Rejected product "Luxury Handbag" as counterfeit.', targetId: 'prod-123', timestamp: { toDate: () => subDays(new Date(), 2) } },
-  { id: 'log-3', adminId: '2C81RVoXZWZuSWXEEueehqbHkMu1', adminName: 'Genti Selenica', actionType: 'setting_changed', details: 'Updated commission rate to 18%.', targetId: 'commission-rate', timestamp: { toDate: () => subDays(new Date(), 3) } },
-  { id: 'log-4', adminId: '2C81RVoXZWZuSWXEEueehqbHkMu1', adminName: 'Genti Selenica', actionType: 'order_status_updated', details: 'Updated order #ORD-12345 to "Shipped".', targetId: 'ORD-12345', timestamp: { toDate: () => subDays(new Date(), 4) } },
-];
+import type { FirestoreAdminLog } from '@/lib/types';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
+import LogsLoading from './loading';
 
 
 export default function AdminLogsPage() {
-  // In a real app, you would fetch logs from Firestore
-  // const { data: logs, isLoading } = useCollection...
-  const logs = mockLogs;
-  const isLoading = false;
+  const firestore = useFirestore();
+  const logsQuery = useMemoFirebase(
+    () => query(collection(firestore, 'admin_logs'), orderBy('timestamp', 'desc')),
+    [firestore]
+  );
+  const { data: logs, isLoading } = useCollection<FirestoreAdminLog>(logsQuery);
+
+  if (isLoading) {
+    return <LogsLoading />;
+  }
 
   return (
     <div className="space-y-4">

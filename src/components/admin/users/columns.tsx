@@ -23,15 +23,10 @@ const currencyFormatter = new Intl.NumberFormat('de-DE', {
   currency: 'EUR',
 });
 
-// Mocking some data for display
-const mockData = (user: FirestoreUser) => ({
-    ...user,
-    role: user.email === 'admin@marigo.app' ? 'Admin' : 'Member',
-    status: 'Active',
-    orders: Math.floor(Math.random() * 50),
-    revenue: Math.floor(Math.random() * 5000),
-    rating: (Math.random() * (5 - 3.5) + 3.5).toFixed(1)
-})
+const statusVariants: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
+  active: 'secondary',
+  banned: 'destructive',
+};
 
 export const columns: ColumnDef<FirestoreUser>[] = [
   {
@@ -88,7 +83,7 @@ export const columns: ColumnDef<FirestoreUser>[] = [
   {
     accessorKey: 'role',
     header: 'Role',
-    cell: ({ row }) => <Badge variant="outline">{mockData(row.original).role}</Badge>,
+    cell: ({ row }) => <Badge variant="outline">{row.original.email === 'admin@marigoapp.com' ? 'Admin' : 'Member'}</Badge>,
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))
     },
@@ -101,20 +96,13 @@ export const columns: ColumnDef<FirestoreUser>[] = [
       return createdAt?.toDate ? format(createdAt.toDate(), 'd MMM, yyyy') : 'N/A';
     },
   },
-    {
-    accessorKey: 'orders',
-    header: 'Orders',
-    cell: ({ row }) => mockData(row.original).orders,
-  },
-  {
-    accessorKey: 'revenue',
-    header: 'Revenue',
-    cell: ({ row }) => currencyFormatter.format(mockData(row.original).revenue),
-  },
   {
     accessorKey: 'status',
     header: 'Status',
-    cell: ({ row }) => <Badge variant="secondary">{mockData(row.original).status}</Badge>,
+    cell: ({ row }) => {
+        const status = row.original.status || 'active';
+        return <Badge variant={statusVariants[status] || 'secondary'}>{status.charAt(0).toUpperCase() + status.slice(1)}</Badge>
+    },
      filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))
     },
