@@ -68,7 +68,7 @@ service cloud.firestore {
     // Marketplace Collections (/products)
     // --------------------------------------------------------------------
     match /products/{productId} {
-      allow read: if true;
+      allow get, list: if true;
       allow create: if isSignedIn();
       // Only the seller or an admin can update/delete.
       allow update, delete: if (isExistingDoc() && isOwner(resource.data.sellerId)) || isAdmin();
