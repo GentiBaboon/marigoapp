@@ -136,7 +136,7 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------------
-    // Admin Roles & Logs
+    // Admin & App Settings
     // --------------------------------------------------------------------
     match /roles_admin/{userId} {
       allow read, write: if isAdmin();
@@ -146,6 +146,14 @@ service cloud.firestore {
       allow get, list: if isAdmin();
       allow create: if isAdmin();
       allow update, delete: if false; // Immutable logs
+    }
+
+    match /settings/{docId} {
+        allow read, write: if isAdmin();
+    }
+
+    match /coupons/{couponId} {
+        allow read, list, create, update, delete: if isAdmin();
     }
   }
 }

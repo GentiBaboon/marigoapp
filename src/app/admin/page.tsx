@@ -123,13 +123,13 @@ export default function AdminDashboardPage() {
             </div>
             <div className="flex gap-2 flex-wrap">
                 <Button asChild>
-                    <Link href="/admin/users">Manage Users</Link>
-                </Button>
-                 <Button asChild variant="outline">
                     <Link href="/admin/products">Manage Products</Link>
                 </Button>
                  <Button asChild variant="outline">
-                    <Link href="/admin/orders">Manage Orders</Link>
+                    <Link href="/admin/orders">Orders</Link>
+                </Button>
+                 <Button asChild variant="outline">
+                    <Link href="/admin/users">Manage Users</Link>
                 </Button>
                  <Button asChild variant="outline">
                     <Link href="/admin/finance">Financials</Link>

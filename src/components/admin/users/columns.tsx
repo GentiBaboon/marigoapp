@@ -28,6 +28,17 @@ const statusVariants: { [key: string]: 'default' | 'secondary' | 'destructive' }
   banned: 'destructive',
 };
 
+const getUserRole = (user: FirestoreUser) => {
+    if (user.email === 'admin@marigoapp.com' || user.id === '2C81RVoXZWZuSWXEEueehqbHkMu1') {
+        return 'Admin';
+    }
+    if (user.isSeller) {
+        return 'Seller';
+    }
+    return 'Customer';
+};
+
+
 export const columns: ColumnDef<FirestoreUser>[] = [
   {
     id: 'select',
@@ -83,9 +94,13 @@ export const columns: ColumnDef<FirestoreUser>[] = [
   {
     accessorKey: 'role',
     header: 'Role',
-    cell: ({ row }) => <Badge variant="outline">{row.original.email === 'admin@marigoapp.com' ? 'Admin' : 'Member'}</Badge>,
+    cell: ({ row }) => {
+        const role = getUserRole(row.original);
+        return <Badge variant="outline">{role}</Badge>
+    },
     filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
+        const role = getUserRole(row.original);
+        return value.includes(role);
     },
   },
    {

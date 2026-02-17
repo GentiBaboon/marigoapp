@@ -330,6 +330,34 @@
             "timestamp": { "type": "string", "format": "date-time" }
         },
         "required": ["adminId", "actionType", "details", "targetId", "timestamp"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "type": "object",
+      "description": "Global settings for the marketplace.",
+      "properties": {
+        "commissionRate": {
+          "type": "number",
+          "description": "The platform's commission rate as a decimal (e.g., 0.15 for 15%)."
+        },
+        "maintenanceMode": {
+          "type": "boolean",
+          "description": "Whether the site is in maintenance mode."
+        }
+      },
+      "required": ["commissionRate", "maintenanceMode"]
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "type": "object",
+      "description": "Represents a discount coupon.",
+      "properties": {
+        "code": { "type": "string" },
+        "discountType": { "type": "string", "enum": ["percentage", "fixed"] },
+        "discountValue": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "expired", "disabled"] }
+      },
+      "required": ["code", "discountType", "discountValue", "status"]
     }
   },
   "auth": {
@@ -407,6 +435,14 @@
     "/admin_logs/{logId}": {
       "schema": { "$ref": "#/entities/AdminLog" },
       "description": "Stores a non-deletable audit trail of all administrator actions."
+    },
+    "/settings/global": {
+      "schema": { "$ref": "#/entities/Settings" },
+      "description": "Stores global application settings in a single document."
+    },
+    "/coupons/{couponId}": {
+      "schema": { "$ref": "#/entities/Coupon" },
+      "description": "Collection of all discount coupons."
     }
   }
 }

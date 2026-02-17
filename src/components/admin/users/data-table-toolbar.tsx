@@ -3,7 +3,7 @@
 import { Table } from '@tanstack/react-table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { X, ListFilter, Trash2 } from 'lucide-react';
+import { X, Trash2 } from 'lucide-react';
 import { DataTableViewOptions } from './data-table-view-options';
 import { DataTableFacetedFilter } from './data-table-faceted-filter';
 
@@ -13,12 +13,13 @@ interface DataTableToolbarProps<TData> {
 
 const roles = [
     { label: 'Admin', value: 'Admin' },
-    { label: 'Member', value: 'Member' }
+    { label: 'Seller', value: 'Seller' },
+    { label: 'Customer', value: 'Customer' },
 ];
 
 const statuses = [
-    { label: 'Active', value: 'Active' },
-    { label: 'Banned', value: 'Banned' }
+    { label: 'Active', value: 'active' },
+    { label: 'Banned', value: 'banned' }
 ]
 
 export function DataTableToolbar<TData>({

@@ -315,3 +315,39 @@ export const firestoreAdminLogSchema = z.object({
   timestamp: z.any(),
 });
 export type FirestoreAdminLog = z.infer<typeof firestoreAdminLogSchema> & { id: string };
+
+
+// --- Admin Settings & Data ---
+export const firestoreSettingsSchema = z.object({
+  commissionRate: z.number(),
+  maintenanceMode: z.boolean(),
+});
+export type FirestoreSettings = z.infer<typeof firestoreSettingsSchema>;
+
+export const firestoreCouponSchema = z.object({
+  code: z.string(),
+  discountType: z.enum(["percentage", "fixed"]),
+  discountValue: z.number(),
+  status: z.enum(["active", "expired", "disabled"]),
+});
+export type FirestoreCoupon = z.infer<typeof firestoreCouponSchema> & { id: string };
+
+export const firestoreCategorySchema = z.object({
+  name: z.object({ sq: z.string(), en: z.string(), it: z.string() }),
+  slug: z.string(),
+  parentId: z.string().optional().nullable(),
+  icon: z.string().optional(),
+  image: z.string().url().optional(),
+  position: z.number().optional(),
+  isActive: z.boolean(),
+});
+export type FirestoreCategory = z.infer<typeof firestoreCategorySchema> & { id: string };
+
+export const firestoreBrandSchema = z.object({
+  name: z.string(),
+  slug: z.string(),
+  logoUrl: z.string().url().optional(),
+  verified: z.boolean().optional(),
+  productCount: z.number().optional(),
+});
+export type FirestoreBrand = z.infer<typeof firestoreBrandSchema> & { id: string };
