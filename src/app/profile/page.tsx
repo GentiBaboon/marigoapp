@@ -32,7 +32,8 @@ import {
   Info,
   ChevronRight,
   Handshake,
-  Landmark
+  Landmark,
+  Truck,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { FirestoreUser } from '@/lib/types';
@@ -87,6 +88,7 @@ export default function ProfilePage() {
     { href: '/profile/listings', label: 'My Listings', icon: Tag },
     { href: '/profile/offers', label: 'My Offers', icon: Handshake },
     ...(firestoreUser?.isSeller ? [{ href: '/profile/stripe-onboarding', label: 'Setup Payouts', icon: Landmark }] : []),
+    { href: '/delivery-partner', label: 'Become a Delivery Partner', icon: Truck },
     { href: '/sell', label: 'Sell an Item', icon: null, special: true },
     { href: '/profile/addresses', label: 'My Addresses', icon: MapPin },
     { href: '/profile/payments', label: 'Payment Methods', icon: CreditCard },
