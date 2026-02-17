@@ -23,6 +23,7 @@ import {
   FileWarning,
   ShieldAlert,
   Settings,
+  Archive,
 } from 'lucide-react';
 import { StatCard } from '@/components/admin/stat-card';
 import { RevenueChart } from '@/components/admin/charts/revenue-chart';
@@ -137,6 +138,12 @@ export default function AdminDashboardPage() {
                     <Link href="/admin/moderation">
                         <ShieldAlert className="mr-2 h-4 w-4" />
                         Moderation
+                    </Link>
+                </Button>
+                 <Button asChild variant="outline">
+                    <Link href="/admin/logs">
+                        <Archive className="mr-2 h-4 w-4" />
+                        Activity Logs
                     </Link>
                 </Button>
                 <Button asChild variant="outline">

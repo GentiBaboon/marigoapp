@@ -310,6 +310,20 @@
           "createdAt": { "type": "string", "format": "date-time" }
         },
         "required": ["reporterId", "type", "itemId", "reason", "status", "createdAt"]
+    },
+    "AdminLog": {
+        "title": "AdminLog",
+        "type": "object",
+        "description": "Represents an action taken by an administrator.",
+        "properties": {
+            "adminId": { "type": "string" },
+            "adminName": { "type": "string" },
+            "actionType": { "type": "string", "enum": ["product_approved", "product_rejected", "user_banned", "user_role_changed", "order_status_updated", "setting_changed"] },
+            "details": { "type": "string" },
+            "targetId": { "type": "string" },
+            "timestamp": { "type": "string", "format": "date-time" }
+        },
+        "required": ["adminId", "actionType", "details", "targetId", "timestamp"]
     }
   },
   "auth": {
@@ -383,6 +397,10 @@
     "/roles_admin/{userId}": {
       "schema": { "type": "object", "properties": {} },
       "description": "Stores admin user roles for access control."
+    },
+    "/admin_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AdminLog" },
+      "description": "Stores a non-deletable audit trail of all administrator actions."
     }
   }
 }

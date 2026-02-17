@@ -303,3 +303,14 @@ export const firestoreReportSchema = z.object({
     createdAt: z.any(),
 });
 export type FirestoreReport = z.infer<typeof firestoreReportSchema> & { id: string };
+
+// --- Admin Log Schema ---
+export const firestoreAdminLogSchema = z.object({
+  adminId: z.string(),
+  adminName: z.string(),
+  actionType: z.enum(["product_approved", "product_rejected", "user_banned", "user_role_changed", "order_status_updated", "setting_changed"]),
+  details: z.string(),
+  targetId: z.string(),
+  timestamp: z.any(),
+});
+export type FirestoreAdminLog = z.infer<typeof firestoreAdminLogSchema> & { id: string };
