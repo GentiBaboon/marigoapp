@@ -17,10 +17,6 @@ service cloud.firestore {
       return resource != null;
     }
     
-    function isExistingOwner(userId) {
-      return isOwner(userId) && isExistingDoc();
-    }
-
     function isAdmin() {
       // Check for an 'admin' custom claim on the user's token.
       return isSignedIn() && request.auth.token.admin == true;
@@ -28,10 +24,6 @@ service cloud.firestore {
 
     function isCorrectOwnerInRequestData(ownerFieldName) {
       return request.resource.data[ownerFieldName] == request.auth.uid;
-    }
-
-    function isOwnerFieldUnchanged(ownerFieldName) {
-      return request.resource.data[ownerFieldName] == resource.data[ownerFieldName];
     }
     
     function isSellerInOrder() {
@@ -42,9 +34,9 @@ service cloud.firestore {
     // User Data Collections (/users/{userId}/*)
     // --------------------------------------------------------------------
     match /users/{userId} {
-      allow get: if isSignedIn() || isAdmin();
+      allow get: if isSignedIn();
       allow list: if isAdmin();
-      allow create: if isSignedIn();
+      allow create: if isOwner(userId); // A user can create their own profile
       allow update, delete: if isOwner(userId) || isAdmin();
       
       // Subcollections
@@ -64,42 +56,39 @@ service cloud.firestore {
     // --------------------------------------------------------------------
     match /categories/{categoryId} {
       allow get, list: if true;
-      allow write: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
     
     match /brands/{brandId} {
       allow get, list: if true;
-      allow write: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     // --------------------------------------------------------------------
     // Marketplace Collections (/products)
     // --------------------------------------------------------------------
     match /products/{productId} {
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
+      // Any signed-in user can create a product, as long as they set themselves as the seller.
       allow create: if isSignedIn() && isCorrectOwnerInRequestData('sellerId');
+      // Only the seller or an admin can update/delete.
       allow update, delete: if (isExistingDoc() && isOwner(resource.data.sellerId)) || isAdmin();
 
       // Subcollections
       match /offers/{offerId} {
         function isProductSeller() {
-          return isOwner(get(/databases/$(database)/documents/products/$(productId)).data.sellerId);
+          return get(/databases/$(database)/documents/products/$(productId)).data.sellerId == request.auth.uid;
         }
 
-        allow get: if isProductSeller() || (isExistingDoc() && isOwner(resource.data.buyer_id)) || isAdmin();
-        allow list: if isSignedIn() || isAdmin();
-        allow create: if isCorrectOwnerInRequestData('buyerId') && request.resource.data.sellerId == get(/databases/$(database)/documents/products/$(productId)).data.sellerId;
-        
-        allow update: if (isOwner(resource.data.buyerId) && request.resource.data.status == 'withdrawn')
-                    || (isProductSeller() && resource.data.status == 'pending' && (request.resource.data.status in ['accepted', 'declined', 'countered']))
-                    || (isOwner(resource.data.buyerId) && resource.data.status == 'countered' && (request.resource.data.status in ['accepted', 'declined']))
-                    || isAdmin();
-
-        allow delete: if isAdmin(); 
+        allow get: if (isExistingDoc() && (isOwner(resource.data.buyerId) || isProductSeller())) || isAdmin();
+        allow list: if isSignedIn();
+        allow create: if isSignedIn() && isCorrectOwnerInRequestData('buyerId');
+        allow update: if (isExistingDoc() && (isOwner(resource.data.buyerId) || isProductSeller())) || isAdmin();
+        allow delete: if isAdmin();
       }
       match /bids/{bidId} {
-         allow read, write: if isSignedIn() || isAdmin();
+         // Allow any signed-in user to bid for now. This could be more specific later.
+         allow read, write: if isSignedIn();
       }
     }
     
@@ -116,7 +105,7 @@ service cloud.firestore {
     match /reviews/{reviewId} {
       allow get, list: if true;
       allow create: if isSignedIn() && isCorrectOwnerInRequestData('reviewerId');
-      allow update: if isExistingOwner(resource.data.reviewerId) || isAdmin();
+      allow update: if (isExistingDoc() && isOwner(resource.data.reviewerId)) || isAdmin();
       allow delete: if isAdmin();
     }
     
@@ -130,7 +119,7 @@ service cloud.firestore {
     // --------------------------------------------------------------------
     match /conversations/{conversationId} {
       allow get, write: if (isSignedIn() && request.auth.uid in resource.data.participants) || isAdmin();
-      allow list: if isAdmin();
+      allow list: if isAdmin(); // Only admins can list all conversations
       
       match /messages/{messageId} {
         allow read, write: if (isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants) || isAdmin();
@@ -138,15 +127,14 @@ service cloud.firestore {
     }
     
     match /notifications/{notificationId} {
-        allow read, write: if isOwner(resource.data.userId) || isAdmin();
-        allow list: if isAdmin();
+        allow get, list, write: if isOwner(resource.data.userId) || isAdmin();
     }
     
     // --------------------------------------------------------------------
     // Admin Roles
     // --------------------------------------------------------------------
     match /roles_admin/{userId} {
-      allow get, list, write: if isAdmin();
+      allow read, write: if isAdmin();
     }
   }
 }

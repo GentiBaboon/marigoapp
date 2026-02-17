@@ -1,6 +1,6 @@
 'use client';
 import { useMemo } from 'react';
-import { collection } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import {
   useFirestore,
   useCollection,
@@ -10,6 +10,7 @@ import type {
   FirestoreUser,
   FirestoreProduct,
   FirestoreOrder,
+  FirestoreReview,
 } from '@/lib/types';
 
 import {
@@ -17,16 +18,16 @@ import {
   Package,
   ShoppingCart,
   DollarSign,
-  PackageCheck,
-  PackageX,
   Star,
-  FileBarChart,
-  BadgePercent,
-  CalendarClock
+  FileWarning,
 } from 'lucide-react';
 import { StatCard } from '@/components/admin/stat-card';
 import { RevenueChart } from '@/components/admin/charts/revenue-chart';
 import { UsersChart } from '@/components/admin/charts/users-chart';
+import { OrdersStatusChart } from '@/components/admin/charts/orders-status-chart';
+import { TopCategoriesChart } from '@/components/admin/charts/top-categories-chart';
+import { OrdersByCountryChart } from '@/components/admin/charts/orders-by-country-chart';
+
 import { subDays } from 'date-fns';
 
 const currencyFormatter = new Intl.NumberFormat('de-DE', {
@@ -48,6 +49,10 @@ export default function AdminDashboardPage() {
 
   const ordersQuery = useMemoFirebase(() => collection(firestore, 'orders'), [firestore]);
   const { data: orders, isLoading: ordersLoading } = useCollection<FirestoreOrder>(ordersQuery);
+  
+  const reviewsQuery = useMemoFirebase(() => collection(firestore, 'reviews'), [firestore]);
+  const { data: reviews, isLoading: reviewsLoading } = useCollection<FirestoreReview>(reviewsQuery);
+
 
   // Memoized Calculations
   const stats = useMemo(() => {
@@ -58,25 +63,30 @@ export default function AdminDashboardPage() {
     const safeUsers = users || [];
     const safeProducts = products || [];
     const safeOrders = orders || [];
+    const safeReviews = reviews || [];
 
     const totalUsers = safeUsers.length;
-    const newUsers = safeUsers.filter(u => u.createdAt?.toDate() > thirtyDaysAgo).length;
+    const newUsers = safeUsers.filter(u => u.createdAt?.toDate && u.createdAt.toDate() > thirtyDaysAgo).length;
 
     const totalProducts = safeProducts.length;
     const activeListings = safeProducts.filter(p => p.status === 'active').length;
-    const soldItems = safeProducts.filter(p => p.status === 'sold').length;
+    const soldItems = safeOrders.reduce((sum, order) => sum + order.items.length, 0);
 
     const totalOrders = safeOrders.length;
-    const ordersThisMonth = safeOrders.filter(o => o.createdAt?.toDate() > startOfMonth).length;
+    const ordersThisMonth = safeOrders.filter(o => o.createdAt?.toDate && o.createdAt.toDate() > startOfMonth).length;
 
     const totalRevenue = safeOrders.reduce((sum, order) => sum + order.totalAmount, 0);
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     const commissionEarned = totalRevenue * COMMISSION_RATE;
     
-    // Placeholder values for metrics without a clear data source yet
-    const pendingReviews = 0;
+    // Placeholder for active users - requires more complex logic
+    const activeUsers = 0; 
+
+    // For now, "pending" reviews are just all reviews, since there's no status field
+    const pendingReviews = safeReviews.length;
+    
+    // Placeholder for reported items - requires data model changes
     const reportedItems = 0;
-    const activeUsers = 0; // Requires more complex logic (e.g., tracking last sign-in)
 
     return {
       totalUsers,
@@ -93,14 +103,16 @@ export default function AdminDashboardPage() {
       pendingReviews,
       reportedItems,
     };
-  }, [users, products, orders]);
+  }, [users, products, orders, reviews]);
 
-  const isLoading = usersLoading || productsLoading || ordersLoading;
+  const isLoading = usersLoading || productsLoading || ordersLoading || reviewsLoading;
 
   return (
     <>
-      <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
+      <h1 className="text-3xl font-bold tracking-tight mb-8">Admin Dashboard</h1>
+
+      {/* Main Stats Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <StatCard
           title="Total Revenue"
           value={currencyFormatter.format(stats.totalRevenue)}
@@ -111,7 +123,7 @@ export default function AdminDashboardPage() {
         <StatCard
           title="Total Sales"
           value={`+${stats.totalOrders}`}
-          description="All-time orders"
+          description={`${stats.soldItems} items sold all-time`}
           icon={<ShoppingCart className="text-muted-foreground h-4 w-4" />}
           isLoading={isLoading}
         />
@@ -122,17 +134,53 @@ export default function AdminDashboardPage() {
           icon={<Users className="text-muted-foreground h-4 w-4" />}
           isLoading={isLoading}
         />
-        <StatCard
+         <StatCard
           title="Active Listings"
           value={`${stats.activeListings}`}
-          description={`${stats.soldItems} items sold`}
+          description={`${stats.totalProducts} total products`}
           icon={<Package className="text-muted-foreground h-4 w-4" />}
           isLoading={isLoading}
         />
       </div>
-      <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:grid-cols-2">
+
+       {/* Secondary Stats Row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 my-8">
+         <StatCard
+          title="Avg. Order Value"
+          value={currencyFormatter.format(stats.avgOrderValue)}
+          icon={<DollarSign className="text-muted-foreground h-4 w-4" />}
+          isLoading={isLoading}
+        />
+         <StatCard
+          title="Commission Earned"
+          value={currencyFormatter.format(stats.commissionEarned)}
+          description={`at ${COMMISSION_RATE * 100}% rate`}
+          icon={<DollarSign className="text-muted-foreground h-4 w-4" />}
+          isLoading={isLoading}
+        />
+        <StatCard
+          title="Pending Reviews"
+          value={`${stats.pendingReviews}`}
+          icon={<Star className="text-muted-foreground h-4 w-4" />}
+          isLoading={isLoading}
+        />
+        <StatCard
+          title="Reported Items"
+          value={`${stats.reportedItems}`}
+          icon={<FileWarning className="text-muted-foreground h-4 w-4" />}
+          isLoading={isLoading}
+        />
+      </div>
+      
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <RevenueChart orders={orders || []} />
         <UsersChart users={users || []} />
+        <OrdersStatusChart orders={orders || []} />
+        <TopCategoriesChart products={products || []} />
+        <div className="lg:col-span-2">
+            <OrdersByCountryChart orders={orders || []} />
+        </div>
       </div>
     </>
   );
