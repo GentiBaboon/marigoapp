@@ -128,6 +128,9 @@ export default function AdminDashboardPage() {
                  <Button asChild variant="outline">
                     <Link href="/admin/orders">Manage Orders</Link>
                 </Button>
+                 <Button asChild variant="outline">
+                    <Link href="/admin/finance">Financials</Link>
+                </Button>
             </div>
         </div>
 
