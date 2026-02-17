@@ -170,7 +170,7 @@ export const firestoreProductSchema = z.object({
   category: z.string(),
   subCategory: z.string(),
   images: z.array(z.string()),
-  status: z.enum(["active", "sold", "reserved"]),
+  status: z.enum(["active", "sold", "reserved", "pending_review"]),
   listingCreated: z.any(),
   keywords: z.array(z.string()).optional(),
   condition: z.string().optional(),
@@ -292,5 +292,3 @@ export const firestoreNotificationSchema = z.object({
   createdAt: z.any(),
 });
 export type FirestoreNotification = z.infer<typeof firestoreNotificationSchema> & { id: string };
-
-    

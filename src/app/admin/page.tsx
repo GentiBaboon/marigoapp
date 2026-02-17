@@ -111,11 +111,21 @@ export default function AdminDashboardPage() {
 
   return (
     <>
-        <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-            <Button asChild>
-                <Link href="/admin/users">Manage Users</Link>
-            </Button>
+        <div className="flex justify-between items-start mb-8 gap-4">
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+                <p className="text-muted-foreground mt-1">
+                    A real-time overview of your marketplace.
+                </p>
+            </div>
+            <div className="flex gap-2">
+                <Button asChild>
+                    <Link href="/admin/users">Manage Users</Link>
+                </Button>
+                 <Button asChild variant="outline">
+                    <Link href="/admin/products">Manage Products</Link>
+                </Button>
+            </div>
         </div>
 
 

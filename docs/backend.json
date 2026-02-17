@@ -131,7 +131,7 @@
         "category": { "type": "string" },
         "subCategory": { "type": "string" },
         "images": { "type": "array", "items": { "type": "string", "format": "uri" } },
-        "status": { "type": "string", "enum": ["active", "sold", "reserved"] },
+        "status": { "type": "string", "enum": ["active", "sold", "reserved", "pending_review"] },
         "listingCreated": { "type": "string", "format": "date-time" },
         "keywords": { "type": "array", "items": { "type": "string" }, "description": "Keywords for search." },
         "brand": { "type": "string" },
