@@ -21,6 +21,7 @@ import {
   DollarSign,
   Star,
   FileWarning,
+  ShieldAlert,
 } from 'lucide-react';
 import { StatCard } from '@/components/admin/stat-card';
 import { RevenueChart } from '@/components/admin/charts/revenue-chart';
@@ -118,7 +119,7 @@ export default function AdminDashboardPage() {
                     A real-time overview of your marketplace.
                 </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
                 <Button asChild>
                     <Link href="/admin/users">Manage Users</Link>
                 </Button>
@@ -130,6 +131,12 @@ export default function AdminDashboardPage() {
                 </Button>
                  <Button asChild variant="outline">
                     <Link href="/admin/finance">Financials</Link>
+                </Button>
+                <Button asChild variant="outline">
+                    <Link href="/admin/moderation">
+                        <ShieldAlert className="mr-2 h-4 w-4" />
+                        Moderation
+                    </Link>
                 </Button>
             </div>
         </div>

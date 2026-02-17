@@ -296,6 +296,20 @@
             "proofOfDelivery": { "type": "string", "format": "uri" }
         },
         "required": ["orderId", "courierId", "status"]
+    },
+    "Report": {
+        "title": "Report",
+        "type": "object",
+        "description": "Represents a user-submitted report for content moderation.",
+        "properties": {
+          "reporterId": { "type": "string" },
+          "type": { "type": "string", "enum": ["product", "user", "message", "review"] },
+          "itemId": { "type": "string" },
+          "reason": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "resolved"], "default": "pending" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["reporterId", "type", "itemId", "reason", "status", "createdAt"]
     }
   },
   "auth": {
@@ -361,6 +375,10 @@
     "/deliveries/{deliveryId}": {
       "schema": { "$ref": "#/entities/Delivery" },
       "description": "Top-level collection for delivery assignments."
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/Report" },
+      "description": "Top-level collection for user-submitted content reports."
     },
     "/roles_admin/{userId}": {
       "schema": { "type": "object", "properties": {} },

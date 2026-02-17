@@ -131,6 +131,14 @@ service cloud.firestore {
     }
     
     // --------------------------------------------------------------------
+    // Moderation
+    // --------------------------------------------------------------------
+    match /reports/{reportId} {
+        allow create: if isSignedIn() && isCorrectOwnerInRequestData('reporterId');
+        allow read, list, update, delete: if isAdmin();
+    }
+
+    // --------------------------------------------------------------------
     // Admin Roles
     // --------------------------------------------------------------------
     match /roles_admin/{userId} {

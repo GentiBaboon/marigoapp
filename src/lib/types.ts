@@ -292,3 +292,14 @@ export const firestoreNotificationSchema = z.object({
   createdAt: z.any(),
 });
 export type FirestoreNotification = z.infer<typeof firestoreNotificationSchema> & { id: string };
+
+// --- Report Schema ---
+export const firestoreReportSchema = z.object({
+    reporterId: z.string(),
+    type: z.enum(['product', 'user', 'message', 'review']),
+    itemId: z.string(), // ID of the reported item/user/etc.
+    reason: z.string(),
+    status: z.enum(['pending', 'resolved']).default('pending'),
+    createdAt: z.any(),
+});
+export type FirestoreReport = z.infer<typeof firestoreReportSchema> & { id: string };
