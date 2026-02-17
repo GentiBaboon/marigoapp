@@ -18,8 +18,8 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      // Check for an 'admin' custom claim on the user's token.
-      return isSignedIn() && request.auth.token.admin == true;
+      // Check for an 'admin' custom claim OR a specific developer admin UID.
+      return isSignedIn() && (request.auth.token.admin == true || request.auth.uid == '2C81RVoXZWZuSWXEEueehqbHkMu1');
     }
 
     function isCorrectOwnerInRequestData(ownerFieldName) {
@@ -95,7 +95,7 @@ service cloud.firestore {
     // Transactional Collections (/orders, /reviews, /deliveries)
     // --------------------------------------------------------------------
     match /orders/{orderId} {
-      // Only admins can read and write to orders
+      // Solo gli admin possono leggere e scrivere gli ordini
       allow read, write: if isAdmin();
     }
 
