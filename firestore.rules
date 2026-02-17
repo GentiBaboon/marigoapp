@@ -22,7 +22,8 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      // Check for an 'admin' custom claim on the user's token.
+      return isSignedIn() && request.auth.token.admin == true;
     }
 
     function isCorrectOwnerInRequestData(ownerFieldName) {
@@ -41,19 +42,20 @@ service cloud.firestore {
     // User Data Collections (/users/{userId}/*)
     // --------------------------------------------------------------------
     match /users/{userId} {
-      allow get: if true;
+      allow get: if isSignedIn() || isAdmin();
+      allow list: if isAdmin();
       allow create: if isSignedIn();
-      allow update, delete: if isOwner(userId);
+      allow update, delete: if isOwner(userId) || isAdmin();
       
       // Subcollections
       match /addresses/{addressId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isAdmin();
       }
       match /paymentMethods/{methodId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isAdmin();
       }
       match /wishlist/{productId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
 
@@ -74,12 +76,10 @@ service cloud.firestore {
     // Marketplace Collections (/products)
     // --------------------------------------------------------------------
     match /products/{productId} {
-      // Public can view active products. Sellers can view their own products.
-      allow get: if (resource.data.status == 'active') || (isSignedIn() && resource.data.sellerId == request.auth.uid) || isAdmin();
-      // Public can perform queries (e.g., for new listings, related items).
+      allow get: if true;
       allow list: if true;
       allow create: if isSignedIn() && isCorrectOwnerInRequestData('sellerId');
-      allow update, delete: if isExistingDoc() && isOwner(resource.data.sellerId);
+      allow update, delete: if (isExistingDoc() && isOwner(resource.data.sellerId)) || isAdmin();
 
       // Subcollections
       match /offers/{offerId} {
@@ -87,21 +87,19 @@ service cloud.firestore {
           return isOwner(get(/databases/$(database)/documents/products/$(productId)).data.sellerId);
         }
 
-        allow get: if isProductSeller() || (isExistingDoc() && isOwner(resource.data.buyer_id));
-        allow list: if isSignedIn();
+        allow get: if isProductSeller() || (isExistingDoc() && isOwner(resource.data.buyer_id)) || isAdmin();
+        allow list: if isSignedIn() || isAdmin();
         allow create: if isCorrectOwnerInRequestData('buyerId') && request.resource.data.sellerId == get(/databases/$(database)/documents/products/$(productId)).data.sellerId;
         
-        // Allow buyer to withdraw
-        // Allow seller to accept, decline, or counter a pending offer
-        // Allow buyer to accept or decline a countered offer from the seller
         allow update: if (isOwner(resource.data.buyerId) && request.resource.data.status == 'withdrawn')
                     || (isProductSeller() && resource.data.status == 'pending' && (request.resource.data.status in ['accepted', 'declined', 'countered']))
-                    || (isOwner(resource.data.buyerId) && resource.data.status == 'countered' && (request.resource.data.status in ['accepted', 'declined']));
+                    || (isOwner(resource.data.buyerId) && resource.data.status == 'countered' && (request.resource.data.status in ['accepted', 'declined']))
+                    || isAdmin();
 
-        allow delete: if false; 
+        allow delete: if isAdmin(); 
       }
       match /bids/{bidId} {
-         allow read, write: if isSignedIn() && (isOwner(request.resource.data.bidderId) || isOwner(get(/databases/$(database)/documents/products/$(productId)).data.sellerId));
+         allow read, write: if isSignedIn() || isAdmin();
       }
     }
     
@@ -109,15 +107,16 @@ service cloud.firestore {
     // Transactional Collections (/orders, /reviews, /deliveries)
     // --------------------------------------------------------------------
     match /orders/{orderId} {
-      allow get, update: if isSignedIn() && (isOwner(resource.data.buyerId) || isSellerInOrder() || isAdmin());
-      allow list: if isSignedIn();
+      allow get: if isSignedIn() && (isOwner(resource.data.buyerId) || isSellerInOrder()) || isAdmin();
+      allow list: if isAdmin();
       allow create: if isSignedIn() && isCorrectOwnerInRequestData('buyerId');
+      allow update: if isAdmin() || (isSignedIn() && (isOwner(resource.data.buyerId) || isSellerInOrder()));
     }
 
     match /reviews/{reviewId} {
       allow get, list: if true;
       allow create: if isSignedIn() && isCorrectOwnerInRequestData('reviewerId');
-      allow update: if isExistingOwner(resource.data.reviewerId);
+      allow update: if isExistingOwner(resource.data.reviewerId) || isAdmin();
       allow delete: if isAdmin();
     }
     
@@ -130,17 +129,17 @@ service cloud.firestore {
     // Communication Collections (/conversations, /notifications)
     // --------------------------------------------------------------------
     match /conversations/{conversationId} {
-      allow get, write: if isSignedIn() && request.auth.uid in resource.data.participants;
-      allow list: if false;
+      allow get, write: if (isSignedIn() && request.auth.uid in resource.data.participants) || isAdmin();
+      allow list: if isAdmin();
       
       match /messages/{messageId} {
-        allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+        allow read, write: if (isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants) || isAdmin();
       }
     }
     
     match /notifications/{notificationId} {
-        allow read, write: if isOwner(resource.data.userId);
-        allow list: if isSignedIn();
+        allow read, write: if isOwner(resource.data.userId) || isAdmin();
+        allow list: if isAdmin();
     }
     
     // --------------------------------------------------------------------
