@@ -55,20 +55,20 @@ service cloud.firestore {
     // Public Metadata (/categories, /brands)
     // --------------------------------------------------------------------
     match /categories/{categoryId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow read: if true;
+      allow write: if isAdmin();
     }
     
     match /brands/{brandId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // --------------------------------------------------------------------
     // Marketplace Collections (/products)
     // --------------------------------------------------------------------
     match /products/{productId} {
-      allow get, list: if true;
+      allow read: if true;
       allow create: if isSignedIn();
       // Only the seller or an admin can update/delete.
       allow update, delete: if (isExistingDoc() && isOwner(resource.data.sellerId)) || isAdmin();
@@ -153,7 +153,7 @@ service cloud.firestore {
     }
 
     match /coupons/{couponId} {
-        allow read, list, create, update, delete: if isAdmin();
+        allow read, write: if isAdmin();
     }
   }
 }
