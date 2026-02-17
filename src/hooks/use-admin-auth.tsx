@@ -31,22 +31,36 @@ export function useAdminAuth() {
     }
 
 
+    // Check for admin claim, with a forced refresh as a fallback.
     user.getIdTokenResult()
       .then((idTokenResult) => {
-        const isAdminClaim = !!idTokenResult.claims.admin;
-        setIsAdmin(isAdminClaim);
-        if (!isAdminClaim) {
-            router.replace('/home');
+        if (idTokenResult.claims.admin) {
+          setIsAdmin(true);
+          setIsLoading(false);
+        } else {
+          // If no admin claim, force a refresh of the token and check again.
+          // This is useful when custom claims have just been set.
+          user.getIdTokenResult(true).then((refreshedTokenResult) => {
+             if (refreshedTokenResult.claims.admin) {
+                setIsAdmin(true);
+             } else {
+                setIsAdmin(false);
+                router.replace('/home');
+             }
+          }).catch(() => {
+             setIsAdmin(false);
+             router.replace('/home');
+          }).finally(() => {
+             setIsLoading(false);
+          });
         }
       })
       .catch(() => {
-        // Error getting token, assume not admin
         setIsAdmin(false);
         router.replace('/home');
-      })
-      .finally(() => {
         setIsLoading(false);
       });
+      
   }, [user, isUserLoading, router]);
 
   return { isAdmin, isLoading: isUserLoading || isLoading };
