@@ -1,5 +1,6 @@
 'use client';
 import { useMemo } from 'react';
+import Link from 'next/link'; // Import Link
 import { collection, query, where } from 'firebase/firestore';
 import {
   useFirestore,
@@ -29,6 +30,7 @@ import { TopCategoriesChart } from '@/components/admin/charts/top-categories-cha
 import { OrdersByCountryChart } from '@/components/admin/charts/orders-by-country-chart';
 
 import { subDays } from 'date-fns';
+import { Button } from '@/components/ui/button';
 
 const currencyFormatter = new Intl.NumberFormat('de-DE', {
   style: 'currency',
@@ -109,7 +111,13 @@ export default function AdminDashboardPage() {
 
   return (
     <>
-      <h1 className="text-3xl font-bold tracking-tight mb-8">Admin Dashboard</h1>
+        <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+            <Button asChild>
+                <Link href="/admin/users">Manage Users</Link>
+            </Button>
+        </div>
+
 
       {/* Main Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
