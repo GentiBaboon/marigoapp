@@ -55,28 +55,11 @@ export const firestoreUserSchema = z.object({
   macroCategoryPreference: z.enum(["womenswear", "menswear"]).optional(),
   hasAcceptedChatRules: z.boolean().optional(),
   isSeller: z.boolean().optional(),
-  isCourier: z.boolean().optional(),
-  courierStatus: z.enum(["none", "pending_approval", "active", "rejected"]).optional(),
   createdAt: z.any().optional(),
   stripeAccountId: z.string().optional().nullable(),
   stripeOnboardingComplete: z.boolean().optional(),
 });
 export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
-
-
-// --- Courier Schemas ---
-
-export const courierApplicationSchema = z.object({
-    legalName: z.string().min(3, "Legal name is required"),
-    dob: z.date({ required_error: "Date of birth is required"}),
-    phone: z.string().min(6, "A valid phone number is required"),
-    vehicleType: z.enum(["bicycle", "scooter", "car", "van"], { required_error: "Vehicle type is required" }),
-    licensePlate: z.string().optional(),
-    serviceAreas: z.string().min(3, "Service area is required"),
-    availability: z.array(z.string()).min(1, "Please select at least one day"),
-});
-
-export type CourierApplicationValues = z.infer<typeof courierApplicationSchema>;
 
 
 // --- Checkout & Address Schemas ---
