@@ -1,4 +1,5 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -14,11 +15,14 @@ service cloud.firestore {
     }
 
     function isExistingDoc() {
+      // resource is the document *before* the request.
+      // It is null on 'create' operations.
       return resource != null;
     }
-    
+
     function isAdmin() {
-      // Check for an 'admin' custom claim OR a specific developer admin UID.
+      // Allows access if the user has an 'admin' custom claim, OR if they are the designated developer admin.
+      // In a production environment, you might remove the hardcoded UID.
       return isSignedIn() && (request.auth.token.admin == true || request.auth.uid == '2C81RVoXZWZuSWXEEueehqbHkMu1');
     }
     
@@ -30,12 +34,32 @@ service cloud.firestore {
       return delivery.courierId == request.auth.uid;
     }
 
+    // Ensures the UID in the incoming data for a given field matches the authenticated user.
     function isCorrectOwnerInRequestData(ownerFieldName) {
       return request.resource.data[ownerFieldName] == request.auth.uid;
     }
     
     function isPartyToOrder(delivery) {
         return isSignedIn() && (request.auth.uid == delivery.buyerId || request.auth.uid in delivery.sellerIds);
+    }
+    
+    // Validates the data structure for a new or updated product.
+    function validProduct(productData) {
+        return productData.title is string && productData.title.size() > 0 && productData.title.size() < 100
+            && productData.price is number && productData.price > 0
+            && productData.category is string && productData.category.size() > 0
+            && productData.images is list && productData.images.size() > 0 && productData.images.size() <= 15
+            && productData.status is string && productData.status == 'pending_review' // New products must be pending review
+            && productData.sellerId == request.auth.uid;
+    }
+    
+    // Validates an update to a product. Seller cannot be changed.
+    function validProductUpdate(updateData, existingData) {
+        return updateData.title is string && updateData.title.size() > 0 && updateData.title.size() < 100
+            && updateData.price is number && updateData.price > 0
+            && updateData.category is string && updateData.category.size() > 0
+            && updateData.images is list && updateData.images.size() > 0 && updateData.images.size() <= 15
+            && updateData.sellerId == existingData.sellerId;
     }
 
     // --------------------------------------------------------------------
@@ -44,10 +68,10 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      allow create: if isOwner(userId); // A user can create their own profile
-      allow update, delete: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) || isAdmin();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
       
-      // Subcollections
       match /addresses/{addressId} {
         allow read, write: if isOwner(userId) || isAdmin();
       }
@@ -77,24 +101,25 @@ service cloud.firestore {
     // --------------------------------------------------------------------
     match /products/{productId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      // Only the seller or an admin can update/delete.
-      allow update, delete: if (isExistingDoc() && isOwner(resource.data.sellerId)) || isAdmin();
+      // Users can create products if the data is valid and they are the declared seller.
+      allow create: if isSignedIn() && validProduct(request.resource.data);
+      // The product owner (seller) can update it if the data is valid, or an admin can.
+      allow update: if (isOwner(resource.data.sellerId) && validProductUpdate(request.resource.data, resource.data)) || isAdmin();
+      // The seller or an admin can delete a product.
+      allow delete: if isOwner(resource.data.sellerId) || isAdmin();
 
-      // Subcollections
       match /offers/{offerId} {
         function isProductSeller() {
           return get(/databases/$(database)/documents/products/$(productId)).data.sellerId == request.auth.uid;
         }
 
-        allow get: if (isExistingDoc() && (isOwner(resource.data.buyerId) || isProductSeller())) || isAdmin();
+        allow get: if isSignedIn() && (isOwner(resource.data.buyerId) || isProductSeller());
         allow list: if isSignedIn();
         allow create: if isSignedIn() && isCorrectOwnerInRequestData('buyerId');
-        allow update: if (isExistingDoc() && (isOwner(resource.data.buyerId) || isProductSeller())) || isAdmin();
+        allow update: if isSignedIn() && (isOwner(resource.data.buyerId) || isProductSeller());
         allow delete: if isAdmin();
       }
       match /bids/{bidId} {
-         // Allow any signed-in user to bid for now. This could be more specific later.
          allow read, write: if isSignedIn();
       }
     }
@@ -103,29 +128,26 @@ service cloud.firestore {
     // Transactional Collections (/orders, /reviews, /deliveries)
     // --------------------------------------------------------------------
     match /orders/{orderId} {
-      // Allow buyer, sellers, and admins to read the order.
       allow get: if isSignedIn() && (isOwner(resource.data.buyerId) || request.auth.uid in resource.data.sellerIds) || isAdmin();
+      // Orders can only be created via the `createPaymentIntent` Cloud Function, which uses the Admin SDK.
+      allow create: if false; 
       allow list, update, delete: if isAdmin();
-      allow create: if isSignedIn(); // Assume functions handle creation logic
     }
 
     match /reviews/{reviewId} {
       allow get, list: if true;
       allow create: if isSignedIn() && isCorrectOwnerInRequestData('reviewerId');
-      allow update: if (isExistingDoc() && isOwner(resource.data.reviewerId)) || isAdmin();
+      allow update: if isOwner(resource.data.reviewerId) || isAdmin();
       allow delete: if isAdmin();
     }
     
     match /deliveries/{deliveryId} {
-       // Allow involved parties to read/get, couriers to list available jobs
       allow get: if isPartyToOrder(resource.data) || isAssignedCourier(resource.data) || isAdmin();
       allow list: if isApprovedCourier() || isAdmin();
       allow create: if isAdmin();
       allow update: if isAdmin() || (
         isApprovedCourier() && (
-          // Accepting a job
           (resource.data.courierId == null && request.resource.data.courierId == request.auth.uid && request.resource.data.status == 'assigned') ||
-          // Courier updating their own assigned job, but cannot re-assign it
           (isAssignedCourier(resource.data) && request.resource.data.courierId == resource.data.courierId)
         )
       );
@@ -134,8 +156,7 @@ service cloud.firestore {
 
     match /courier_profiles/{userId} {
         allow read, create, update: if isOwner(userId) || isAdmin();
-        allow list: if isAdmin();
-        allow delete: if isAdmin();
+        allow list, delete: if isAdmin();
     }
 
     // --------------------------------------------------------------------
@@ -143,7 +164,7 @@ service cloud.firestore {
     // --------------------------------------------------------------------
     match /conversations/{conversationId} {
       allow get, write: if (isSignedIn() && request.auth.uid in resource.data.participants) || isAdmin();
-      allow list: if isAdmin(); // Only admins can list all conversations
+      allow list: if isAdmin();
       
       match /messages/{messageId} {
         allow read, write: if (isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants) || isAdmin();
@@ -151,7 +172,11 @@ service cloud.firestore {
     }
     
     match /notifications/{notificationId} {
-        allow get, list, write: if isOwner(resource.data.userId) || isAdmin();
+        // Users can only access their own notifications.
+        allow read, list, update: if isOwner(resource.data.userId);
+        // Notifications are created by backend functions, not clients directly.
+        allow create: if false;
+        allow delete: if isAdmin();
     }
     
     match /support_chats/{chatId} {
@@ -182,16 +207,18 @@ service cloud.firestore {
     match /admin_logs/{logId} {
       allow get, list: if isAdmin();
       allow create: if isAdmin();
-      allow update, delete: if false; // Immutable logs
+      allow update, delete: if false;
     }
 
     match /settings/{docId} {
-        allow read: if true; // Allow public read for settings like maintenance mode
+        allow read: if true;
         allow write: if isAdmin();
     }
 
     match /coupons/{couponId} {
-        allow read, write: if isAdmin();
+        // Anyone can read a coupon to see if it's valid.
+        allow read: if true;
+        allow write: if isAdmin();
     }
 
     match /config/{docId} {
