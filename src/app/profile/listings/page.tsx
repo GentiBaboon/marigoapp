@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { collection, query, where } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreProduct, FirestoreOrder } from '@/lib/types';
@@ -57,6 +58,9 @@ function EmptyState() {
 export default function ListingsPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const [sales, setSales] = React.useState<FirestoreOrder[]>([]);
+  const [areSalesLoading, setAreSalesLoading] = React.useState(true);
+
 
   const productsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -65,18 +69,36 @@ export default function ListingsPage() {
   
   const { data: listings, isLoading: areListingsLoading } = useCollection<FirestoreProduct>(productsQuery);
 
-  const salesQuery = useMemoFirebase(() => {
-      if (!user || !firestore) return null;
-      return query(collection(firestore, 'orders'), where('sellerIds', 'array-contains', user.uid));
-  }, [user, firestore]);
-
-  const { data: sales, isLoading: areSalesLoading } = useCollection<FirestoreOrder>(salesQuery);
+  React.useEffect(() => {
+      if (isUserLoading) return;
+      if (!user) {
+          setAreSalesLoading(false);
+          return;
+      }
+      
+      const fetchSales = async () => {
+        setAreSalesLoading(true);
+        const functions = getFunctions();
+        const getMySales = httpsCallable(functions, 'getMySales');
+        try {
+            const result: any = await getMySales();
+            setSales(result.data.sales);
+        } catch (error) {
+            console.error("Error fetching sales via Cloud Function:", error);
+            setSales([]);
+        } finally {
+            setAreSalesLoading(false);
+        }
+      };
+      
+      fetchSales();
+  }, [user, isUserLoading]);
 
   const { active, sold, inactive } = React.useMemo(() => {
     const listingsData = listings || [];
     return {
       active: listingsData.filter(l => l.status === 'active'),
-      sold: sales || [], // Use sales for the sold tab
+      sold: sales || [], // Use sales from state now
       inactive: listingsData.filter(l => !['active', 'sold'].includes(l.status)),
     };
   }, [listings, sales]);

@@ -3,9 +3,9 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { User, HelpCircle } from 'lucide-react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
-import { useUser, useFirestore } from '@/firebase';
+import { useUser } from '@/firebase';
 import type { FirestoreOrder } from '@/lib/types';
 
 import { Button } from '@/components/ui/button';
@@ -64,29 +64,27 @@ function EmptyState() {
 
 export default function OrdersPage() {
   const { user, isUserLoading } = useUser();
-  const firestore = useFirestore();
   const [orders, setOrders] = React.useState<FirestoreOrder[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
-    if (!user || !firestore) {
-        if (!isUserLoading) {
-            setIsLoading(false);
-        }
+    if (isUserLoading) {
+        return;
+    }
+    if (!user) {
+        setIsLoading(false);
         return;
     };
 
     const fetchOrders = async () => {
         setIsLoading(true);
         try {
-            const ordersQuery = query(collection(firestore, 'orders'), where('buyerId', '==', user.uid));
-            const querySnapshot = await getDocs(ordersQuery);
-            const fetchedOrders = querySnapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as FirestoreOrder))
-                .sort((a, b) => b.createdAt.seconds - a.createdAt.seconds); // Sort by newest first
-            setOrders(fetchedOrders);
+            const functions = getFunctions();
+            const getMyOrders = httpsCallable(functions, 'getMyOrders');
+            const result: any = await getMyOrders();
+            setOrders(result.data.orders);
         } catch (error) {
-            console.error("Error fetching orders:", error);
+            console.error("Error fetching orders via Cloud Function:", error);
         } finally {
             setIsLoading(false);
         }
@@ -94,7 +92,7 @@ export default function OrdersPage() {
     
     fetchOrders();
 
-  }, [user, firestore, isUserLoading]);
+  }, [user, isUserLoading]);
 
   const areDataLoading = isUserLoading || isLoading;
   

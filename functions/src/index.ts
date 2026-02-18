@@ -272,6 +272,49 @@ export const processRefund = onCall(async (request) => {
 });
 
 /**
+ * [NEW] getMyOrders
+ * Fetches all orders where the calling user is the buyer.
+ */
+export const getMyOrders = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
+  const {uid: buyerId} = request.auth;
+
+  try {
+    const ordersQuery = db.collection("orders").where("buyerId", "==", buyerId).orderBy("createdAt", "desc");
+    const snapshot = await ordersQuery.get();
+    const orders = snapshot.docs.map((doc) => ({id: doc.id, ...doc.data()}));
+    return {orders};
+  } catch (error) {
+    logger.error(`Error fetching orders for buyer ${buyerId}:`, error);
+    throw new HttpsError("internal", "Could not fetch orders.");
+  }
+});
+
+/**
+ * [NEW] getMySales
+ * Fetches all sales where the calling user is a seller.
+ */
+export const getMySales = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
+  const {uid: sellerId} = request.auth;
+
+  try {
+    const salesQuery = db.collection("orders").where("sellerIds", "array-contains", sellerId).orderBy("createdAt", "desc");
+    const snapshot = await salesQuery.get();
+    const sales = snapshot.docs.map((doc) => ({id: doc.id, ...doc.data()}));
+    return {sales};
+  } catch (error) {
+    logger.error(`Error fetching sales for seller ${sellerId}:`, error);
+    throw new HttpsError("internal", "Could not fetch sales.");
+  }
+});
+
+
+/**
  * 6. releaseEscrow (Scheduled)
  * Automatically releases payments for delivered orders.
  */
