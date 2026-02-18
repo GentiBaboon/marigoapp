@@ -5,6 +5,8 @@ import {onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as logger from "firebase-functions/logger";
 import Stripe from "stripe";
+import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import {VertexAI} from "@google-cloud/vertexai";
 
 // Initialize Firebase Admin SDK
 initializeApp();
@@ -497,3 +499,122 @@ export const getExchangeRates = onSchedule("every 24 hours", async (context) => 
     }
     return null;
 });
+
+// =================================================================
+// AI Functions
+// =================================================================
+
+// Initialize VertexAI
+const vertexAI = new VertexAI({
+  project: process.env.GCLOUD_PROJECT,
+  location: "us-central1",
+});
+
+const generativeModel = vertexAI.getGenerativeModel({
+  model: "gemini-1.5-flash",
+});
+
+export const moderateProductImage = onDocumentCreated("products/{productId}", async (event) => {
+  const snapshot = event.data;
+  if (!snapshot) {
+    logger.info("No data associated with the event");
+    return;
+  }
+  const productData = snapshot.data();
+  const images = productData.images as string[]; // Array of data URIs
+
+  if (!images || images.length === 0) {
+    logger.info(`Product ${snapshot.id} has no images to moderate.`);
+    await snapshot.ref.update({
+      status: "active",
+      moderation: { status: "approved", checkedAt: admin.firestore.FieldValue.serverTimestamp() },
+    });
+    return;
+  }
+
+  let overallModerationResult = "approved";
+  const moderationReasons: string[] = [];
+
+  try {
+    for (const imageString of images) {
+      const base64Data = imageString.split(",")[1];
+      if (!base64Data) continue;
+
+      const imagePart = {
+        inlineData: {
+          data: base64Data,
+          mimeType: imageString.substring(imageString.indexOf(":") + 1, imageString.indexOf(";")),
+        },
+      };
+
+      const request = {
+        contents: [{role: "user", parts: [imagePart]}],
+      };
+
+      const streamingResp = await generativeModel.generateContentStream(request);
+      const response = await streamingResp.response;
+      
+      const safetyRatings = response.candidates?.[0]?.safetyRatings;
+      
+      if (safetyRatings) {
+        for (const rating of safetyRatings) {
+          if (rating.probability === "HIGH" || rating.probability === "MEDIUM") {
+            if (overallModerationResult !== "rejected") {
+              overallModerationResult = "needs_review";
+            }
+            const reason = `Image flagged for ${rating.category} with probability ${rating.probability}.`;
+            if (!moderationReasons.includes(reason)) {
+              moderationReasons.push(reason);
+            }
+            if (rating.probability === "HIGH" && (rating.category === "HARM_CATEGORY_DANGEROUS_CONTENT" || rating.category === "HARM_CATEGORY_SEXUALLY_EXPLICIT")) {
+              overallModerationResult = "rejected";
+            }
+          }
+        }
+      }
+    }
+
+    // Update Firestore document based on moderation results
+    if (overallModerationResult === "rejected") {
+      await snapshot.ref.update({
+        status: "rejected",
+        moderation: {
+          status: "rejected",
+          reasons: moderationReasons,
+          checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      });
+      logger.warn(`Product ${snapshot.id} rejected due to: ${moderationReasons.join(", ")}`);
+    } else if (overallModerationResult === "needs_review") {
+      await snapshot.ref.update({
+        moderation: {
+          status: "needs_review",
+          reasons: moderationReasons,
+          checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      });
+      logger.info(`Product ${snapshot.id} flagged for admin review.`);
+    } else {
+      await snapshot.ref.update({
+        status: "active",
+        moderation: {
+          status: "approved",
+          checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      });
+      logger.info(`Product ${snapshot.id} approved automatically.`);
+    }
+  } catch (error) {
+      logger.error(`Error during image moderation for product ${snapshot.id}:`, error);
+      // Fallback: flag for manual review in case of AI API error
+      await snapshot.ref.update({
+          moderation: {
+              status: "needs_review",
+              reasons: ["AI moderation failed. Please review manually."],
+              checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+      });
+  }
+});
+
+    

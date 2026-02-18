@@ -207,7 +207,7 @@ export const firestoreProductSchema = z.object({
   category: z.string(),
   subCategory: z.string(),
   images: z.array(z.string()),
-  status: z.enum(["active", "sold", "reserved", "pending_review"]),
+  status: z.enum(["active", "sold", "reserved", "pending_review", "rejected"]),
   listingCreated: z.any(),
   keywords: z.array(z.string()).optional(),
   condition: z.string().optional(),
@@ -216,6 +216,11 @@ export const firestoreProductSchema = z.object({
   size: z.string().optional(),
   pattern: z.string().optional(),
   vintage: z.boolean().optional(),
+  moderation: z.object({
+    status: z.enum(["approved", "rejected", "needs_review"]),
+    reasons: z.array(z.string()).optional(),
+    checkedAt: z.any(),
+  }).optional(),
 });
 
 export type FirestoreProduct = z.infer<typeof firestoreProductSchema> & { id: string };
@@ -449,3 +454,5 @@ export const firestoreExchangeRatesSchema = z.object({
   }),
 });
 export type FirestoreExchangeRates = z.infer<typeof firestoreExchangeRatesSchema>;
+
+    

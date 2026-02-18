@@ -83,7 +83,7 @@ export function ReviewStep() {
       category: formData.category || '',
       subCategory: formData.category || '',
       images: formData.images?.map((img) => img.preview) || [],
-      status: 'active',
+      status: 'pending_review',
       listingCreated: serverTimestamp(),
       keywords: keywords,
       brand: formData.brand,
@@ -254,3 +254,5 @@ export function ReviewStep() {
     </div>
   );
 }
+
+    

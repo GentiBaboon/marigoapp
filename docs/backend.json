@@ -151,7 +151,7 @@
         "category": { "type": "string" },
         "subCategory": { "type": "string" },
         "images": { "type": "array", "items": { "type": "string", "format": "uri" } },
-        "status": { "type": "string", "enum": ["active", "sold", "reserved", "pending_review"] },
+        "status": { "type": "string", "enum": ["active", "sold", "reserved", "pending_review", "rejected"] },
         "listingCreated": { "type": "string", "format": "date-time" },
         "keywords": { "type": "array", "items": { "type": "string" }, "description": "Keywords for search." },
         "brand": { "type": "string" },
@@ -160,7 +160,25 @@
         "material": { "type": "string" },
         "color": { "type": "string" },
         "pattern": { "type": "string" },
-        "vintage": { "type": "boolean" }
+        "vintage": { "type": "boolean" },
+        "moderation": {
+            "type": "object",
+            "description": "Image moderation status.",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["approved", "rejected", "needs_review"]
+                },
+                "reasons": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                },
+                "checkedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            }
+        }
       },
       "required": ["sellerId", "title", "price", "category", "images", "status", "listingCreated"]
     },
@@ -604,3 +622,5 @@
     }
   }
 }
+
+    
