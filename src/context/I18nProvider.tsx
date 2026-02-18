@@ -4,7 +4,7 @@ import React, { createContext, useState, useEffect, ReactNode, useCallback, useM
 import { useUser, useFirestore } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
-type Locale = 'sq' | 'en' | 'it';
+export type Locale = 'sq' | 'en' | 'it';
 
 interface I18nContextType {
   locale: Locale;

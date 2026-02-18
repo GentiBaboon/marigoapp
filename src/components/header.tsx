@@ -7,6 +7,7 @@ import { Button } from './ui/button';
 import { Bell, Search, ShoppingCart, ArrowLeft } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { Skeleton } from './ui/skeleton';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 function HeaderContent() {
   const { totalItems } = useCart();
@@ -52,7 +53,8 @@ function HeaderContent() {
           </Link>
         </div>
 
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-0 md:gap-2">
+          <LanguageSwitcher />
           <Button asChild variant="ghost" size="icon" aria-label="Notifications">
             <Link href="/notifications">
               <Bell className="h-6 w-6" />

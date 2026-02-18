@@ -183,15 +183,7 @@ export function UserNav() {
             <DropdownMenuRadioItem value="USD">US Dollar (USD)</DropdownMenuRadioItem>
             <DropdownMenuRadioItem value="ALL">Albanian Lek (ALL)</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
-
-        <DropdownMenuSeparator />
-
-        <DropdownMenuItem disabled>
-          <span role="img" aria-label="Italian flag" className="mr-2">
-            🇮🇹
-          </span>
-          <span>Italy (€ EUR) • English UK</span>
-        </DropdownMenuItem>
+        
       </DropdownMenuContent>
     </DropdownMenu>
   );
