@@ -53,6 +53,7 @@ export const firestoreUserSchema = z.object({
   email: z.string().email().optional().nullable(),
   photoURL: z.string().url().optional().nullable(),
   macroCategoryPreference: z.enum(["womenswear", "menswear"]).optional(),
+  language: z.string().optional(),
   hasAcceptedChatRules: z.boolean().optional(),
   isSeller: z.boolean().optional(),
   createdAt: z.any().optional(),

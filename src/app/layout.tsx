@@ -9,6 +9,7 @@ import { CartProvider } from '@/context/CartContext';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { ShoppingPreferenceModal } from '@/components/home/ShoppingPreferenceModal';
 import { DownloadAppBanner } from '@/components/home/DownloadAppBanner';
+import { I18nProvider } from '@/context/I18nProvider';
 
 export const metadata: Metadata = {
   title: 'MarigoApp',
@@ -40,18 +41,20 @@ export default function RootLayout({
       </head>
       <body className={cn('font-body antialiased')}>
         <FirebaseClientProvider>
-          <CartProvider>
-            <WishlistProvider>
-              <div className="relative flex min-h-screen flex-col">
-                <Header />
-                <main className="flex-1 pb-16 md:pb-0">{children}</main>
-                <MobileNav />
-                <ShoppingPreferenceModal />
-                <DownloadAppBanner />
-              </div>
-              <Toaster />
-            </WishlistProvider>
-          </CartProvider>
+          <I18nProvider>
+            <CartProvider>
+              <WishlistProvider>
+                <div className="relative flex min-h-screen flex-col">
+                  <Header />
+                  <main className="flex-1 pb-16 md:pb-0">{children}</main>
+                  <MobileNav />
+                  <ShoppingPreferenceModal />
+                  <DownloadAppBanner />
+                </div>
+                <Toaster />
+              </WishlistProvider>
+            </CartProvider>
+          </I18nProvider>
         </FirebaseClientProvider>
       </body>
     </html>

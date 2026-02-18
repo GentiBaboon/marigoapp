@@ -27,6 +27,11 @@
           ],
           "description": "The user's preferred shopping category."
         },
+        "language": {
+          "type": "string",
+          "enum": ["sq", "en", "it"],
+          "description": "The user's preferred language."
+        },
         "hasAcceptedChatRules": {
           "type": "boolean",
           "description": "Whether the user has accepted the chat rules."

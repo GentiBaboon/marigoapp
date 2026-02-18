@@ -3,12 +3,14 @@
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useI18n } from '@/hooks/use-i18n';
 
 export default function LanguagePickerPage() {
   const router = useRouter();
+  const { setLocale, t } = useI18n();
 
-  const handleLanguageSelect = (language: string) => {
-    localStorage.setItem('marigo_language', language);
+  const handleLanguageSelect = (language: 'sq' | 'en' | 'it') => {
+    setLocale(language);
     router.push('/welcome');
   };
 
@@ -17,7 +19,7 @@ export default function LanguagePickerPage() {
       <Card className="w-full max-w-md mx-auto">
         <CardHeader className="text-center">
           <CardTitle className="font-headline text-3xl">
-            Choose Your Language
+            {t('LanguagePicker.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -27,21 +29,21 @@ export default function LanguagePickerPage() {
               className="w-full"
               onClick={() => handleLanguageSelect('sq')}
             >
-              Shqip (Albanian)
+              {t('LanguagePicker.albanian')}
             </Button>
             <Button
               size="lg"
               className="w-full"
               onClick={() => handleLanguageSelect('en')}
             >
-              English
+              {t('LanguagePicker.english')}
             </Button>
             <Button
               size="lg"
               className="w-full"
               onClick={() => handleLanguageSelect('it')}
             >
-              Italiano (Italian)
+              {t('LanguagePicker.italian')}
             </Button>
           </div>
         </CardContent>
