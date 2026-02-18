@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
-import { NewListingsSection } from '@/components/home/NewArrivalsSection';
+import { NewArrivalsSection } from '@/components/home/NewArrivalsSection';
 import { RecentlyViewedSection } from '@/components/home/RecentlyViewedSection';
 import { PersonalizedPicks } from '@/components/home/PersonalizedPicks';
 
@@ -24,7 +24,7 @@ export default function HomePage() {
       <div className="container mx-auto px-4 py-8 md:py-12 space-y-12">
         <PersonalizedPicks />
         <RecentlyViewedSection />
-        <NewListingsSection />
+        <NewArrivalsSection />
       </div>
     </div>
   );

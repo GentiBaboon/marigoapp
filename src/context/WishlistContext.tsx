@@ -40,6 +40,7 @@ export const WishlistProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [router]);
 
     const addToWishlist = useCallback(async (productId: string) => {
+        if (isUserLoading) return; // Prevent action while auth state is resolving
         if (!user || !firestore) {
             handleAuthRedirect();
             return;
@@ -64,9 +65,10 @@ export const WishlistProvider: React.FC<{ children: ReactNode }> = ({ children }
                 description: 'Could not add to favorites.',
             });
         }
-    }, [user, firestore, handleAuthRedirect, toast]);
+    }, [user, isUserLoading, firestore, handleAuthRedirect, toast]);
 
     const removeFromWishlist = useCallback(async (productId: string) => {
+        if (isUserLoading) return; // Prevent action while auth state is resolving
         if (!user || !firestore) {
             handleAuthRedirect();
             return;
@@ -90,7 +92,7 @@ export const WishlistProvider: React.FC<{ children: ReactNode }> = ({ children }
                 description: 'Could not remove from favorites.',
             });
         }
-    }, [user, firestore, handleAuthRedirect, toast]);
+    }, [user, isUserLoading, firestore, handleAuthRedirect, toast]);
 
     const isFavorite = useCallback((productId: string) => {
         return favoriteIds.has(productId);

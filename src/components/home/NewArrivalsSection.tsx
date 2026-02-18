@@ -22,7 +22,7 @@ function ProductCardSkeleton() {
     )
 }
 
-export function NewListingsSection() {
+export function NewArrivalsSection() {
   const firestore = useFirestore();
 
   const productsQuery = useMemoFirebase(() => {
@@ -44,7 +44,7 @@ export function NewListingsSection() {
   return (
     <section>
         <h2 className="text-xl md:text-2xl font-serif mb-6">
-            New Listings
+            New Arrivals
         </h2>
 
         {isLoading ? (
