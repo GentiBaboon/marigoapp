@@ -299,3 +299,159 @@ export const releaseEscrow = onSchedule("every 1 hours", async () => {
 
   await Promise.all(promises);
 });
+
+
+// =================================================================
+// Delivery & Courier Functions
+// =================================================================
+
+/**
+ * [NEW] calculateDeliveryFee
+ * Calculates a delivery fee based on distance.
+ * NOTE: This is a placeholder. A real implementation would use the
+ * Google Maps Distance Matrix API and require an API key.
+ */
+export const calculateDeliveryFee = onCall(async (request) => {
+  const {distanceKm, isRush} = request.data; // distance in kilometers
+  if (typeof distanceKm !== "number") {
+    throw new HttpsError("invalid-argument", "Distance must be a number.");
+  }
+
+  const BASE_FEE = 3.00; // EUR
+  const PER_KM_FEE = 0.50; // EUR
+  const RUSH_MULTIPLIER = 1.5;
+
+  let fee = BASE_FEE + (distanceKm * PER_KM_FEE);
+  if (isRush) {
+    fee *= RUSH_MULTIPLIER;
+  }
+
+  return {fee: parseFloat(fee.toFixed(2))};
+});
+
+/**
+ * [NEW] assignCourier
+ * Finds an available courier and assigns them to a delivery.
+ * NOTE: This is a simplified version. A real implementation would use
+ * geospatial queries (e.g., with GeoFire) to find the *nearest* courier.
+ */
+export const assignCourier = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be an admin.");
+  }
+  // TODO: Add admin role check
+  const {deliveryId} = request.data;
+  if (!deliveryId) {
+    throw new HttpsError("invalid-argument", "deliveryId is required.");
+  }
+
+  try {
+    const availableCouriersSnap = await db.collection("courier_profiles")
+      .where("isAvailable", "==", true)
+      .limit(1) // Get the first available courier
+      .get();
+
+    if (availableCouriersSnap.empty) {
+      throw new HttpsError("not-found", "No available couriers found.");
+    }
+
+    const courier = availableCouriersSnap.docs[0];
+    const courierId = courier.id;
+
+    await db.doc(`deliveries/${deliveryId}`).update({
+      courierId: courierId,
+      status: "assigned",
+    });
+
+    // TODO: Add notification logic to inform the courier.
+
+    logger.info(`Assigned courier ${courierId} to delivery ${deliveryId}`);
+    return {success: true, courierId};
+  } catch (error) {
+    logger.error("Error assigning courier:", error);
+    throw new HttpsError("internal", "Could not assign courier.");
+  }
+});
+
+
+/**
+ * [NEW] updateCourierLocation
+ * Updates the courier's real-time location on a delivery document.
+ */
+export const updateCourierLocation = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be a courier.");
+  }
+  const {deliveryId, latitude, longitude} = request.data;
+  const courierId = request.auth.uid;
+
+  if (!deliveryId || typeof latitude !== "number" || typeof longitude !== "number") {
+    throw new HttpsError("invalid-argument", "Missing required parameters.");
+  }
+
+  const deliveryRef = db.doc(`deliveries/${deliveryId}`);
+  const deliverySnap = await deliveryRef.get();
+
+  if (!deliverySnap.exists || deliverySnap.data()?.courierId !== courierId) {
+    throw new HttpsError("permission-denied", "You are not assigned to this delivery.");
+  }
+
+  try {
+    await deliveryRef.update({
+      currentLocation: new admin.firestore.GeoPoint(latitude, longitude),
+    });
+    return {success: true};
+  } catch (error) {
+    logger.error("Error updating location:", error);
+    throw new HttpsError("internal", "Could not update location.");
+  }
+});
+
+/**
+ * [NEW] completeDelivery
+ * Finalizes a delivery, saves proof, and updates status.
+ */
+export const completeDelivery = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be a courier.");
+  }
+
+  const {deliveryId, proofOfDeliveryUrl, notes, buyerSignatureUrl} = request.data;
+  const courierId = request.auth.uid;
+
+  if (!deliveryId || !proofOfDeliveryUrl) {
+    throw new HttpsError("invalid-argument", "Missing deliveryId or proofOfDeliveryUrl.");
+  }
+
+  const deliveryRef = db.doc(`deliveries/${deliveryId}`);
+  const deliverySnap = await deliveryRef.get();
+
+  if (!deliverySnap.exists || deliverySnap.data()?.courierId !== courierId) {
+    throw new HttpsError("permission-denied", "You are not assigned to this delivery.");
+  }
+
+  try {
+    await deliveryRef.update({
+      status: "delivered",
+      deliveredAt: admin.firestore.FieldValue.serverTimestamp(),
+      proofOfDelivery: proofOfDeliveryUrl,
+      notes: notes || null,
+      buyerSignature: buyerSignatureUrl || null,
+    });
+    
+    // Also update the main order status
+    const orderId = deliverySnap.data()?.orderId;
+    if (orderId) {
+        await db.doc(`orders/${orderId}`).update({
+            status: "delivered",
+            deliveredAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+    }
+
+    logger.info(`Delivery ${deliveryId} completed by courier ${courierId}.`);
+    return {success: true};
+  } catch (error) {
+    logger.error("Error completing delivery:", error);
+    throw new HttpsError("internal", "Could not complete delivery.");
+  }
+});
