@@ -16,28 +16,30 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { useI18n } from '@/hooks/use-i18n';
 
 export default function WelcomePage() {
   const [api, setApi] = React.useState<CarouselApi>();
   const [current, setCurrent] = React.useState(0);
   const [count, setCount] = React.useState(0);
   const router = useRouter();
+  const { t } = useI18n();
 
   const slides = [
     {
       id: 'welcome-1',
-      title: 'Discover Luxury',
-      description: 'Explore a curated selection of authentic luxury fashion.',
+      title: t('Welcome.slide1Title'),
+      description: t('Welcome.slide1Description'),
     },
     {
       id: 'welcome-2',
-      title: 'Buy & Sell with Ease',
-      description: 'Your trusted marketplace for pre-loved treasures.',
+      title: t('Welcome.slide2Title'),
+      description: t('Welcome.slide2Description'),
     },
     {
       id: 'welcome-3',
-      title: 'Join the Community',
-      description: 'Connect with fashion lovers across Albania and Europe.',
+      title: t('Welcome.slide3Title'),
+      description: t('Welcome.slide3Description'),
     },
   ];
 
@@ -114,9 +116,10 @@ export default function WelcomePage() {
           className="w-full max-w-xs animate-in fade-in duration-500"
           onClick={handleGetStarted}
         >
-          Get Started
+          {t('Welcome.getStarted')}
         </Button>
       )}
     </div>
   );
 }
+    
