@@ -12,6 +12,8 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { FirestoreOrder } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/hooks/use-i18n';
+import { translateText } from '@/ai/flows/translate-text';
 
 const reviewSchema = z.object({
   rating: z.number().min(1, 'Please select a rating.'),
@@ -54,6 +56,7 @@ export function ReviewForm({ order }: ReviewFormProps) {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { locale } = useI18n();
   
   const form = useForm<ReviewFormValues>({
     resolver: zodResolver(reviewSchema),
@@ -64,17 +67,19 @@ export function ReviewForm({ order }: ReviewFormProps) {
     if (!user || !firestore || order.sellerIds.length === 0) return;
     setIsSubmitting(true);
 
-    const reviewData = {
-        orderId: order.id,
-        productId: order.items[0].productId, // Assuming review is for the first item for now
-        reviewerId: user.uid,
-        revieweeId: order.sellerIds[0], // Assuming single seller for now
-        rating: data.rating,
-        content: data.content,
-        createdAt: serverTimestamp(),
-    };
-
     try {
+        const translatedContent = await translateText({ text: data.content, sourceLanguage: locale });
+
+        const reviewData = {
+            orderId: order.id,
+            productId: order.items[0].productId, // Assuming review is for the first item for now
+            reviewerId: user.uid,
+            revieweeId: order.sellerIds[0], // Assuming single seller for now
+            rating: data.rating,
+            content: translatedContent,
+            createdAt: serverTimestamp(),
+        };
+
         await addDoc(collection(firestore, 'reviews'), reviewData);
         toast({
             title: 'Review Submitted!',
@@ -87,7 +92,7 @@ export function ReviewForm({ order }: ReviewFormProps) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: 'reviews',
             operation: 'create',
-            requestResourceData: reviewData,
+            requestResourceData: { error: 'data too large to display' },
         }));
         toast({
             variant: 'destructive',

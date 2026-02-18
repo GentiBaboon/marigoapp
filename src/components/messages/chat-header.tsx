@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '../ui/button';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { useI18n } from '@/hooks/use-i18n';
+import type { LocalizedString } from '@/lib/types';
 
 interface ChatHeaderProps {
     user: {
@@ -14,15 +16,17 @@ interface ChatHeaderProps {
     };
     product: {
         id: string;
-        title: string;
+        title: string | LocalizedString;
         image: string;
     }
 }
 
 export function ChatHeader({ user, product }: ChatHeaderProps) {
+    const { l } = useI18n();
 
     const productImage = PlaceHolderImages.find((p) => p.id === product.image);
     const imageUrl = productImage?.imageUrl || product.image;
+    const displayTitle = l(product.title);
 
     return (
         <div className="flex items-center p-2 border-b">
@@ -38,12 +42,12 @@ export function ChatHeader({ user, product }: ChatHeaderProps) {
                 </Avatar>
                 <div className="grid gap-0.5">
                     <p className="font-semibold">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">Replying about: {product.title}</p>
+                    <p className="text-xs text-muted-foreground">Replying about: {displayTitle}</p>
                 </div>
             </div>
             <Link href={`/products/${product.id}`} className="ml-auto flex items-center gap-2">
                  <div className="relative h-10 w-10 flex-shrink-0 bg-muted rounded-md overflow-hidden">
-                    <Image src={imageUrl} alt={product.title} fill className="object-cover" sizes="40px" />
+                    <Image src={imageUrl} alt={displayTitle} fill className="object-cover" sizes="40px" />
                 </div>
             </Link>
         </div>

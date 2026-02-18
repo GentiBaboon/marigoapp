@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, useAuth } from '@/firebase';
-import type { FirestoreUser, FirestoreReview, FirestoreCourierProfile } from '@/lib/types';
+import type { FirestoreUser, FirestoreReview } from '@/lib/types';
 import { StatCard } from '@/components/admin/stat-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { signOutUser } from '@/firebase/auth/actions';
 import { useToast } from '@/hooks/use-toast';
+import { useI18n } from '@/hooks/use-i18n';
 
 const getInitials = (name?: string | null) => {
   if (!name) return 'U';
@@ -25,6 +26,7 @@ const getInitials = (name?: string | null) => {
 
 function ReviewItem({ review }: { review: FirestoreReview }) {
   const firestore = useFirestore();
+  const { l } = useI18n();
   const reviewerRef = useMemoFirebase(() => doc(firestore, 'users', review.reviewerId), [firestore, review.reviewerId]);
   const { data: reviewer } = useDoc<FirestoreUser>(reviewerRef);
 
@@ -44,7 +46,7 @@ function ReviewItem({ review }: { review: FirestoreReview }) {
                     <Star key={i} className={`h-4 w-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
                 ))}
             </div>
-            <p className="text-sm text-muted-foreground">{review.content}</p>
+            <p className="text-sm text-muted-foreground">{l(review.content)}</p>
         </div>
     </div>
   );

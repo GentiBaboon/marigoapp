@@ -12,6 +12,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { ShoppingCart, Trash2 } from 'lucide-react';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
+import { useI18n } from '@/hooks/use-i18n';
 
 const currencyFormatter = (value: number) => {
     return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
@@ -27,6 +28,7 @@ export default function CartPage() {
     } = useCart();
     const router = useRouter();
     const { user, isUserLoading } = useUser();
+    const { l } = useI18n();
     
     React.useEffect(() => {
         if (!isUserLoading && !user) {
@@ -68,14 +70,14 @@ export default function CartPage() {
                             <Card className="overflow-hidden">
                                 <CardContent className="p-4 flex gap-4">
                                     <div className="relative h-32 w-28 flex-shrink-0">
-                                        {item.image && <Image src={item.image} alt={item.title} fill className="object-cover rounded-md" sizes="112px" />}
+                                        {item.image && <Image src={item.image} alt={l(item.title)} fill className="object-cover rounded-md" sizes="112px" />}
                                     </div>
                                     <div className="flex-1 space-y-1">
                                         <div className="flex justify-between">
                                             <p className="font-bold uppercase text-sm">{item.brand}</p>
                                             <p className="font-bold">{currencyFormatter(item.price)}</p>
                                         </div>
-                                        <p>{item.title}</p>
+                                        <p>{l(item.title)}</p>
                                         <p className="text-sm text-muted-foreground">Size: {item.selectedSize || 'M'}</p>
                                         <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
                                          <Button variant="link" className="text-destructive h-auto p-0 text-sm font-normal" onClick={() => removeFromCart(item.id)}>

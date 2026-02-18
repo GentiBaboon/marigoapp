@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+export const localizedStringSchema = z.object({
+  sq: z.string(),
+  en: z.string(),
+  it: z.string(),
+});
+export type LocalizedString = z.infer<typeof localizedStringSchema>;
+
 export const priceSuggestionSchema = z.object({
   category: z.string().min(3, "Category must be at least 3 characters long."),
   brand: z.string().min(2, "Brand must be at least 2 characters long."),
@@ -200,9 +207,9 @@ export type FirestoreCourierProfile = z.infer<typeof firestoreCourierProfileSche
 
 export const firestoreProductSchema = z.object({
   sellerId: z.string(),
-  title: z.string(),
+  title: localizedStringSchema,
   brand: z.string(),
-  description: z.string(),
+  description: localizedStringSchema,
   price: z.number(),
   category: z.string(),
   subCategory: z.string(),
@@ -257,7 +264,7 @@ export type FirestoreOffer = z.infer<typeof firestoreOfferSchema> & { id: string
 const orderItemSchema = z.object({
   productId: z.string(),
   sellerId: z.string(),
-  title: z.string(),
+  title: z.union([z.string(), localizedStringSchema]),
   brand: z.string(),
   image: z.string(),
   price: z.number(),
@@ -346,7 +353,7 @@ export const firestoreConversationSchema = z.object({
     avatar: z.string().optional(),
   })),
   productId: z.string(),
-  productTitle: z.string(),
+  productTitle: localizedStringSchema,
   productImage: z.string(),
   lastMessage: z.string().optional(),
   lastMessageAt: z.any(),
@@ -361,8 +368,8 @@ export const firestoreReviewSchema = z.object({
   reviewerId: z.string(), // The one writing the review (buyer)
   revieweeId: z.string(), // The one being reviewed (seller)
   rating: z.number().min(1).max(5),
-  title: z.string().optional(),
-  content: z.string().min(10, "Review must be at least 10 characters long."),
+  title: localizedStringSchema.optional(),
+  content: localizedStringSchema,
   createdAt: z.any(),
 });
 export type FirestoreReview = z.infer<typeof firestoreReviewSchema> & { id: string };

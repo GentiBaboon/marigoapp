@@ -3,6 +3,7 @@
 import React, { createContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useUser, useFirestore } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { type LocalizedString } from '@/lib/types';
 
 export type Locale = 'sq' | 'en' | 'it';
 
@@ -10,6 +11,7 @@ interface I18nContextType {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   t: (key: string) => string;
+  l: (field: LocalizedString | string | undefined) => string;
 }
 
 export const I18nContext = createContext<I18nContextType | undefined>(undefined);
@@ -43,6 +45,13 @@ export const I18nProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const savedLocale = getCookie('marigo_language') as Locale | undefined;
     if (savedLocale && ['sq', 'en', 'it'].includes(savedLocale)) {
       setLocaleState(savedLocale);
+    } else if (typeof navigator !== 'undefined') {
+        const browserLang = navigator.language.split('-')[0] as Locale;
+        if (['sq', 'en', 'it'].includes(browserLang)) {
+            setLocaleState(browserLang);
+        } else {
+            setLocaleState('sq'); // Default
+        }
     }
   }, []);
 
@@ -86,8 +95,14 @@ export const I18nProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     return typeof result === 'string' ? result : key;
   }, [translations]);
+  
+  const l = useCallback((field: LocalizedString | string | undefined): string => {
+    if (!field) return '';
+    if (typeof field === 'string') return field;
+    return field[locale] || field.en || field.sq || '';
+  }, [locale]);
 
-  const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
+  const value = useMemo(() => ({ locale, setLocale, t, l }), [locale, setLocale, t, l]);
 
   return (
     <I18nContext.Provider value={value}>

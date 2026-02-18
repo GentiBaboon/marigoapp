@@ -3,10 +3,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import type { Product } from '@/lib/mock-data';
 import { useToast } from '@/hooks/use-toast';
+import { LocalizedString } from '@/lib/types';
 
 export type ShippingMethod = 'direct' | 'authentication';
 
-export type CartItem = Product & {
+// Update CartItem to handle multilingual titles
+export type CartItem = Omit<Product, 'title'> & {
+    title: string | LocalizedString;
     quantity: number;
     selectedSize?: string;
     selectedColor?: string;
@@ -18,7 +21,7 @@ export type CartItem = Product & {
 
 interface CartContextType {
     items: CartItem[];
-    addToCart: (product: Product, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => void;
+    addToCart: (product: Omit<Product, 'title'> & { title: string | LocalizedString }, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => void;
     removeFromCart: (itemId: string) => void;
     updateQuantity: (itemId: string, quantity: number) => void;
     clearCart: () => void;
@@ -53,7 +56,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         localStorage.setItem('marigo_cart', JSON.stringify(items));
     }, [items]);
 
-    const addToCart = useCallback((product: Product, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => {
+    const addToCart = useCallback((product: Omit<Product, 'title'> & { title: string | LocalizedString }, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => {
         setItems(prevItems => {
             const existingItem = prevItems.find(item => item.id === product.id);
             const quantity = options?.quantity || 1;
@@ -77,9 +80,10 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 return [...prevItems, newItem];
             }
         });
+        const titleText = typeof product.title === 'string' ? product.title : product.title.en;
         toast({
             title: "Added to Cart",
-            description: `${product.title} has been added to your shopping bag.`,
+            description: `${titleText} has been added to your shopping bag.`,
         });
     }, [toast]);
 

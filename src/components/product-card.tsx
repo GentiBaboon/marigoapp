@@ -9,15 +9,18 @@ import { Badge } from '@/components/ui/badge';
 import { useWishlist } from '@/context/WishlistContext';
 import React from 'react';
 import { useCurrency } from '@/context/CurrencyContext';
+import { useI18n } from '@/hooks/use-i18n';
+import type { LocalizedString } from '@/lib/types';
 
 interface ProductCardProps {
-  product: Product;
+  product: Product & { title: string | LocalizedString };
   className?: string;
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
   const { isFavorite, addToWishlist, removeFromWishlist } = useWishlist();
   const { formatPrice } = useCurrency();
+  const { l } = useI18n();
   const favorite = isFavorite(product.id);
 
   let imageUrl: string | undefined;
@@ -46,6 +49,8 @@ export function ProductCard({ product, className }: ProductCardProps) {
       }
   }
 
+  const displayTitle = l(product.title);
+
   return (
     <div className={cn('group', className)}>
       <Link href={`/products/${product.id}`} className="block mb-2">
@@ -53,7 +58,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
           {imageUrl ? (
             <Image
               src={imageUrl}
-              alt={product.title}
+              alt={displayTitle}
               fill
               sizes="(max-width: 768px) 50vw, 33vw"
               className="object-cover"
@@ -71,7 +76,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
         <div className="flex justify-between items-start">
           <div className="text-sm">
             <p className="font-bold uppercase">{product.brand}</p>
-            <p className="text-muted-foreground">{product.title}</p>
+            <p className="text-muted-foreground">{displayTitle}</p>
             {product.size && (
               <p className="text-muted-foreground">{product.size}</p>
             )}

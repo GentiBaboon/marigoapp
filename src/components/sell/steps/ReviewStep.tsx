@@ -14,6 +14,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { FirestoreProduct, FirestoreAddress } from '@/lib/types';
+import { useI18n } from '@/hooks/use-i18n';
+import { translateText } from '@/ai/flows/translate-text';
 
 // Helper component for each review section
 const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode; }) => (
@@ -45,6 +47,7 @@ export function ReviewStep() {
   const router = useRouter();
   const { user } = useUser();
   const firestore = useFirestore();
+  const { locale } = useI18n();
   const [selectedAddress, setSelectedAddress] = useState<FirestoreAddress | null>(null);
 
   const addressesCollection = useMemoFirebase(() => {
@@ -73,52 +76,55 @@ export function ReviewStep() {
     }
     setIsLoading(true);
 
-    const keywords = Array.from(new Set((formData.title || '').toLowerCase().split(' ').filter(Boolean)));
+    try {
+        const [translatedTitle, translatedDescription] = await Promise.all([
+            translateText({ text: formData.title || '', sourceLanguage: locale }),
+            translateText({ text: formData.description || '', sourceLanguage: locale })
+        ]);
 
-    const listingData: Partial<Omit<FirestoreProduct, 'id'>> & { listingCreated: any } = {
-      sellerId: user.uid,
-      title: formData.title || '',
-      description: formData.description || '',
-      price: formData.price || 0,
-      category: formData.category || '',
-      subCategory: formData.category || '',
-      images: formData.images?.map((img) => img.preview) || [],
-      status: 'pending_review',
-      listingCreated: serverTimestamp(),
-      keywords: keywords,
-      brand: formData.brand,
-      size: formData.sizeValue ? `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() : undefined,
-      condition: formData.condition,
-      material: formData.material,
-      color: formData.color,
-      pattern: formData.pattern,
-      vintage: formData.vintage,
-    };
+        const keywords = Array.from(new Set((formData.title || '').toLowerCase().split(' ').filter(Boolean)));
 
-    // Remove undefined fields
-    Object.keys(listingData).forEach(key => listingData[key as keyof typeof listingData] === undefined && delete listingData[key as keyof typeof listingData]);
+        const listingData: Partial<Omit<FirestoreProduct, 'id'>> & { listingCreated: any } = {
+            sellerId: user.uid,
+            title: translatedTitle,
+            description: translatedDescription,
+            price: formData.price || 0,
+            category: formData.category || '',
+            subCategory: formData.category || '',
+            images: formData.images?.map((img) => img.preview) || [],
+            status: 'pending_review',
+            listingCreated: serverTimestamp(),
+            keywords: keywords,
+            brand: formData.brand,
+            size: formData.sizeValue ? `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() : undefined,
+            condition: formData.condition,
+            material: formData.material,
+            color: formData.color,
+            pattern: formData.pattern,
+            vintage: formData.vintage,
+        };
 
+        // Remove undefined fields
+        Object.keys(listingData).forEach(key => listingData[key as keyof typeof listingData] === undefined && delete listingData[key as keyof typeof listingData]);
 
-    addDoc(collection(firestore, "products"), listingData)
-        .then(docRef => {
-            nextStep();
-        })
-        .catch(error => {
-            const permissionError = new FirestorePermissionError({
-                path: 'products',
-                operation: 'create',
-                requestResourceData: listingData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-            toast({
-                variant: 'destructive',
-                title: 'Publishing Failed',
-                description: 'There was a problem publishing your listing. Please try again.',
-            });
-        })
-        .finally(() => {
-            setIsLoading(false);
+        await addDoc(collection(firestore, "products"), listingData);
+        nextStep();
+
+    } catch (error) {
+        const permissionError = new FirestorePermissionError({
+            path: 'products',
+            operation: 'create',
+            requestResourceData: { error: 'data too large to display'},
         });
+        errorEmitter.emit('permission-error', permissionError);
+        toast({
+            variant: 'destructive',
+            title: 'Publishing Failed',
+            description: 'There was a problem publishing your listing. Please try again.',
+        });
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const handleSaveDraft = () => {

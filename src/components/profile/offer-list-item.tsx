@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useCurrency } from '@/context/CurrencyContext';
+import { useI18n } from '@/hooks/use-i18n';
 
 const statusStyles: { [key: string]: string } = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -23,8 +24,11 @@ const statusStyles: { [key: string]: string } = {
 export function OfferListItem({ offer }: { offer: OfferWithProduct }) {
     const { product } = offer;
     const { formatPrice } = useCurrency();
+    const { l } = useI18n();
+
     const imageUrl = product.images?.[0] || 'https://placehold.co/96x96/E2E8F0/A0AEC0?text=MARIGO';
-    const imageAlt = product.title;
+    const displayTitle = l(product.title);
+    const imageAlt = displayTitle;
 
     const getStatusLabel = (status: string) => {
         return status.charAt(0).toUpperCase() + status.slice(1);
@@ -37,7 +41,7 @@ export function OfferListItem({ offer }: { offer: OfferWithProduct }) {
             <div className="flex flex-col gap-4 rounded-lg border p-4 hover:bg-muted/50 transition-colors">
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <div>
-                        <span className="font-semibold text-foreground">Offer for {product.title}</span>
+                        <span className="font-semibold text-foreground">Offer for {displayTitle}</span>
                     </div>
                     <Badge className={cn(statusVariant)}>{getStatusLabel(offer.status)}</Badge>
                 </div>

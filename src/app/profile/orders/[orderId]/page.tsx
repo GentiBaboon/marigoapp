@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { OrderTimeline } from '@/components/profile/order-timeline';
 import { useParams } from 'next/navigation';
 import { DeliveryTracking } from '@/components/tracking/DeliveryTracking';
+import { useI18n } from '@/hooks/use-i18n';
 
 function OrderDetailsSkeleton() {
     return (
@@ -52,6 +53,7 @@ export default function OrderDetailsPage() {
     const params = useParams();
     const orderId = params.orderId as string;
     const firestore = useFirestore();
+    const { l } = useI18n();
 
     const orderRef = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -86,6 +88,7 @@ export default function OrderDetailsPage() {
     }
 
     const item = order.items[0];
+    const displayTitle = l(item.title);
 
     return (
         <div className="bg-muted/40 min-h-screen">
@@ -94,11 +97,11 @@ export default function OrderDetailsPage() {
                     <h1 className="font-semibold text-lg mb-4">Ref #{order.orderNumber}</h1>
                     <div className="flex gap-4 items-center">
                         <div className="relative h-16 w-16 rounded-md bg-muted flex-shrink-0">
-                            <Image src={item.image} alt={item.title} fill className="object-cover rounded-md" sizes="64px" />
+                            <Image src={item.image} alt={displayTitle} fill className="object-cover rounded-md" sizes="64px" />
                         </div>
                         <div>
                             <p className="font-bold text-lg uppercase">{item.brand}</p>
-                            <p>{item.title}</p>
+                            <p>{displayTitle}</p>
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
                                 <PackageCheck className="h-4 w-4" />
                                 Direct Shipping

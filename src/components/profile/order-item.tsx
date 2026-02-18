@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrency } from '@/context/CurrencyContext';
+import { useI18n } from '@/hooks/use-i18n';
 
 // A new sub-component to fetch and display the seller's name
 const SellerInfo = ({ sellerId }: { sellerId: string }) => {
@@ -51,9 +52,12 @@ type OrderItemProps = {
 
 export function OrderItem({ order }: OrderItemProps) {
   const { formatPrice } = useCurrency();
+  const { l } = useI18n();
+
   const firstItem = order.items[0];
   const imageUrl = firstItem.image;
-  const imageAlt = firstItem.title;
+  const displayTitle = l(firstItem.title);
+  const imageAlt = displayTitle;
   // Assuming a single seller for simplicity as per the current data model for items.
   const sellerId = firstItem.sellerId; 
 
@@ -93,7 +97,7 @@ export function OrderItem({ order }: OrderItemProps) {
                 </div>
                 <div className="flex-1 space-y-0.5">
                     <h3 className="font-bold text-lg uppercase">{firstItem.brand}</h3>
-                    <p className="text-sm text-muted-foreground">{firstItem.title}</p>
+                    <p className="text-sm text-muted-foreground">{displayTitle}</p>
                     {sellerId && <SellerInfo sellerId={sellerId} />}
                 </div>
                 <ChevronRight className="h-6 w-6 text-muted-foreground transition-transform group-hover:translate-x-1" />

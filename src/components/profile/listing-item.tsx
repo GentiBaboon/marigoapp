@@ -25,6 +25,7 @@ import {
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useCurrency } from '@/context/CurrencyContext';
+import { useI18n } from '@/hooks/use-i18n';
 
 const statusStyles = {
   active: 'bg-green-100 text-green-800 border-green-200',
@@ -39,10 +40,12 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
   const isSale = !!order;
   const firestore = useFirestore();
   const { formatPrice } = useCurrency();
+  const { l } = useI18n();
 
   const itemData = isSale ? order.items[0] : product!;
   const imageUrl = isSale ? order.items[0].image : (product?.images?.[0] || PlaceHolderImages.find(p => p.id === 'product-1')?.imageUrl || '/placeholder.png');
-  const imageAlt = itemData.title || 'Product image';
+  const displayTitle = l(itemData.title);
+  const imageAlt = displayTitle || 'Product image';
   
   const link = isSale ? `/profile/listings/sales/${order.id}` : `/products/${product!.id}`;
   const status = isSale ? order.status : product!.status;
@@ -83,7 +86,7 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
           <div className="flex items-start justify-between">
               <div>
                   <p className="text-sm font-medium text-muted-foreground">{product?.category || 'Sale'}</p>
-                  <h3 className="font-semibold text-foreground leading-tight">{itemData.title}</h3>
+                  <h3 className="font-semibold text-foreground leading-tight">{displayTitle}</h3>
               </div>
               <Badge className={cn(statusStyles[statusVariant])}>
                   {getStatusLabel(status)}
