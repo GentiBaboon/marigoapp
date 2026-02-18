@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreProduct } from '@/lib/types';
 import type { Product } from '@/lib/mock-data';
@@ -29,16 +29,19 @@ export function NewArrivalsSection() {
     if (!firestore) return null;
     return query(
       collection(firestore, 'products'),
-      where('status', '==', 'active'),
       orderBy('listingCreated', 'desc'),
-      limit(10)
+      limit(20) // Fetch more to filter on the client
     );
   }, [firestore]);
 
   const { data: products, isLoading } = useCollection<FirestoreProduct>(productsQuery);
+  
+  const activeProducts = React.useMemo(() => {
+    return products?.filter(p => p.status === 'active').slice(0, 10) || [];
+  }, [products]);
 
-  if (!isLoading && (!products || products.length === 0)) {
-    return null; // Hide the block if no new products exist
+  if (!isLoading && activeProducts.length === 0) {
+    return null; // Hide the block if no active new products exist
   }
 
   return (
@@ -59,7 +62,7 @@ export function NewArrivalsSection() {
              <>
                 <ScrollArea>
                     <div className="flex space-x-4 pb-4">
-                        {products?.map((p) => {
+                        {activeProducts.map((p) => {
                             const productForCard: Product = {
                                 id: p.id,
                                 brand: p.brand,

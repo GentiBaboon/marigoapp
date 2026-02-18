@@ -77,18 +77,21 @@ export function PersonalizedPicks() {
                     return;
                 }
                 
-                queryConstraints.push(where('status', '==', 'active'));
                 // Exclude items already in the user's wishlist
                 if (wishlistedProductIds.length > 0) {
                     // 'not-in' queries are limited to 10 items. This is a potential issue but fine for a demo.
                     queryConstraints.push(where(documentId(), 'not-in', wishlistedProductIds.slice(0, 10)));
                 }
-                queryConstraints.push(limit(10));
+                queryConstraints.push(limit(20)); // Fetch more to filter
 
                 const finalQuery = query(productsRef, ...queryConstraints);
                 const recommendedProductsSnapshot = await getDocs(finalQuery);
                 
-                const products = recommendedProductsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreProduct));
+                const fetchedProducts = recommendedProductsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreProduct));
+
+                // Filter for active products on the client
+                const products = fetchedProducts.filter(p => p.status === 'active').slice(0, 10);
+
 
                 setRecommendations({
                     products: products,
