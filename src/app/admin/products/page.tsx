@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreProduct } from '@/lib/types';
-import { DataTable } from '@/components/admin/users/data-table';
+import { DataTable } from '@/components/admin/products/data-table';
 import { columns } from '@/components/admin/products/columns';
 import {
   Card,
