@@ -74,7 +74,7 @@ export function ReviewStep() {
     setIsLoading(true);
 
     try {
-        const keywords = Array.from(new Set((formData.title?.en || '').toLowerCase().split(' ').filter(Boolean)));
+        const keywords = Array.from(new Set((formData.title || '').toLowerCase().split(' ').filter(Boolean)));
 
         const listingData: Partial<Omit<FirestoreProduct, 'id'>> & { listingCreated: any } = {
             sellerId: user.uid,
@@ -197,7 +197,7 @@ export function ReviewStep() {
             <Separator/>
             
              <ReviewSection title="Description" onEdit={() => goToStep(4)}>
-                <p className="text-foreground">{formData.description?.en || formData.description}</p>
+                <p className="text-foreground">{formData.description}</p>
             </ReviewSection>
 
             <Separator/>
@@ -252,5 +252,3 @@ export function ReviewStep() {
     </div>
   );
 }
-
-    

@@ -46,7 +46,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
       }
   }
 
-  const displayTitle = (typeof product.title === 'string' || !product.title?.en) ? product.title : product.title.en;
+  const displayTitle = product.title;
 
 
   return (

@@ -120,11 +120,11 @@ export default function AdminSettingsPage() {
                 <div className="space-y-4">
                     {categoryTree.map(category => (
                         <div key={category.id} className="space-y-2">
-                             <h4 className="font-semibold text-md">{category.name.en}</h4>
+                             <h4 className="font-semibold text-md">{category.name}</h4>
                              <div className="border rounded-md">
                                 {category.subcategories.map((sub, index) => (
                                     <div key={sub.slug} className={`flex justify-between items-center p-3 ${index < category.subcategories.length - 1 ? 'border-b' : ''}`}>
-                                        <span>{sub.name.en}</span>
+                                        <span>{sub.name}</span>
                                         <div className="flex items-center gap-2">
                                             <Button variant="ghost" size="icon" className="h-8 w-8"><Edit className="h-4 w-4" /></Button>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>

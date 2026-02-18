@@ -11,7 +11,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 export const SuggestPriceInputSchema = z.object({
-  title: z.any().describe('The title of the product.'),
+  title: z.string().describe('The title of the product.'),
   brand: z.string().describe('The brand of the product.'),
   category: z.string().describe('The category of the product.'),
   condition: z.string().optional().describe('The condition of the product (e.g., New, Like New, Good).'),
@@ -67,5 +67,3 @@ const suggestPriceFlow = ai.defineFlow(
     return output!;
   }
 );
-
-    

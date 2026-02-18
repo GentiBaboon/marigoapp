@@ -131,8 +131,8 @@ export const sellStep3Schema = z.object({
 });
 
 export const sellStep4Schema = z.object({
-    title: z.any(),
-    description: z.any(),
+    title: z.string().min(5, 'Title must be at least 5 characters long.'),
+    description: z.string().min(20, 'Description must be at least 20 characters long.'),
     origin: z.enum(['direct', 'private', 'vestiaire', 'other']).optional(),
     yearOfPurchase: z.string().optional(),
     serialNumber: z.string().optional(),
@@ -213,9 +213,9 @@ export type FirestoreCourierProfile = z.infer<typeof firestoreCourierProfileSche
 
 export const firestoreProductSchema = z.object({
   sellerId: z.string(),
-  title: z.any(),
+  title: z.string(),
   brand: z.string(),
-  description: z.any(),
+  description: z.string(),
   price: z.number(),
   category: z.string(),
   subCategory: z.string(),
@@ -270,7 +270,7 @@ export type FirestoreOffer = z.infer<typeof firestoreOfferSchema> & { id: string
 const orderItemSchema = z.object({
   productId: z.string(),
   sellerId: z.string(),
-  title: z.any(),
+  title: z.string(),
   brand: z.string(),
   image: z.string(),
   price: z.number(),
@@ -374,7 +374,7 @@ export const firestoreReviewSchema = z.object({
   reviewerId: z.string(), // The one writing the review (buyer)
   revieweeId: z.string(), // The one being reviewed (seller)
   rating: z.number().min(1).max(5),
-  content: z.any(),
+  content: z.string(),
   createdAt: z.any(),
 });
 export type FirestoreReview = z.infer<typeof firestoreReviewSchema> & { id: string };
@@ -443,7 +443,7 @@ export const firestoreCouponSchema = z.object({
 export type FirestoreCoupon = z.infer<typeof firestoreCouponSchema> & { id: string };
 
 export const firestoreCategorySchema = z.object({
-  name: z.any(),
+  name: z.string(),
   slug: z.string(),
   parentId: z.string().optional().nullable(),
   icon: z.string().optional(),
@@ -472,5 +472,3 @@ export const firestoreExchangeRatesSchema = z.object({
   }),
 });
 export type FirestoreExchangeRates = z.infer<typeof firestoreExchangeRatesSchema>;
-
-    

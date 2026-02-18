@@ -42,7 +42,7 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
 
   const itemData = isSale ? order.items[0] : product!;
   const imageUrl = isSale ? order.items[0].image : (product?.images?.[0] || PlaceHolderImages.find(p => p.id === 'product-1')?.imageUrl || '/placeholder.png');
-  const displayTitle = itemData.title?.en ?? (typeof itemData.title === 'string' ? itemData.title : 'Untitled');
+  const displayTitle = itemData.title ?? 'Untitled';
   const imageAlt = displayTitle || 'Product image';
   
   const link = isSale ? `/profile/listings/sales/${order.id}` : `/products/${product!.id}`;

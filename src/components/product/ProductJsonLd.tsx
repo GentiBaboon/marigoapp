@@ -7,17 +7,8 @@ interface ProductJsonLdProps {
 }
 
 export const ProductJsonLd = ({ product, seller }: ProductJsonLdProps) => {
-    const nameText = (typeof product.title === 'object' && product.title?.en)
-        ? product.title.en
-        : typeof product.title === 'string'
-        ? product.title
-        : 'Untitled Product';
-    
-    const descriptionText = (typeof product.description === 'object' && product.description?.en)
-        ? product.description.en
-        : typeof product.description === 'string'
-        ? product.description
-        : '';
+    const nameText = product.title || 'Untitled Product';
+    const descriptionText = product.description || '';
 
     const jsonLd = {
         '@context': 'https://schema.org',

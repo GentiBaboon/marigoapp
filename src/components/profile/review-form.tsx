@@ -12,7 +12,6 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { FirestoreOrder } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { translateText } from '@/ai/flows/translate-text';
 
 const reviewSchema = z.object({
   rating: z.number().min(1, 'Please select a rating.'),
@@ -66,15 +65,13 @@ export function ReviewForm({ order }: ReviewFormProps) {
     setIsSubmitting(true);
 
     try {
-        const translatedContent = await translateText({ text: data.content });
-
         const reviewData = {
             orderId: order.id,
             productId: order.items[0].productId, // Assuming review is for the first item for now
             reviewerId: user.uid,
             revieweeId: order.sellerIds[0], // Assuming single seller for now
             rating: data.rating,
-            content: translatedContent,
+            content: data.content,
             createdAt: serverTimestamp(),
         };
 

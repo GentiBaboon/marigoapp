@@ -154,7 +154,7 @@ export default function ProductDetailPage() {
     
      React.useEffect(() => {
         if (product) {
-            document.title = `${product.brand} ${product.title?.en} | Marigo`;
+            document.title = `${product.brand} ${product.title} | Marigo`;
         }
     }, [product]);
 
@@ -219,7 +219,7 @@ export default function ProductDetailPage() {
                         { userId: seller.id, name: seller.displayName || 'Seller', avatar: seller.photoURL || '' }
                     ],
                     productId: product.id,
-                    productTitle: product.title.en,
+                    productTitle: product.title,
                     productImage: product.images[0] || '',
                     lastMessage: 'Conversation started.',
                     lastMessageAt: serverTimestamp(),
@@ -262,7 +262,7 @@ export default function ProductDetailPage() {
         addToCart({
         id: product.id,
         brand: product.brand,
-        title: product.title.en,
+        title: product.title,
         price: product.price,
         sellerId: product.sellerId,
         image: product.images[0], // Use first image URL
@@ -298,7 +298,7 @@ export default function ProductDetailPage() {
                       <div className="aspect-[3/4] relative bg-muted rounded-lg overflow-hidden">
                         <Image
                           src={imgUrl}
-                          alt={`${product.title.en} image ${index + 1}`}
+                          alt={`${product.title} image ${index + 1}`}
                           fill
                           className="object-cover"
                           sizes="(max-width: 768px) 100vw, 50vw"
@@ -328,7 +328,7 @@ export default function ProductDetailPage() {
             <div className="flex justify-between items-start">
                 <div className="space-y-1">
                     <h1 className="text-4xl font-headline text-foreground">{product.brand}</h1>
-                    <p className="text-lg text-muted-foreground">{product.title.en}</p>
+                    <p className="text-lg text-muted-foreground">{product.title}</p>
                     <div className="pt-2">
                         <AuthenticityBadge authenticityCheck={product.authenticityCheck} />
                     </div>
@@ -399,7 +399,7 @@ export default function ProductDetailPage() {
                 <AccordionTrigger className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Description & Details</AccordionTrigger>
                 <AccordionContent className="pt-4 space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    {product.description.en}
+                    {product.description}
                   </p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm pt-2">
                     {product.condition && <DetailRow label="Condition" value={conditionLabel} />}
