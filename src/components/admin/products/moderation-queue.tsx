@@ -11,9 +11,9 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, X } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { Check, X, Loader2 } from 'lucide-react';
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import type { FirestoreProduct } from '@/lib/types';
 
@@ -28,17 +28,36 @@ interface ModerationCardProps {
 
 const ModerationCard: React.FC<ModerationCardProps> = ({ product }) => {
   const firestore = useFirestore();
+  const { user: adminUser } = useUser();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState<null | 'approve' | 'reject'>(null);
 
   const handleUpdateStatus = async (status: 'active' | 'rejected') => {
+    if (!adminUser) {
+        toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be logged in as an admin.'});
+        return;
+    }
     setIsLoading(status === 'active' ? 'approve' : 'reject');
     const productRef = doc(firestore, 'products', product.id);
+    const logCollectionRef = collection(firestore, 'admin_logs');
+
     try {
+      // Update product status
       await updateDoc(productRef, { status: status });
+
+      // Create admin log entry
+      await addDoc(logCollectionRef, {
+          adminId: adminUser.uid,
+          adminName: adminUser.displayName || 'Admin',
+          actionType: status === 'active' ? 'product_approved' : 'product_rejected',
+          details: `${status === 'active' ? 'Approved' : 'Rejected'} product "${product.title.en}" (ID: ${product.id})`,
+          targetId: product.id,
+          timestamp: serverTimestamp()
+      });
+
       toast({
         title: `Product ${status}`,
-        description: `The product "${product.title}" has been ${status}.`,
+        description: `The product "${product.title.en}" has been ${status}.`,
       });
     } catch (error) {
       console.error(`Error updating product status:`, error);
@@ -55,14 +74,14 @@ const ModerationCard: React.FC<ModerationCardProps> = ({ product }) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{product.title}</CardTitle>
+        <CardTitle>{product.title.en}</CardTitle>
         <CardDescription>{product.brand}</CardDescription>
       </CardHeader>
       <CardContent className="grid md:grid-cols-2 gap-6">
         <div className="relative aspect-[4/3] bg-muted rounded-md overflow-hidden">
             <Image 
                 src={product.images?.[0] || '/placeholder.png'} 
-                alt={product.title} 
+                alt={product.title.en} 
                 fill 
                 className="object-cover" 
                 sizes="(max-width: 768px) 100vw, 50vw"
@@ -71,7 +90,7 @@ const ModerationCard: React.FC<ModerationCardProps> = ({ product }) => {
         <div className="space-y-4">
             <div>
                 <h4 className="font-semibold">Description</h4>
-                <p className="text-sm text-muted-foreground">{product.description}</p>
+                <p className="text-sm text-muted-foreground">{product.description.en}</p>
             </div>
             <div>
                 <h4 className="font-semibold">Details</h4>
