@@ -22,7 +22,11 @@ import { sellStep6Schema } from '@/lib/types';
 import type { z } from 'zod';
 import { StepActions } from '../StepActions';
 import { Button } from '@/components/ui/button';
-import { Info } from 'lucide-react';
+import { Info, Wand2, Loader2 } from 'lucide-react';
+import { suggestPrice, type SuggestPriceInput, type SuggestPriceOutput } from '@/ai/flows/ai-suggest-price';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { productCategories } from '@/lib/mock-data';
 
 type Step6Values = z.infer<typeof sellStep6Schema>;
 
@@ -32,6 +36,10 @@ const FIXED_FEE = 5;
 export function PricingStep() {
   const { formData, setFormData, nextStep } = useSellForm();
   const [earning, setEarning] = useState<number>(0);
+  const { toast } = useToast();
+
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestion, setSuggestion] = useState<SuggestPriceOutput | null>(null);
 
   const form = useForm<Step6Values>({
     resolver: zodResolver(sellStep6Schema),
@@ -51,6 +59,61 @@ export function PricingStep() {
         setEarning(0);
     }
   }, [priceValue]);
+  
+  const getCategoryName = (gender: string | undefined, categorySlug: string | undefined): string => {
+    if (!gender || !categorySlug) return formData.category || '';
+    const genderName = `${gender.charAt(0).toUpperCase()}${gender.slice(1)}'s`;
+    
+    for (const mainCategory of productCategories) {
+        const sub = mainCategory.subcategories.find(s => s.slug === categorySlug);
+        if (sub) {
+            return `${genderName} ${sub.name}`;
+        }
+    }
+    return `${genderName} ${categorySlug}`;
+  }
+
+
+  const handleSuggestPrice = async () => {
+    setIsSuggesting(true);
+    setSuggestion(null);
+
+    try {
+        if (!formData.title || !formData.brand || !formData.category || !formData.images || formData.images.length === 0) {
+            toast({
+                variant: 'destructive',
+                title: 'Missing Information',
+                description: 'Please provide a title, brand, category, and at least one photo before generating a price suggestion.',
+            });
+            setIsSuggesting(false);
+            return;
+        }
+
+        const categoryName = getCategoryName(formData.gender, formData.category);
+
+        const input: SuggestPriceInput = {
+            title: formData.title,
+            brand: formData.brand,
+            category: categoryName,
+            condition: formData.condition,
+            images: formData.images.map(img => img.preview),
+        };
+        
+        const result = await suggestPrice(input);
+        setSuggestion(result);
+
+    } catch (error) {
+        console.error("AI price suggestion failed:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Suggestion Failed',
+            description: 'Could not generate a price suggestion at this time. Please try again.',
+        });
+    } finally {
+        setIsSuggesting(false);
+    }
+  };
+
 
   const onSubmit = (data: Step6Values) => {
     setFormData({ ...data, sellerEarning: earning, currency: 'EUR' });
@@ -83,6 +146,27 @@ export function PricingStep() {
                   </FormItem>
               )}
             />
+
+            <Button type="button" variant="outline" onClick={handleSuggestPrice} disabled={isSuggesting} className="w-full">
+                {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                AI Price Suggestion
+            </Button>
+            
+            {suggestion && (
+                <Card className="mt-4 bg-primary/5 border-primary/20">
+                    <CardHeader>
+                        <CardTitle className="text-base">AI Suggestion</CardTitle>
+                        <CardDescription>We suggest a price between €{suggestion.minPrice} and €{suggestion.maxPrice}.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <p className="text-sm text-muted-foreground italic">"{suggestion.reasoning}"</p>
+                        <Button type="button" onClick={() => form.setValue('price', suggestion.recommendedPrice, { shouldValidate: true })} className="w-full">
+                            Apply Recommended Price (€{suggestion.recommendedPrice})
+                        </Button>
+                    </CardContent>
+                </Card>
+            )}
+
              <div className="bg-muted rounded-lg p-4 flex flex-col justify-center">
                 <FormLabel className="text-sm text-muted-foreground flex items-center">
                     You earn
