@@ -305,6 +305,8 @@
       "description": "Represents a delivery assignment.",
       "properties": {
         "orderId": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "sellerIds": { "type": "array", "items": { "type": "string" } },
         "courierId": { "type": "string" },
         "status": {
           "type": "string",
@@ -337,7 +339,27 @@
           "description": "Estimated delivery time in minutes"
         },
         "specialInstructions": { "type": "string" },
-        "distance": { "type": "number", "description": "Distance in kilometers" }
+        "distance": { "type": "number", "description": "Distance in kilometers" },
+        "currentLocation": {
+          "type": "object",
+          "properties": {
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" }
+          },
+          "description": "The courier's current GPS location."
+        },
+        "history": {
+          "type": "array",
+          "description": "A log of status changes and events for the delivery.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "notes": { "type": "string" }
+            }
+          }
+        }
       },
       "required": ["orderId", "status"]
     },

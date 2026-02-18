@@ -1,15 +1,16 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import type { FirestoreOrder } from '@/lib/types';
+import { useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, query, where, limit } from 'firebase/firestore';
+import type { FirestoreOrder, FirestoreDelivery } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { HelpCircle, PackageCheck } from 'lucide-react';
 import Image from 'next/image';
 import { OrderTimeline } from '@/components/profile/order-timeline';
 import { useParams } from 'next/navigation';
+import { DeliveryTracking } from '@/components/tracking/DeliveryTracking';
 
 function OrderDetailsSkeleton() {
     return (
@@ -57,7 +58,16 @@ export default function OrderDetailsPage() {
         return doc(firestore, 'orders', orderId);
     }, [firestore, orderId]);
 
-    const { data: order, isLoading } = useDoc<FirestoreOrder>(orderRef);
+    const { data: order, isLoading: isOrderLoading } = useDoc<FirestoreOrder>(orderRef);
+    
+    const deliveryQuery = useMemoFirebase(() => {
+        if (!firestore || !orderId) return null;
+        return query(collection(firestore, 'deliveries'), where('orderId', '==', orderId), limit(1));
+    }, [firestore, orderId]);
+    const { data: deliveries, isLoading: isDeliveryLoading } = useCollection<FirestoreDelivery>(deliveryQuery);
+    const delivery = deliveries?.[0];
+
+    const isLoading = isOrderLoading || isDeliveryLoading;
     
     if (isLoading) {
         return <OrderDetailsSkeleton />;
@@ -98,7 +108,11 @@ export default function OrderDetailsPage() {
                 </div>
 
                 <div className="bg-background p-4 rounded-lg">
-                    <OrderTimeline order={order} />
+                    {delivery ? (
+                        <DeliveryTracking order={order} delivery={delivery} />
+                    ) : (
+                        <OrderTimeline order={order} />
+                    )}
                 </div>
                 
                 <div className="pt-8">

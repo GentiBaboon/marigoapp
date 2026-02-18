@@ -34,8 +34,8 @@ service cloud.firestore {
       return request.resource.data[ownerFieldName] == request.auth.uid;
     }
     
-    function isSellerInOrder() {
-      return request.auth.uid in resource.data.sellerIds;
+    function isPartyToOrder(delivery) {
+        return isSignedIn() && (request.auth.uid == delivery.buyerId || request.auth.uid in delivery.sellerIds);
     }
 
     // --------------------------------------------------------------------
@@ -103,8 +103,10 @@ service cloud.firestore {
     // Transactional Collections (/orders, /reviews, /deliveries)
     // --------------------------------------------------------------------
     match /orders/{orderId} {
-      // Solo gli admin possono leggere e scrivere gli ordini
-      allow read, write: if isAdmin();
+      // Allow buyer, sellers, and admins to read the order.
+      allow get: if isSignedIn() && (isOwner(resource.data.buyerId) || request.auth.uid in resource.data.sellerIds) || isAdmin();
+      allow list, update, delete: if isAdmin();
+      allow create: if isSignedIn(); // Assume functions handle creation logic
     }
 
     match /reviews/{reviewId} {
@@ -115,7 +117,9 @@ service cloud.firestore {
     }
     
     match /deliveries/{deliveryId} {
-      allow read: if isApprovedCourier() || isAdmin();
+       // Allow involved parties to read/get, couriers to list available jobs
+      allow get: if isPartyToOrder(resource.data) || isAssignedCourier(resource.data) || isAdmin();
+      allow list: if isApprovedCourier() || isAdmin();
       allow create: if isAdmin();
       allow update: if isAdmin() || (
         isApprovedCourier() && (
@@ -171,7 +175,8 @@ service cloud.firestore {
     }
 
     match /settings/{docId} {
-        allow read, write: if isAdmin();
+        allow read: if true; // Allow public read for settings like maintenance mode
+        allow write: if isAdmin();
     }
 
     match /coupons/{couponId} {

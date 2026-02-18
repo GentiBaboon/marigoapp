@@ -276,6 +276,8 @@ export type FirestoreOrder = z.infer<typeof firestoreOrderSchema> & { id: string
 // --- Delivery Schema ---
 export const firestoreDeliverySchema = z.object({
     orderId: z.string(),
+    buyerId: z.string(),
+    sellerIds: z.array(z.string()),
     courierId: z.string().nullable().optional(),
     status: z.enum([
         "pending_assignment", 
@@ -300,6 +302,15 @@ export const firestoreDeliverySchema = z.object({
     timeEstimate: z.number().optional(),
     specialInstructions: z.string().optional(),
     distance: z.number().optional(),
+    currentLocation: z.object({
+        latitude: z.number(),
+        longitude: z.number(),
+    }).optional().nullable(),
+    history: z.array(z.object({
+        status: z.string(),
+        timestamp: z.any(),
+        notes: z.string().optional(),
+    })).optional(),
 });
 export type FirestoreDelivery = z.infer<typeof firestoreDeliverySchema> & { id: string };
 

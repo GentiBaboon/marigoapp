@@ -2,8 +2,8 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection } from 'firebase/firestore';
-import type { FirestoreOrder, FirestoreAddress } from '@/lib/types';
+import { doc, collection, query, where, limit } from 'firebase/firestore';
+import type { FirestoreOrder, FirestoreAddress, FirestoreDelivery } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PackageCheck, Copy } from 'lucide-react';
@@ -12,6 +12,7 @@ import { SellerOrderTimeline } from '@/components/profile/seller-order-timeline'
 import { useParams } from 'next/navigation';
 import { format, addDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { DeliveryTracking } from '@/components/tracking/DeliveryTracking';
 
 function SaleDetailsSkeleton() {
     return (
@@ -67,7 +68,14 @@ export default function SaleDetailsPage() {
     }, [user, firestore]);
     const { data: addresses, isLoading: areAddressesLoading } = useCollection<FirestoreAddress>(addressesCollection);
 
-    const isLoading = isUserLoading || isOrderLoading || areAddressesLoading;
+    const deliveryQuery = useMemoFirebase(() => {
+        if (!firestore || !orderId) return null;
+        return query(collection(firestore, 'deliveries'), where('orderId', '==', orderId), limit(1));
+    }, [firestore, orderId]);
+    const { data: deliveries, isLoading: isDeliveryLoading } = useCollection<FirestoreDelivery>(deliveryQuery);
+    const delivery = deliveries?.[0];
+
+    const isLoading = isUserLoading || isOrderLoading || areAddressesLoading || isDeliveryLoading;
 
     if (isLoading) {
         return <SaleDetailsSkeleton />;
@@ -124,7 +132,13 @@ export default function SaleDetailsPage() {
                 </div>
 
                 <div className="bg-background p-4 rounded-lg">
-                    {shippingFromAddress && <SellerOrderTimeline order={order} shippingFromAddress={shippingFromAddress} />}
+                    {delivery ? (
+                        <DeliveryTracking order={order} delivery={delivery} />
+                    ) : shippingFromAddress ? (
+                        <SellerOrderTimeline order={order} shippingFromAddress={shippingFromAddress} />
+                    ) : (
+                        <p className="text-center text-muted-foreground">Waiting for shipping details...</p>
+                    )}
                 </div>
             </main>
         </div>
