@@ -13,14 +13,50 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, X, Loader2 } from 'lucide-react';
 import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { useFirestore, useUser } from '@/firebase';
+import { useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import type { FirestoreProduct } from '@/lib/types';
+import type { FirestoreProduct, FirestoreUser } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const currencyFormatter = new Intl.NumberFormat('de-DE', {
   style: 'currency',
   currency: 'EUR',
 });
+
+// Helper component to fetch and display seller name
+const SellerInfo = ({ sellerId }: { sellerId: string }) => {
+    const firestore = useFirestore();
+    const sellerRef = useMemoFirebase(() => doc(firestore, 'users', sellerId), [firestore, sellerId]);
+    const { data: seller, isLoading } = useDoc<FirestoreUser>(sellerRef);
+
+    if (isLoading) {
+        return <div className="flex items-center gap-2">
+            <Skeleton className="h-6 w-6 rounded-full" />
+            <Skeleton className="h-4 w-24" />
+        </div>;
+    }
+    
+    if (!seller) return null;
+
+    const getInitials = (name?: string | null) => {
+        if (!name) return 'S';
+        const names = name.split(' ');
+        return names.length > 1
+            ? `${names[0][0]}${names[names.length - 1][0]}`
+            : name.substring(0, 2);
+    };
+
+    return (
+        <div className="flex items-center gap-2">
+            <Avatar className="h-6 w-6">
+                <AvatarImage src={seller.photoURL ?? undefined} />
+                <AvatarFallback>{getInitials(seller.displayName)}</AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium">{seller.displayName}</span>
+        </div>
+    );
+}
 
 interface ModerationCardProps {
   product: FirestoreProduct;
@@ -74,8 +110,13 @@ const ModerationCard: React.FC<ModerationCardProps> = ({ product }) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{product.title.en}</CardTitle>
-        <CardDescription>{product.brand}</CardDescription>
+        <div className="flex justify-between items-start">
+            <div>
+                <CardTitle>{product.title.en}</CardTitle>
+                <CardDescription>{product.brand}</CardDescription>
+            </div>
+            <SellerInfo sellerId={product.sellerId} />
+        </div>
       </CardHeader>
       <CardContent className="grid md:grid-cols-2 gap-6">
         <div className="relative aspect-[4/3] bg-muted rounded-md overflow-hidden">
