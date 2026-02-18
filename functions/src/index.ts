@@ -63,7 +63,7 @@ export const createStripeConnectedAccount = onCall(async (request) => {
  * 2. createPaymentIntent
  * Creates a Payment Intent for a purchase with escrow.
  */
-export const createPaymentIntent = onCall(async (request) => {
+export const createPaymentIntent = onCall({minInstances: 1}, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be logged in.");
   }
@@ -146,7 +146,7 @@ export const createPaymentIntent = onCall(async (request) => {
  * 3. handleStripeWebhook
  * Handles incoming webhooks from Stripe to update order statuses.
  */
-export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET"]}, async (req, res) => {
+export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET"], minInstances: 1}, async (req, res) => {
   const signature = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 

@@ -11,7 +11,12 @@ import { ShoppingPreferenceModal } from '@/components/home/ShoppingPreferenceMod
 import { DownloadAppBanner } from '@/components/home/DownloadAppBanner';
 import { I18nProvider } from '@/context/I18nProvider';
 import { CurrencyProvider } from '@/context/CurrencyContext';
-import { ChatbotWidget } from '@/components/ai/ChatbotWidget';
+import dynamic from 'next/dynamic';
+
+const ChatbotWidget = dynamic(() => import('@/components/ai/ChatbotWidget').then(mod => mod.ChatbotWidget), {
+  ssr: false,
+});
+
 
 export const metadata: Metadata = {
   title: 'MarigoApp',
@@ -26,6 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="manifest" href="/manifest.json" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link

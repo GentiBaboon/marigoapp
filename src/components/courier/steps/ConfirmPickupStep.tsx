@@ -113,8 +113,8 @@ export function ConfirmPickupStep({ delivery }: ConfirmPickupStepProps) {
     // Compress the captured image before submitting
     const imageFile = await (await fetch(capturedImage)).blob();
     const compressedFile = await imageCompression(imageFile, {
-        maxSizeMB: 0.5, // Compress to under 0.5MB
-        maxWidthOrHeight: 1280,
+        maxSizeMB: 0.8,
+        maxWidthOrHeight: 1200,
     });
     const compressedDataUrl = await new Promise<string>(resolve => {
         const reader = new FileReader();

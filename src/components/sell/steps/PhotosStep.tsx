@@ -64,8 +64,8 @@ export function PhotosStep() {
       newFilesToProcess.forEach(async imageFile => {
         try {
           const compressedFile = await imageCompression(imageFile.file, {
-            maxSizeMB: 1,
-            maxWidthOrHeight: 1920,
+            maxSizeMB: 0.8,
+            maxWidthOrHeight: 1200,
             useWebWorker: true,
           });
           
