@@ -69,6 +69,11 @@ export const firestoreUserSchema = z.object({
   status: z.enum(['active', 'banned']).optional(),
   isCourier: z.boolean().optional(),
   courierStatus: z.enum(['pending_approval', 'approved', 'rejected']).optional(),
+  emailPreferences: z.object({
+    marketing: z.boolean().default(true),
+    productUpdates: z.boolean().default(true),
+    orderUpdates: z.boolean().default(true),
+  }).optional(),
 });
 export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
 

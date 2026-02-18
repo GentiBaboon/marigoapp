@@ -12,6 +12,7 @@ import { DownloadAppBanner } from '@/components/home/DownloadAppBanner';
 import { I18nProvider } from '@/context/I18nProvider';
 import { CurrencyProvider } from '@/context/CurrencyContext';
 import dynamic from 'next/dynamic';
+import { CookieBanner } from '@/components/CookieBanner';
 
 const ChatbotWidget = dynamic(() => import('@/components/ai/ChatbotWidget').then(mod => mod.ChatbotWidget), {
   ssr: false,
@@ -62,6 +63,7 @@ export default function RootLayout({
                     <DownloadAppBanner />
                   </div>
                   <Toaster />
+                  <CookieBanner />
                 </WishlistProvider>
               </CartProvider>
             </CurrencyProvider>

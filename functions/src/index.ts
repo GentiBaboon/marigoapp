@@ -7,6 +7,7 @@ import * as logger from "firebase-functions/logger";
 import Stripe from "stripe";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {VertexAI} from "@google-cloud/vertexai";
+import {getStorage} from "firebase-admin/storage";
 
 // Initialize Firebase Admin SDK
 initializeApp();
@@ -440,7 +441,7 @@ export const completeDelivery = onCall(async (request) => {
       notes: notes || null,
       buyerSignature: buyerSignatureUrl || null,
     });
-    
+
     // Also update the main order status
     const orderId = deliverySnap.data()?.orderId;
     if (orderId) {
@@ -537,7 +538,7 @@ export const moderateProductImage = onDocumentCreated("products/{productId}", as
     let overallModerationResult = "approved";
     const moderationReasons: string[] = [];
 
-    const imageParts = images.map(imageString => {
+    const imageParts = images.map((imageString) => {
       const base64Data = imageString.split(",")[1];
       if (!base64Data) return null;
 
@@ -547,7 +548,7 @@ export const moderateProductImage = onDocumentCreated("products/{productId}", as
           mimeType: imageString.substring(imageString.indexOf(":") + 1, imageString.indexOf(";")),
         },
       };
-    }).filter(p => p !== null);
+    }).filter((p) => p !== null);
 
     if (imageParts.length > 0) {
         const request = {
@@ -556,9 +557,9 @@ export const moderateProductImage = onDocumentCreated("products/{productId}", as
 
         const streamingResp = await generativeModel.generateContentStream(request);
         const response = await streamingResp.response;
-        
+
         const safetyRatings = response.candidates?.[0]?.safetyRatings;
-        
+
         if (safetyRatings) {
             for (const rating of safetyRatings) {
             if (rating.probability === "HIGH" || rating.probability === "MEDIUM") {
@@ -580,7 +581,7 @@ export const moderateProductImage = onDocumentCreated("products/{productId}", as
     // --- Authenticity Check Logic ---
     if (productData.price > 200) {
         try {
-            const authImageParts = images.map(imageString => ({
+            const authImageParts = images.map((imageString) => ({
                 inlineData: {
                   data: imageString.split(",")[1],
                   mimeType: imageString.substring(imageString.indexOf(":") + 1, imageString.indexOf(";")),
@@ -639,9 +640,8 @@ export const moderateProductImage = onDocumentCreated("products/{productId}", as
         };
         logger.info(`Product ${snapshot.id} approved automatically.`);
     }
-    
-    await snapshot.ref.update(finalUpdateData);
 
+    await snapshot.ref.update(finalUpdateData);
   } catch (error) {
       logger.error(`Error during image moderation for product ${snapshot.id}:`, error);
       // Fallback: flag for manual review in case of AI API error
@@ -652,5 +652,73 @@ export const moderateProductImage = onDocumentCreated("products/{productId}", as
               checkedAt: admin.firestore.FieldValue.serverTimestamp(),
           },
       });
+  }
+});
+
+// =================================================================
+// GDPR & Compliance Functions
+// =================================================================
+
+export const exportUserData = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in to export your data.");
+  }
+  const userId = request.auth.uid;
+
+  try {
+    const userDoc = await db.collection("users").doc(userId).get();
+    const productsQuery = await db.collection("products").where("sellerId", "==", userId).get();
+    const ordersQuery = await db.collection("orders").where("buyerId", "==", userId).get();
+
+    const userData = {
+      profile: userDoc.data(),
+      products: productsQuery.docs.map((doc) => doc.data()),
+      orders: ordersQuery.docs.map((doc) => doc.data()),
+    };
+
+    const bucket = getStorage().bucket();
+    const fileName = `user-exports/${userId}/${Date.now()}.json`;
+    const file = bucket.file(fileName);
+
+    await file.save(JSON.stringify(userData, null, 2), {
+      contentType: "application/json",
+    });
+
+    const [signedUrl] = await file.getSignedUrl({
+      action: "read",
+      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+    });
+
+    return {downloadUrl: signedUrl};
+  } catch (error) {
+    logger.error(`Error exporting data for user ${userId}:`, error);
+    throw new HttpsError("internal", "Could not export user data.");
+  }
+});
+
+
+export const deleteAccount = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in to delete your account.");
+  }
+  const userId = request.auth.uid;
+
+  try {
+    // Delete user from Firebase Authentication
+    await admin.auth().deleteUser(userId);
+
+    // Delete user's main profile document from Firestore
+    await db.collection("users").doc(userId).delete();
+
+    // IMPORTANT: This does NOT delete subcollections or other user-related data
+    // (e.g., products, orders). A more robust solution would involve a recursive
+    // delete function or background process, which is more complex.
+    // For now, this removes primary access and personal info.
+
+    logger.info(`Successfully deleted account and profile for user ${userId}.`);
+    return {success: true};
+  } catch (error) {
+    logger.error(`Error deleting account for user ${userId}:`, error);
+    throw new HttpsError("internal", "Could not delete account.");
   }
 });

@@ -67,6 +67,15 @@
           "enum": ["active", "banned"],
           "default": "active",
           "description": "The user's account status."
+        },
+        "emailPreferences": {
+            "type": "object",
+            "description": "User's email notification preferences.",
+            "properties": {
+                "marketing": { "type": "boolean", "default": true },
+                "productUpdates": { "type": "boolean", "default": true },
+                "orderUpdates": { "type": "boolean", "default": true }
+            }
         }
       },
       "required": [
@@ -145,8 +154,8 @@
       "description": "Represents a product listed on the marketplace.",
       "properties": {
         "sellerId": { "type": "string", "description": "Reference to the user who is selling the item." },
-        "title": { "type": "object", "properties": { "sq": { "type": "string" }, "en": { "type": "string" }, "it": { "type": "string" } } },
-        "description": { "type": "object", "properties": { "sq": { "type": "string" }, "en": { "type": "string" }, "it": { "type": "string" } } },
+        "title": { "$ref": "#/entities/LocalizedString" },
+        "description": { "$ref": "#/entities/LocalizedString" },
         "price": { "type": "number" },
         "category": { "type": "string" },
         "subCategory": { "type": "string" },
@@ -185,7 +194,7 @@
             "properties": {
                 "status": {
                     "type": "string",
-                    "enum": ["unchecked", "pending", "completed"]
+                    "enum": ["unchecked", "pending", "completed", "failed"]
                 },
                 "confidence": {
                     "type": "string",
@@ -262,7 +271,7 @@
             "properties": {
               "productId": { "type": "string" },
               "sellerId": { "type": "string" },
-              "title": { "type": "object", "properties": { "sq": { "type": "string" }, "en": { "type": "string" }, "it": { "type": "string" } } },
+              "title": { "$ref": "#/entities/LocalizedString" },
               "brand": { "type": "string" },
               "image": { "type": "string" },
               "price": { "type": "number" },
@@ -294,7 +303,7 @@
         "participants": { "type": "array", "items": { "type": "string" } },
         "type": { "type": "string" },
         "productId": { "type": "string" },
-        "productTitle": { "type": "object", "properties": { "sq": { "type": "string" }, "en": { "type": "string" }, "it": { "type": "string" } } },
+        "productTitle": { "$ref": "#/entities/LocalizedString" },
         "lastMessage": { "type": "string" },
         "lastMessageAt": { "type": "string", "format": "date-time" },
         "unreadCount": { "type": "object" }
@@ -349,8 +358,8 @@
             "revieweeId": { "type": "string" },
             "productId": { "type": "string" },
             "rating": { "type": "number" },
-            "title": { "type": "object", "properties": { "sq": { "type": "string" }, "en": { "type": "string" }, "it": { "type": "string" } } },
-            "content": { "type": "object", "properties": { "sq": { "type": "string" }, "en": { "type": "string" }, "it": { "type": "string" } } }
+            "title": { "$ref": "#/entities/LocalizedString" },
+            "content": { "$ref": "#/entities/LocalizedString" }
         },
         "required": ["orderId", "reviewerId", "revieweeId", "rating", "content"]
     },
@@ -539,6 +548,16 @@
         "lastUpdated",
         "rates"
       ]
+    },
+    "LocalizedString": {
+        "title": "Localized String",
+        "type": "object",
+        "description": "A string that can be translated into multiple languages.",
+        "properties": {
+            "sq": { "type": "string", "description": "Albanian translation" },
+            "en": { "type": "string", "description": "English translation" },
+            "it": { "type": "string", "description": "Italian translation" }
+        }
     }
   },
   "auth": {
