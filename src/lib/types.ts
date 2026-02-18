@@ -277,11 +277,23 @@ export type FirestoreOrder = z.infer<typeof firestoreOrderSchema> & { id: string
 export const firestoreDeliverySchema = z.object({
     orderId: z.string(),
     courierId: z.string().nullable().optional(),
-    status: z.enum(["pending_assignment", "assigned", "picked_up", "in_transit", "delivered", "cancelled"]),
+    status: z.enum([
+        "pending_assignment", 
+        "assigned", 
+        "arrived_for_pickup",
+        "picked_up", 
+        "in_transit",
+        "arrived_for_delivery", 
+        "delivered", 
+        "cancelled"
+    ]),
     addresses: z.object({
         pickup: addressSchema,
         delivery: addressSchema,
     }),
+    pickupNotes: z.string().optional(),
+    pickupSignature: z.string().url().optional(),
+    proofOfPickup: z.string().url().optional(),
     proofOfDelivery: z.string().url().optional(),
     deliveryFee: z.number(),
     packageSize: z.enum(["small", "medium", "large"]),

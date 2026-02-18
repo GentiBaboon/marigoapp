@@ -300,22 +300,46 @@
         "required": ["userId", "type", "message", "createdAt"]
     },
     "Delivery": {
-        "title": "Delivery",
-        "type": "object",
-        "description": "Represents a delivery assignment.",
-        "properties": {
-            "orderId": { "type": "string" },
-            "courierId": { "type": "string" },
-            "status": { "type": "string", "enum": ["pending_assignment", "assigned", "picked_up", "in_transit", "delivered", "cancelled"] },
-            "addresses": { "type": "object", "properties": { "pickup": { "$ref": "#/entities/Address" }, "delivery": { "$ref": "#/entities/Address" } } },
-            "proofOfDelivery": { "type": "string", "format": "uri" },
-            "deliveryFee": { "type": "number" },
-            "packageSize": { "type": "string", "enum": ["small", "medium", "large"] },
-            "timeEstimate": { "type": "number", "description": "Estimated delivery time in minutes" },
-            "specialInstructions": { "type": "string" },
-            "distance": { "type": "number", "description": "Distance in kilometers" }
+      "title": "Delivery",
+      "type": "object",
+      "description": "Represents a delivery assignment.",
+      "properties": {
+        "orderId": { "type": "string" },
+        "courierId": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending_assignment",
+            "assigned",
+            "arrived_for_pickup",
+            "picked_up",
+            "in_transit",
+            "arrived_for_delivery",
+            "delivered",
+            "cancelled"
+          ]
         },
-        "required": ["orderId", "status"]
+        "addresses": {
+          "type": "object",
+          "properties": {
+            "pickup": { "$ref": "#/entities/Address" },
+            "delivery": { "$ref": "#/entities/Address" }
+          }
+        },
+        "pickupNotes": { "type": "string" },
+        "pickupSignature": { "type": "string", "format": "uri" },
+        "proofOfPickup": { "type": "string", "format": "uri" },
+        "proofOfDelivery": { "type": "string", "format": "uri" },
+        "deliveryFee": { "type": "number" },
+        "packageSize": { "type": "string", "enum": ["small", "medium", "large"] },
+        "timeEstimate": {
+          "type": "number",
+          "description": "Estimated delivery time in minutes"
+        },
+        "specialInstructions": { "type": "string" },
+        "distance": { "type": "number", "description": "Distance in kilometers" }
+      },
+      "required": ["orderId", "status"]
     },
     "CourierProfile": {
       "title": "CourierProfile",
