@@ -178,6 +178,28 @@
                     "format": "date-time"
                 }
             }
+        },
+        "authenticityCheck": {
+            "type": "object",
+            "description": "AI-powered authenticity pre-check results.",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["unchecked", "pending", "completed"]
+                },
+                "confidence": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"]
+                },
+                "findings": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                },
+                "checkedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            }
         }
       },
       "required": ["sellerId", "title", "price", "category", "images", "status", "listingCreated"]
@@ -622,5 +644,3 @@
     }
   }
 }
-
-    

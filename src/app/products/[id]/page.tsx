@@ -35,6 +35,7 @@ import { useCollection, useDoc, useMemoFirebase, useFirestore, useUser } from '@
 import { collection, query, where, limit, doc, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrency } from '@/context/CurrencyContext';
+import { AuthenticityBadge } from '@/components/product/AuthenticityBadge';
 
 const PayPalIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" className="h-8 w-auto flex-shrink-0">
@@ -326,6 +327,9 @@ export default function ProductDetailPage() {
                 <div className="space-y-1">
                     <h1 className="text-4xl font-headline text-foreground">{product.brand}</h1>
                     <p className="text-lg text-muted-foreground">{product.title}</p>
+                    <div className="pt-2">
+                        <AuthenticityBadge authenticityCheck={product.authenticityCheck} />
+                    </div>
                 </div>
                 <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-destructive" aria-label="Add to wishlist" onClick={handleToggleFavorite}>
                     <Heart className={cn("h-6 w-6", favorite && "fill-destructive text-destructive")} />

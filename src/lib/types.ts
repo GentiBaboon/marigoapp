@@ -221,6 +221,12 @@ export const firestoreProductSchema = z.object({
     reasons: z.array(z.string()).optional(),
     checkedAt: z.any(),
   }).optional(),
+  authenticityCheck: z.object({
+      status: z.enum(["unchecked", "pending", "completed", "failed"]),
+      confidence: z.enum(["low", "medium", "high"]),
+      findings: z.array(z.string()),
+      checkedAt: z.any(),
+    }).optional(),
 });
 
 export type FirestoreProduct = z.infer<typeof firestoreProductSchema> & { id: string };

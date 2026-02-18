@@ -522,6 +522,7 @@ export const moderateProductImage = onDocumentCreated("products/{productId}", as
   }
   const productData = snapshot.data();
   const images = productData.images as string[]; // Array of data URIs
+  const finalUpdateData: any = {};
 
   if (!images || images.length === 0) {
     logger.info(`Product ${snapshot.id} has no images to moderate.`);
@@ -532,78 +533,115 @@ export const moderateProductImage = onDocumentCreated("products/{productId}", as
     return;
   }
 
-  let overallModerationResult = "approved";
-  const moderationReasons: string[] = [];
-
   try {
-    for (const imageString of images) {
-      const base64Data = imageString.split(",")[1];
-      if (!base64Data) continue;
+    let overallModerationResult = "approved";
+    const moderationReasons: string[] = [];
 
-      const imagePart = {
+    const imageParts = images.map(imageString => {
+      const base64Data = imageString.split(",")[1];
+      if (!base64Data) return null;
+
+      return {
         inlineData: {
           data: base64Data,
           mimeType: imageString.substring(imageString.indexOf(":") + 1, imageString.indexOf(";")),
         },
       };
+    }).filter(p => p !== null);
 
-      const request = {
-        contents: [{role: "user", parts: [imagePart]}],
-      };
+    if (imageParts.length > 0) {
+        const request = {
+            contents: [{role: "user", parts: imageParts as any[]}],
+        };
 
-      const streamingResp = await generativeModel.generateContentStream(request);
-      const response = await streamingResp.response;
-      
-      const safetyRatings = response.candidates?.[0]?.safetyRatings;
-      
-      if (safetyRatings) {
-        for (const rating of safetyRatings) {
-          if (rating.probability === "HIGH" || rating.probability === "MEDIUM") {
-            if (overallModerationResult !== "rejected") {
-              overallModerationResult = "needs_review";
+        const streamingResp = await generativeModel.generateContentStream(request);
+        const response = await streamingResp.response;
+        
+        const safetyRatings = response.candidates?.[0]?.safetyRatings;
+        
+        if (safetyRatings) {
+            for (const rating of safetyRatings) {
+            if (rating.probability === "HIGH" || rating.probability === "MEDIUM") {
+                if (overallModerationResult !== "rejected") {
+                overallModerationResult = "needs_review";
+                }
+                const reason = `Image flagged for ${rating.category} with probability ${rating.probability}.`;
+                if (!moderationReasons.includes(reason)) {
+                moderationReasons.push(reason);
+                }
+                if (rating.probability === "HIGH" && (rating.category === "HARM_CATEGORY_DANGEROUS_CONTENT" || rating.category === "HARM_CATEGORY_SEXUALLY_EXPLICIT")) {
+                overallModerationResult = "rejected";
+                }
             }
-            const reason = `Image flagged for ${rating.category} with probability ${rating.probability}.`;
-            if (!moderationReasons.includes(reason)) {
-              moderationReasons.push(reason);
             }
-            if (rating.probability === "HIGH" && (rating.category === "HARM_CATEGORY_DANGEROUS_CONTENT" || rating.category === "HARM_CATEGORY_SEXUALLY_EXPLICIT")) {
-              overallModerationResult = "rejected";
-            }
-          }
         }
-      }
+    }
+
+    // --- Authenticity Check Logic ---
+    if (productData.price > 200) {
+        try {
+            const authImageParts = images.map(imageString => ({
+                inlineData: {
+                  data: imageString.split(",")[1],
+                  mimeType: imageString.substring(imageString.indexOf(":") + 1, imageString.indexOf(";")),
+                },
+            }));
+            const authenticityPrompt = `You are a highly-trained authenticator for luxury fashion items. Your task is to perform a pre-check for authenticity based on user-provided images and details. Do not make a definitive "authentic" or "fake" judgment. Instead, provide a confidence level (high, medium, or low) and the reasons for it in a JSON format: {"confidence": "high" | "medium" | "low", "findings": ["finding 1", "finding 2"]}. Analyze the following details and images, paying close attention to: Logo, Stitching, Hardware, Material, and Serial Number. Product Details: Title: ${productData.title}, Brand: ${productData.brand}, Description: ${productData.description}.`;
+            const authRequest = {
+                contents: [{ role: "user", parts: [...authImageParts, { text: authenticityPrompt }] }],
+                generationConfig: { responseMimeType: "application/json" },
+            };
+            const authResponse = await generativeModel.generateContent(authRequest);
+            const jsonResponseText = authResponse.response.candidates?.[0]?.content?.parts[0]?.text;
+            if (jsonResponseText) {
+                const authResult = JSON.parse(jsonResponseText);
+                finalUpdateData.authenticityCheck = {
+                    status: "completed",
+                    confidence: authResult.confidence,
+                    findings: authResult.findings,
+                    checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+                };
+            } else {
+                throw new Error("No JSON response from authenticity check.");
+            }
+        } catch (authError) {
+            logger.error(`Error during authenticity check for product ${snapshot.id}:`, authError);
+            finalUpdateData.authenticityCheck = {
+                status: "failed",
+                confidence: "low",
+                findings: ["AI authenticity check could not be completed."],
+                checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+            };
+        }
     }
 
     // Update Firestore document based on moderation results
     if (overallModerationResult === "rejected") {
-      await snapshot.ref.update({
-        status: "rejected",
-        moderation: {
-          status: "rejected",
-          reasons: moderationReasons,
-          checkedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-      });
-      logger.warn(`Product ${snapshot.id} rejected due to: ${moderationReasons.join(", ")}`);
+        finalUpdateData.status = "rejected";
+        finalUpdateData.moderation = {
+            status: "rejected",
+            reasons: moderationReasons,
+            checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        logger.warn(`Product ${snapshot.id} rejected due to: ${moderationReasons.join(", ")}`);
     } else if (overallModerationResult === "needs_review") {
-      await snapshot.ref.update({
-        moderation: {
-          status: "needs_review",
-          reasons: moderationReasons,
-          checkedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-      });
-      logger.info(`Product ${snapshot.id} flagged for admin review.`);
+        finalUpdateData.moderation = {
+            status: "needs_review",
+            reasons: moderationReasons,
+            checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        logger.info(`Product ${snapshot.id} flagged for admin review.`);
     } else {
-      await snapshot.ref.update({
-        status: "active",
-        moderation: {
-          status: "approved",
-          checkedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-      });
-      logger.info(`Product ${snapshot.id} approved automatically.`);
+        finalUpdateData.status = "active";
+        finalUpdateData.moderation = {
+            status: "approved",
+            checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        logger.info(`Product ${snapshot.id} approved automatically.`);
     }
+    
+    await snapshot.ref.update(finalUpdateData);
+
   } catch (error) {
       logger.error(`Error during image moderation for product ${snapshot.id}:`, error);
       // Fallback: flag for manual review in case of AI API error
@@ -616,5 +654,3 @@ export const moderateProductImage = onDocumentCreated("products/{productId}", as
       });
   }
 });
-
-    
