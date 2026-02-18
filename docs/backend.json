@@ -274,6 +274,30 @@
       },
       "required": ["senderId", "content", "createdAt"]
     },
+    "SupportChat": {
+        "title": "SupportChat",
+        "type": "object",
+        "description": "Represents a support chat session between a user and the AI assistant.",
+        "properties": {
+          "userId": { "type": "string", "description": "The ID of the user who initiated the chat." },
+          "startedAt": { "type": "string", "format": "date-time", "description": "Timestamp when the chat started." },
+          "lastMessageAt": { "type": "string", "format": "date-time", "description": "Timestamp of the last message." },
+          "topic": { "type": "string", "description": "The initial topic or question of the chat." },
+          "status": { "type": "string", "enum": ["open", "resolved"], "description": "The current status of the chat." }
+        },
+        "required": ["userId", "startedAt"]
+    },
+    "SupportMessage": {
+        "title": "SupportMessage",
+        "type": "object",
+        "description": "Represents a single message within a support chat.",
+        "properties": {
+          "sender": { "type": "string", "enum": ["user", "ai"], "description": "Who sent the message." },
+          "content": { "type": "string", "description": "The text content of the message." },
+          "timestamp": { "type": "string", "format": "date-time", "description": "Timestamp of the message." }
+        },
+        "required": ["sender", "content", "timestamp"]
+    },
     "Review": {
         "title": "Review",
         "type": "object",
@@ -527,6 +551,14 @@
     "/conversations/{conversationId}/messages/{messageId}": {
       "schema": { "$ref": "#/entities/Message" },
       "description": "Subcollection for messages within a conversation."
+    },
+    "/support_chats/{chatId}": {
+        "schema": { "$ref": "#/entities/SupportChat" },
+        "description": "Top-level collection for AI support chat sessions."
+    },
+    "/support_chats/{chatId}/messages/{messageId}": {
+        "schema": { "$ref": "#/entities/SupportMessage" },
+        "description": "Subcollection for messages within a support chat."
     },
     "/reviews/{reviewId}": {
       "schema": { "$ref": "#/entities/Review" },

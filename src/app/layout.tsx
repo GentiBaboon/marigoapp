@@ -11,6 +11,7 @@ import { ShoppingPreferenceModal } from '@/components/home/ShoppingPreferenceMod
 import { DownloadAppBanner } from '@/components/home/DownloadAppBanner';
 import { I18nProvider } from '@/context/I18nProvider';
 import { CurrencyProvider } from '@/context/CurrencyContext';
+import { ChatbotWidget } from '@/components/ai/ChatbotWidget';
 
 export const metadata: Metadata = {
   title: 'MarigoApp',
@@ -49,6 +50,7 @@ export default function RootLayout({
                   <div className="relative flex min-h-screen flex-col">
                     <Header />
                     <main className="flex-1 pb-16 md:pb-0">{children}</main>
+                    <ChatbotWidget />
                     <MobileNav />
                     <ShoppingPreferenceModal />
                     <DownloadAppBanner />

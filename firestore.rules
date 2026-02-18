@@ -154,6 +154,16 @@ service cloud.firestore {
         allow get, list, write: if isOwner(resource.data.userId) || isAdmin();
     }
     
+    match /support_chats/{chatId} {
+      allow read, create, update: if isOwner(resource.data.userId);
+      allow list, delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read, create: if isOwner(get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId);
+        allow list, update, delete: if isAdmin();
+      }
+    }
+    
     // --------------------------------------------------------------------
     // Moderation
     // --------------------------------------------------------------------
