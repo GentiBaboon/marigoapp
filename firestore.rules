@@ -111,6 +111,11 @@ service cloud.firestore {
         allow list, write: if isAdmin();
     }
 
+    match /courier_profiles/{userId} {
+        allow read, create, update: if isOwner(userId) || isAdmin();
+        allow delete: if isAdmin();
+    }
+
     // --------------------------------------------------------------------
     // Communication Collections (/conversations, /notifications)
     // --------------------------------------------------------------------

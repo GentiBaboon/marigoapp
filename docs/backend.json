@@ -35,6 +35,15 @@
           "type": "boolean",
           "description": "Whether the user is a seller."
         },
+        "isCourier": {
+          "type": "boolean",
+          "description": "Whether the user has applied to be a courier."
+        },
+        "courierStatus": {
+          "type": "string",
+          "enum": ["pending_approval", "approved", "rejected"],
+          "description": "The status of the user's courier application."
+        },
         "stripeAccountId": {
           "type": "string",
           "description": "The user's Stripe Connected Account ID."
@@ -303,6 +312,22 @@
         },
         "required": ["orderId", "courierId", "status"]
     },
+    "CourierProfile": {
+      "title": "CourierProfile",
+      "type": "object",
+      "description": "Represents a courier's detailed profile.",
+      "properties": {
+        "userId": { "type": "string" },
+        "legalName": { "type": "string" },
+        "phone": { "type": "string" },
+        "dob": { "type": "string", "format": "date" },
+        "vehicleType": { "type": "string", "enum": ["bicycle", "scooter", "car", "van"] },
+        "licensePlate": { "type": "string" },
+        "serviceAreas": { "type": "string" },
+        "availability": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["userId", "legalName", "phone", "dob", "vehicleType", "serviceAreas"]
+    },
     "Report": {
         "title": "Report",
         "type": "object",
@@ -423,6 +448,10 @@
     "/deliveries/{deliveryId}": {
       "schema": { "$ref": "#/entities/Delivery" },
       "description": "Top-level collection for delivery assignments."
+    },
+    "/courier_profiles/{userId}": {
+      "schema": { "$ref": "#/entities/CourierProfile" },
+      "description": "Stores detailed profiles for delivery couriers."
     },
     "/reports/{reportId}": {
       "schema": { "$ref": "#/entities/Report" },

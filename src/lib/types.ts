@@ -59,6 +59,8 @@ export const firestoreUserSchema = z.object({
   stripeAccountId: z.string().optional().nullable(),
   stripeOnboardingComplete: z.boolean().optional(),
   status: z.enum(['active', 'banned']).optional(),
+  isCourier: z.boolean().optional(),
+  courierStatus: z.enum(['pending_approval', 'approved', 'rejected']).optional(),
 });
 export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
 
@@ -158,6 +160,26 @@ export interface SellDraft {
   currentStep: number;
   lastModified: number;
 }
+
+
+// --- Courier Schemas ---
+export const courierApplicationSchema = z.object({
+  legalName: z.string().min(3, "Legal name must be at least 3 characters long."),
+  phone: z.string().min(9, "Please enter a valid phone number."),
+  dob: z.date({
+    required_error: "A date of birth is required.",
+  }),
+  vehicleType: z.enum(['bicycle', 'scooter', 'car', 'van'], {
+    required_error: "Please select a vehicle type.",
+  }),
+  licensePlate: z.string().optional(),
+  serviceAreas: z.string().min(3, "Please enter at least one service area."),
+  availability: z.array(z.string()).refine(value => value.some(item => item), {
+    message: "You have to select at least one day.",
+  }),
+});
+
+export type CourierApplicationValues = z.infer<typeof courierApplicationSchema>;
 
 
 // --- Product & Cart Schemas ---
