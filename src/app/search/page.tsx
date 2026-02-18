@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, type QueryConstraint } from 'firebase/firestore';
+import { collection, query, where, orderBy, type QueryConstraint, limit } from 'firebase/firestore';
 import type { FirestoreProduct } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 
@@ -58,8 +58,10 @@ function ProductListPage() {
       queryConstraints.push(where('brand', '==', brand));
     }
     if (section === 'new-arrivals') {
-        queryConstraints.push(orderBy('listing_created', 'desc'));
+        queryConstraints.push(orderBy('listingCreated', 'desc'));
     }
+
+    queryConstraints.push(limit(50)); // Limit query results for performance
 
     return query(baseQuery, ...queryConstraints);
   }, [firestore, category, brand, section]);

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Handshake } from 'lucide-react';
-import { collectionGroup, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
+import { collectionGroup, query, where, getDocs, getDoc, doc, limit, orderBy } from 'firebase/firestore';
 
 import { useUser, useFirestore } from '@/firebase';
 import type { FirestoreOffer, FirestoreProduct } from '@/lib/types';
@@ -72,7 +72,12 @@ export default function OffersPage() {
         const fetchOffers = async () => {
             setIsLoading(true);
             try {
-                const offersQuery = query(collectionGroup(firestore, 'offers'), where('buyerId', '==', user.uid));
+                const offersQuery = query(
+                    collectionGroup(firestore, 'offers'), 
+                    where('buyerId', '==', user.uid),
+                    orderBy('createdAt', 'desc'),
+                    limit(50)
+                );
                 const offersSnapshot = await getDocs(offersQuery);
                 
                 const offersWithProductData: (OfferWithProduct | null)[] = await Promise.all(
@@ -91,9 +96,8 @@ export default function OffersPage() {
                     })
                 );
                 
-                const validOffers = offersWithProductData.filter((o): o is OfferWithProduct => o !== null)
-                    .sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
-
+                const validOffers = offersWithProductData.filter((o): o is OfferWithProduct => o !== null);
+                // The query already sorts by creation date.
                 setOffers(validOffers);
 
             } catch (error) {

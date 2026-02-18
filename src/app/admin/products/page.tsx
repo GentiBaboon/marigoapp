@@ -1,7 +1,7 @@
 'use client';
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreProduct } from '@/lib/types';
 import { DataTable } from '@/components/admin/users/data-table';
@@ -23,7 +23,7 @@ export default function AdminProductsPage() {
   const firestore = useFirestore();
 
   const productsQuery = useMemoFirebase(
-    () => query(collection(firestore, 'products'), orderBy('listingCreated', 'desc')),
+    () => query(collection(firestore, 'products'), orderBy('listingCreated', 'desc'), limit(100)),
     [firestore]
   );
   const { data: products, isLoading: productsLoading } =

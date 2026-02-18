@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreOrder } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ export default function AdminFinancePage() {
   const firestore = useFirestore();
 
   const ordersQuery = useMemoFirebase(
-    () => query(collection(firestore, 'orders'), orderBy('createdAt', 'desc')),
+    () => query(collection(firestore, 'orders'), orderBy('createdAt', 'desc'), limit(100)),
     [firestore]
   );
   const { data: orders, isLoading } =

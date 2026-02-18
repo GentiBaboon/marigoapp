@@ -1,6 +1,6 @@
 'use client';
 
-import { collection } from 'firebase/firestore';
+import { collection, query, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreUser } from '@/lib/types';
 import { DataTable } from '@/components/admin/users/data-table';
@@ -21,7 +21,7 @@ export default function AdminUsersPage() {
   const firestore = useFirestore();
 
   const usersQuery = useMemoFirebase(
-    () => collection(firestore, 'users'),
+    () => query(collection(firestore, 'users'), limit(100)),
     [firestore]
   );
   const { data: users, isLoading: usersLoading } =

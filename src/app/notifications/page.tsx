@@ -7,6 +7,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
 } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreNotification, FirestoreConversation } from '@/lib/types';
@@ -105,7 +106,8 @@ export default function NotificationsPage() {
     return query(
       collection(firestore, 'notifications'),
       where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(50)
     );
   }, [user, firestore]);
 

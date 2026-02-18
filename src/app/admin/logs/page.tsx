@@ -6,14 +6,14 @@ import { DataTable } from '@/components/admin/logs/data-table';
 import { columns } from '@/components/admin/logs/columns';
 import type { FirestoreAdminLog } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
 import LogsLoading from './loading';
 
 
 export default function AdminLogsPage() {
   const firestore = useFirestore();
   const logsQuery = useMemoFirebase(
-    () => query(collection(firestore, 'admin_logs'), orderBy('timestamp', 'desc')),
+    () => query(collection(firestore, 'admin_logs'), orderBy('timestamp', 'desc'), limit(100)),
     [firestore]
   );
   const { data: logs, isLoading } = useCollection<FirestoreAdminLog>(logsQuery);

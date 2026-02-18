@@ -7,6 +7,7 @@ import {
   where,
   orderBy,
   getDocs,
+  limit,
 } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import type {
@@ -34,7 +35,7 @@ export default function AdminLogisticsPage() {
 
   // Fetch all deliveries
   const deliveriesQuery = useMemoFirebase(
-    () => query(collection(firestore, 'deliveries')),
+    () => query(collection(firestore, 'deliveries'), limit(100)),
     [firestore]
   );
   const { data: deliveries, isLoading: deliveriesLoading } =

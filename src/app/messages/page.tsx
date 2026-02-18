@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, where, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, updateDoc, limit } from 'firebase/firestore';
 import type { FirestoreConversation, FirestoreUser } from '@/lib/types';
 import { ConversationListItem, ConversationSkeleton } from '@/components/messages/conversation-list-item';
 import { MessageSquare } from 'lucide-react';
@@ -20,7 +20,7 @@ function EmptyState() {
             <p className="mt-2 text-muted-foreground max-w-xs">
                 When you contact a seller, your conversation will appear here.
             </p>
-            <Button asChild className="mt-6">
+            <Button asChild className="mt-4">
                 <Link href="/home">Start Shopping</Link>
             </Button>
         </div>
@@ -69,7 +69,8 @@ export default function MessagesPage() {
         return query(
             collection(firestore, 'conversations'), 
             where('participants', 'array-contains', user.uid),
-            orderBy('lastMessageAt', 'desc')
+            orderBy('lastMessageAt', 'desc'),
+            limit(50)
         );
     }, [user, firestore]);
 

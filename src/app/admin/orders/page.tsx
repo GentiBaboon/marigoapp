@@ -1,6 +1,6 @@
 'use client';
 
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreOrder } from '@/lib/types';
 import { DataTable } from '@/components/admin/orders/data-table';
@@ -14,7 +14,7 @@ export default function AdminOrdersPage() {
   const firestore = useFirestore();
 
   const ordersQuery = useMemoFirebase(
-    () => query(collection(firestore, 'orders'), orderBy('createdAt', 'desc')),
+    () => query(collection(firestore, 'orders'), orderBy('createdAt', 'desc'), limit(100)),
     [firestore]
   );
   const { data: orders, isLoading: ordersLoading } =
