@@ -18,10 +18,11 @@ import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, limit } from 'firebase/firestore';
 import type { FirestoreReport, FirestoreProduct, FirestoreUser, FirestoreMessage, FirestoreReview } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ModerationQueue } from '@/components/admin/products/moderation-queue';
 
 
 const ReportItem = ({ report }: { report: FirestoreReport }) => {
@@ -75,11 +76,12 @@ const ReportItem = ({ report }: { report: FirestoreReport }) => {
         switch (report.type) {
             case 'product':
                 const product = itemData as FirestoreProduct;
+                const productTitle = (typeof product.title === 'object' && product.title?.en) ? product.title.en : product.title;
                 return (
                      <div className="flex items-center gap-3">
-                        <Image src={product.images?.[0] || ''} alt={product.title} width={64} height={64} className="rounded-md bg-background" />
+                        <Image src={product.images?.[0] || ''} alt={productTitle} width={64} height={64} className="rounded-md bg-background" />
                         <div>
-                            <p className="font-semibold">{product.title}</p>
+                            <p className="font-semibold">{productTitle}</p>
                             <p className="text-sm text-muted-foreground">Item ID: {report.itemId}</p>
                         </div>
                     </div>
@@ -101,9 +103,10 @@ const ReportItem = ({ report }: { report: FirestoreReport }) => {
              case 'message':
              case 'review':
                 const contentItem = itemData as FirestoreMessage | FirestoreReview;
+                const contentText = (typeof contentItem.content === 'object' && contentItem.content?.en) ? contentItem.content.en : contentItem.content;
                 return (
                      <blockquote className="border-l-4 pl-4 italic">
-                        "{contentItem.content}"
+                        "{contentText}"
                     </blockquote>
                 )
             default:
@@ -151,13 +154,29 @@ const ReportItem = ({ report }: { report: FirestoreReport }) => {
 
 export default function AdminModerationPage() {
   const firestore = useFirestore();
+
   const reportsQuery = useMemoFirebase(
-    () => query(collection(firestore, 'reports'), where('status', '==', 'pending')),
+    () => query(collection(firestore, 'reports'), where('status', '==', 'pending'), limit(50)),
     [firestore]
   );
-  const { data: reports, isLoading } = useCollection<FirestoreReport>(reportsQuery);
+  const { data: reports, isLoading: reportsLoading } = useCollection<FirestoreReport>(reportsQuery);
+
+  const productsToReviewQuery = useMemoFirebase(
+    () => query(collection(firestore, 'products'), where('status', '==', 'pending_review'), limit(50)),
+    [firestore]
+  );
+  const { data: productsToReview, isLoading: productsLoading } = useCollection<FirestoreProduct>(productsToReviewQuery);
+
 
   const reportsByType = (type: string) => reports?.filter(r => r.type === type) || [];
+
+  const isLoading = reportsLoading || productsLoading;
+  
+  const productCount = (reportsByType('product').length) + (productsToReview?.length || 0);
+  const userCount = reportsByType('user').length;
+  const messageCount = reportsByType('message').length;
+  const reviewCount = reportsByType('review').length;
+
 
   return (
     <div className="space-y-4">
@@ -170,39 +189,76 @@ export default function AdminModerationPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Content Moderation</h1>
           <p className="text-muted-foreground">
-            Review and take action on reported content.
+            Review and take action on reported content and new listings.
           </p>
         </div>
       </div>
       
       <Tabs defaultValue="products">
         <TabsList className="grid grid-cols-4 max-w-lg">
-            <TabsTrigger value="products">Products ({reportsByType('product').length})</TabsTrigger>
-            <TabsTrigger value="users">Users ({reportsByType('user').length})</TabsTrigger>
-            <TabsTrigger value="messages">Messages ({reportsByType('message').length})</TabsTrigger>
-            <TabsTrigger value="reviews">Reviews ({reportsByType('review').length})</TabsTrigger>
+            <TabsTrigger value="products">Products ({isLoading ? '...' : productCount})</TabsTrigger>
+            <TabsTrigger value="users">Users ({isLoading ? '...' : userCount})</TabsTrigger>
+            <TabsTrigger value="messages">Messages ({isLoading ? '...' : messageCount})</TabsTrigger>
+            <TabsTrigger value="reviews">Reviews ({isLoading ? '...' : reviewCount})</TabsTrigger>
         </TabsList>
 
         {isLoading ? <p>Loading reports...</p> : (
             <>
                 <TabsContent value="products" className="mt-4">
-                    <div className="space-y-4">
-                        {reportsByType('product').map(report => <ReportItem key={report.id} report={report} />)}
+                    <div className="space-y-6">
+                        <div>
+                            <h3 className="text-xl font-bold mb-4">New Products for Review</h3>
+                            {productsToReview && productsToReview.length > 0 ? (
+                                <ModerationQueue products={productsToReview} />
+                            ) : (
+                                <Card>
+                                    <CardContent className="p-6 text-center text-muted-foreground">
+                                        No new products are waiting for review.
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+
+                        <Separator />
+
+                         <div>
+                            <h3 className="text-xl font-bold mb-4">Reported Products</h3>
+                            {reportsByType('product').length > 0 ? (
+                                <div className="space-y-4">
+                                  {reportsByType('product').map(report => <ReportItem key={report.id} report={report} />)}
+                                </div>
+                            ) : (
+                                <Card>
+                                    <CardContent className="p-6 text-center text-muted-foreground">
+                                        No products have been reported.
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
                     </div>
                 </TabsContent>
                 <TabsContent value="users" className="mt-4">
                     <div className="space-y-4">
-                        {reportsByType('user').map(report => <ReportItem key={report.id} report={report} />)}
+                        {reportsByType('user').length > 0 ?
+                            reportsByType('user').map(report => <ReportItem key={report.id} report={report} />) :
+                            <Card><CardContent className="p-6 text-center text-muted-foreground">No users have been reported.</CardContent></Card>
+                        }
                     </div>
                 </TabsContent>
                 <TabsContent value="messages" className="mt-4">
                     <div className="space-y-4">
-                        {reportsByType('message').map(report => <ReportItem key={report.id} report={report} />)}
+                        {reportsByType('message').length > 0 ?
+                            reportsByType('message').map(report => <ReportItem key={report.id} report={report} />) :
+                            <Card><CardContent className="p-6 text-center text-muted-foreground">No messages have been reported.</CardContent></Card>
+                        }
                     </div>
                 </TabsContent>
                 <TabsContent value="reviews" className="mt-4">
                     <div className="space-y-4">
-                        {reportsByType('review').map(report => <ReportItem key={report.id} report={report} />)}
+                        {reportsByType('review').length > 0 ?
+                            reportsByType('review').map(report => <ReportItem key={report.id} report={report} />) :
+                            <Card><CardContent className="p-6 text-center text-muted-foreground">No reviews have been reported.</CardContent></Card>
+                        }
                     </div>
                 </TabsContent>
             </>
