@@ -386,7 +386,17 @@ export type FirestoreReport = z.infer<typeof firestoreReportSchema> & { id: stri
 export const firestoreAdminLogSchema = z.object({
   adminId: z.string(),
   adminName: z.string(),
-  actionType: z.enum(["product_approved", "product_rejected", "user_banned", "user_unbanned", "user_role_changed", "order_status_updated", "setting_changed"]),
+  actionType: z.enum([
+      "product_approved", 
+      "product_rejected", 
+      "user_banned", 
+      "user_unbanned", 
+      "user_role_changed", 
+      "order_status_updated", 
+      "setting_changed",
+      "courier_approved",
+      "courier_rejected"
+    ]),
   details: z.string(),
   targetId: z.string(),
   timestamp: z.any(),

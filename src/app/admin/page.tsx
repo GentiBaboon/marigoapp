@@ -24,6 +24,7 @@ import {
   ShieldAlert,
   Settings,
   Archive,
+  Truck,
 } from 'lucide-react';
 import { StatCard } from '@/components/admin/stat-card';
 import { RevenueChart } from '@/components/admin/charts/revenue-chart';
@@ -133,6 +134,12 @@ export default function AdminDashboardPage() {
                 </Button>
                  <Button asChild variant="outline">
                     <Link href="/admin/finance">Financials</Link>
+                </Button>
+                <Button asChild variant="outline">
+                    <Link href="/admin/logistics">
+                        <Truck className="mr-2 h-4 w-4" />
+                        Logistics
+                    </Link>
                 </Button>
                 <Button asChild variant="outline">
                     <Link href="/admin/moderation">

@@ -401,7 +401,7 @@
         "properties": {
             "adminId": { "type": "string" },
             "adminName": { "type": "string" },
-            "actionType": { "type": "string", "enum": ["product_approved", "product_rejected", "user_banned", "user_unbanned", "user_role_changed", "order_status_updated", "setting_changed"] },
+            "actionType": { "type": "string", "enum": ["product_approved", "product_rejected", "user_banned", "user_unbanned", "user_role_changed", "order_status_updated", "setting_changed", "courier_approved", "courier_rejected"] },
             "details": { "type": "string" },
             "targetId": { "type": "string" },
             "timestamp": { "type": "string", "format": "date-time" }

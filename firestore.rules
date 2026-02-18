@@ -134,6 +134,7 @@ service cloud.firestore {
 
     match /courier_profiles/{userId} {
         allow read, create, update: if isOwner(userId) || isAdmin();
+        allow list: if isAdmin();
         allow delete: if isAdmin();
     }
 
