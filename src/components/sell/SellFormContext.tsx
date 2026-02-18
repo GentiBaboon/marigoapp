@@ -2,6 +2,8 @@
 
 import React, { useState, createContext, useContext, ReactNode, useEffect, useCallback, useMemo } from 'react';
 import type { SellFormValues, SellDraft } from '@/lib/types';
+import { useFirestore } from '@/firebase';
+import { doc, collection } from 'firebase/firestore';
 
 interface SellFormContextType {
   drafts: SellDraft[];
@@ -27,6 +29,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const totalSteps = 7;
+  const firestore = useFirestore();
 
   // Load drafts from localStorage on initial mount
   useEffect(() => {
@@ -70,16 +73,20 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [activeDraftId]);
   
   const startNewDraft = useCallback(() => {
+    if (!firestore) return;
+    const newProductId = doc(collection(firestore, 'products')).id;
     const newDraftId = `draft_${Date.now()}`;
     const newDraft: SellDraft = {
         id: newDraftId,
-        formData: {},
+        formData: {
+            productId: newProductId
+        },
         currentStep: 1,
         lastModified: Date.now(),
     };
     setDrafts(prev => [...prev, newDraft]);
     setActiveDraftId(newDraftId);
-  }, []);
+  }, [firestore]);
 
   const selectDraft = useCallback((draftId: string) => {
       setActiveDraftId(draftId);
@@ -152,4 +159,5 @@ export const useSellForm = () => {
   }
   return context;
 };
+    
     

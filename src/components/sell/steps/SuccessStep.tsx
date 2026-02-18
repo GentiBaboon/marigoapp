@@ -39,6 +39,7 @@ export function SuccessStep() {
     
     // In a real app this would be calculated based on the order. Hardcoding based on image for now.
     const buyerServiceFee = 6;
+    const title = typeof formData.title === 'object' ? formData.title.en : formData.title;
 
     return (
         <div className="flex flex-col items-center text-center space-y-6">
@@ -56,8 +57,8 @@ export function SuccessStep() {
                 <div className="relative h-20 w-20 flex-shrink-0 bg-muted rounded-md">
                     {formData.images && formData.images.length > 0 ? (
                         <Image
-                            src={formData.images[0].preview}
-                            alt={formData.title || 'Submitted item'}
+                            src={formData.images[0].url}
+                            alt={title || 'Submitted item'}
                             fill
                             sizes="80px"
                             className="object-cover rounded-md"
@@ -68,7 +69,7 @@ export function SuccessStep() {
                 </div>
                 <div className="flex-1">
                     <p className="font-semibold uppercase text-muted-foreground text-sm">{formData.brand || 'NON SIGNÉ / UNSIGNED'}</p>
-                    <p className="font-medium">{formData.title || 'Cloth handbag'}</p>
+                    <p className="font-medium">{title || 'Cloth handbag'}</p>
                     <p className="font-semibold">{currencyFormatter(formData.price)} (You earn {currencyFormatter(formData.sellerEarning)})</p>
                     <p className="text-sm text-muted-foreground">Buyer service fee not included ({currencyFormatter(buyerServiceFee)})</p>
                 </div>
@@ -97,3 +98,5 @@ export function SuccessStep() {
         </div>
     );
 }
+
+    

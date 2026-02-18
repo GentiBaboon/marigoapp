@@ -1,3 +1,4 @@
+'use client';
 import { z } from "zod";
 
 export const priceSuggestionSchema = z.object({
@@ -94,14 +95,14 @@ export type FirestoreAddress = AddressFormValues & {
 
 // --- Sell Schemas ---
 export const imageFileSchema = z.object({
-  preview: z.string(), // This will be a data URL
+  url: z.string().url(),
   name: z.string(),
   type: z.string(),
 });
 export type ImageFile = z.infer<typeof imageFileSchema>;
 
 export const proofFileSchema = z.object({
-  preview: z.string(), // data URL or object URL for PDFs
+  url: z.string().url(),
   name: z.string(),
   type: z.string(),
 });
@@ -160,7 +161,11 @@ export const sellFormSchema = sellStep1Schema
   .merge(sellStep5Schema)
   .merge(sellStep6Schema);
 
-export type SellFormValues = z.infer<typeof sellFormSchema> & { sellerEarning?: number; currency?: 'EUR' };
+export type SellFormValues = z.infer<typeof sellFormSchema> & { 
+    sellerEarning?: number; 
+    currency?: 'EUR';
+    productId?: string;
+};
 
 export interface SellDraft {
   id: string;
@@ -214,7 +219,7 @@ export const firestoreProductSchema = z.object({
   price: z.number(),
   category: z.string(),
   subCategory: z.string(),
-  images: z.array(z.string()),
+  images: z.array(z.string().url()),
   status: z.enum(["active", "sold", "reserved", "pending_review", "rejected"]),
   listingCreated: z.any(),
   keywords: z.array(z.string()).optional(),
@@ -467,3 +472,5 @@ export const firestoreExchangeRatesSchema = z.object({
   }),
 });
 export type FirestoreExchangeRates = z.infer<typeof firestoreExchangeRatesSchema>;
+
+    

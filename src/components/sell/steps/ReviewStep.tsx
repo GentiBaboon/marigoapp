@@ -63,18 +63,18 @@ export function ReviewStep() {
 
 
   const handlePublish = async () => {
-    if (!user || !firestore) {
+    if (!user || !firestore || !formData.productId) {
         toast({
             variant: 'destructive',
-            title: 'Authentication Error',
-            description: 'You must be signed in to create a listing.',
+            title: 'Error',
+            description: 'You must be signed in and have a valid draft to create a listing.',
         });
         return;
     }
     setIsLoading(true);
 
     try {
-        const keywords = Array.from(new Set((formData.title || '').toLowerCase().split(' ').filter(Boolean)));
+        const keywords = Array.from(new Set((formData.title?.en || '').toLowerCase().split(' ').filter(Boolean)));
 
         const listingData: Partial<Omit<FirestoreProduct, 'id'>> & { listingCreated: any } = {
             sellerId: user.uid,
@@ -83,7 +83,7 @@ export function ReviewStep() {
             price: formData.price || 0,
             category: formData.category || '',
             subCategory: formData.category || '',
-            images: formData.images?.map((img) => img.preview) || [],
+            images: formData.images?.map((img) => img.url) || [],
             status: 'pending_review',
             listingCreated: serverTimestamp(),
             keywords: keywords,
@@ -188,7 +188,7 @@ export function ReviewStep() {
                 <div className="grid grid-cols-3 gap-2 mt-2">
                     {formData.images?.slice(0, 3).map((image, index) => (
                         <div key={index} className="relative aspect-[1/1] rounded-md overflow-hidden bg-muted">
-                            <Image src={image.preview} alt={`preview ${index}`} fill sizes="150px" className="object-cover" />
+                            <Image src={image.url} alt={`preview ${index}`} fill sizes="150px" className="object-cover" />
                         </div>
                     ))}
                 </div>
@@ -197,7 +197,7 @@ export function ReviewStep() {
             <Separator/>
             
              <ReviewSection title="Description" onEdit={() => goToStep(4)}>
-                <p className="text-foreground">{formData.description}</p>
+                <p className="text-foreground">{formData.description?.en || formData.description}</p>
             </ReviewSection>
 
             <Separator/>
@@ -252,3 +252,5 @@ export function ReviewStep() {
     </div>
   );
 }
+
+    

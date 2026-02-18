@@ -11,11 +11,13 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import imageCompression from 'browser-image-compression';
 import type { ImageFile } from '@/lib/types';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useFirebaseApp } from '@/firebase';
 
-// The local state for this component, including temporary properties
 type ImageFileState = ImageFile & {
   id: string;
   isLoading: boolean;
+  error?: string;
 };
 
 const fileToDataUrl = (file: Blob | File): Promise<string> => {
@@ -27,10 +29,11 @@ const fileToDataUrl = (file: Blob | File): Promise<string> => {
     });
 };
 
-
 export function PhotosStep() {
   const { formData, setFormData, nextStep } = useSellForm();
   const { toast } = useToast();
+  const firebaseApp = useFirebaseApp();
+  const storage = getStorage(firebaseApp);
 
   const [imageFiles, setImageFiles] = useState<ImageFileState[]>(
     formData.images?.map((img, i) => ({ 
@@ -50,47 +53,35 @@ export function PhotosStep() {
         });
       }
 
-      const newFilesToProcess: (ImageFileState & { file: File })[] = acceptedFiles.map(file => ({
-        id: `${file.name}-${file.lastModified}-${Math.random()}`,
-        preview: URL.createObjectURL(file), // Use temporary object URL for immediate feedback
-        name: file.name,
-        type: file.type,
-        isLoading: true,
-        file: file,
-      }));
+      const productId = formData.productId;
+      if (!productId) {
+          toast({ variant: 'destructive', title: 'Error', description: 'Could not create a product draft. Please go back and try again.' });
+          return;
+      }
 
-      setImageFiles(current => [...current, ...newFilesToProcess]);
+      acceptedFiles.forEach(async (file) => {
+          const fileId = `${file.name}-${Date.now()}`;
+          const tempUrl = URL.createObjectURL(file);
 
-      newFilesToProcess.forEach(async imageFile => {
-        try {
-          const compressedFile = await imageCompression(imageFile.file, {
-            maxSizeMB: 0.8,
-            maxWidthOrHeight: 1200,
-            useWebWorker: true,
-          });
-          
-          const dataUrl = await fileToDataUrl(compressedFile);
-          
-          setImageFiles(current => {
-             const originalFile = current.find(f => f.id === imageFile.id);
-             if (originalFile) {
-               URL.revokeObjectURL(originalFile.preview); // Free up memory from the temporary object URL
-             }
-             return current.map(f => f.id === imageFile.id ? { ...f, preview: dataUrl, isLoading: false } : f);
-          });
+          setImageFiles(current => [...current, { id: fileId, url: tempUrl, name: file.name, type: file.type, isLoading: true }]);
 
-        } catch (error) {
-          console.error("Compression error:", error);
-          toast({
-            variant: 'destructive',
-            title: 'Image Processing Failed',
-            description: `Could not process ${imageFile.file.name}.`,
-          });
-          setImageFiles(current => current.filter(f => f.id !== imageFile.id));
-        }
+          try {
+              const compressedFile = await imageCompression(file, { maxSizeMB: 0.8, maxWidthOrHeight: 1200, useWebWorker: true });
+              const storageRef = ref(storage, `products/${productId}/${fileId}-${file.name}`);
+              await uploadBytes(storageRef, compressedFile);
+              const downloadURL = await getDownloadURL(storageRef);
+
+              URL.revokeObjectURL(tempUrl); // Clean up blob URL
+              setImageFiles(current => current.map(f => f.id === fileId ? { ...f, url: downloadURL, isLoading: false } : f));
+          } catch (error) {
+              console.error("Upload failed:", error);
+              toast({ variant: 'destructive', title: 'Upload Failed', description: `Could not upload ${file.name}` });
+              URL.revokeObjectURL(tempUrl);
+              setImageFiles(current => current.filter(f => f.id !== fileId));
+          }
       });
     },
-    [toast]
+    [formData.productId, storage, toast]
   );
   
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -99,6 +90,8 @@ export function PhotosStep() {
   });
 
   const removeFile = (idToRemove: string) => {
+    // Note: This doesn't delete the file from Firebase Storage.
+    // A more robust implementation would do that.
     setImageFiles(prev => prev.filter(file => file.id !== idToRemove));
   };
   
@@ -119,29 +112,25 @@ export function PhotosStep() {
       });
       return;
     }
-    // Data is already in the context via the useEffect hook
     nextStep();
   }
 
   useEffect(() => {
-    // This effect ensures that any changes to imageFiles are propagated to the form context
-    // This is key for the draft mechanism to work as you add/remove photos
     const filesToSave: ImageFile[] = imageFiles
-        .filter(f => !f.isLoading)
-        .map(({ preview, name, type }) => ({ preview, name, type }));
+        .filter(f => !f.isLoading && !f.error)
+        .map(({ url, name, type }) => ({ url, name, type }));
     setFormData({ images: filesToSave });
   }, [imageFiles, setFormData]);
 
-  // Clean up object URLs on unmount
   useEffect(() => {
     return () => {
         imageFiles.forEach(file => {
-            if (file.preview.startsWith('blob:')) {
-                URL.revokeObjectURL(file.preview);
+            if (file.url.startsWith('blob:')) {
+                URL.revokeObjectURL(file.url);
             }
         });
     }
-  }, []);
+  }, [imageFiles]);
 
 
   return (
@@ -171,7 +160,7 @@ export function PhotosStep() {
           {imageFiles.map((file) => (
             <div key={file.id} className="relative aspect-square">
               <Image
-                src={file.preview}
+                src={file.url}
                 alt={`Preview ${file.name}`}
                 fill
                 sizes="128px"
@@ -210,3 +199,5 @@ export function PhotosStep() {
     </div>
   );
 }
+
+    
