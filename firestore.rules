@@ -21,6 +21,10 @@ service cloud.firestore {
       // Check for an 'admin' custom claim OR a specific developer admin UID.
       return isSignedIn() && (request.auth.token.admin == true || request.auth.uid == '2C81RVoXZWZuSWXEEueehqbHkMu1');
     }
+    
+    function isApprovedCourier() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.courierStatus == 'approved';
+    }
 
     function isCorrectOwnerInRequestData(ownerFieldName) {
       return request.resource.data[ownerFieldName] == request.auth.uid;
@@ -107,8 +111,17 @@ service cloud.firestore {
     }
     
     match /deliveries/{deliveryId} {
-        allow get: if isSignedIn() && (isOwner(resource.data.courierId) || isAdmin());
-        allow list, write: if isAdmin();
+        allow read: if isApprovedCourier() || isAdmin();
+        allow create: if isAdmin();
+        // Allow a courier to assign an unassigned job to themselves,
+        // or allow an assigned courier to update their own job, or allow admin.
+        allow update: if isAdmin() || (
+            isApprovedCourier() && (
+                (resource.data.courierId == null && request.resource.data.courierId == request.auth.uid) || 
+                (resource.data.courierId == request.auth.uid)
+            )
+        );
+        allow delete: if isAdmin();
     }
 
     match /courier_profiles/{userId} {

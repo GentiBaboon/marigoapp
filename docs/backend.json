@@ -306,11 +306,16 @@
         "properties": {
             "orderId": { "type": "string" },
             "courierId": { "type": "string" },
-            "status": { "type": "string" },
-            "addresses": { "type": "object" },
-            "proofOfDelivery": { "type": "string", "format": "uri" }
+            "status": { "type": "string", "enum": ["pending_assignment", "assigned", "picked_up", "in_transit", "delivered", "cancelled"] },
+            "addresses": { "type": "object", "properties": { "pickup": { "$ref": "#/entities/Address" }, "delivery": { "$ref": "#/entities/Address" } } },
+            "proofOfDelivery": { "type": "string", "format": "uri" },
+            "deliveryFee": { "type": "number" },
+            "packageSize": { "type": "string", "enum": ["small", "medium", "large"] },
+            "timeEstimate": { "type": "number", "description": "Estimated delivery time in minutes" },
+            "specialInstructions": { "type": "string" },
+            "distance": { "type": "number", "description": "Distance in kilometers" }
         },
-        "required": ["orderId", "courierId", "status"]
+        "required": ["orderId", "status"]
     },
     "CourierProfile": {
       "title": "CourierProfile",
@@ -324,7 +329,8 @@
         "vehicleType": { "type": "string", "enum": ["bicycle", "scooter", "car", "van"] },
         "licensePlate": { "type": "string" },
         "serviceAreas": { "type": "string" },
-        "availability": { "type": "array", "items": { "type": "string" } }
+        "availability": { "type": "array", "items": { "type": "string" } },
+        "isAvailable": { "type": "boolean", "default": true }
       },
       "required": ["userId", "legalName", "phone", "dob", "vehicleType", "serviceAreas"]
     },

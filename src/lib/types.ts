@@ -181,6 +181,20 @@ export const courierApplicationSchema = z.object({
 
 export type CourierApplicationValues = z.infer<typeof courierApplicationSchema>;
 
+export const firestoreCourierProfileSchema = z.object({
+  userId: z.string(),
+  legalName: z.string(),
+  phone: z.string(),
+  dob: z.string(),
+  vehicleType: z.enum(['bicycle', 'scooter', 'car', 'van']),
+  licensePlate: z.string().optional(),
+  serviceAreas: z.string(),
+  availability: z.array(z.string()),
+  isAvailable: z.boolean().default(true),
+});
+
+export type FirestoreCourierProfile = z.infer<typeof firestoreCourierProfileSchema> & { id: string };
+
 
 // --- Product & Cart Schemas ---
 
@@ -258,6 +272,24 @@ export const firestoreOrderSchema = z.object({
 });
 
 export type FirestoreOrder = z.infer<typeof firestoreOrderSchema> & { id: string };
+
+// --- Delivery Schema ---
+export const firestoreDeliverySchema = z.object({
+    orderId: z.string(),
+    courierId: z.string().nullable().optional(),
+    status: z.enum(["pending_assignment", "assigned", "picked_up", "in_transit", "delivered", "cancelled"]),
+    addresses: z.object({
+        pickup: addressSchema,
+        delivery: addressSchema,
+    }),
+    proofOfDelivery: z.string().url().optional(),
+    deliveryFee: z.number(),
+    packageSize: z.enum(["small", "medium", "large"]),
+    timeEstimate: z.number().optional(),
+    specialInstructions: z.string().optional(),
+    distance: z.number().optional(),
+});
+export type FirestoreDelivery = z.infer<typeof firestoreDeliverySchema> & { id: string };
 
 
 // --- Messaging Schemas ---
