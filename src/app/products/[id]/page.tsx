@@ -108,9 +108,9 @@ export default function ProductDetailPage() {
     const { data: product, isLoading: isProductLoading } = useDoc<FirestoreProduct>(productRef);
 
     const sellerRef = useMemoFirebase(() => {
-        if (!firestore || !product?.sellerId) return null;
+        if (!firestore || !product?.sellerId || !user) return null;
         return doc(firestore, 'users', product.sellerId);
-    }, [firestore, product?.sellerId]);
+    }, [firestore, product?.sellerId, user]);
     const { data: seller } = useDoc<FirestoreUser>(sellerRef);
     
     const { addToCart } = useCart();
@@ -125,7 +125,7 @@ export default function ProductDetailPage() {
 
     React.useEffect(() => {
         if (!isUserLoading && !user) {
-            router.replace('/auth');
+            // No redirect, allow guest users to view the page
         }
     }, [user, isUserLoading, router]);
 
@@ -242,7 +242,7 @@ export default function ProductDetailPage() {
     };
 
 
-    if (isProductLoading || isUserLoading || !user) {
+    if (isProductLoading || isUserLoading) {
         return <ProductPageSkeleton />;
     }
 
@@ -259,6 +259,10 @@ export default function ProductDetailPage() {
     }
   
     const handleAddToCart = () => {
+        if (!user) {
+            router.push('/auth');
+            return;
+        }
         addToCart({
         id: product.id,
         brand: product.brand,
@@ -364,7 +368,7 @@ export default function ProductDetailPage() {
                     </div>
                 ) : (
                     <>
-                        <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90 h-12 text-base" onClick={handleAddToCart} disabled={!user || isSoldOrReserved}>Add to bag</Button>
+                        <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90 h-12 text-base" onClick={handleAddToCart} disabled={isSoldOrReserved}>Add to bag</Button>
                         <div className="grid grid-cols-2 gap-3">
                             <Button size="lg" variant="outline" className="w-full h-12 text-base" onClick={handleChat} disabled={isChatLoading || !user || isSoldOrReserved}>
                                 {isChatLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
