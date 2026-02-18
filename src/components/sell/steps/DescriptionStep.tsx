@@ -1,4 +1,5 @@
 'use client';
+import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -35,8 +36,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Info } from 'lucide-react';
+import { Info, Wand2, Loader2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { productCategories } from '@/lib/mock-data';
+import { generateDescription, type GenerateDescriptionInput } from '@/ai/flows/generate-description';
+
 
 type Step4Values = z.infer<typeof sellStep4Schema>;
 
@@ -58,6 +64,8 @@ const packagingItems = [
 
 export function DescriptionStep() {
   const { formData, setFormData, nextStep } = useSellForm();
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const { toast } = useToast();
 
   const form = useForm<Step4Values>({
     resolver: zodResolver(sellStep4Schema),
@@ -70,6 +78,61 @@ export function DescriptionStep() {
       packaging: formData.packaging || [],
     },
   });
+
+  const getCategoryName = (gender: string | undefined, categorySlug: string | undefined): string => {
+    if (!gender || !categorySlug) return formData.category || '';
+    const genderName = `${gender.charAt(0).toUpperCase()}${gender.slice(1)}'s`;
+    
+    for (const mainCategory of productCategories) {
+        const sub = mainCategory.subcategories.find(s => s.slug === categorySlug);
+        if (sub) {
+            return `${genderName} ${sub.name}`;
+        }
+    }
+    return `${genderName} ${categorySlug}`;
+  }
+
+  const handleGenerateDescription = async () => {
+    setIsGenerating(true);
+    try {
+      if (!formData.title || !formData.brand || !formData.category || !formData.images || formData.images.length === 0) {
+           toast({
+              variant: 'destructive',
+              title: 'Missing Information',
+              description: 'Please provide a title, brand, category, and at least one photo before generating a description.',
+          });
+          setIsGenerating(false);
+          return;
+      }
+      
+      const categoryName = getCategoryName(formData.gender, formData.category);
+
+      const input: GenerateDescriptionInput = {
+        title: formData.title,
+        brand: formData.brand,
+        category: categoryName,
+        condition: formData.condition,
+        images: formData.images.map(img => img.preview),
+      };
+
+      const result = await generateDescription(input);
+      form.setValue('description', result.description, { shouldValidate: true });
+      toast({
+          title: 'Description Generated!',
+          description: 'The AI-generated description has been added.',
+      });
+    } catch (error) {
+      console.error("AI description generation failed:", error);
+      toast({
+          variant: 'destructive',
+          title: 'Generation Failed',
+          description: 'Could not generate a description at this time. Please try again.',
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
 
   const onSubmit = (data: Step4Values) => {
     setFormData(data);
@@ -105,7 +168,17 @@ export function DescriptionStep() {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <div className="flex justify-between items-center">
+                    <FormLabel>Description</FormLabel>
+                    <Button type="button" variant="outline" size="sm" onClick={handleGenerateDescription} disabled={isGenerating}>
+                        {isGenerating ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Wand2 className="mr-2 h-4 w-4" />
+                        )}
+                        Generate with AI
+                    </Button>
+                  </div>
                   <FormControl>
                     <Textarea
                       placeholder="Describe the item's features, history, and any imperfections."
