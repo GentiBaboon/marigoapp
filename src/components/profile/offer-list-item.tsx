@@ -7,9 +7,7 @@ import { format } from 'date-fns';
 import type { OfferWithProduct } from '@/app/profile/offers/page';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useCurrency } from '@/context/CurrencyContext';
-import { useI18n } from '@/hooks/use-i18n';
 
 const statusStyles: { [key: string]: string } = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -24,10 +22,9 @@ const statusStyles: { [key: string]: string } = {
 export function OfferListItem({ offer }: { offer: OfferWithProduct }) {
     const { product } = offer;
     const { formatPrice } = useCurrency();
-    const { l } = useI18n();
 
     const imageUrl = product.images?.[0] || 'https://placehold.co/96x96/E2E8F0/A0AEC0?text=MARIGO';
-    const displayTitle = l(product.title);
+    const displayTitle = product.title?.en;
     const imageAlt = displayTitle;
 
     const getStatusLabel = (status: string) => {

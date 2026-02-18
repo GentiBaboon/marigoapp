@@ -4,20 +4,18 @@ import { Home, Heart, User, Search, PlusCircle } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/firebase';
-import { useI18n } from '@/hooks/use-i18n';
 
 export function MobileNav() {
     const pathname = usePathname();
     const { user, isUserLoading } = useUser();
     const router = useRouter();
-    const { t } = useI18n();
 
     const navItems = [
-        { href: '/home', label: t('Nav.home'), icon: Home, requiresAuth: false },
-        { href: '/browse', label: t('Nav.shop'), icon: Search, requiresAuth: false },
-        { href: '/sell', label: t('Nav.sell'), icon: PlusCircle, requiresAuth: true },
-        { href: '/favorites', label: t('Nav.favorites'), icon: Heart, requiresAuth: true },
-        { href: '/profile', label: t('Nav.me'), icon: User, requiresAuth: true },
+        { href: '/home', label: "Home", icon: Home, requiresAuth: false },
+        { href: '/browse', label: "Shop", icon: Search, requiresAuth: false },
+        { href: '/sell', label: "Sell", icon: PlusCircle, requiresAuth: true },
+        { href: '/favorites', label: "Favorites", icon: Heart, requiresAuth: true },
+        { href: '/profile', label: "Me", icon: User, requiresAuth: true },
     ];
   
   return (
@@ -48,4 +46,3 @@ export function MobileNav() {
     </div>
   );
 }
-    

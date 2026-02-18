@@ -1,12 +1,5 @@
 import { z } from "zod";
 
-export const localizedStringSchema = z.object({
-  sq: z.string(),
-  en: z.string(),
-  it: z.string(),
-});
-export type LocalizedString = z.infer<typeof localizedStringSchema>;
-
 export const priceSuggestionSchema = z.object({
   category: z.string().min(3, "Category must be at least 3 characters long."),
   brand: z.string().min(2, "Brand must be at least 2 characters long."),
@@ -49,7 +42,9 @@ export const forgotPasswordSchema = z.object({
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
 export const editProfileSchema = z.object({
-  displayName: z.string().min(2, "Name must be at least 2 characters.").max(50, "Name must be 50 characters or less."),
+  firstName: z.string().min(1, "First name is required.").max(50),
+  lastName: z.string().min(1, "Last name is required.").max(50),
+  phone: z.string().optional(),
 });
 export type EditProfileValues = z.infer<typeof editProfileSchema>;
 
@@ -58,6 +53,7 @@ export const firestoreUserSchema = z.object({
   id: z.string(),
   displayName: z.string().optional().nullable(),
   email: z.string().email().optional().nullable(),
+  phone: z.string().optional().nullable(),
   photoURL: z.string().url().optional().nullable(),
   macroCategoryPreference: z.enum(["womenswear", "menswear"]).optional(),
   language: z.string().optional(),
@@ -134,8 +130,8 @@ export const sellStep3Schema = z.object({
 });
 
 export const sellStep4Schema = z.object({
-    title: z.string().min(10, 'Title must be at least 10 characters.').max(70, 'Title must be 70 characters or less.'),
-    description: z.string().min(20, 'Description must be at least 20 characters.').max(500, 'Description cannot exceed 500 characters.'),
+    title: z.any(),
+    description: z.any(),
     origin: z.enum(['direct', 'private', 'vestiaire', 'other']).optional(),
     yearOfPurchase: z.string().optional(),
     serialNumber: z.string().optional(),
@@ -212,9 +208,9 @@ export type FirestoreCourierProfile = z.infer<typeof firestoreCourierProfileSche
 
 export const firestoreProductSchema = z.object({
   sellerId: z.string(),
-  title: localizedStringSchema,
+  title: z.any(),
   brand: z.string(),
-  description: localizedStringSchema,
+  description: z.any(),
   price: z.number(),
   category: z.string(),
   subCategory: z.string(),
@@ -269,7 +265,7 @@ export type FirestoreOffer = z.infer<typeof firestoreOfferSchema> & { id: string
 const orderItemSchema = z.object({
   productId: z.string(),
   sellerId: z.string(),
-  title: z.union([z.string(), localizedStringSchema]),
+  title: z.any(),
   brand: z.string(),
   image: z.string(),
   price: z.number(),
@@ -358,7 +354,7 @@ export const firestoreConversationSchema = z.object({
     avatar: z.string().optional(),
   })),
   productId: z.string(),
-  productTitle: localizedStringSchema,
+  productTitle: z.string(),
   productImage: z.string(),
   lastMessage: z.string().optional(),
   lastMessageAt: z.any(),
@@ -373,8 +369,7 @@ export const firestoreReviewSchema = z.object({
   reviewerId: z.string(), // The one writing the review (buyer)
   revieweeId: z.string(), // The one being reviewed (seller)
   rating: z.number().min(1).max(5),
-  title: localizedStringSchema.optional(),
-  content: localizedStringSchema,
+  content: z.any(),
   createdAt: z.any(),
 });
 export type FirestoreReview = z.infer<typeof firestoreReviewSchema> & { id: string };
@@ -443,7 +438,7 @@ export const firestoreCouponSchema = z.object({
 export type FirestoreCoupon = z.infer<typeof firestoreCouponSchema> & { id: string };
 
 export const firestoreCategorySchema = z.object({
-  name: z.object({ sq: z.string(), en: z.string(), it: z.string() }),
+  name: z.any(),
   slug: z.string(),
   parentId: z.string().optional().nullable(),
   icon: z.string().optional(),
@@ -472,5 +467,3 @@ export const firestoreExchangeRatesSchema = z.object({
   }),
 });
 export type FirestoreExchangeRates = z.infer<typeof firestoreExchangeRatesSchema>;
-
-    

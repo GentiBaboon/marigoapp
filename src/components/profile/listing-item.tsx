@@ -25,7 +25,6 @@ import {
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useCurrency } from '@/context/CurrencyContext';
-import { useI18n } from '@/hooks/use-i18n';
 
 const statusStyles = {
   active: 'bg-green-100 text-green-800 border-green-200',
@@ -40,11 +39,10 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
   const isSale = !!order;
   const firestore = useFirestore();
   const { formatPrice } = useCurrency();
-  const { l } = useI18n();
 
   const itemData = isSale ? order.items[0] : product!;
   const imageUrl = isSale ? order.items[0].image : (product?.images?.[0] || PlaceHolderImages.find(p => p.id === 'product-1')?.imageUrl || '/placeholder.png');
-  const displayTitle = l(itemData.title);
+  const displayTitle = itemData.title?.en ?? (typeof itemData.title === 'string' ? itemData.title : 'Untitled');
   const imageAlt = displayTitle || 'Product image';
   
   const link = isSale ? `/profile/listings/sales/${order.id}` : `/products/${product!.id}`;

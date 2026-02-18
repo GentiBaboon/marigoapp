@@ -6,11 +6,12 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bot, Loader2, SendHorizonal, User, X } from 'lucide-react';
 import { useUser, useFirestore, errorEmitter } from '@/firebase';
-import { useI18n } from '@/hooks/use-i18n';
-import { chatWithAI, type MessageSchema } from '@/ai/flows/ai-chat';
+import { chatWithAI } from '@/ai/flows/ai-chat';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { cn } from '@/lib/utils';
+import { z } from 'zod';
+import { MessageSchema } from '@/ai/flows/ai-chat';
 
 type Message = z.infer<typeof MessageSchema> & { id: string };
 
@@ -49,7 +50,6 @@ export function ChatbotWidget() {
 
     const { user } = useUser();
     const firestore = useFirestore();
-    const { t, locale } = useI18n();
 
     const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -112,7 +112,7 @@ export function ChatbotWidget() {
             history.push({ role: 'user', content: input });
             
             try {
-                const aiResponse = await chatWithAI({ history, message: input, language: t('Auth.signInTitle') /* Using a key to detect language */ });
+                const aiResponse = await chatWithAI({ history, message: input });
                 const aiMessage: Message = { id: `ai-${Date.now()}`, role: 'model', content: aiResponse.response };
                 setMessages(prev => [...prev, aiMessage]);
                 await saveMessage(currentChatId, { role: 'model', content: aiResponse.response });

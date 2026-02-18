@@ -9,10 +9,10 @@ import { CartProvider } from '@/context/CartContext';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { ShoppingPreferenceModal } from '@/components/home/ShoppingPreferenceModal';
 import { DownloadAppBanner } from '@/components/home/DownloadAppBanner';
-import { I18nProvider } from '@/context/I18nProvider';
 import { CurrencyProvider } from '@/context/CurrencyContext';
 import dynamic from 'next/dynamic';
 import { CookieBanner } from '@/components/CookieBanner';
+import { Footer } from '@/components/footer';
 
 const ChatbotWidget = dynamic(() => import('@/components/ai/ChatbotWidget').then(mod => mod.ChatbotWidget), {
   ssr: false,
@@ -50,7 +50,6 @@ export default function RootLayout({
       </head>
       <body className={cn('font-body antialiased')}>
         <FirebaseClientProvider>
-          <I18nProvider>
             <CurrencyProvider>
               <CartProvider>
                 <WishlistProvider>
@@ -61,13 +60,13 @@ export default function RootLayout({
                     <MobileNav />
                     <ShoppingPreferenceModal />
                     <DownloadAppBanner />
+                    <Footer />
                   </div>
                   <Toaster />
                   <CookieBanner />
                 </WishlistProvider>
               </CartProvider>
             </CurrencyProvider>
-          </I18nProvider>
         </FirebaseClientProvider>
       </body>
     </html>

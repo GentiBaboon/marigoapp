@@ -14,8 +14,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { FirestoreProduct, FirestoreAddress } from '@/lib/types';
-import { useI18n } from '@/hooks/use-i18n';
-import { translateText } from '@/ai/flows/translate-text';
 
 // Helper component for each review section
 const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode; }) => (
@@ -47,7 +45,6 @@ export function ReviewStep() {
   const router = useRouter();
   const { user } = useUser();
   const firestore = useFirestore();
-  const { locale } = useI18n();
   const [selectedAddress, setSelectedAddress] = useState<FirestoreAddress | null>(null);
 
   const addressesCollection = useMemoFirebase(() => {
@@ -77,17 +74,12 @@ export function ReviewStep() {
     setIsLoading(true);
 
     try {
-        const [translatedTitle, translatedDescription] = await Promise.all([
-            translateText({ text: formData.title || '', sourceLanguage: locale }),
-            translateText({ text: formData.description || '', sourceLanguage: locale })
-        ]);
-
         const keywords = Array.from(new Set((formData.title || '').toLowerCase().split(' ').filter(Boolean)));
 
         const listingData: Partial<Omit<FirestoreProduct, 'id'>> & { listingCreated: any } = {
             sellerId: user.uid,
-            title: translatedTitle,
-            description: translatedDescription,
+            title: formData.title,
+            description: formData.description,
             price: formData.price || 0,
             category: formData.category || '',
             subCategory: formData.category || '',
@@ -260,5 +252,3 @@ export function ReviewStep() {
     </div>
   );
 }
-
-    

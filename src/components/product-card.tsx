@@ -9,18 +9,15 @@ import { Badge } from '@/components/ui/badge';
 import { useWishlist } from '@/context/WishlistContext';
 import React from 'react';
 import { useCurrency } from '@/context/CurrencyContext';
-import { useI18n } from '@/hooks/use-i18n';
-import type { LocalizedString } from '@/lib/types';
 
 interface ProductCardProps {
-  product: Product & { title: string | LocalizedString };
+  product: Product;
   className?: string;
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
   const { isFavorite, addToWishlist, removeFromWishlist } = useWishlist();
   const { formatPrice } = useCurrency();
-  const { l } = useI18n();
   const favorite = isFavorite(product.id);
 
   let imageUrl: string | undefined;
@@ -49,7 +46,8 @@ export function ProductCard({ product, className }: ProductCardProps) {
       }
   }
 
-  const displayTitle = l(product.title);
+  const displayTitle = (typeof product.title === 'string' || !product.title?.en) ? product.title : product.title.en;
+
 
   return (
     <div className={cn('group', className)}>
@@ -58,7 +56,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
           {imageUrl ? (
             <Image
               src={imageUrl}
-              alt={displayTitle}
+              alt={displayTitle || ''}
               fill
               sizes="(max-width: 768px) 50vw, 33vw"
               className="object-cover"

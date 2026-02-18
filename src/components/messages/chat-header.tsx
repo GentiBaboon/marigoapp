@@ -5,8 +5,6 @@ import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '../ui/button';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { useI18n } from '@/hooks/use-i18n';
-import type { LocalizedString } from '@/lib/types';
 
 interface ChatHeaderProps {
     user: {
@@ -16,17 +14,15 @@ interface ChatHeaderProps {
     };
     product: {
         id: string;
-        title: string | LocalizedString;
+        title: string;
         image: string;
     }
 }
 
 export function ChatHeader({ user, product }: ChatHeaderProps) {
-    const { l } = useI18n();
-
     const productImage = PlaceHolderImages.find((p) => p.id === product.image);
     const imageUrl = productImage?.imageUrl || product.image;
-    const displayTitle = l(product.title);
+    const displayTitle = product.title;
 
     return (
         <div className="flex items-center p-2 border-b">

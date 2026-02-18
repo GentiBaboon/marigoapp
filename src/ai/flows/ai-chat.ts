@@ -13,7 +13,6 @@ export const MessageSchema = z.object({
 export const ChatInputSchema = z.object({
   history: z.array(MessageSchema),
   message: z.string(),
-  language: z.string().default('English'),
 });
 
 export type ChatInput = z.infer<typeof ChatInputSchema>;
@@ -44,12 +43,12 @@ const aiChatFlow = ai.defineFlow(
     inputSchema: ChatInputSchema,
     outputSchema: ChatOutputSchema,
   },
-  async ({ history, message, language }) => {
+  async ({ history, message }) => {
     const prompt = `You are a friendly and helpful customer support agent for MarigoApp, a luxury fashion marketplace.
 Your goal is to answer user questions based on the provided knowledge base.
 If the user's question cannot be answered using the knowledge base, politely inform them that you can't help with that and offer to connect them with a human agent.
 Keep your answers concise and clear.
-Always respond in the user's specified language: ${language}.
+Always respond in English.
 
 Here is the knowledge base:
 ${knowledgeBase}

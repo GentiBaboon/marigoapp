@@ -16,7 +16,6 @@ import { Separator } from '@/components/ui/separator';
 import { SellDraft } from '@/lib/types';
 import Image from 'next/image';
 import { productCategories } from '@/lib/mock-data';
-import { useI18n } from '@/hooks/use-i18n';
 
 const getCategoryName = (gender: string, categorySlug: string) => {
     const genderName = gender ? `${gender.charAt(0).toUpperCase()}${gender.slice(1)}'s` : '';
@@ -31,7 +30,6 @@ const getCategoryName = (gender: string, categorySlug: string) => {
 }
 
 const DraftItem = ({ draft, onSelect, onDelete, totalSteps }: { draft: SellDraft, onSelect: () => void, onDelete: () => void, totalSteps: number }) => {
-    const { t } = useI18n();
     const { formData, currentStep } = draft;
     const stepsRemaining = totalSteps - currentStep + 1;
 
@@ -42,7 +40,7 @@ const DraftItem = ({ draft, onSelect, onDelete, totalSteps }: { draft: SellDraft
                     {formData.images && formData.images.length > 0 ? (
                         <Image
                             src={formData.images[0].preview}
-                            alt={formData.title || 'Draft image'}
+                            alt={formData.title?.en || 'Draft image'}
                             fill
                             sizes="96px"
                             className="object-cover rounded-md"
@@ -54,12 +52,12 @@ const DraftItem = ({ draft, onSelect, onDelete, totalSteps }: { draft: SellDraft
                 <div className="flex-1">
                     <p className="font-bold text-lg">{formData.brand || 'Untitled'}</p>
                     <p className="text-muted-foreground">{getCategoryName(formData.gender || '', formData.category || '')}</p>
-                    <p className="text-sm text-muted-foreground">{t('Sell.stepsRemaining', { count: stepsRemaining })}</p>
+                    <p className="text-sm text-muted-foreground">{stepsRemaining} steps remaining</p>
                 </div>
             </div>
             <div className="flex items-center justify-end gap-4">
-                <Button variant="ghost" onClick={onDelete}>{t('Common.delete')}</Button>
-                <Button variant="outline" onClick={onSelect}>{t('Sell.finishListing')}</Button>
+                <Button variant="ghost" onClick={onDelete}>Delete</Button>
+                <Button variant="outline" onClick={onSelect}>Finish Listing</Button>
             </div>
              <Separator />
         </div>
@@ -68,7 +66,6 @@ const DraftItem = ({ draft, onSelect, onDelete, totalSteps }: { draft: SellDraft
 
 export default function SellPage() {
   const { drafts, activeDraft, startNewDraft, selectDraft, deleteDraft, currentStep, totalSteps } = useSellForm();
-  const { t } = useI18n();
   const [isClient, setIsClient] = useState(false);
   useEffect(() => setIsClient(true), []);
 
@@ -101,14 +98,14 @@ export default function SellPage() {
       <div className="space-y-8">
         <div className="text-left">
           <h1 className="font-headline text-4xl font-bold tracking-tight text-foreground mb-2">
-            {t('Sell.title')}
+            Sell your item
           </h1>
           <p className="text-muted-foreground">
-            {t('Sell.description')}
+            It's easy to sell with us. We'll help you every step of the way.
           </p>
         </div>
         <Button className="w-full bg-foreground text-background hover:bg-foreground/90" size="lg" onClick={handleStartNew}>
-          {t('Sell.startListing')}
+          Start a listing
         </Button>
         
         {drafts.length > 0 && (
@@ -119,7 +116,7 @@ export default function SellPage() {
                     </div>
                     <div className="relative flex justify-start">
                         <span className="bg-background pr-3 text-sm font-medium text-muted-foreground">
-                            {t('Sell.listingDrafts')}
+                            Listing drafts
                         </span>
                     </div>
                 </div>

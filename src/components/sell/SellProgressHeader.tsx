@@ -32,7 +32,7 @@ export function SellProgressHeader() {
     <div className="text-center space-y-4">
         <div>
             <h2 className="font-semibold text-lg">{formData.brand}</h2>
-            <p className="text-muted-foreground">{`${getGenderName(formData.gender)}, ${getCategoryName(formData.category)}`}</p>
+            <p className="text-muted-foreground">{`${getGenderName(formData.gender)}, ${formData.category}`}</p>
         </div>
         <div className="flex justify-center items-center gap-4">
             {visualSteps.map(step => {

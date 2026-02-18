@@ -12,7 +12,6 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { FirestoreOrder } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { useI18n } from '@/hooks/use-i18n';
 import { translateText } from '@/ai/flows/translate-text';
 
 const reviewSchema = z.object({
@@ -56,7 +55,6 @@ export function ReviewForm({ order }: ReviewFormProps) {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { locale } = useI18n();
   
   const form = useForm<ReviewFormValues>({
     resolver: zodResolver(reviewSchema),
@@ -68,7 +66,7 @@ export function ReviewForm({ order }: ReviewFormProps) {
     setIsSubmitting(true);
 
     try {
-        const translatedContent = await translateText({ text: data.content, sourceLanguage: locale });
+        const translatedContent = await translateText({ text: data.content });
 
         const reviewData = {
             orderId: order.id,

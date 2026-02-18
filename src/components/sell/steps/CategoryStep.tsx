@@ -23,10 +23,9 @@ import { StepActions } from '../StepActions';
 
 type Step1Values = z.infer<typeof sellStep1Schema>;
 
-const categoryItems = productCategories.map(group => ({
-    heading: group.name,
-    items: group.subcategories.map(item => ({ value: item.slug, label: item.name })),
-}));
+const categoryItems = productCategories.flatMap(group => 
+    group.subcategories.map(item => ({ value: item.slug, label: item.name }))
+);
 
 export function CategoryStep() {
   const { formData, setFormData, nextStep } = useSellForm();

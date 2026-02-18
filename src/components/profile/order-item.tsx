@@ -17,7 +17,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrency } from '@/context/CurrencyContext';
-import { useI18n } from '@/hooks/use-i18n';
 
 // A new sub-component to fetch and display the seller's name
 const SellerInfo = ({ sellerId }: { sellerId: string }) => {
@@ -52,11 +51,10 @@ type OrderItemProps = {
 
 export function OrderItem({ order }: OrderItemProps) {
   const { formatPrice } = useCurrency();
-  const { l } = useI18n();
 
   const firstItem = order.items[0];
   const imageUrl = firstItem.image;
-  const displayTitle = l(firstItem.title);
+  const displayTitle = firstItem.title;
   const imageAlt = displayTitle;
   // Assuming a single seller for simplicity as per the current data model for items.
   const sellerId = firstItem.sellerId; 

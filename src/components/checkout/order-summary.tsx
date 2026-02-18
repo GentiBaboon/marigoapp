@@ -5,12 +5,10 @@ import { useCart } from '@/context/CartContext';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useCurrency } from '@/context/CurrencyContext';
-import { useI18n } from '@/hooks/use-i18n';
 
 export function OrderSummary() {
   const { items, subtotal, totalShipping, grandTotal } = useCart();
   const { formatPrice } = useCurrency();
-  const { l } = useI18n();
 
   return (
     <Card className="sticky top-24">
@@ -21,7 +19,7 @@ export function OrderSummary() {
         <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
             {items.map(item => {
                 const productImage = PlaceHolderImages.find(p => p.id === item.image);
-                const displayTitle = l(item.title);
+                const displayTitle = item.title;
                 return (
                     <div key={item.id} className="flex gap-4 items-center">
                         <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md border">

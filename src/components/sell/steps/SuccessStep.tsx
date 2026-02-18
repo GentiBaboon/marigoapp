@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import Image from 'next/image';
 import { Separator } from '@/components/ui/separator';
-import { useI18n } from '@/hooks/use-i18n';
 
 const GreenCheckIcon = () => (
     <div className="h-12 w-12 rounded-full bg-green-500 flex items-center justify-center">
@@ -17,7 +16,6 @@ const GreenCheckIcon = () => (
 
 export function SuccessStep() {
     const { formData, deleteActiveDraft } = useSellForm();
-    const { t } = useI18n();
 
     useEffect(() => {
         // This will now delete the completed draft from localStorage
@@ -46,9 +44,9 @@ export function SuccessStep() {
         <div className="flex flex-col items-center text-center space-y-6">
             <GreenCheckIcon />
             <div className="space-y-2">
-                <h1 className="text-2xl font-semibold">{t('Sell.successTitle')}</h1>
+                <h1 className="text-2xl font-semibold">Item submitted</h1>
                 <p className="text-muted-foreground max-w-xs">
-                    {t('Sell.successDescription')}
+                    We'll review your listing, edit the main photo, and email you an update soon.
                 </p>
             </div>
 
@@ -71,8 +69,8 @@ export function SuccessStep() {
                 <div className="flex-1">
                     <p className="font-semibold uppercase text-muted-foreground text-sm">{formData.brand || 'NON SIGNÉ / UNSIGNED'}</p>
                     <p className="font-medium">{formData.title || 'Cloth handbag'}</p>
-                    <p className="font-semibold">{currencyFormatter(formData.price)} ({t('Sell.yourEarning')} {currencyFormatter(formData.sellerEarning)})</p>
-                    <p className="text-sm text-muted-foreground">{t('Sell.buyerFeeInfo', { fee: currencyFormatter(buyerServiceFee) })}</p>
+                    <p className="font-semibold">{currencyFormatter(formData.price)} (You earn {currencyFormatter(formData.sellerEarning)})</p>
+                    <p className="text-sm text-muted-foreground">Buyer service fee not included ({currencyFormatter(buyerServiceFee)})</p>
                 </div>
             </div>
 
@@ -83,20 +81,19 @@ export function SuccessStep() {
                     <Sprout className="h-4 w-4 text-green-700"/>
                  </div>
                  <div>
-                    <p className="font-semibold">{t('Sell.sustainabilityTitle')}</p>
-                    <p className="text-sm">{t('Sell.sustainabilityDescription')}</p>
+                    <p className="font-semibold">You're supporting sustainability</p>
+                    <p className="text-sm">82% of items sold with us replace a new purchase.</p>
                  </div>
             </div>
             
             <div className="flex w-full gap-4 pt-4">
                 <Button asChild variant="outline" className="w-full" size="lg">
-                    <Link href="/profile/listings">{t('Sell.viewListings')}</Link>
+                    <Link href="/profile/listings">View your listings</Link>
                 </Button>
                 <Button asChild className="w-full bg-foreground text-background hover:bg-foreground/90" size="lg">
-                    <Link href="/sell">{t('Sell.sellAnother')}</Link>
+                    <Link href="/sell">Sell another item</Link>
                 </Button>
             </div>
         </div>
     );
 }
-    

@@ -7,7 +7,14 @@ import { Button } from './ui/button';
 import { Bell, Search, ShoppingCart, ArrowLeft } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { Skeleton } from './ui/skeleton';
-import { LanguageSwitcher } from './LanguageSwitcher';
+import { UserNav } from './user-nav';
+
+const navLinks = [
+    { href: '/browse/women', label: 'Womenswear' },
+    { href: '/browse/men', label: 'Menswear' },
+    { href: '/browse/bags', label: 'Bags' },
+    { href: '/browse/shoes', label: 'Shoes' },
+];
 
 function HeaderContent() {
   const { totalItems } = useCart();
@@ -32,45 +39,38 @@ function HeaderContent() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background">
-      <div className="container grid h-16 grid-cols-3 items-center px-4">
-        <div className="flex justify-start">
+      <div className="container flex h-16 items-center justify-between px-4">
+        <div className="flex items-center gap-4">
           {showBackArrow ? (
-            <Button variant="ghost" size="icon" aria-label="Go back" onClick={() => router.back()}>
+            <Button variant="ghost" size="icon" aria-label="Go back" onClick={() => router.back()} className="md:hidden">
               <ArrowLeft className="h-6 w-6" />
             </Button>
           ) : (
-            <Button asChild variant="ghost" size="icon" aria-label="Search">
+            <Button asChild variant="ghost" size="icon" aria-label="Search" className="md:hidden">
               <Link href="/search">
                 <Search className="h-6 w-6" />
               </Link>
             </Button>
           )}
-        </div>
-        
-        <div className="flex justify-center">
           <Link href="/home" className="font-logo text-3xl font-bold tracking-tight">
             marigo
           </Link>
+          <nav className="hidden md:flex items-center gap-6 ml-6">
+            {navLinks.map(link => (
+                <Link key={link.href} href={link.href} className="text-sm font-medium text-muted-foreground hover:text-primary">
+                    {link.label}
+                </Link>
+            ))}
+          </nav>
         </div>
 
-        <div className="flex items-center justify-end gap-0 md:gap-2">
-          <LanguageSwitcher />
-          <Button asChild variant="ghost" size="icon" aria-label="Notifications">
-            <Link href="/notifications">
-              <Bell className="h-6 w-6" />
-            </Link>
-          </Button>
-          
-          <Button asChild variant="ghost" size="icon" aria-label="Shopping Cart" className="relative">
-            <Link href="/cart">
-              {totalItems > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
-                  {totalItems}
-                </span>
-              )}
-              <ShoppingCart className="h-6 w-6" />
-            </Link>
-          </Button>
+        <div className="flex items-center justify-end gap-2">
+            <Button asChild variant="ghost" size="icon" aria-label="Search" className="hidden md:inline-flex">
+              <Link href="/search">
+                <Search className="h-6 w-6" />
+              </Link>
+            </Button>
+            <UserNav />
         </div>
       </div>
     </header>

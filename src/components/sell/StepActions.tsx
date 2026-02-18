@@ -2,7 +2,6 @@
 import { Button } from '@/components/ui/button';
 import { useSellForm } from './SellFormContext';
 import { Loader2 } from 'lucide-react';
-import { useI18n } from '@/hooks/use-i18n';
 
 interface StepActionsProps {
   onNext?: () => void;
@@ -24,7 +23,6 @@ export function StepActions({
   hideBack = false,
 }: StepActionsProps) {
   const { prevStep, nextStep } = useSellForm();
-  const { t } = useI18n();
 
   const handleBack = onBack || prevStep;
   const handleNext = onNext || nextStep;
@@ -38,11 +36,11 @@ export function StepActions({
         size="lg"
       >
         {isNextLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {nextText || t('Common.continue')}
+        {nextText || 'Continue'}
       </Button>
       {!hideBack && (
         <Button variant="outline" onClick={handleBack} className="w-full" size="lg">
-          {backText || t('Common.back')}
+          {backText || 'Back'}
         </Button>
       )}
     </div>

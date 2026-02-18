@@ -1,6 +1,5 @@
 'use client';
 import type { FirestoreProduct, FirestoreUser } from '@/lib/types';
-import { useI18n } from '@/hooks/use-i18n';
 
 interface ProductJsonLdProps {
     product: FirestoreProduct;
@@ -8,16 +7,13 @@ interface ProductJsonLdProps {
 }
 
 export const ProductJsonLd = ({ product, seller }: ProductJsonLdProps) => {
-    const { l, locale } = useI18n();
-
     const jsonLd = {
         '@context': 'https://schema.org',
         '@type': 'Product',
-        name: l(product.title),
-        description: l(product.description).substring(0, 5000), // Max length for description
+        name: product.title.en,
+        description: product.description.en.substring(0, 5000), // Max length for description
         image: product.images?.[0] || '',
         sku: product.id,
-        inLanguage: locale,
         brand: {
             '@type': 'Brand',
             name: product.brand,
@@ -52,7 +48,7 @@ export const ProductJsonLd = ({ product, seller }: ProductJsonLdProps) => {
       },{
         "@type": "ListItem",
         "position": 3,
-        "name": l(product.title)
+        "name": product.title.en
       }]
     };
 

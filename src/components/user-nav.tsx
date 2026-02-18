@@ -27,6 +27,8 @@ import {
   LifeBuoy,
   Circle,
   CircleDot,
+  ShoppingCart,
+  Bell
 } from 'lucide-react';
 import { useCurrency, type Currency } from '@/context/CurrencyContext';
 
@@ -65,126 +67,141 @@ export function UserNav() {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarImage
-              src={user.photoURL || ''}
-              alt={user.displayName || 'User'}
-            />
-            <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-80" align="end" forceMount>
-        <DropdownMenuLabel className="font-serif text-3xl font-normal py-3">
-          {user?.displayName}
-        </DropdownMenuLabel>
+    <div className="flex items-center gap-2">
+      <Button asChild variant="ghost" size="icon" aria-label="Notifications">
+        <Link href="/notifications">
+          <Bell className="h-6 w-6" />
+        </Link>
+      </Button>
+      
+      <Button asChild variant="ghost" size="icon" aria-label="Shopping Cart" className="relative">
+        <Link href="/cart">
+          {/* Cart item count can be added here */}
+          <ShoppingCart className="h-6 w-6" />
+        </Link>
+      </Button>
 
-        <DropdownMenuGroup>
-          <DropdownMenuItem asChild>
-            <Link href="/profile">See my profile</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/profile/settings">Account settings</Link>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-
-        <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider flex items-center px-2 py-1.5">
-          Shopping Preference
-          <Info className="ml-1 h-3 w-3" />
-        </DropdownMenuLabel>
-
-        <DropdownMenuItem
-          onSelect={() => setShoppingPreference('womenswear')}
-          className="flex justify-between items-center"
-        >
-          Womenswear
-          {shoppingPreference === 'womenswear' ? <CircleDot /> : <Circle />}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => setShoppingPreference('menswear')}
-          className="flex justify-between items-center"
-        >
-          Menswear
-          {shoppingPreference === 'menswear' ? <CircleDot /> : <Circle />}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1.5">
-            Buying
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+            <Avatar className="h-8 w-8">
+              <AvatarImage
+                src={user.photoURL || ''}
+                alt={user.displayName || 'User'}
+              />
+              <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-80" align="end" forceMount>
+          <DropdownMenuLabel className="font-serif text-3xl font-normal py-3">
+            {user?.displayName}
           </DropdownMenuLabel>
-          <DropdownMenuItem asChild>
-            <Link href="/profile/orders">Orders</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="#">Buying offers</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="#">Saved searches</Link>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
 
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1.5">
-            Selling
+          <DropdownMenuGroup>
+            <DropdownMenuItem asChild>
+              <Link href="/profile">See my profile</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/profile/settings">Account settings</Link>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+
+          <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider flex items-center px-2 py-1.5">
+            Shopping Preference
+            <Info className="ml-1 h-3 w-3" />
           </DropdownMenuLabel>
-          <DropdownMenuItem asChild>
-            <Link href="/profile/listings">Listings</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="#">Selling offers</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="#">Sales</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="#">Get paid</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Calendar className="mr-2 h-4 w-4" />
-            <span>Vacation mode</span>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
 
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1.5">
-            Support
+          <DropdownMenuItem
+            onSelect={() => setShoppingPreference('womenswear')}
+            className="flex justify-between items-center"
+          >
+            Womenswear
+            {shoppingPreference === 'womenswear' ? <CircleDot /> : <Circle />}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => setShoppingPreference('menswear')}
+            className="flex justify-between items-center"
+          >
+            Menswear
+            {shoppingPreference === 'menswear' ? <CircleDot /> : <Circle />}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1.5">
+              Buying
+            </DropdownMenuLabel>
+            <DropdownMenuItem asChild>
+              <Link href="/profile/orders">Orders</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="#">Buying offers</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="#">Saved searches</Link>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1.5">
+              Selling
+            </DropdownMenuLabel>
+            <DropdownMenuItem asChild>
+              <Link href="/profile/listings">Listings</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="#">Selling offers</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="#">Sales</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="#">Get paid</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Calendar className="mr-2 h-4 w-4" />
+              <span>Vacation mode</span>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1.5">
+              Support
+            </DropdownMenuLabel>
+            <DropdownMenuItem asChild>
+              <Link href="/messages" className="flex items-center">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                <span>Chat with us</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/help" className="flex items-center">
+                <LifeBuoy className="mr-2 h-4 w-4" />
+                <span>Help center</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSignOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+
+          <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider flex items-center px-2 py-1.5">
+            Currency
           </DropdownMenuLabel>
-          <DropdownMenuItem asChild>
-            <Link href="/messages" className="flex items-center">
-              <MessageSquare className="mr-2 h-4 w-4" />
-              <span>Chat with us</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/help" className="flex items-center">
-              <LifeBuoy className="mr-2 h-4 w-4" />
-              <span>Help center</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleSignOut}>
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>Log out</span>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-
-        <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider flex items-center px-2 py-1.5">
-          Currency
-        </DropdownMenuLabel>
-        <DropdownMenuRadioGroup value={currency} onValueChange={(value) => setCurrency(value as Currency)}>
-            <DropdownMenuRadioItem value="EUR">Euro (EUR)</DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="USD">US Dollar (USD)</DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="ALL">Albanian Lek (ALL)</DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-        
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuRadioGroup value={currency} onValueChange={(value) => setCurrency(value as Currency)}>
+              <DropdownMenuRadioItem value="EUR">Euro (EUR)</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="USD">US Dollar (USD)</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="ALL">Albanian Lek (ALL)</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+          
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }

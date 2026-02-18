@@ -11,7 +11,6 @@ import Image from 'next/image';
 import { OrderTimeline } from '@/components/profile/order-timeline';
 import { useParams } from 'next/navigation';
 import { DeliveryTracking } from '@/components/tracking/DeliveryTracking';
-import { useI18n } from '@/hooks/use-i18n';
 
 function OrderDetailsSkeleton() {
     return (
@@ -53,7 +52,6 @@ export default function OrderDetailsPage() {
     const params = useParams();
     const orderId = params.orderId as string;
     const firestore = useFirestore();
-    const { l } = useI18n();
 
     const orderRef = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -88,7 +86,7 @@ export default function OrderDetailsPage() {
     }
 
     const item = order.items[0];
-    const displayTitle = l(item.title);
+    const displayTitle = item.title.en;
 
     return (
         <div className="bg-muted/40 min-h-screen">

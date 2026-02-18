@@ -14,6 +14,10 @@
           "format": "email",
           "description": "The user's email address."
         },
+        "phone": {
+            "type": "string",
+            "description": "The user's phone number."
+        },
         "photoURL": {
             "type": "string",
             "format": "uri",
@@ -125,7 +129,7 @@
       "type": "object",
       "description": "Represents a product category.",
       "properties": {
-        "name": { "type": "object", "properties": { "sq": { "type": "string" }, "en": { "type": "string" }, "it": { "type": "string" } } },
+        "name": { "type": "string" },
         "slug": { "type": "string" },
         "parentId": { "type": "string" },
         "icon": { "type": "string" },
@@ -154,8 +158,8 @@
       "description": "Represents a product listed on the marketplace.",
       "properties": {
         "sellerId": { "type": "string", "description": "Reference to the user who is selling the item." },
-        "title": { "$ref": "#/entities/LocalizedString" },
-        "description": { "$ref": "#/entities/LocalizedString" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
         "price": { "type": "number" },
         "category": { "type": "string" },
         "subCategory": { "type": "string" },
@@ -271,7 +275,7 @@
             "properties": {
               "productId": { "type": "string" },
               "sellerId": { "type": "string" },
-              "title": { "$ref": "#/entities/LocalizedString" },
+              "title": { "type": "string" },
               "brand": { "type": "string" },
               "image": { "type": "string" },
               "price": { "type": "number" },
@@ -303,7 +307,7 @@
         "participants": { "type": "array", "items": { "type": "string" } },
         "type": { "type": "string" },
         "productId": { "type": "string" },
-        "productTitle": { "$ref": "#/entities/LocalizedString" },
+        "productTitle": { "type": "string" },
         "lastMessage": { "type": "string" },
         "lastMessageAt": { "type": "string", "format": "date-time" },
         "unreadCount": { "type": "object" }
@@ -358,8 +362,8 @@
             "revieweeId": { "type": "string" },
             "productId": { "type": "string" },
             "rating": { "type": "number" },
-            "title": { "$ref": "#/entities/LocalizedString" },
-            "content": { "$ref": "#/entities/LocalizedString" }
+            "title": { "type": "string" },
+            "content": { "type": "string" }
         },
         "required": ["orderId", "reviewerId", "revieweeId", "rating", "content"]
     },
@@ -548,16 +552,6 @@
         "lastUpdated",
         "rates"
       ]
-    },
-    "LocalizedString": {
-        "title": "Localized String",
-        "type": "object",
-        "description": "A string that can be translated into multiple languages.",
-        "properties": {
-            "sq": { "type": "string", "description": "Albanian translation" },
-            "en": { "type": "string", "description": "English translation" },
-            "it": { "type": "string", "description": "Italian translation" }
-        }
     }
   },
   "auth": {
