@@ -34,6 +34,7 @@ import { useWishlist } from '@/context/WishlistContext';
 import { useCollection, useDoc, useMemoFirebase, useFirestore, useUser } from '@/firebase';
 import { collection, query, where, limit, doc, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useCurrency } from '@/context/CurrencyContext';
 
 const PayPalIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" className="h-8 w-auto flex-shrink-0">
@@ -96,6 +97,7 @@ export default function ProductDetailPage() {
     const productId = params.id as string;
     const firestore = useFirestore();
     const { user, isUserLoading } = useUser();
+    const { formatPrice } = useCurrency();
 
     const productRef = useMemoFirebase(() => {
         if (!firestore || !productId) return null;
@@ -265,13 +267,6 @@ export default function ProductDetailPage() {
         });
     };
   
-    const currencyFormatter = (value: number) => new Intl.NumberFormat('de-DE', {
-      style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  
     const conditionLabel = product.condition === 'good' ? 'Very good condition' : product.condition?.replace('_', ' ');
     const favorite = isFavorite(product.id);
 
@@ -338,7 +333,7 @@ export default function ProductDetailPage() {
             </div>
             <div className="flex items-start justify-between">
               <div className="space-y-1 text-sm">
-                  <p className="text-2xl font-bold flex items-center">{currencyFormatter(product.price)} <Info className="h-4 w-4 ml-2 text-muted-foreground"/></p>
+                  <p className="text-2xl font-bold flex items-center">{formatPrice(product.price)} <Info className="h-4 w-4 ml-2 text-muted-foreground"/></p>
                   {product.size && (<p>{product.size} <Link href="#" className="underline text-muted-foreground">Size guide</Link></p>)}
                   {product.condition && (<p>{conditionLabel} <Link href="#" className="underline text-muted-foreground">More info</Link></p>)}
               </div>
@@ -351,7 +346,7 @@ export default function ProductDetailPage() {
             <div className="flex items-center gap-4 rounded-lg bg-gray-100 p-3">
                 <PayPalIcon />
                 <p className="text-sm text-gray-800">
-                    Pay in 3 interest-free payments of {currencyFormatter(product.price / 3)}. <Link href="#" className="underline font-semibold">Learn more</Link>
+                    Pay in 3 interest-free payments of {formatPrice(product.price / 3)}. <Link href="#" className="underline font-semibold">Learn more</Link>
                 </p>
             </div>
             

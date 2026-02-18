@@ -24,11 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-
-const currencyFormatter = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-});
+import { useCurrency } from '@/context/CurrencyContext';
 
 const statusStyles = {
   active: 'bg-green-100 text-green-800 border-green-200',
@@ -42,6 +38,7 @@ const statusStyles = {
 export function ListingItem({ product, order }: { product?: FirestoreProduct, order?: FirestoreOrder }) {
   const isSale = !!order;
   const firestore = useFirestore();
+  const { formatPrice } = useCurrency();
 
   const itemData = isSale ? order.items[0] : product!;
   const imageUrl = isSale ? order.items[0].image : (product?.images?.[0] || PlaceHolderImages.find(p => p.id === 'product-1')?.imageUrl || '/placeholder.png');
@@ -95,7 +92,7 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
 
           <div className="flex items-end justify-between">
               <div>
-                   <p className="font-bold text-lg">{currencyFormatter.format(itemData.price)}</p>
+                   <p className="font-bold text-lg">{formatPrice(itemData.price)}</p>
                    {!isSale && activeOfferCount > 0 && (
                        <p className="text-sm font-semibold text-primary mt-1">{activeOfferCount} active offer(s)</p>
                    )}

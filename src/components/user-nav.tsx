@@ -13,6 +13,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -26,6 +28,8 @@ import {
   Circle,
   CircleDot,
 } from 'lucide-react';
+import { useCurrency, type Currency } from '@/context/CurrencyContext';
+
 
 const getInitials = (name: string | null | undefined) => {
   if (!name) return 'U';
@@ -41,6 +45,7 @@ export function UserNav() {
   const auth = useAuth();
   const router = useRouter();
   const [shoppingPreference, setShoppingPreference] = useState('menswear');
+  const { currency, setCurrency } = useCurrency();
 
   const handleSignOut = async () => {
     await signOutUser(auth);
@@ -168,6 +173,17 @@ export function UserNav() {
             <span>Log out</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+
+        <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider flex items-center px-2 py-1.5">
+          Currency
+        </DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={currency} onValueChange={(value) => setCurrency(value as Currency)}>
+            <DropdownMenuRadioItem value="EUR">Euro (EUR)</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="USD">US Dollar (USD)</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="ALL">Albanian Lek (ALL)</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+
         <DropdownMenuSeparator />
 
         <DropdownMenuItem disabled>

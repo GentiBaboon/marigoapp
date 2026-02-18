@@ -13,13 +13,14 @@ import {
 import {
   Tooltip,
   TooltipProvider,
+  TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Input } from '@/components/ui/input';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { sellStep6Schema } from '@/lib/types';
 import type { z } from 'zod';
-import { StepActions } from '@/components/sell/StepActions';
+import { StepActions } from '../StepActions';
 import { Button } from '@/components/ui/button';
 import { Info } from 'lucide-react';
 
@@ -36,7 +37,6 @@ export function PricingStep() {
     resolver: zodResolver(sellStep6Schema),
     defaultValues: {
       price: formData.price,
-      currency: formData.currency || 'EUR',
     },
   });
 
@@ -53,56 +53,53 @@ export function PricingStep() {
   }, [priceValue]);
 
   const onSubmit = (data: Step6Values) => {
-    setFormData({ ...data, sellerEarning: earning });
+    setFormData({ ...data, sellerEarning: earning, currency: 'EUR' });
     nextStep();
   };
-  
-  const currencyFormatter = (value: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: form.getValues('currency') }).format(value);
 
   return (
     <div className="space-y-8">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <h3 className="font-semibold text-lg">Price</h3>
-            <div className="grid grid-cols-2 gap-4">
-                <FormField
-                control={form.control}
-                name="price"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Price</FormLabel>
-                    <FormControl>
+            <FormField
+              control={form.control}
+              name="price"
+              render={({ field }) => (
+                  <FormItem>
+                  <FormLabel>Set your price in EUR</FormLabel>
+                    <div className="relative">
                         <Input 
                             type="number" 
                             placeholder="e.g. 550" 
                             {...field} 
                             onChange={e => field.onChange(parseFloat(e.target.value) || undefined)}
                             value={field.value ?? ''} 
-                            className="h-16 text-lg"
+                            className="h-16 text-lg pl-12"
                          />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                 <div className="bg-muted rounded-lg p-2 flex flex-col justify-center">
-                    <FormLabel className="text-sm text-muted-foreground flex items-center">
-                        You earn
-                         <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-4 w-4 ml-1">
-                                        <Info className="h-3 w-3" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                <p>This is your estimated earning after a 20% commission and a €5 service fee are deducted.</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                    </FormLabel>
-                    <p className="font-bold text-lg">{currencyFormatter(earning)}</p>
-                </div>
+                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-muted-foreground">EUR</span>
+                    </div>
+                  <FormMessage />
+                  </FormItem>
+              )}
+            />
+             <div className="bg-muted rounded-lg p-4 flex flex-col justify-center">
+                <FormLabel className="text-sm text-muted-foreground flex items-center">
+                    You earn
+                     <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-4 w-4 ml-1">
+                                    <Info className="h-3 w-3" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                            <p>This is your estimated earning after a 20% commission and a €5 service fee are deducted.</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </FormLabel>
+                <p className="font-bold text-lg">€{earning.toFixed(2)}</p>
             </div>
             <p className="text-sm text-muted-foreground">The buyer will also pay for shipping. <a href="#" className="underline">Learn more</a></p>
           </form>

@@ -8,8 +8,7 @@ import type { OfferWithProduct } from '@/app/profile/offers/page';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-
-const currencyFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+import { useCurrency } from '@/context/CurrencyContext';
 
 const statusStyles: { [key: string]: string } = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -23,6 +22,7 @@ const statusStyles: { [key: string]: string } = {
 
 export function OfferListItem({ offer }: { offer: OfferWithProduct }) {
     const { product } = offer;
+    const { formatPrice } = useCurrency();
     const imageUrl = product.images?.[0] || 'https://placehold.co/96x96/E2E8F0/A0AEC0?text=MARIGO';
     const imageAlt = product.title;
 
@@ -46,9 +46,9 @@ export function OfferListItem({ offer }: { offer: OfferWithProduct }) {
                         <Image src={imageUrl} alt={imageAlt} fill className="object-cover" sizes="96px" />
                     </div>
                     <div className="flex-1 space-y-1">
-                        <p className="font-semibold text-lg">{currencyFormatter.format(offer.amount)}</p>
-                        {offer.status === 'countered' && offer.counterAmount && (
-                            <p className="text-sm font-semibold">Seller countered: <span className="text-primary">{currencyFormatter.format(offer.counterAmount)}</span></p>
+                        <p className="font-semibold text-lg">{formatPrice(offer.offerAmount)}</p>
+                        {offer.status === 'countered' && offer.counterOfferAmount && (
+                            <p className="text-sm font-semibold">Seller countered: <span className="text-primary">{formatPrice(offer.counterOfferAmount)}</span></p>
                         )}
                         <p className="text-sm text-muted-foreground">
                            Sent on {format(new Date(offer.createdAt.seconds * 1000), 'PPP')}

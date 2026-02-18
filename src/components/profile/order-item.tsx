@@ -16,11 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-
-const currencyFormatter = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-});
+import { useCurrency } from '@/context/CurrencyContext';
 
 // A new sub-component to fetch and display the seller's name
 const SellerInfo = ({ sellerId }: { sellerId: string }) => {
@@ -54,6 +50,7 @@ type OrderItemProps = {
 };
 
 export function OrderItem({ order }: OrderItemProps) {
+  const { formatPrice } = useCurrency();
   const firstItem = order.items[0];
   const imageUrl = firstItem.image;
   const imageAlt = firstItem.title;
@@ -104,7 +101,7 @@ export function OrderItem({ order }: OrderItemProps) {
         </Link>
         
         <div className="font-semibold text-lg">
-            Order value: {currencyFormatter.format(order.totalAmount)}
+            Order value: {formatPrice(order.totalAmount)}
         </div>
     </div>
   );

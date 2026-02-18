@@ -455,3 +455,45 @@ export const completeDelivery = onCall(async (request) => {
     throw new HttpsError("internal", "Could not complete delivery.");
   }
 });
+
+/**
+ * [NEW] getExchangeRates (Scheduled)
+ * Fetches the latest currency exchange rates and saves them to Firestore.
+ * This should be scheduled to run daily.
+ */
+export const getExchangeRates = onSchedule("every 24 hours", async (context) => {
+    // IMPORTANT: Add your ExchangeRate-API key to your Firebase environment variables.
+    // You can get a free key from https://www.exchangerate-api.com/
+    const apiKey = process.env.EXCHANGERATE_API_KEY;
+    if (!apiKey) {
+        logger.error("ExchangeRate-API key is not set in environment variables. Skipping currency update.");
+        return null;
+    }
+    const url = `https://v6.exchangerate-api.com/v6/${apiKey}/latest/EUR`;
+
+    try {
+        const response = await fetch(url);
+        const data: any = await response.json();
+
+        if (data.result === "success") {
+            const ratesToStore = {
+                EUR: data.conversion_rates.EUR,
+                USD: data.conversion_rates.USD,
+                ALL: data.conversion_rates.ALL,
+            };
+
+            await db.collection("config").doc("exchangeRates").set({
+                base: "EUR",
+                rates: ratesToStore,
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            logger.info("Successfully updated currency exchange rates.", ratesToStore);
+        } else {
+            logger.error("Failed to fetch exchange rates from API:", data["error-type"]);
+        }
+    } catch (error) {
+        logger.error("Error fetching or saving exchange rates:", error);
+    }
+    return null;
+});

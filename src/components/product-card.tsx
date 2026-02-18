@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useWishlist } from '@/context/WishlistContext';
 import React from 'react';
+import { useCurrency } from '@/context/CurrencyContext';
 
 interface ProductCardProps {
   product: Product;
@@ -16,15 +17,8 @@ interface ProductCardProps {
 
 export function ProductCard({ product, className }: ProductCardProps) {
   const { isFavorite, addToWishlist, removeFromWishlist } = useWishlist();
+  const { formatPrice } = useCurrency();
   const favorite = isFavorite(product.id);
-
-  const currencyFormatter = (value: number) =>
-    new Intl.NumberFormat('de-DE', {
-      style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
 
   let imageUrl: string | undefined;
   let imageHint: string | undefined;
@@ -95,11 +89,11 @@ export function ProductCard({ product, className }: ProductCardProps) {
         <div className="mt-2">
           {product.originalPrice && (
             <p className="text-sm text-muted-foreground line-through">
-              {currencyFormatter(product.originalPrice)}
+              {formatPrice(product.originalPrice)}
             </p>
           )}
           <p className="font-semibold">
-            {currencyFormatter(product.price)}
+            {formatPrice(product.price)}
           </p>
           {product.sellerLocation && (
             <p className="text-sm text-muted-foreground mt-1">

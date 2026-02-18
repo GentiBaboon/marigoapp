@@ -14,10 +14,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-
-const currencyFormatter = (value: number, currency: string = 'EUR') => {
-    return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(value);
-};
+import { useCurrency } from '@/context/CurrencyContext';
 
 function OfferPageSkeleton() {
     return (
@@ -46,6 +43,7 @@ function OfferPageSkeleton() {
 }
 
 function OfferTimeline({ offer, product, buyer, seller }: { offer: FirestoreOffer, product: FirestoreProduct, buyer: FirestoreUser | null, seller: FirestoreUser | null}) {
+    const { formatPrice } = useCurrency();
     if (!offer.history) return null; // Wait for history to be present
 
     const getActionLabel = (action: string) => {
@@ -73,7 +71,7 @@ function OfferTimeline({ offer, product, buyer, seller }: { offer: FirestoreOffe
                             <p className="font-semibold text-sm">{actor?.displayName}</p>
                             <p className="text-xs text-muted-foreground">{format(new Date(item.timestamp.seconds * 1000), 'dd/MM/yy, HH:mm')}</p>
                         </div>
-                        <p className="ml-auto font-semibold text-sm underline text-right">{getActionLabel(item.action)}: {currencyFormatter(item.amount, 'EUR')}</p>
+                        <p className="ml-auto font-semibold text-sm underline text-right">{getActionLabel(item.action)}: {formatPrice(item.amount)}</p>
                     </div>
                 )
             })}
@@ -88,6 +86,7 @@ function OfferActions({ offer, product, userRole }: { offer: FirestoreOffer, pro
     const [isLoading, setIsLoading] = React.useState<string | null>(null);
     const [isCountering, setIsCountering] = React.useState(false);
     const [counterAmount, setCounterAmount] = React.useState('');
+    const { formatPrice } = useCurrency();
 
     const offerRef = doc(firestore, 'products', product.id, 'offers', offer.id);
 
@@ -141,7 +140,7 @@ function OfferActions({ offer, product, userRole }: { offer: FirestoreOffer, pro
             return (
                 <div className="grid grid-cols-2 gap-3">
                     <Button onClick={() => handleUpdateOffer('accepted')} disabled={!!isLoading}>
-                        {isLoading === 'accepted' ? <Loader2 className="animate-spin" /> : `Accept ${currencyFormatter(offer.counter_offer_amount!, 'EUR')}`}
+                        {isLoading === 'accepted' ? <Loader2 className="animate-spin" /> : `Accept ${formatPrice(offer.counter_offer_amount!)}`}
                     </Button>
                     <Button variant="outline" onClick={() => handleUpdateOffer('declined')} disabled={!!isLoading}>
                         {isLoading === 'declined' ? <Loader2 className="animate-spin" /> : 'Decline'}
@@ -199,6 +198,7 @@ export default function OfferDetailsPage({ params }: { params: { id: string; off
     const { id: productId, offerId } = params;
     const { user } = useUser();
     const firestore = useFirestore();
+    const { formatPrice } = useCurrency();
 
     const productRef = useMemoFirebase(() => firestore ? doc(firestore, 'products', productId) : null, [firestore, productId]);
     const { data: product, isLoading: isProductLoading } = useDoc<FirestoreProduct>(productRef);
@@ -255,7 +255,7 @@ export default function OfferDetailsPage({ params }: { params: { id: string; off
                 <div>
                     <p className="font-bold">{product.title}</p>
                     <p>{product.title}</p>
-                    <p className="text-muted-foreground">Listed for: {currencyFormatter(product.price, 'EUR')}</p>
+                    <p className="text-muted-foreground">Listed for: {formatPrice(product.price)}</p>
                 </div>
             </div>
             <Button variant="outline" className="w-full">

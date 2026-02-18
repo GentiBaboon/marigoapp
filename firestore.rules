@@ -183,5 +183,10 @@ service cloud.firestore {
     match /coupons/{couponId} {
         allow read, write: if isAdmin();
     }
+
+    match /config/{docId} {
+        allow read: if true;
+        allow write: if isAdmin();
+    }
   }
 }

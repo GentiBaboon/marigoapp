@@ -19,6 +19,7 @@ import type { FirestoreAddress, FirestoreOrder } from '@/lib/types';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { useCurrency } from '@/context/CurrencyContext';
 
 type SummaryStepProps = {
   onPrevStep: (step: number) => void;
@@ -36,11 +37,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
   const stripe = useStripe();
   const elements = useElements();
   const functions = getFunctions();
-
-  const currencyFormatter = new Intl.NumberFormat('de-DE', {
-    style: 'currency',
-    currency: 'EUR',
-  });
+  const { formatPrice } = useCurrency();
   
   const handlePay = async () => {
     if (!user || !firestore || !shippingAddress || !paymentMethod) {
@@ -221,7 +218,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             disabled={isLoading || !shippingAddress || !paymentMethod || (paymentMethod === 'new_card' && !stripe)}
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Pay Now - {currencyFormatter.format(grandTotal)}
+            Pay Now - {formatPrice(grandTotal, 'EUR')}
           </Button>
       </CardFooter>
     </Card>

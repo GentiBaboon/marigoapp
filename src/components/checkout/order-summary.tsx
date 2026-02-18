@@ -4,14 +4,11 @@ import { Separator } from '@/components/ui/separator';
 import { useCart } from '@/context/CartContext';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { useCurrency } from '@/context/CurrencyContext';
 
 export function OrderSummary() {
   const { items, subtotal, totalShipping, grandTotal } = useCart();
-
-  const currencyFormatter = new Intl.NumberFormat('de-DE', {
-    style: 'currency',
-    currency: 'EUR',
-  });
+  const { formatPrice } = useCurrency();
 
   return (
     <Card className="sticky top-24">
@@ -33,7 +30,7 @@ export function OrderSummary() {
                             <h3 className="font-medium text-sm leading-tight">{item.title}</h3>
                             <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
                         </div>
-                        <p className="font-medium text-sm">{currencyFormatter.format(item.price)}</p>
+                        <p className="font-medium text-sm">{formatPrice(item.price)}</p>
                     </div>
                 )
             })}
@@ -42,17 +39,17 @@ export function OrderSummary() {
         <div className="space-y-2">
           <div className="flex justify-between">
             <span>Subtotal</span>
-            <span>{currencyFormatter.format(subtotal)}</span>
+            <span>{formatPrice(subtotal)}</span>
           </div>
           <div className="flex justify-between">
             <span>Shipping</span>
-            <span>{currencyFormatter.format(totalShipping)}</span>
+            <span>{formatPrice(totalShipping)}</span>
           </div>
         </div>
         <Separator />
         <div className="flex justify-between font-bold text-lg">
           <span>Total</span>
-          <span>{currencyFormatter.format(grandTotal)}</span>
+          <span>{formatPrice(grandTotal)}</span>
         </div>
       </CardContent>
     </Card>

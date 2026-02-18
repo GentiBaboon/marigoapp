@@ -13,10 +13,7 @@ import { X, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Confetti from 'react-confetti';
 import { useWindowSize } from '@/hooks/use-window-size';
-
-const currencyFormatter = (value: number, currency: string = 'EUR') => {
-  return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(value);
-};
+import { useCurrency } from '@/context/CurrencyContext';
 
 const AnimatedCheck = () => (
   <motion.div
@@ -61,6 +58,7 @@ export default function OrderSuccessPage() {
   const orderId = params.orderId as string;
   const firestore = useFirestore();
   const { width, height } = useWindowSize();
+  const { formatPrice } = useCurrency();
   
   const orderRef = useMemoFirebase(() => {
     if (!firestore || !orderId) return null;
@@ -103,7 +101,7 @@ export default function OrderSuccessPage() {
                  <p className="text-lg text-muted-foreground">
                     We got your order{' '}
                     <span className="font-semibold text-foreground">#{order.orderNumber}</span> for{' '}
-                    <span className="font-semibold text-foreground">{currencyFormatter(order.totalAmount)}</span>.
+                    <span className="font-semibold text-foreground">{formatPrice(order.totalAmount)}</span>.
                 </p>
                 <p className="text-muted-foreground">You'll receive a confirmation email shortly.</p>
             </div>

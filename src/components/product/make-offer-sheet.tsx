@@ -18,6 +18,7 @@ import { useUser, useFirestore, errorEmitter } from '@/firebase';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { useCurrency } from '@/context/CurrencyContext';
 
 interface MakeOfferSheetProps {
   isOpen: boolean;
@@ -30,13 +31,6 @@ interface MakeOfferSheetProps {
   };
 }
 
-const currencyFormatter = (value: number) => new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-}).format(value);
-
 export function MakeOfferSheet({ isOpen, onOpenChange, product }: MakeOfferSheetProps) {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -45,6 +39,7 @@ export function MakeOfferSheet({ isOpen, onOpenChange, product }: MakeOfferSheet
   const [selectedOffer, setSelectedOffer] = React.useState<number | null>(null);
   const [customOffer, setCustomOffer] = React.useState<string>('');
   const [isLoading, setIsLoading] = React.useState(false);
+  const { formatPrice } = useCurrency();
 
   const suggestedOffers = React.useMemo(() => {
     const price = product.price;
@@ -180,7 +175,7 @@ export function MakeOfferSheet({ isOpen, onOpenChange, product }: MakeOfferSheet
                         selectedOffer === offer.value && customOffer === '' ? 'border-primary ring-1 ring-primary bg-green-50/50' : 'border-input bg-background',
                         )}
                     >
-                        <p className="font-bold text-lg">{currencyFormatter(offer.value)}</p>
+                        <p className="font-bold text-lg">{formatPrice(offer.value)}</p>
                         <p className="text-sm text-muted-foreground">{offer.percentage}% off</p>
                         {index === 0 && <p className="text-xs text-green-700 font-medium mt-1">Recommended</p>}
                     </button>
@@ -206,7 +201,7 @@ export function MakeOfferSheet({ isOpen, onOpenChange, product }: MakeOfferSheet
                     disabled={isLoading || !selectedOffer || selectedOffer <= 0}
                 >
                     {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Send className="h-5 w-5" />}
-                    Send {selectedOffer ? currencyFormatter(selectedOffer) : ''} offer
+                    Send {selectedOffer ? formatPrice(selectedOffer) : ''} offer
                 </Button>
                 </SheetFooter>
             </>

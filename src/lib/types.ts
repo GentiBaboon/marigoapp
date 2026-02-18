@@ -143,7 +143,6 @@ export const sellStep6Schema = z.object({
         },
         z.number({required_error: "Price is required.", invalid_type_error: "Price must be a number."}).min(1, "Price must be at least 1.")
     ),
-    currency: z.enum(['EUR', 'ALL'], { required_error: 'A currency is required.' }),
 });
 
 export const sellFormSchema = sellStep1Schema
@@ -153,7 +152,7 @@ export const sellFormSchema = sellStep1Schema
   .merge(sellStep5Schema)
   .merge(sellStep6Schema);
 
-export type SellFormValues = z.infer<typeof sellFormSchema> & { sellerEarning?: number };
+export type SellFormValues = z.infer<typeof sellFormSchema> & { sellerEarning?: number; currency?: 'EUR' };
 
 export interface SellDraft {
   id: string;
@@ -439,3 +438,14 @@ export const firestoreBrandSchema = z.object({
   productCount: z.number().optional(),
 });
 export type FirestoreBrand = z.infer<typeof firestoreBrandSchema> & { id: string };
+
+export const firestoreExchangeRatesSchema = z.object({
+  base: z.string(),
+  lastUpdated: z.any(),
+  rates: z.object({
+    EUR: z.number(),
+    USD: z.number(),
+    ALL: z.number(),
+  }),
+});
+export type FirestoreExchangeRates = z.infer<typeof firestoreExchangeRatesSchema>;

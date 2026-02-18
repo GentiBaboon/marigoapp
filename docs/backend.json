@@ -440,6 +440,40 @@
         "status": { "type": "string", "enum": ["active", "expired", "disabled"] }
       },
       "required": ["code", "discountType", "discountValue", "status"]
+    },
+    "ExchangeRates": {
+      "title": "ExchangeRates",
+      "type": "object",
+      "description": "Stores currency exchange rates relative to a base currency (EUR).",
+      "properties": {
+        "base": {
+          "type": "string",
+          "description": "The base currency code."
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "rates": {
+          "type": "object",
+          "properties": {
+            "EUR": {
+              "type": "number"
+            },
+            "USD": {
+              "type": "number"
+            },
+            "ALL": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      "required": [
+        "base",
+        "lastUpdated",
+        "rates"
+      ]
     }
   },
   "auth": {
@@ -529,6 +563,12 @@
     "/coupons/{couponId}": {
       "schema": { "$ref": "#/entities/Coupon" },
       "description": "Collection of all discount coupons."
+    },
+    "/config/exchangeRates": {
+      "schema": {
+        "$ref": "#/entities/ExchangeRates"
+      },
+      "description": "Stores currency exchange rates, updated daily."
     }
   }
 }
