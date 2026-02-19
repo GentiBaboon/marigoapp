@@ -45,12 +45,12 @@ service cloud.firestore {
     
     // Validates the data structure for a new product. On create, images array must be empty.
     function validProduct(productData) {
-        return productData.title is string && productData.title.size() > 0 && productData.title.size() < 100
-            && productData.price is number && productData.price > 0
-            && productData.category is string && productData.category.size() > 0
-            && productData.images is list && productData.images.size() == 0 // Must be empty on create
-            && productData.status is string && productData.status == 'pending_review' // New products must be pending review
-            && productData.sellerId == request.auth.uid;
+      return ('title' in productData && productData.title is string && productData.title.size() > 0 && productData.title.size() < 100)
+          && ('price' in productData && productData.price is number && productData.price > 0)
+          && ('category' in productData && productData.category is string && productData.category.size() > 0)
+          && ('images' in productData && productData.images is list && productData.images.size() == 0)
+          && ('status' in productData && productData.status is string && productData.status == 'pending_review')
+          && ('sellerId' in productData && productData.sellerId == request.auth.uid);
     }
     
     // Validates an update to a product. Seller cannot be changed. Now ensures images are added after creation.
