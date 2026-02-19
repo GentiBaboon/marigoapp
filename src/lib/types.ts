@@ -95,14 +95,14 @@ export type FirestoreAddress = AddressFormValues & {
 
 // --- Sell Schemas ---
 export const imageFileSchema = z.object({
-  url: z.string().url(),
+  url: z.string(),
   name: z.string(),
   type: z.string(),
 });
 export type ImageFile = z.infer<typeof imageFileSchema>;
 
 export const proofFileSchema = z.object({
-  url: z.string().url(),
+  url: z.string(),
   name: z.string(),
   type: z.string(),
 });

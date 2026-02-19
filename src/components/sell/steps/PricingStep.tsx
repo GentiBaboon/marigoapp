@@ -96,7 +96,7 @@ export function PricingStep() {
             brand: formData.brand,
             category: categoryName,
             condition: formData.condition,
-            images: formData.images.map(img => img.preview),
+            images: formData.images.map(img => img.url),
         };
         
         const result = await suggestPrice(input);

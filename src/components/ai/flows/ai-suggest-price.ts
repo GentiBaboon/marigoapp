@@ -15,7 +15,7 @@ export const SuggestPriceInputSchema = z.object({
   brand: z.string().describe('The brand of the product.'),
   category: z.string().describe('The category of the product.'),
   condition: z.string().optional().describe('The condition of the product (e.g., New, Like New, Good).'),
-  images: z.array(z.string().url()).describe("A list of product photos as public URLs."),
+  images: z.array(z.string()).describe("A list of product photos as data URIs. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
 });
 export type SuggestPriceInput = z.infer<typeof SuggestPriceInputSchema>;
 

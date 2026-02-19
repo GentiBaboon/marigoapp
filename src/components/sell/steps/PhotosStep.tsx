@@ -11,8 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import imageCompression from 'browser-image-compression';
 import type { ImageFile } from '@/lib/types';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { useFirebaseApp } from '@/firebase';
 
 type ImageFileState = ImageFile & {
   id: string;
@@ -20,7 +18,7 @@ type ImageFileState = ImageFile & {
   error?: string;
 };
 
-const fileToDataUrl = (file: Blob | File): Promise<string> => {
+const fileToDataUrl = (file: Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -32,8 +30,6 @@ const fileToDataUrl = (file: Blob | File): Promise<string> => {
 export function PhotosStep() {
   const { formData, setFormData, nextStep } = useSellForm();
   const { toast } = useToast();
-  const firebaseApp = useFirebaseApp();
-  const storage = getStorage(firebaseApp);
 
   const [imageFiles, setImageFiles] = useState<ImageFileState[]>(
     formData.images?.map((img, i) => ({ 
@@ -53,12 +49,6 @@ export function PhotosStep() {
         });
       }
 
-      const productId = formData.productId;
-      if (!productId) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Could not create a product draft. Please go back and try again.' });
-          return;
-      }
-
       acceptedFiles.forEach(async (file) => {
           const fileId = `${file.name}-${Date.now()}`;
           const tempUrl = URL.createObjectURL(file);
@@ -66,22 +56,20 @@ export function PhotosStep() {
           setImageFiles(current => [...current, { id: fileId, url: tempUrl, name: file.name, type: file.type, isLoading: true }]);
 
           try {
-              const compressedFile = await imageCompression(file, { maxSizeMB: 0.8, maxWidthOrHeight: 1200, useWebWorker: true });
-              const storageRef = ref(storage, `products/${productId}/${fileId}-${file.name}`);
-              await uploadBytes(storageRef, compressedFile);
-              const downloadURL = await getDownloadURL(storageRef);
+              const webpFile = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1280, useWebWorker: true, fileType: 'image/webp' });
+              const dataUrl = await fileToDataUrl(webpFile);
 
-              URL.revokeObjectURL(tempUrl); // Clean up blob URL
-              setImageFiles(current => current.map(f => f.id === fileId ? { ...f, url: downloadURL, isLoading: false } : f));
+              URL.revokeObjectURL(tempUrl);
+              setImageFiles(current => current.map(f => f.id === fileId ? { ...f, url: dataUrl, name: `${file.name.split('.')[0]}.webp`, type: 'image/webp', isLoading: false } : f));
           } catch (error) {
-              console.error("Upload failed:", error);
-              toast({ variant: 'destructive', title: 'Upload Failed', description: `Could not upload ${file.name}` });
+              console.error("Image processing failed:", error);
+              toast({ variant: 'destructive', title: 'Processing Failed', description: `Could not process ${file.name}` });
               URL.revokeObjectURL(tempUrl);
               setImageFiles(current => current.filter(f => f.id !== fileId));
           }
       });
     },
-    [formData.productId, storage, toast]
+    [toast]
   );
   
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -90,8 +78,6 @@ export function PhotosStep() {
   });
 
   const removeFile = (idToRemove: string) => {
-    // Note: This doesn't delete the file from Firebase Storage.
-    // A more robust implementation would do that.
     setImageFiles(prev => prev.filter(file => file.id !== idToRemove));
   };
   
@@ -199,5 +185,3 @@ export function PhotosStep() {
     </div>
   );
 }
-
-    

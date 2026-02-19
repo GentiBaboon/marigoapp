@@ -11,8 +11,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { categories, productConditions } from '@/lib/mock-data';
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { FirestoreProduct, FirestoreAddress } from '@/lib/types';
 
 // Helper component for each review section
@@ -45,6 +46,7 @@ export function ReviewStep() {
   const router = useRouter();
   const { user } = useUser();
   const firestore = useFirestore();
+  const firebaseApp = useFirebaseApp();
   const [selectedAddress, setSelectedAddress] = useState<FirestoreAddress | null>(null);
 
   const addressesCollection = useMemoFirebase(() => {
@@ -74,6 +76,16 @@ export function ReviewStep() {
     setIsLoading(true);
 
     try {
+        const imageUrls: string[] = [];
+        if (formData.images && formData.images.length > 0) {
+            const storage = getStorage(firebaseApp);
+            const uploadPromises = formData.images.map(imageFile => {
+                const storageRef = ref(storage, `products/${formData.productId}/${Date.now()}-${imageFile.name}`);
+                return uploadString(storageRef, imageFile.url, 'data_url').then(snapshot => getDownloadURL(snapshot.ref));
+            });
+            imageUrls.push(...await Promise.all(uploadPromises));
+        }
+
         const keywords = Array.from(new Set((formData.title || '').toLowerCase().split(' ').filter(Boolean)));
 
         const listingData: Partial<Omit<FirestoreProduct, 'id'>> & { listingCreated: any } = {
@@ -83,7 +95,7 @@ export function ReviewStep() {
             price: formData.price || 0,
             category: formData.category || '',
             subCategory: formData.category || '',
-            images: formData.images?.map((img) => img.url) || [],
+            images: imageUrls,
             status: 'pending_review',
             listingCreated: serverTimestamp(),
             keywords: keywords,
