@@ -43,17 +43,17 @@ service cloud.firestore {
         return isSignedIn() && (request.auth.uid == delivery.buyerId || request.auth.uid in delivery.sellerIds);
     }
     
-    // Validates the data structure for a new or updated product.
+    // Validates the data structure for a new product. On create, images array must be empty.
     function validProduct(productData) {
         return productData.title is string && productData.title.size() > 0 && productData.title.size() < 100
             && productData.price is number && productData.price > 0
             && productData.category is string && productData.category.size() > 0
-            && productData.images is list && productData.images.size() > 0 && productData.images.size() <= 15
+            && productData.images is list && productData.images.size() == 0 // Must be empty on create
             && productData.status is string && productData.status == 'pending_review' // New products must be pending review
             && productData.sellerId == request.auth.uid;
     }
     
-    // Validates an update to a product. Seller cannot be changed.
+    // Validates an update to a product. Seller cannot be changed. Now ensures images are added after creation.
     function validProductUpdate(updateData, existingData) {
         return updateData.title is string && updateData.title.size() > 0 && updateData.title.size() < 100
             && updateData.price is number && updateData.price > 0
