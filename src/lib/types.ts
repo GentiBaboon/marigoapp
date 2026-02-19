@@ -229,6 +229,8 @@ export const firestoreProductSchema = z.object({
   size: z.string().optional(),
   pattern: z.string().optional(),
   vintage: z.boolean().optional(),
+  views: z.number().optional(),
+  likes: z.number().optional(),
   moderation: z.object({
     status: z.enum(["approved", "rejected", "needs_review"]),
     reasons: z.array(z.string()).optional(),

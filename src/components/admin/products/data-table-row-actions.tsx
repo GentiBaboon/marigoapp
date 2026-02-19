@@ -1,7 +1,7 @@
 'use client';
 
 import { Row } from '@tanstack/react-table';
-import { MoreHorizontal, Edit, Trash2, ShieldCheck, View } from 'lucide-react';
+import { MoreHorizontal, Eye, Edit, Star, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,6 +9,10 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 
 interface DataTableRowActionsProps<TData> {
@@ -18,9 +22,6 @@ interface DataTableRowActionsProps<TData> {
 export function DataTableRowActions<TData>({
   row,
 }: DataTableRowActionsProps<TData>) {
-  // In a real app, you'd get the product from row.original and perform actions
-  // const product = row.original;
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -30,22 +31,36 @@ export function DataTableRowActions<TData>({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuItem>
-          <View className="mr-2 h-4 w-4" />
-          View Product
+          <Eye className="mr-2 h-4 w-4" />
+          View on Site
         </DropdownMenuItem>
         <DropdownMenuItem>
           <Edit className="mr-2 h-4 w-4" />
           Edit Product
         </DropdownMenuItem>
+        <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+                Change Status
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+                <DropdownMenuSubContent>
+                   <DropdownMenuItem>Active</DropdownMenuItem>
+                   <DropdownMenuItem>Pending Review</DropdownMenuItem>
+                   <DropdownMenuItem>Sold</DropdownMenuItem>
+                   <DropdownMenuItem>Rejected</DropdownMenuItem>
+                </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+        </DropdownMenuSub>
         <DropdownMenuItem>
-            <ShieldCheck className="mr-2 h-4 w-4" />
-            Verify Authenticity
+            <Star className="mr-2 h-4 w-4" />
+            Feature
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive">
           <Trash2 className="mr-2 h-4 w-4" />
-          Remove
+          Delete Product
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

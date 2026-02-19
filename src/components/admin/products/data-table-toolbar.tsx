@@ -3,10 +3,10 @@
 import { Table } from '@tanstack/react-table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { X, Trash2 } from 'lucide-react';
+import { X } from 'lucide-react';
 import { DataTableViewOptions } from '@/components/admin/users/data-table-view-options';
 import { DataTableFacetedFilter } from '@/components/admin/users/data-table-faceted-filter';
-import { productCategories } from '@/lib/mock-data';
+import { brands } from '@/lib/mock-data';
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>;
@@ -17,27 +17,25 @@ const statuses = [
     { label: 'Pending Review', value: 'pending_review' },
     { label: 'Sold', value: 'sold' },
     { label: 'Reserved', value: 'reserved' },
+    { label: 'Rejected', value: 'rejected' },
 ];
 
-const categories = productCategories.flatMap(cat => 
-    cat.subcategories.map(sub => ({
-        label: sub.name,
-        value: sub.slug
-    }))
-);
+const brandOptions = brands.map(brand => ({
+    label: brand.name,
+    value: brand.name
+}));
 
 
 export function DataTableToolbar<TData>({
   table,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0;
-  const isRowsSelected = table.getIsSomeRowsSelected() || table.getIsAllRowsSelected();
 
   return (
     <div className="flex items-center justify-between">
       <div className="flex flex-1 items-center space-x-2">
         <Input
-          placeholder="Filter by title..."
+          placeholder="Filter by product title..."
           value={(table.getColumn('title')?.getFilterValue() as string) ?? ''}
           onChange={(event) =>
             table.getColumn('title')?.setFilterValue(event.target.value)
@@ -51,11 +49,11 @@ export function DataTableToolbar<TData>({
             options={statuses}
           />
         )}
-        {table.getColumn('category') && (
+        {table.getColumn('brand') && (
           <DataTableFacetedFilter
-            column={table.getColumn('category')}
-            title="Category"
-            options={categories}
+            column={table.getColumn('brand')}
+            title="Brand"
+            options={brandOptions}
           />
         )}
         {isFiltered && (
@@ -69,15 +67,7 @@ export function DataTableToolbar<TData>({
           </Button>
         )}
       </div>
-      <div className="flex items-center space-x-2">
-        {isRowsSelected && (
-            <Button variant="destructive" size="sm" className="h-8">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete ({table.getFilteredSelectedRowModel().rows.length})
-            </Button>
-        )}
-        <DataTableViewOptions table={table} />
-      </div>
+      <DataTableViewOptions table={table} />
     </div>
   );
 }
