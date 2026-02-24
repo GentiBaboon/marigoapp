@@ -70,8 +70,8 @@ export function DescriptionStep() {
   const form = useForm<Step4Values>({
     resolver: zodResolver(sellStep4Schema),
     defaultValues: {
-      title: formData.title || '',
-      description: formData.description || '',
+      title: typeof formData.title === 'string' ? formData.title : '',
+      description: typeof formData.description === 'string' ? formData.description : '',
       origin: formData.origin,
       yearOfPurchase: formData.yearOfPurchase,
       serialNumber: formData.serialNumber || '',
@@ -108,11 +108,11 @@ export function DescriptionStep() {
       const categoryName = getCategoryName(formData.gender, formData.category);
 
       const input: GenerateDescriptionInput = {
-        title: formData.title,
+        title: typeof formData.title === 'string' ? formData.title : '',
         brand: formData.brand,
         category: categoryName,
         condition: formData.condition,
-        images: formData.images.map(img => img.preview),
+        images: formData.images.map(img => img.url),
       };
 
       const result = await generateDescription(input);

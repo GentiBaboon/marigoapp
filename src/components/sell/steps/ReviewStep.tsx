@@ -73,6 +73,26 @@ export function ReviewStep() {
         });
         return;
     }
+    
+    // --- Defensive Data Validation ---
+    if (!formData.title || typeof formData.title !== 'string' || formData.title.length < 5 || formData.title.length > 99) {
+        toast({ variant: 'destructive', title: 'Invalid Title', description: 'Please go back and provide a valid title (5-99 characters).', duration: 5000 });
+        goToStep(4); return;
+    }
+    if (!formData.brand || typeof formData.brand !== 'string' || formData.brand.length === 0) {
+        toast({ variant: 'destructive', title: 'Brand Missing', description: 'Please go back and select a brand.', duration: 5000 });
+        goToStep(1); return;
+    }
+    if (!formData.category || typeof formData.category !== 'string' || formData.category.length === 0) {
+        toast({ variant: 'destructive', title: 'Category Missing', description: 'Please go back and select a category.', duration: 5000 });
+        goToStep(1); return;
+    }
+    if (!formData.price || typeof formData.price !== 'number' || formData.price <= 0) {
+        toast({ variant: 'destructive', title: 'Invalid Price', description: 'Please go back and set a valid price.', duration: 5000 });
+        goToStep(6); return;
+    }
+    // --- End Validation ---
+
     setIsLoading(true);
 
     const productRef = doc(firestore, 'products', formData.productId);

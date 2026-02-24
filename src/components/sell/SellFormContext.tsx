@@ -36,11 +36,25 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const savedDrafts = localStorage.getItem('sell_form_drafts');
       if (savedDrafts) {
-        setDrafts(JSON.parse(savedDrafts));
+        const parsedDrafts: SellDraft[] = JSON.parse(savedDrafts);
+        
+        // Sanitize loaded drafts to handle old data format where title/description were objects
+        const sanitizedDrafts = parsedDrafts.map(draft => {
+            const formData = draft.formData;
+            if (formData.title && typeof formData.title === 'object') {
+                formData.title = (formData.title as any).en || '';
+            }
+             if (formData.description && typeof formData.description === 'object') {
+                formData.description = (formData.description as any).en || '';
+            }
+            return { ...draft, formData };
+        });
+
+        setDrafts(sanitizedDrafts);
       }
     } catch (error) {
-      console.error("Failed to load drafts from localStorage", error);
-      localStorage.removeItem('sell_form_drafts');
+      console.error("Failed to load or sanitize drafts from localStorage", error);
+      localStorage.removeItem('sell_form_drafts'); // Clear corrupted data
     }
     setIsInitialized(true);
   }, []);
