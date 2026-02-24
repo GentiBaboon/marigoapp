@@ -24,7 +24,7 @@ export function OfferListItem({ offer }: { offer: OfferWithProduct }) {
     const { formatPrice } = useCurrency();
 
     const imageUrl = product.images?.[0] || 'https://placehold.co/96x96/E2E8F0/A0AEC0?text=MARIGO';
-    const displayTitle = product.title?.en;
+    const displayTitle = product.title;
     const imageAlt = displayTitle;
 
     const getStatusLabel = (status: string) => {

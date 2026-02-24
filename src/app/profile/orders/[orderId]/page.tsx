@@ -86,7 +86,7 @@ export default function OrderDetailsPage() {
     }
 
     const item = order.items[0];
-    const displayTitle = item.title.en;
+    const displayTitle = item.title;
 
     return (
         <div className="bg-muted/40 min-h-screen">

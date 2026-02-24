@@ -39,7 +39,7 @@ export function SuccessStep() {
     
     // In a real app this would be calculated based on the order. Hardcoding based on image for now.
     const buyerServiceFee = 6;
-    const title = typeof formData.title === 'object' ? formData.title.en : formData.title;
+    const title = formData.title;
 
     return (
         <div className="flex flex-col items-center text-center space-y-6">

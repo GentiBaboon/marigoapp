@@ -86,14 +86,14 @@ const ModerationCard: React.FC<ModerationCardProps> = ({ product }) => {
           adminId: adminUser.uid,
           adminName: adminUser.displayName || 'Admin',
           actionType: status === 'active' ? 'product_approved' : 'product_rejected',
-          details: `${status === 'active' ? 'Approved' : 'Rejected'} product "${product.title.en}" (ID: ${product.id})`,
+          details: `${status === 'active' ? 'Approved' : 'Rejected'} product "${product.title}" (ID: ${product.id})`,
           targetId: product.id,
           timestamp: serverTimestamp()
       });
 
       toast({
         title: `Product ${status}`,
-        description: `The product "${product.title.en}" has been ${status}.`,
+        description: `The product "${product.title}" has been ${status}.`,
       });
     } catch (error) {
       console.error(`Error updating product status:`, error);
@@ -112,7 +112,7 @@ const ModerationCard: React.FC<ModerationCardProps> = ({ product }) => {
       <CardHeader>
         <div className="flex justify-between items-start">
             <div>
-                <CardTitle>{product.title.en}</CardTitle>
+                <CardTitle>{product.title}</CardTitle>
                 <CardDescription>{product.brand}</CardDescription>
             </div>
             <SellerInfo sellerId={product.sellerId} />
@@ -122,7 +122,7 @@ const ModerationCard: React.FC<ModerationCardProps> = ({ product }) => {
         <div className="relative aspect-[4/3] bg-muted rounded-md overflow-hidden">
             <Image 
                 src={product.images?.[0] || '/placeholder.png'} 
-                alt={product.title.en} 
+                alt={product.title} 
                 fill 
                 className="object-cover" 
                 sizes="(max-width: 768px) 100vw, 50vw"
@@ -131,7 +131,7 @@ const ModerationCard: React.FC<ModerationCardProps> = ({ product }) => {
         <div className="space-y-4">
             <div>
                 <h4 className="font-semibold">Description</h4>
-                <p className="text-sm text-muted-foreground">{product.description.en}</p>
+                <p className="text-sm text-muted-foreground">{product.description}</p>
             </div>
             <div>
                 <h4 className="font-semibold">Details</h4>

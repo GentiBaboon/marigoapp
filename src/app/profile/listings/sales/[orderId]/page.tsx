@@ -109,11 +109,11 @@ export default function SaleDetailsPage() {
                  <div className="bg-background p-4 rounded-lg">
                     <div className="flex gap-4 items-center">
                         <div className="relative h-16 w-16 rounded-md bg-muted flex-shrink-0">
-                            <Image src={item.image} alt={item.title.en} fill className="object-cover rounded-md" sizes="64px" />
+                            <Image src={item.image} alt={item.title} fill className="object-cover rounded-md" sizes="64px" />
                         </div>
                         <div>
                             <p className="font-bold text-lg uppercase">{item.brand}</p>
-                            <p>{item.title.en}</p>
+                            <p>{item.title}</p>
                              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                                 Ref. {item.productId.slice(0, 8)}
                                 <Copy className="h-3 w-3 cursor-pointer" onClick={() => copyToClipboard(item.productId)} />
