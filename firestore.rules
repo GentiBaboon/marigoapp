@@ -45,13 +45,17 @@ service cloud.firestore {
     
     // Validates the data structure for a new product. On create, images array must be empty.
     function validProduct(productData) {
-      return ('title' in productData && productData.title is string && productData.title.size() > 0 && productData.title.size() < 100)
-          && ('brand' in productData && productData.brand is string && productData.brand.size() > 0)
-          && ('price' in productData && productData.price is number && productData.price > 0)
-          && ('category' in productData && productData.category is string && productData.category.size() > 0)
-          && ('images' in productData && productData.images is list && productData.images.size() == 0)
-          && ('status' in productData && productData.status is string && productData.status == 'pending_review')
-          && ('sellerId' in productData && productData.sellerId == request.auth.uid);
+      return productData.sellerId == request.auth.uid
+        && productData.status == 'pending_review'
+        && productData.images.size() == 0
+        && productData.title is string && productData.title.size() > 0 && productData.title.size() < 100
+        && productData.description is string && productData.description.size() > 0
+        && productData.brand is string && productData.brand.size() > 0
+        && productData.category is string && productData.category.size() > 0
+        && productData.price is number && productData.price > 0
+        && productData.condition is string && productData.condition.size() > 0
+        && productData.material is string && productData.material.size() > 0
+        && productData.color is string && productData.color.size() > 0;
     }
     
     // Validates an update to a product. Seller cannot be changed.
