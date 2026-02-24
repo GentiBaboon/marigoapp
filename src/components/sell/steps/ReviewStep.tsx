@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Pencil, Info, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { categories, productConditions } from '@/lib/mock-data';
+import { productCategories, productConditions } from '@/lib/mock-data';
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
@@ -78,8 +78,13 @@ export function ReviewStep() {
     const productRef = doc(firestore, 'products', formData.productId);
 
     try {
-        // 1. Create a document shell first to satisfy storage rules.
-        const keywords = Array.from(new Set((formData.title || '').toLowerCase().split(' ').filter(Boolean)));
+        const keywords = Array.from(new Set([
+          ...(formData.title || '').toLowerCase().split(' '),
+          ...(formData.brand || '').toLowerCase().split(' '),
+          ...(formData.category || '').toLowerCase().split(' '),
+        ].filter(Boolean)));
+        
+        // 1. Create the product document with an empty images array
         const initialListingData: Partial<Omit<FirestoreProduct, 'id'>> & { listingCreated: any } = {
             sellerId: user.uid,
             title: formData.title,
@@ -87,7 +92,7 @@ export function ReviewStep() {
             price: formData.price || 0,
             category: formData.category || '',
             subCategory: formData.category || '',
-            images: [], // Images will be added in the next step
+            images: [],
             status: 'pending_review',
             listingCreated: serverTimestamp(),
             keywords: keywords,
@@ -100,11 +105,12 @@ export function ReviewStep() {
             vintage: formData.vintage,
         };
 
+        // Remove undefined properties to avoid Firestore errors
         Object.keys(initialListingData).forEach(key => initialListingData[key as keyof typeof initialListingData] === undefined && delete initialListingData[key as keyof typeof initialListingData]);
         
         await setDoc(productRef, initialListingData);
-
-        // 2. Upload images now that the document exists.
+        
+        // 2. Upload images to Firebase Storage
         const imageUrls: string[] = [];
         if (formData.images && formData.images.length > 0) {
             const storage = getStorage(firebaseApp);
@@ -115,25 +121,29 @@ export function ReviewStep() {
             imageUrls.push(...await Promise.all(uploadPromises));
         }
 
-        // 3. Update the document with the image URLs.
-        await updateDoc(productRef, {
-            images: imageUrls,
-        });
-
+        // 3. Update the product document with the final image URLs
+        if (imageUrls.length > 0) {
+            await updateDoc(productRef, {
+                images: imageUrls,
+            });
+        }
+        
         nextStep();
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Publishing error:", error);
+        // This creates a more detailed error for the developer overlay
         const permissionError = new FirestorePermissionError({
             path: `products/${formData.productId}`,
-            operation: 'create', // or 'write'
-            requestResourceData: { error: 'data too large to display' },
+            operation: error.code?.includes('permission') ? 'create' : 'write', // Guess operation
+            requestResourceData: { error: 'data too large to display' }, // Avoid sending large image data
         });
         errorEmitter.emit('permission-error', permissionError);
+        
         toast({
             variant: 'destructive',
             title: 'Publishing Failed',
-            description: 'There was a problem publishing your listing. Please try again.',
+            description: 'There was a problem publishing your listing. Please check your connection and try again.',
         });
     } finally {
         setIsLoading(false);
@@ -147,17 +157,20 @@ export function ReviewStep() {
   
   const getCategoryName = (slug: string | undefined) => {
     if (!slug) return 'N/A';
-    // The image shows "Handbags", which isn't a direct category, so we'll do our best.
-    const cat = categories.find(c => c.slug === slug);
-    if(cat?.slug === 'bags') return 'Handbags';
-    return cat?.name || slug;
+    for (const mainCategory of productCategories) {
+        for (const subCategory of mainCategory.subcategories) {
+            if (subCategory.slug === slug) {
+                return subCategory.name;
+            }
+        }
+    }
+    return slug;
   }
   
   const getConditionLabel = (value: string | undefined) => {
     if (!value) return 'N/A';
     const condition = productConditions.find(c => c.value === value);
-    // The image shows "Good condition"
-    return condition ? `${condition.label} condition` : value;
+    return condition?.label || value;
   }
   
   const currencyFormatter = (value: number | undefined) => {
@@ -172,8 +185,6 @@ export function ReviewStep() {
       return new Intl.NumberFormat(locale, {
         style: 'currency',
         currency: currency,
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
       }).format(value);
     } catch (e) {
       return `${value} ${currency}`;

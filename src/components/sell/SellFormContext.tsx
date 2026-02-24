@@ -49,13 +49,22 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     if (!isInitialized) return;
     try {
-      if (drafts.length > 0) {
-        localStorage.setItem('sell_form_drafts', JSON.stringify(drafts));
+      // Create a savable version of drafts without large data URLs
+      const savableDrafts = drafts.map(draft => {
+        const { images, proofOfOrigin, ...restOfFormData } = draft.formData;
+        return {
+          ...draft,
+          formData: restOfFormData,
+        };
+      });
+
+      if (savableDrafts.length > 0) {
+        localStorage.setItem('sell_form_drafts', JSON.stringify(savableDrafts));
       } else {
         localStorage.removeItem('sell_form_drafts');
       }
     } catch (error) {
-      console.error("Failed to save drafts to localStorage. Data may be too large.", error);
+      console.error("Failed to save drafts to localStorage.", error);
     }
   }, [drafts, isInitialized]);
 
@@ -159,5 +168,3 @@ export const useSellForm = () => {
   }
   return context;
 };
-    
-    

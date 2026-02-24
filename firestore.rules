@@ -53,7 +53,7 @@ service cloud.firestore {
           && ('sellerId' in productData && productData.sellerId == request.auth.uid);
     }
     
-    // Validates an update to a product. Seller cannot be changed. Now ensures images are added after creation.
+    // Validates an update to a product. Seller cannot be changed. Ensures images are added after creation.
     function validProductUpdate(updateData, existingData) {
         return updateData.title is string && updateData.title.size() > 0 && updateData.title.size() < 100
             && updateData.price is number && updateData.price > 0

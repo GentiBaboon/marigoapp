@@ -5,7 +5,7 @@ import {onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as logger from "firebase-functions/logger";
 import Stripe from "stripe";
-import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import {onDocumentWritten} from "firebase-functions/v2/firestore";
 import {VertexAI} from "@google-cloud/vertexai";
 import {getStorage} from "firebase-admin/storage";
 
@@ -558,44 +558,63 @@ const generativeModel = vertexAI.getGenerativeModel({
   model: "gemini-1.5-flash",
 });
 
-export const moderateProductImage = onDocumentCreated("products/{productId}", async (event) => {
-  const snapshot = event.data;
-  if (!snapshot) {
-    logger.info("No data associated with the event");
+export const moderateProductImage = onDocumentWritten("products/{productId}", async (event) => {
+  const snapshotAfter = event.data?.after;
+  const productData = snapshotAfter?.data();
+
+  // Exit if the document was deleted or doesn't exist.
+  if (!productData || !snapshotAfter) {
+    logger.info(`Product ${event.params.productId} deleted or does not exist.`);
     return;
   }
-  const productData = snapshot.data();
-  const images = productData.images as string[]; // Array of data URIs
+
+  // Only run moderation if the status is 'pending_review'
+  if (productData.status !== "pending_review") {
+      logger.info(`Product ${snapshotAfter.id} is not pending review. Skipping moderation.`);
+      return;
+  }
+
+  const images = productData.images as string[]; // Array of Storage URLs
   const finalUpdateData: any = {};
 
   if (!images || images.length === 0) {
-    logger.info(`Product ${snapshot.id} has no images to moderate.`);
-    await snapshot.ref.update({
-      status: "active",
-      moderation: { status: "approved", checkedAt: admin.firestore.FieldValue.serverTimestamp() },
-    });
+    logger.info(`Product ${snapshotAfter.id} has no images to moderate yet. This may be temporary.`);
+    // Don't auto-approve. Wait for the image URLs to be added.
     return;
   }
 
   try {
     let overallModerationResult = "approved";
     const moderationReasons: string[] = [];
+    const bucket = getStorage().bucket();
 
-    const imageParts = images.map((imageString) => {
-      const base64Data = imageString.split(",")[1];
-      if (!base64Data) return null;
+    // Convert storage URLs to base64 image data for Vertex AI
+    const imageParts = await Promise.all(
+        images.map(async (imageUrl) => {
+            try {
+                const url = new URL(imageUrl);
+                // gs://<bucket>/<filePath>
+                const filePath = decodeURIComponent(url.pathname.split("/o/")[1].split("?")[0]);
+                const file = bucket.file(filePath);
+                const [buffer] = await file.download();
+                const base64Data = buffer.toString("base64");
+                const mimeType = (await file.getMetadata())[0].contentType || "image/webp";
 
-      return {
-        inlineData: {
-          data: base64Data,
-          mimeType: imageString.substring(imageString.indexOf(":") + 1, imageString.indexOf(";")),
-        },
-      };
-    }).filter((p) => p !== null);
+                return {
+                    inlineData: { data: base64Data, mimeType },
+                };
+            } catch (e) {
+                logger.error(`Failed to download image ${imageUrl}`, e);
+                return null; // Skip failed downloads
+            }
+        })
+    );
 
-    if (imageParts.length > 0) {
+    const validImageParts = imageParts.filter((p) => p !== null);
+
+    if (validImageParts.length > 0) {
         const request = {
-            contents: [{role: "user", parts: imageParts as any[]}],
+            contents: [{role: "user", parts: validImageParts as any[]}],
         };
 
         const streamingResp = await generativeModel.generateContentStream(request);
@@ -605,34 +624,28 @@ export const moderateProductImage = onDocumentCreated("products/{productId}", as
 
         if (safetyRatings) {
             for (const rating of safetyRatings) {
-            if (rating.probability === "HIGH" || rating.probability === "MEDIUM") {
-                if (overallModerationResult !== "rejected") {
-                overallModerationResult = "needs_review";
+                if (rating.probability === "HIGH" || rating.probability === "MEDIUM") {
+                    if (overallModerationResult !== "rejected") {
+                        overallModerationResult = "needs_review";
+                    }
+                    const reason = `Image flagged for ${rating.category} with probability ${rating.probability}.`;
+                    if (!moderationReasons.includes(reason)) {
+                        moderationReasons.push(reason);
+                    }
+                    if (rating.probability === "HIGH" && (rating.category === "HARM_CATEGORY_DANGEROUS_CONTENT" || rating.category === "HARM_CATEGORY_SEXUALLY_EXPLICIT")) {
+                        overallModerationResult = "rejected";
+                    }
                 }
-                const reason = `Image flagged for ${rating.category} with probability ${rating.probability}.`;
-                if (!moderationReasons.includes(reason)) {
-                moderationReasons.push(reason);
-                }
-                if (rating.probability === "HIGH" && (rating.category === "HARM_CATEGORY_DANGEROUS_CONTENT" || rating.category === "HARM_CATEGORY_SEXUALLY_EXPLICIT")) {
-                overallModerationResult = "rejected";
-                }
-            }
             }
         }
     }
 
     // --- Authenticity Check Logic ---
-    if (productData.price > 200) {
+    if (productData.price > 200 && validImageParts.length > 0) {
         try {
-            const authImageParts = images.map((imageString) => ({
-                inlineData: {
-                  data: imageString.split(",")[1],
-                  mimeType: imageString.substring(imageString.indexOf(":") + 1, imageString.indexOf(";")),
-                },
-            }));
             const authenticityPrompt = `You are a highly-trained authenticator for luxury fashion items. Your task is to perform a pre-check for authenticity based on user-provided images and details. Do not make a definitive "authentic" or "fake" judgment. Instead, provide a confidence level (high, medium, or low) and the reasons for it in a JSON format: {"confidence": "high" | "medium" | "low", "findings": ["finding 1", "finding 2"]}. Analyze the following details and images, paying close attention to: Logo, Stitching, Hardware, Material, and Serial Number. Product Details: Title: ${productData.title}, Brand: ${productData.brand}, Description: ${productData.description}.`;
             const authRequest = {
-                contents: [{ role: "user", parts: [...authImageParts, { text: authenticityPrompt }] }],
+                contents: [{ role: "user", parts: [...validImageParts as any[], { text: authenticityPrompt }] }],
                 generationConfig: { responseMimeType: "application/json" },
             };
             const authResponse = await generativeModel.generateContent(authRequest);
@@ -649,7 +662,7 @@ export const moderateProductImage = onDocumentCreated("products/{productId}", as
                 throw new Error("No JSON response from authenticity check.");
             }
         } catch (authError) {
-            logger.error(`Error during authenticity check for product ${snapshot.id}:`, authError);
+            logger.error(`Error during authenticity check for product ${snapshotAfter.id}:`, authError);
             finalUpdateData.authenticityCheck = {
                 status: "failed",
                 confidence: "low",
@@ -667,28 +680,29 @@ export const moderateProductImage = onDocumentCreated("products/{productId}", as
             reasons: moderationReasons,
             checkedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
-        logger.warn(`Product ${snapshot.id} rejected due to: ${moderationReasons.join(", ")}`);
+        logger.warn(`Product ${snapshotAfter.id} rejected due to: ${moderationReasons.join(", ")}`);
     } else if (overallModerationResult === "needs_review") {
+        // Keep status as pending_review
         finalUpdateData.moderation = {
             status: "needs_review",
             reasons: moderationReasons,
             checkedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
-        logger.info(`Product ${snapshot.id} flagged for admin review.`);
+        logger.info(`Product ${snapshotAfter.id} flagged for admin review.`);
     } else {
         finalUpdateData.status = "active";
         finalUpdateData.moderation = {
             status: "approved",
             checkedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
-        logger.info(`Product ${snapshot.id} approved automatically.`);
+        logger.info(`Product ${snapshotAfter.id} approved automatically.`);
     }
 
-    await snapshot.ref.update(finalUpdateData);
+    await snapshotAfter.ref.update(finalUpdateData);
   } catch (error) {
-      logger.error(`Error during image moderation for product ${snapshot.id}:`, error);
-      // Fallback: flag for manual review in case of AI API error
-      await snapshot.ref.update({
+      logger.error(`Error during image moderation for product ${snapshotAfter.id}:`, error);
+      // Fallback: keep for manual review in case of AI API error
+      await snapshotAfter.ref.update({
           moderation: {
               status: "needs_review",
               reasons: ["AI moderation failed. Please review manually."],
