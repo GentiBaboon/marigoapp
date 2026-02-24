@@ -42,10 +42,10 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
         const sanitizedDrafts = parsedDrafts.map(draft => {
             const formData = draft.formData;
             if (formData.title && typeof formData.title === 'object') {
-                formData.title = (formData.title as any).en || '';
+                formData.title = '';
             }
              if (formData.description && typeof formData.description === 'object') {
-                formData.description = (formData.description as any).en || '';
+                formData.description = '';
             }
             return { ...draft, formData };
         });
@@ -63,9 +63,9 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     if (!isInitialized) return;
     try {
-      // Create a savable version of drafts without large data URLs
+      // Create a savable version of drafts, keeping images but excluding proofOfOrigin to save space.
       const savableDrafts = drafts.map(draft => {
-        const { images, proofOfOrigin, ...restOfFormData } = draft.formData;
+        const { proofOfOrigin, ...restOfFormData } = draft.formData;
         return {
           ...draft,
           formData: restOfFormData,

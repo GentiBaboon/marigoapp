@@ -39,8 +39,8 @@ const DraftItem = ({ draft, onSelect, onDelete, totalSteps }: { draft: SellDraft
                 <div className="relative h-24 w-24 flex-shrink-0 bg-muted rounded-md flex items-center justify-center">
                     {formData.images && formData.images.length > 0 ? (
                         <Image
-                            src={formData.images[0].preview}
-                            alt={formData.title?.en || 'Draft image'}
+                            src={formData.images[0].url}
+                            alt={formData.title || 'Draft image'}
                             fill
                             sizes="96px"
                             className="object-cover rounded-md"
