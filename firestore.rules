@@ -49,7 +49,6 @@ service cloud.firestore {
         && productData.status == 'pending_review'
         && productData.images.size() == 0
         && productData.title is string && productData.title.size() > 0 && productData.title.size() < 100
-        && productData.description is string && productData.description.size() > 0
         && productData.brand is string && productData.brand.size() > 0
         && productData.category is string && productData.category.size() > 0
         && productData.price is number && productData.price > 0
