@@ -74,9 +74,13 @@ export function ReviewStep() {
         return;
     }
     
-    // --- Defensive Data Validation ---
+    // --- Comprehensive Defensive Data Validation ---
     if (!formData.title || typeof formData.title !== 'string' || formData.title.length < 5 || formData.title.length > 99) {
         toast({ variant: 'destructive', title: 'Invalid Title', description: 'Please go back and provide a valid title (5-99 characters).', duration: 5000 });
+        goToStep(4); return;
+    }
+     if (!formData.description || typeof formData.description !== 'string' || formData.description.length < 20) {
+        toast({ variant: 'destructive', title: 'Invalid Description', description: 'Please go back and provide a valid description (min 20 characters).', duration: 5000 });
         goToStep(4); return;
     }
     if (!formData.brand || typeof formData.brand !== 'string' || formData.brand.length === 0) {
@@ -90,6 +94,18 @@ export function ReviewStep() {
     if (!formData.price || typeof formData.price !== 'number' || formData.price <= 0) {
         toast({ variant: 'destructive', title: 'Invalid Price', description: 'Please go back and set a valid price.', duration: 5000 });
         goToStep(6); return;
+    }
+    if (!formData.condition || typeof formData.condition !== 'string' || formData.condition.length === 0) {
+        toast({ variant: 'destructive', title: 'Condition Missing', description: 'Please go back and select a condition.', duration: 5000 });
+        goToStep(2); return;
+    }
+    if (!formData.material || typeof formData.material !== 'string' || formData.material.length === 0) {
+        toast({ variant: 'destructive', title: 'Material Missing', description: 'Please go back and select a material.', duration: 5000 });
+        goToStep(2); return;
+    }
+    if (!formData.color || typeof formData.color !== 'string' || formData.color.length === 0) {
+        toast({ variant: 'destructive', title: 'Color Missing', description: 'Please go back and select a color.', duration: 5000 });
+        goToStep(2); return;
     }
     // --- End Validation ---
 
