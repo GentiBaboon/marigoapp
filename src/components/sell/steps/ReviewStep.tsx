@@ -15,6 +15,7 @@ import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useColle
 import { doc, collection, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { FirestoreProduct, FirestoreAddress } from '@/lib/types';
+import { z } from 'zod';
 
 // Helper component for each review section
 const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode; }) => (
@@ -74,90 +75,90 @@ export function ReviewStep() {
         return;
     }
     
-    // --- Comprehensive Defensive Data Validation ---
-    if (!formData.title || typeof formData.title !== 'string' || formData.title.length < 5 || formData.title.length > 99) {
-        toast({ variant: 'destructive', title: 'Invalid Title', description: 'Please go back and provide a valid title (5-99 characters).', duration: 5000 });
-        goToStep(4); return;
-    }
-     if (!formData.description || typeof formData.description !== 'string' || formData.description.length < 20) {
-        toast({ variant: 'destructive', title: 'Invalid Description', description: 'Please go back and provide a valid description (min 20 characters).', duration: 5000 });
-        goToStep(4); return;
-    }
-    if (!formData.brand || typeof formData.brand !== 'string' || formData.brand.length === 0) {
-        toast({ variant: 'destructive', title: 'Brand Missing', description: 'Please go back and select a brand.', duration: 5000 });
-        goToStep(1); return;
-    }
-    if (!formData.category || typeof formData.category !== 'string' || formData.category.length === 0) {
-        toast({ variant: 'destructive', title: 'Category Missing', description: 'Please go back and select a category.', duration: 5000 });
-        goToStep(1); return;
-    }
-    if (!formData.price || typeof formData.price !== 'number' || formData.price <= 0) {
-        toast({ variant: 'destructive', title: 'Invalid Price', description: 'Please go back and set a valid price.', duration: 5000 });
-        goToStep(6); return;
-    }
-    if (!formData.condition || typeof formData.condition !== 'string' || formData.condition.length === 0) {
-        toast({ variant: 'destructive', title: 'Condition Missing', description: 'Please go back and select a condition.', duration: 5000 });
-        goToStep(2); return;
-    }
-    if (!formData.material || typeof formData.material !== 'string' || formData.material.length === 0) {
-        toast({ variant: 'destructive', title: 'Material Missing', description: 'Please go back and select a material.', duration: 5000 });
-        goToStep(2); return;
-    }
-    if (!formData.color || typeof formData.color !== 'string' || formData.color.length === 0) {
-        toast({ variant: 'destructive', title: 'Color Missing', description: 'Please go back and select a color.', duration: 5000 });
-        goToStep(2); return;
-    }
-    // --- End Validation ---
-
     setIsLoading(true);
+
+    const productForCreation = {
+        title: formData.title || '',
+        description: formData.description || '',
+        brand: formData.brand || '',
+        category: formData.category || '',
+        price: Number(formData.price) || 0,
+        condition: formData.condition || '',
+        material: formData.material || '',
+        color: formData.color || '',
+        sellerId: user.uid,
+        status: 'pending_review' as const,
+        images: [],
+        listingCreated: serverTimestamp(),
+        // Optional fields that are not required by the strict rule
+        ...(formData.subCategory && { subCategory: formData.subCategory }),
+        ...(formData.sizeValue && { size: `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() }),
+        ...(formData.pattern && { pattern: formData.pattern }),
+        ...(formData.vintage && { vintage: formData.vintage }),
+        keywords: Array.from(new Set([
+          ...(formData.title || '').toLowerCase().split(' '),
+          ...(formData.brand || '').toLowerCase().split(' '),
+          ...(formData.category || '').toLowerCase().split(' '),
+        ].filter(Boolean))),
+      };
+
+    const creationSchema = z.object({
+        sellerId: z.string().min(1),
+        status: z.literal('pending_review'),
+        images: z.array(z.any()).length(0),
+        title: z.string().min(1, 'Title is required.').max(99),
+        description: z.string().min(1, 'Description is required.'),
+        brand: z.string().min(1, 'Brand is required.'),
+        category: z.string().min(1, 'Category is required.'),
+        price: z.number().gt(0, 'Price must be greater than 0.'),
+        condition: z.string().min(1, 'Condition is required.'),
+        material: z.string().min(1, 'Material is required.'),
+        color: z.string().min(1, 'Color is required.'),
+    });
+
+    const validationResult = creationSchema.safeParse(productForCreation);
+
+    if (!validationResult.success) {
+        const firstError = validationResult.error.issues[0];
+        const fieldToStepMap: Record<string, number> = {
+            'title': 4, 'description': 4,
+            'brand': 1, 'category': 1,
+            'price': 6,
+            'condition': 2, 'material': 2, 'color': 2,
+        };
+        const errorField = firstError.path[0] as string;
+        
+        toast({
+          variant: 'destructive',
+          title: 'Incomplete Listing',
+          description: `Please complete all required fields. ${firstError.message}`,
+          duration: 5000,
+        });
+
+        // Guide user to the correct step
+        const stepToGo = fieldToStepMap[errorField];
+        if (stepToGo) {
+            goToStep(stepToGo);
+        }
+        setIsLoading(false);
+        return;
+    }
 
     const productRef = doc(firestore, 'products', formData.productId);
 
     try {
-        const keywords = Array.from(new Set([
-          ...(formData.title || '').toLowerCase().split(' '),
-          ...(formData.brand || '').toLowerCase().split(' '),
-          ...(formData.category || '').toLowerCase().split(' '),
-        ].filter(Boolean)));
+        await setDoc(productRef, validationResult.data);
         
-        // 1. Create the product document with an empty images array
-        const initialListingData: Partial<Omit<FirestoreProduct, 'id'>> & { listingCreated: any } = {
-            sellerId: user.uid,
-            title: formData.title,
-            description: formData.description,
-            price: formData.price || 0,
-            category: formData.category || '',
-            subCategory: formData.category || '',
-            images: [],
-            status: 'pending_review',
-            listingCreated: serverTimestamp(),
-            keywords: keywords,
-            brand: formData.brand,
-            size: formData.sizeValue ? `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() : undefined,
-            condition: formData.condition,
-            material: formData.material,
-            color: formData.color,
-            pattern: formData.pattern,
-            vintage: formData.vintage,
-        };
-
-        // Remove undefined properties to avoid Firestore errors
-        Object.keys(initialListingData).forEach(key => initialListingData[key as keyof typeof initialListingData] === undefined && delete initialListingData[key as keyof typeof initialListingData]);
-        
-        await setDoc(productRef, initialListingData);
-        
-        // 2. Upload images to Firebase Storage
-        const imageUrls: string[] = [];
+        let imageUrls: string[] = [];
         if (formData.images && formData.images.length > 0) {
             const storage = getStorage(firebaseApp);
             const uploadPromises = formData.images.map(imageFile => {
               const storageRef = ref(storage, `products/${formData.productId}/${Date.now()}-${imageFile.name}`);
               return uploadString(storageRef, imageFile.url, 'data_url').then(snapshot => getDownloadURL(snapshot.ref));
             });
-            imageUrls.push(...await Promise.all(uploadPromises));
+            imageUrls = await Promise.all(uploadPromises);
         }
 
-        // 3. Update the product document with the final image URLs
         if (imageUrls.length > 0) {
             await updateDoc(productRef, {
                 images: imageUrls,
@@ -168,11 +169,10 @@ export function ReviewStep() {
 
     } catch (error: any) {
         console.error("Publishing error:", error);
-        // This creates a more detailed error for the developer overlay
         const permissionError = new FirestorePermissionError({
             path: `products/${formData.productId}`,
-            operation: error.code?.includes('permission') ? 'create' : 'write', // Guess operation
-            requestResourceData: { error: 'data too large to display' }, // Avoid sending large image data
+            operation: error.code?.includes('permission') ? 'create' : 'write',
+            requestResourceData: { error: 'data too large to display' },
         });
         errorEmitter.emit('permission-error', permissionError);
         
