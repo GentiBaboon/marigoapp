@@ -46,6 +46,7 @@ service cloud.firestore {
     // Validates the data structure for a new product. On create, images array must be empty.
     function validProduct(productData) {
       return ('title' in productData && productData.title is string && productData.title.size() > 0 && productData.title.size() < 100)
+          && ('brand' in productData && productData.brand is string && productData.brand.size() > 0)
           && ('price' in productData && productData.price is number && productData.price > 0)
           && ('category' in productData && productData.category is string && productData.category.size() > 0)
           && ('images' in productData && productData.images is list && productData.images.size() == 0)
@@ -53,13 +54,22 @@ service cloud.firestore {
           && ('sellerId' in productData && productData.sellerId == request.auth.uid);
     }
     
-    // Validates an update to a product. Seller cannot be changed. Ensures images are added after creation.
+    // Validates an update to a product. Seller cannot be changed.
     function validProductUpdate(updateData, existingData) {
-        return updateData.title is string && updateData.title.size() > 0 && updateData.title.size() < 100
-            && updateData.price is number && updateData.price > 0
-            && updateData.category is string && updateData.category.size() > 0
-            && updateData.images is list && updateData.images.size() > 0 && updateData.images.size() <= 15
-            && updateData.sellerId == existingData.sellerId;
+        let sellerUnchanged = !('sellerId' in updateData) || updateData.sellerId == existingData.sellerId;
+
+        // This rule allows the initial image upload and subsequent edits by the owner.
+        // For the first image upload, it only checks that images are being added.
+        if (existingData.images.size() == 0 && 'images' in updateData) {
+            return updateData.images is list 
+                && updateData.images.size() > 0 
+                && updateData.images.size() <= 15
+                && sellerUnchanged;
+        }
+
+        // For general updates, you can add more checks if needed.
+        // For now, it just prevents the sellerId from changing.
+        return sellerUnchanged;
     }
 
     // --------------------------------------------------------------------

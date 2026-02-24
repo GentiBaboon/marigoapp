@@ -131,8 +131,8 @@ export const sellStep3Schema = z.object({
 });
 
 export const sellStep4Schema = z.object({
-    title: z.string().min(5, 'Title must be at least 5 characters long.'),
-    description: z.string().min(20, 'Description must be at least 20 characters long.'),
+    title: z.string().min(5, 'Title must be at least 5 characters long.').max(99, 'Title must be under 100 characters.'),
+    description: z.string().min(20, 'Description must be at least 20 characters long.').max(5000, "Description is too long."),
     origin: z.enum(['direct', 'private', 'vestiaire', 'other']).optional(),
     yearOfPurchase: z.string().optional(),
     serialNumber: z.string().optional(),
