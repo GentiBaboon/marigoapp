@@ -35,27 +35,23 @@ service cloud.firestore {
     }
     
     // Prodotto valido per la creazione (shell iniziale)
-    function validProduct(productData) {
-      let isCorrectSeller = productData.sellerId == request.auth.uid;
-      let isCorrectStatus = productData.status == 'pending_review';
-      // Robust check for initial state: images must be an empty list, title and price must be valid
-      return isCorrectSeller 
-          && isCorrectStatus 
-          && productData.images.size() == 0
-          && productData.title.size() > 0
-          && productData.price > 0;
+    function validProduct(p) {
+      return p.sellerId == request.auth.uid 
+          && p.status == 'pending_review' 
+          && p.images.size() == 0
+          && p.title is string
+          && p.title.size() > 0
+          && p.price > 0;
     }
     
     // Validazione aggiornamento (per aggiunta immagini o modifiche)
-    function validProductUpdate(updateData, existingData) {
-        let sellerUnchanged = !('sellerId' in updateData) || updateData.sellerId == existingData.sellerId;
-        
-        // Se si stanno aggiungendo immagini a un prodotto che non ne aveva (caso tipico del nostro flusso di upload)
-        if (existingData.images.size() == 0 && 'images' in updateData && updateData.images.size() > 0) {
-            return updateData.images.size() <= 15 && sellerUnchanged;
-        }
-
-        return sellerUnchanged;
+    function validProductUpdate(newData, oldData) {
+        return (newData.sellerId == oldData.sellerId)
+            && (
+                (oldData.images.size() == 0 && newData.images.size() > 0)
+                ? (newData.images.size() <= 15)
+                : true
+            );
     }
 
     // --------------------------------------------------------------------

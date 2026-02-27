@@ -81,7 +81,6 @@ export function ReviewStep() {
 
     setIsLoading(true);
 
-    // Prepare clean data for the shell document
     const productData = {
         title: String(formData.title).trim(),
         description: String(formData.description).trim(),
@@ -107,36 +106,47 @@ export function ReviewStep() {
 
     const productRef = doc(firestore, 'products', formData.productId);
 
-    // Use sequential logic but catch errors non-blockingly
+    // Follow Pattern 1: Non-blocking Firestore Mutation
     setDoc(productRef, productData)
         .then(async () => {
-            // Document shell created, now upload images
+            // Document shell created successfully, proceed to image uploads
             let imageUrls: string[] = [];
-            if (formData.images && formData.images.length > 0) {
-                const storage = getStorage(firebaseApp);
-                const uploadPromises = formData.images.map(async (imageFile, index) => {
-                    const fileName = `img_${Date.now()}_${index}.webp`;
-                    const storageRef = ref(storage, `products/${formData.productId}/${fileName}`);
-                    const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
-                    return getDownloadURL(snapshot.ref);
-                });
-                imageUrls = await Promise.all(uploadPromises);
-            }
+            try {
+                if (formData.images && formData.images.length > 0) {
+                    const storage = getStorage(firebaseApp);
+                    const uploadPromises = formData.images.map(async (imageFile, index) => {
+                        const fileName = `img_${Date.now()}_${index}.webp`;
+                        const storageRef = ref(storage, `products/${formData.productId}/${fileName}`);
+                        const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
+                        return getDownloadURL(snapshot.ref);
+                    });
+                    imageUrls = await Promise.all(uploadPromises);
+                }
 
-            // Update with image URLs
-            if (imageUrls.length > 0) {
-                await updateDoc(productRef, { images: imageUrls });
+                // Update document with final image URLs
+                if (imageUrls.length > 0) {
+                    // This update is also sequential but following the shell creation
+                    await updateDoc(productRef, { images: imageUrls });
+                }
+                
+                toast({ title: 'Success!', description: 'Your item has been submitted for review.' });
+                setIsLoading(false);
+                nextStep(); // Advance to SuccessStep
+            } catch (imageError) {
+                // Handle image upload failures separately if the doc was already created
+                setIsLoading(false);
+                toast({ 
+                    variant: 'destructive', 
+                    title: 'Partial Success', 
+                    description: 'Your item was listed, but some images failed to upload. You can edit it later.' 
+                });
+                nextStep();
             }
-            
-            toast({ title: 'Success!', description: 'Your item has been submitted for review.' });
-            setIsLoading(false);
-            nextStep(); // Go to step 8 (SuccessStep)
         })
         .catch(async (error: any) => {
-            console.error("Publishing error:", error);
             setIsLoading(false);
             
-            // Emit contextual error for developer debugging
+            // Emit rich contextual error for the development overlay
             const permissionError = new FirestorePermissionError({
                 path: `products/${formData.productId}`,
                 operation: 'create',
