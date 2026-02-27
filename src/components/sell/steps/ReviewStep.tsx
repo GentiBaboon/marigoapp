@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -7,13 +8,24 @@ import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Pencil, Info, Loader2 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { productCategories, productConditions } from '@/lib/mock-data';
 import Link from 'next/link';
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { FirestoreAddress } from '@/lib/types';
+
+// Helper to convert Data URI to Blob without fetch() overhead
+const dataURItoBlob = (dataURI: string) => {
+    const byteString = atob(dataURI.split(',')[1]);
+    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: mimeString });
+};
 
 const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode; }) => (
     <div className="space-y-2">
@@ -89,38 +101,40 @@ export function ReviewStep() {
 
     try {
         const totalImages = formData.images?.length || 0;
-        let uploadedCount = 0;
-
-        // Upload images in sequence to accurately track progress and prevent browser hang
         const imageUrls: string[] = [];
         
+        // Progress per-image weights (e.g. if 3 images, each is 33%)
+        const weight = 100 / totalImages;
+
         for (let i = 0; i < totalImages; i++) {
             const imageFile = formData.images![i];
             const fileName = `img_${Date.now()}_${i}.webp`;
             const storagePath = `products/${user.uid}/${formData.productId}/${fileName}`;
             const storageRef = ref(storage, storagePath);
             
-            // Robust conversion from Data URL to Blob
-            const response = await fetch(imageFile.url);
-            const blob = await response.blob();
-            
-            const snapshot = await uploadBytes(storageRef, blob, {
+            const blob = dataURItoBlob(imageFile.url);
+            const uploadTask = uploadBytesResumable(storageRef, blob, {
                 contentType: 'image/webp',
-                customMetadata: {
-                    originalName: imageFile.name,
-                    productId: formData.productId
-                }
+                customMetadata: { productId: formData.productId! }
             });
-            
-            const downloadUrl = await getDownloadURL(snapshot.ref);
-            imageUrls.push(downloadUrl);
-            
-            uploadedCount++;
-            setUploadProgress(Math.round((uploadedCount / totalImages) * 100));
-        }
 
-        if (imageUrls.length < 3) {
-            throw new Error("Failed to upload minimum required images.");
+            // Wait for individual upload while tracking progress
+            const downloadUrl = await new Promise<string>((resolve, reject) => {
+                uploadTask.on('state_changed', 
+                    (snapshot) => {
+                        const fileProgress = (snapshot.bytesTransferred / snapshot.totalBytes) * weight;
+                        const totalProgress = Math.round((i * weight) + fileProgress);
+                        setUploadProgress(totalProgress);
+                    }, 
+                    (error) => reject(error), 
+                    async () => {
+                        const url = await getDownloadURL(uploadTask.snapshot.ref);
+                        resolve(url);
+                    }
+                );
+            });
+
+            imageUrls.push(downloadUrl);
         }
 
         const productData = {
@@ -156,8 +170,7 @@ export function ReviewStep() {
         setIsLoading(false);
         console.error("Submission failed:", error);
         
-        const isPermissionError = error.code === 'permission-denied' || error.message?.includes('permissions');
-        if (isPermissionError) {
+        if (error.code === 'storage/unauthorized' || error.code === 'permission-denied') {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: `products/${formData.productId}`,
                 operation: 'create',
@@ -167,7 +180,7 @@ export function ReviewStep() {
             toast({ 
                 variant: 'destructive', 
                 title: 'Upload failed', 
-                description: 'An error occurred during upload. Please check your connection and try again.' 
+                description: error.message || 'An error occurred during upload. Please try again.' 
             });
         }
     }

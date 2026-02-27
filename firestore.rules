@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -40,13 +41,11 @@ service cloud.firestore {
     
     function validProduct(p) {
       return p.sellerId == request.auth.uid 
-          && (p.status == 'pending_review' || p.status == 'active')
-          && p.images is list
-          && p.images.size() >= 1
-          && p.title is string
+          && (p.status == 'pending_review' || p.status == 'active' || p.status == 'rejected' || p.status == 'sold')
+          && p.title != null
           && p.price >= 0
-          && p.brand is string
-          && p.category is string;
+          && p.brand != null
+          && p.category != null;
     }
     
     function validProductUpdate(newData, oldData) {
