@@ -31,54 +31,43 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   const totalSteps = 7;
   const firestore = useFirestore();
 
-  // Load drafts from localStorage on initial mount
+  // Caricamento bozze all'avvio
   useEffect(() => {
     try {
       const savedDrafts = localStorage.getItem('sell_form_drafts');
       if (savedDrafts) {
         const parsedDrafts: SellDraft[] = JSON.parse(savedDrafts);
         
-        // Sanitize loaded drafts to handle old data format where title/description were objects
+        // Sanificazione dati obsoleti (es. se title era un oggetto)
         const sanitizedDrafts = parsedDrafts.map(draft => {
-            const formData = draft.formData;
-            if (formData.title && typeof formData.title === 'object') {
-                formData.title = '';
-            }
-             if (formData.description && typeof formData.description === 'object') {
-                formData.description = '';
-            }
+            const formData = { ...draft.formData };
+            if (formData.title && typeof formData.title === 'object') formData.title = '';
+            if (formData.description && typeof formData.description === 'object') formData.description = '';
             return { ...draft, formData };
         });
 
         setDrafts(sanitizedDrafts);
       }
     } catch (error) {
-      console.error("Failed to load or sanitize drafts from localStorage", error);
-      localStorage.removeItem('sell_form_drafts'); // Clear corrupted data
+      console.error("Failed to load drafts", error);
     }
     setIsInitialized(true);
   }, []);
 
-  // Save drafts to localStorage whenever the drafts array changes
+  // Salvataggio bozze persistente
   useEffect(() => {
     if (!isInitialized) return;
     try {
-      // Create a savable version of drafts, keeping images but excluding proofOfOrigin to save space.
-      const savableDrafts = drafts.map(draft => {
-        const { proofOfOrigin, ...restOfFormData } = draft.formData;
-        return {
-          ...draft,
-          formData: restOfFormData,
-        };
-      });
-
-      if (savableDrafts.length > 0) {
-        localStorage.setItem('sell_form_drafts', JSON.stringify(savableDrafts));
+      if (drafts.length > 0) {
+        localStorage.setItem('sell_form_drafts', JSON.stringify(drafts));
       } else {
         localStorage.removeItem('sell_form_drafts');
       }
     } catch (error) {
-      console.error("Failed to save drafts to localStorage.", error);
+      console.error("Failed to save drafts to localStorage. Storage may be full.", error);
+      // Se lo storage è pieno, proviamo a salvare senza immagini come fallback
+      const lightDrafts = drafts.map(d => ({ ...d, formData: { ...d.formData, images: [] } }));
+      localStorage.setItem('sell_form_drafts', JSON.stringify(lightDrafts));
     }
   }, [drafts, isInitialized]);
 
@@ -86,13 +75,11 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   const setFormData = useCallback((newData: Partial<SellFormValues>) => {
     if (!activeDraftId) return;
-    setDrafts(prevDrafts =>
-        prevDrafts.map(d =>
-            d.id === activeDraftId
-            ? { ...d, formData: { ...d.formData, ...newData }, lastModified: Date.now() }
-            : d
-        )
-    );
+    setDrafts(prev => prev.map(d =>
+        d.id === activeDraftId
+        ? { ...d, formData: { ...d.formData, ...newData }, lastModified: Date.now() }
+        : d
+    ));
   }, [activeDraftId]);
   
   const startNewDraft = useCallback(() => {
@@ -101,9 +88,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
     const newDraftId = `draft_${Date.now()}`;
     const newDraft: SellDraft = {
         id: newDraftId,
-        formData: {
-            productId: newProductId
-        },
+        formData: { productId: newProductId },
         currentStep: 1,
         lastModified: Date.now(),
     };
@@ -111,46 +96,30 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
     setActiveDraftId(newDraftId);
   }, [firestore]);
 
-  const selectDraft = useCallback((draftId: string) => {
-      setActiveDraftId(draftId);
-  }, []);
-  
-  const unselectDraft = useCallback(() => {
-      setActiveDraftId(null);
-  }, []);
+  const selectDraft = useCallback((draftId: string) => setActiveDraftId(draftId), []);
+  const unselectDraft = useCallback(() => setActiveDraftId(null), []);
 
   const deleteDraft = useCallback((draftId: string) => {
     setDrafts(prev => prev.filter(d => d.id !== draftId));
-    if (activeDraftId === draftId) {
-        setActiveDraftId(null);
-    }
+    if (activeDraftId === draftId) setActiveDraftId(null);
   }, [activeDraftId]);
 
   const deleteActiveDraft = useCallback(() => {
-      if(activeDraftId) {
-          deleteDraft(activeDraftId);
-      }
+      if(activeDraftId) deleteDraft(activeDraftId);
   }, [activeDraftId, deleteDraft]);
   
   const goToStep = useCallback((step: number) => {
     if (!activeDraftId || step <= 0 || step > totalSteps + 1) return;
-     setDrafts(prevDrafts =>
-        prevDrafts.map(d =>
-            d.id === activeDraftId
-            ? { ...d, currentStep: step, lastModified: Date.now() }
-            : d
-        )
-    );
+     setDrafts(prev => prev.map(d =>
+        d.id === activeDraftId ? { ...d, currentStep: step, lastModified: Date.now() } : d
+    ));
   }, [activeDraftId, totalSteps]);
 
   const nextStep = useCallback(() => goToStep((activeDraft?.currentStep || 0) + 1), [activeDraft, goToStep]);
   
   const prevStep = useCallback(() => {
-     if (activeDraft?.currentStep === 1) {
-        unselectDraft();
-    } else {
-        goToStep((activeDraft?.currentStep || 1) - 1);
-    }
+     if (activeDraft?.currentStep === 1) unselectDraft();
+     else goToStep((activeDraft?.currentStep || 1) - 1);
   }, [activeDraft, goToStep, unselectDraft]);
 
   return (
@@ -167,7 +136,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
         nextStep, 
         prevStep, 
         goToStep, 
-        deleteActiveDraft: deleteActiveDraft,
+        deleteActiveDraft,
         totalSteps,
     }}>
       {children}
@@ -177,8 +146,6 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
 
 export const useSellForm = () => {
   const context = useContext(SellFormContext);
-  if (context === undefined) {
-    throw new Error('useSellForm must be used within a SellFormProvider');
-  }
+  if (context === undefined) throw new Error('useSellForm must be used within a SellFormProvider');
   return context;
 };

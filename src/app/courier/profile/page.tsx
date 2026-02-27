@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { signOutUser } from '@/firebase/auth/actions';
 import { useToast } from '@/hooks/use-toast';
+import { doc } from 'firebase/firestore';
 
 const getInitials = (name?: string | null) => {
   if (!name) return 'U';
@@ -37,7 +38,9 @@ function ReviewItem({ review }: { review: FirestoreReview }) {
         <div className="space-y-1">
             <div className="flex items-center gap-2">
                 <p className="font-semibold">{reviewer?.displayName || 'Anonymous'}</p>
-                <p className="text-xs text-muted-foreground">{format(review.createdAt.toDate(), 'MMM d, yyyy')}</p>
+                <p className="text-xs text-muted-foreground">
+                    {review.createdAt?.toDate ? format(review.createdAt.toDate(), 'MMM d, yyyy') : 'Recently'}
+                </p>
             </div>
             <div className="flex items-center">
                 {[...Array(5)].map((_, i) => (
@@ -50,7 +53,6 @@ function ReviewItem({ review }: { review: FirestoreReview }) {
   );
 }
 
-
 export default function CourierProfilePage() {
     const { user } = useUser();
     const firestore = useFirestore();
@@ -58,7 +60,6 @@ export default function CourierProfilePage() {
     const router = useRouter();
     const { toast } = useToast();
 
-    // Mock data for stats
     const profileStats = {
         deliveries: 128,
         onTime: 98,

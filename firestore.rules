@@ -14,15 +14,7 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isExistingDoc() {
-      // resource is the document *before* the request.
-      // It is null on 'create' operations.
-      return resource != null;
-    }
-
     function isAdmin() {
-      // Allows access if the user has an 'admin' custom claim, OR if they are the designated developer admin.
-      // In a production environment, you might remove the hardcoded UID.
       return isSignedIn() && (request.auth.token.admin == true || request.auth.uid == '2C81RVoXZWZuSWXEEueehqbHkMu1');
     }
     
@@ -34,7 +26,6 @@ service cloud.firestore {
       return delivery.courierId == request.auth.uid;
     }
 
-    // Ensures the UID in the incoming data for a given field matches the authenticated user.
     function isCorrectOwnerInRequestData(ownerFieldName) {
       return request.resource.data[ownerFieldName] == request.auth.uid;
     }
@@ -43,26 +34,22 @@ service cloud.firestore {
         return isSignedIn() && (request.auth.uid == delivery.buyerId || request.auth.uid in delivery.sellerIds);
     }
     
-    // Validates the data structure for a new product. On create, images array must be empty.
+    // Prodotto valido per la creazione (shell iniziale)
     function validProduct(productData) {
       return productData.sellerId == request.auth.uid
         && productData.status == 'pending_review'
-        && productData.images.size() == 0
-        && productData.title is string && productData.title.size() > 0 && productData.title.size() < 100
+        && (productData.images == [] || productData.images.size() == 0)
+        && productData.title is string && productData.title.size() > 0
         && productData.brand is string && productData.brand.size() > 0
         && productData.category is string && productData.category.size() > 0
-        && productData.price is number && productData.price > 0
-        && productData.condition is string && productData.condition.size() > 0
-        && productData.material is string && productData.material.size() > 0
-        && productData.color is string && productData.color.size() > 0;
+        && (productData.price is number || productData.price is float) && productData.price > 0;
     }
     
-    // Validates an update to a product. Seller cannot be changed.
+    // Validazione aggiornamento (per aggiunta immagini o modifiche)
     function validProductUpdate(updateData, existingData) {
         let sellerUnchanged = !('sellerId' in updateData) || updateData.sellerId == existingData.sellerId;
-
-        // This rule allows the initial image upload and subsequent edits by the owner.
-        // For the first image upload, it only checks that images are being added.
+        
+        // Se si stanno aggiungendo immagini a un prodotto che non ne aveva
         if (existingData.images.size() == 0 && 'images' in updateData) {
             return updateData.images is list 
                 && updateData.images.size() > 0 
@@ -70,13 +57,11 @@ service cloud.firestore {
                 && sellerUnchanged;
         }
 
-        // For general updates, you can add more checks if needed.
-        // For now, it just prevents the sellerId from changing.
         return sellerUnchanged;
     }
 
     // --------------------------------------------------------------------
-    // User Data Collections (/users/{userId}/*)
+    // User Data Collections
     // --------------------------------------------------------------------
     match /users/{userId} {
       allow get: if isSignedIn();
@@ -96,9 +81,6 @@ service cloud.firestore {
       }
     }
 
-    // --------------------------------------------------------------------
-    // Public Metadata (/categories, /brands)
-    // --------------------------------------------------------------------
     match /categories/{categoryId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -110,22 +92,18 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------------
-    // Marketplace Collections (/products)
+    // Marketplace Collections
     // --------------------------------------------------------------------
     match /products/{productId} {
       allow get, list: if true;
-      // Users can create products if the data is valid and they are the declared seller.
       allow create: if isSignedIn() && validProduct(request.resource.data);
-      // The product owner (seller) can update it if the data is valid, or an admin can.
       allow update: if (isOwner(resource.data.sellerId) && validProductUpdate(request.resource.data, resource.data)) || isAdmin();
-      // The seller or an admin can delete a product.
       allow delete: if isOwner(resource.data.sellerId) || isAdmin();
 
       match /offers/{offerId} {
         function isProductSeller() {
           return get(/databases/$(database)/documents/products/$(productId)).data.sellerId == request.auth.uid;
         }
-
         allow get: if isSignedIn() && (isOwner(resource.data.buyerId) || isProductSeller());
         allow list: if isSignedIn();
         allow create: if isSignedIn() && isCorrectOwnerInRequestData('buyerId');
@@ -137,12 +115,8 @@ service cloud.firestore {
       }
     }
     
-    // --------------------------------------------------------------------
-    // Transactional Collections (/orders, /reviews, /deliveries)
-    // --------------------------------------------------------------------
     match /orders/{orderId} {
       allow get: if isSignedIn() && (isOwner(resource.data.buyerId) || request.auth.uid in resource.data.sellerIds) || isAdmin();
-      // Orders can only be created via the `createPaymentIntent` Cloud Function, which uses the Admin SDK.
       allow create: if false; 
       allow list, update, delete: if isAdmin();
     }
@@ -172,9 +146,6 @@ service cloud.firestore {
         allow list, delete: if isAdmin();
     }
 
-    // --------------------------------------------------------------------
-    // Communication Collections (/conversations, /notifications)
-    // --------------------------------------------------------------------
     match /conversations/{conversationId} {
       allow get, write: if (isSignedIn() && request.auth.uid in resource.data.participants) || isAdmin();
       allow list: if isAdmin();
@@ -185,9 +156,7 @@ service cloud.firestore {
     }
     
     match /notifications/{notificationId} {
-        // Users can only access their own notifications.
         allow read, list, update: if isOwner(resource.data.userId);
-        // Notifications are created by backend functions, not clients directly.
         allow create: if false;
         allow delete: if isAdmin();
     }
@@ -202,17 +171,11 @@ service cloud.firestore {
       }
     }
     
-    // --------------------------------------------------------------------
-    // Moderation
-    // --------------------------------------------------------------------
     match /reports/{reportId} {
         allow create: if isSignedIn() && isCorrectOwnerInRequestData('reporterId');
         allow read, list, update, delete: if isAdmin();
     }
 
-    // --------------------------------------------------------------------
-    // Admin & App Settings
-    // --------------------------------------------------------------------
     match /roles_admin/{userId} {
       allow read, write: if isAdmin();
     }
@@ -229,7 +192,6 @@ service cloud.firestore {
     }
 
     match /coupons/{couponId} {
-        // Anyone can read a coupon to see if it's valid.
         allow read: if true;
         allow write: if isAdmin();
     }

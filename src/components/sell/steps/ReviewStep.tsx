@@ -14,10 +14,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
 import { doc, collection, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { FirestoreProduct, FirestoreAddress } from '@/lib/types';
+import { FirestoreAddress } from '@/lib/types';
 import { z } from 'zod';
 
-// Helper component for each review section
 const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode; }) => (
     <div>
         <div className="flex justify-between items-start mb-2">
@@ -31,14 +30,12 @@ const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () 
     </div>
 );
 
-// Helper for detail rows
 const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="flex justify-between items-center">
         <span className="text-muted-foreground">{label}:</span>
         <span className="font-medium text-right">{value}</span>
     </div>
 );
-
 
 export function ReviewStep() {
   const { formData, nextStep, goToStep, unselectDraft } = useSellForm();
@@ -64,50 +61,45 @@ export function ReviewStep() {
     }
   }, [addresses, formData.shippingFromAddressId]);
 
-
   const handlePublish = async () => {
     if (!user || !firestore || !formData.productId) {
         toast({
             variant: 'destructive',
             title: 'Error',
-            description: 'You must be signed in and have a valid draft to create a listing.',
+            description: 'Session error. Please restart the listing.',
         });
         return;
     }
     
     setIsLoading(true);
 
-    const productForCreation = {
-        title: formData.title || '',
-        description: formData.description || '',
-        brand: formData.brand || '',
-        category: formData.category || '',
+    // Preparazione dati puliti per Firestore
+    const productData = {
+        title: String(formData.title || '').trim(),
+        description: String(formData.description || '').trim(),
+        brand: String(formData.brand || '').trim(),
+        category: String(formData.category || '').trim(),
         price: Number(formData.price) || 0,
-        condition: formData.condition || '',
-        material: formData.material || '',
-        color: formData.color || '',
+        condition: String(formData.condition || '').trim(),
+        material: String(formData.material || '').trim(),
+        color: String(formData.color || '').trim(),
         sellerId: user.uid,
         status: 'pending_review' as const,
-        images: [],
+        images: [], // Le regole richiedono un array vuoto alla creazione
         listingCreated: serverTimestamp(),
-        // Optional fields that are not required by the strict rule
-        ...(formData.subCategory && { subCategory: formData.subCategory }),
+        keywords: Array.from(new Set([
+          ...(formData.title || '').toLowerCase().split(/\s+/),
+          ...(formData.brand || '').toLowerCase().split(/\s+/),
+          ...(formData.category || '').toLowerCase().split(/\s+/)
+        ].filter(k => k.length > 2))),
         ...(formData.sizeValue && { size: `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() }),
         ...(formData.pattern && { pattern: formData.pattern }),
-        ...(formData.vintage && { vintage: formData.vintage }),
-        keywords: Array.from(new Set([
-          ...(formData.title || '').toLowerCase().split(' '),
-          ...(formData.brand || '').toLowerCase().split(' '),
-          ...(formData.category || '').toLowerCase().split(' '),
-        ].filter(Boolean))),
-      };
+        ...(formData.vintage !== undefined && { vintage: formData.vintage }),
+    };
 
+    // Validazione finale pre-invio
     const creationSchema = z.object({
-        sellerId: z.string().min(1),
-        status: z.literal('pending_review'),
-        images: z.array(z.any()).length(0),
         title: z.string().min(1, 'Title is required.').max(99),
-        description: z.string().min(1, 'Description is required.'),
         brand: z.string().min(1, 'Brand is required.'),
         category: z.string().min(1, 'Category is required.'),
         price: z.number().gt(0, 'Price must be greater than 0.'),
@@ -116,30 +108,22 @@ export function ReviewStep() {
         color: z.string().min(1, 'Color is required.'),
     });
 
-    const validationResult = creationSchema.safeParse(productForCreation);
+    const validation = creationSchema.safeParse(productData);
 
-    if (!validationResult.success) {
-        const firstError = validationResult.error.issues[0];
-        const fieldToStepMap: Record<string, number> = {
-            'title': 4, 'description': 4,
-            'brand': 1, 'category': 1,
-            'price': 6,
-            'condition': 2, 'material': 2, 'color': 2,
+    if (!validation.success) {
+        const errorField = validation.error.issues[0].path[0] as string;
+        const fieldToStep: Record<string, number> = {
+            'title': 4, 'brand': 1, 'category': 1, 'price': 6,
+            'condition': 2, 'material': 2, 'color': 2
         };
-        const errorField = firstError.path[0] as string;
         
         toast({
           variant: 'destructive',
-          title: 'Incomplete Listing',
-          description: `Please complete all required fields. ${firstError.message}`,
-          duration: 5000,
+          title: 'Missing information',
+          description: validation.error.issues[0].message,
         });
 
-        // Guide user to the correct step
-        const stepToGo = fieldToStepMap[errorField];
-        if (stepToGo) {
-            goToStep(stepToGo);
-        }
+        if (fieldToStep[errorField]) goToStep(fieldToStep[errorField]);
         setIsLoading(false);
         return;
     }
@@ -147,42 +131,45 @@ export function ReviewStep() {
     const productRef = doc(firestore, 'products', formData.productId);
 
     try {
-        await setDoc(productRef, validationResult.data);
+        // 1. Crea il guscio del prodotto
+        await setDoc(productRef, productData);
         
+        // 2. Carica le immagini se presenti
         let imageUrls: string[] = [];
         if (formData.images && formData.images.length > 0) {
             const storage = getStorage(firebaseApp);
-            const uploadPromises = formData.images.map(imageFile => {
-              const storageRef = ref(storage, `products/${formData.productId}/${Date.now()}-${imageFile.name}`);
-              return uploadString(storageRef, imageFile.url, 'data_url').then(snapshot => getDownloadURL(snapshot.ref));
+            const uploadPromises = formData.images.map(async (imageFile, index) => {
+              const fileName = `img_${Date.now()}_${index}.webp`;
+              const storageRef = ref(storage, `products/${formData.productId}/${fileName}`);
+              const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
+              return getDownloadURL(snapshot.ref);
             });
             imageUrls = await Promise.all(uploadPromises);
         }
 
+        // 3. Aggiorna con gli URL definitivi
         if (imageUrls.length > 0) {
-            await updateDoc(productRef, {
-                images: imageUrls,
-            });
+            await updateDoc(productRef, { images: imageUrls });
         }
         
-        nextStep();
+        nextStep(); // Vai al successo
 
     } catch (error: any) {
         console.error("Publishing error:", error);
+        setIsLoading(false);
+        
         const permissionError = new FirestorePermissionError({
             path: `products/${formData.productId}`,
-            operation: error.code?.includes('permission') ? 'create' : 'write',
-            requestResourceData: { error: 'data too large to display' },
+            operation: 'create',
+            requestResourceData: productData,
         });
         errorEmitter.emit('permission-error', permissionError);
         
         toast({
             variant: 'destructive',
-            title: 'Publishing Failed',
-            description: 'There was a problem publishing your listing. Please check your connection and try again.',
+            title: 'Submission failed',
+            description: 'There was a problem saving your listing. Please try again.',
         });
-    } finally {
-        setIsLoading(false);
     }
   };
 
@@ -195,36 +182,20 @@ export function ReviewStep() {
     if (!slug) return 'N/A';
     for (const mainCategory of productCategories) {
         for (const subCategory of mainCategory.subcategories) {
-            if (subCategory.slug === slug) {
-                return subCategory.name;
-            }
+            if (subCategory.slug === slug) return subCategory.name;
         }
     }
     return slug;
-  }
+  };
   
   const getConditionLabel = (value: string | undefined) => {
     if (!value) return 'N/A';
-    const condition = productConditions.find(c => c.value === value);
-    return condition?.label || value;
-  }
+    return productConditions.find(c => c.value === value)?.label || value;
+  };
   
-  const currencyFormatter = (value: number | undefined) => {
+  const formatPriceLocal = (value: number | undefined) => {
     if (value === undefined) return '';
-    const currency = formData.currency || 'EUR';
-    let locale = 'de-DE';
-    if (currency === 'ALL') {
-      locale = 'sq-AL';
-    }
-
-    try {
-      return new Intl.NumberFormat(locale, {
-        style: 'currency',
-        currency: currency,
-      }).format(value);
-    } catch (e) {
-      return `${value} ${currency}`;
-    }
+    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
   };
   
   return (
@@ -233,9 +204,9 @@ export function ReviewStep() {
             <h2 className="text-2xl font-bold">Review before listing</h2>
         </div>
 
-        <Alert variant="default" className="bg-amber-50 border-amber-200">
+        <Alert className="bg-amber-50 border-amber-200">
             <Info className="h-4 w-4 text-amber-600"/>
-            <AlertDescription className="text-amber-900">
+            <AlertDescription className="text-amber-900 text-sm">
                 Double check everything: after listing, you can only add photos and lower the price.
             </AlertDescription>
         </Alert>
@@ -252,10 +223,9 @@ export function ReviewStep() {
             <Separator/>
 
             <ReviewSection title="Photos" onEdit={() => goToStep(3)}>
-                <p className="text-muted-foreground text-xs">Main photo</p>
                 <div className="grid grid-cols-3 gap-2 mt-2">
                     {formData.images?.slice(0, 3).map((image, index) => (
-                        <div key={index} className="relative aspect-[1/1] rounded-md overflow-hidden bg-muted">
+                        <div key={index} className="relative aspect-square rounded-md overflow-hidden bg-muted">
                             <Image src={image.url} alt={`preview ${index}`} fill sizes="150px" className="object-cover" />
                         </div>
                     ))}
@@ -265,41 +235,26 @@ export function ReviewStep() {
             <Separator/>
             
              <ReviewSection title="Description" onEdit={() => goToStep(4)}>
-                <p className="text-foreground">{formData.description}</p>
+                <p className="line-clamp-3">{formData.description}</p>
             </ReviewSection>
 
             <Separator/>
 
             <ReviewSection title="Address" onEdit={() => goToStep(5)}>
                  {selectedAddress ? (
-                    <>
-                        <p className="font-medium">{selectedAddress.fullName}</p>
-                        <p className="text-muted-foreground">{selectedAddress.address}, {selectedAddress.city} {selectedAddress.postal}, {selectedAddress.country}</p>
-                    </>
+                    <div className="text-muted-foreground">
+                        <p className="font-medium text-foreground">{selectedAddress.fullName}</p>
+                        <p>{selectedAddress.address}, {selectedAddress.city}</p>
+                    </div>
                  ) : (
-                    <p className="text-muted-foreground">No address selected.</p>
+                    <p className="text-destructive">No address selected.</p>
                  )}
             </ReviewSection>
             
             <Separator/>
 
             <ReviewSection title="Price" onEdit={() => goToStep(6)}>
-                <p className="font-semibold text-lg">{currencyFormatter(formData.price)} (you earn {currencyFormatter(formData.sellerEarning)})</p>
-                <p className="text-sm text-muted-foreground flex items-center">
-                    Buyer service fee not included
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-4 w-4 ml-1 cursor-default">
-                                    <Info className="h-3 w-3" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>The buyer will pay an additional service fee on top of your listing price.</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                </p>
+                <p className="font-semibold text-lg">{formatPriceLocal(formData.price)} (you earn {formatPriceLocal(formData.sellerEarning)})</p>
             </ReviewSection>
 
             <Separator/>
@@ -309,10 +264,10 @@ export function ReviewStep() {
              <p className="text-xs text-center text-muted-foreground">
                 By clicking on "Submit my item", I confirm that the information provided complies with the <Link href="#" className="underline">general terms of use</Link>.
              </p>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
                 <Button variant="link" className="text-foreground font-semibold px-0" onClick={handleSaveDraft}>Save draft</Button>
-                <Button size="lg" className="bg-foreground text-background hover:bg-foreground/90" onClick={handlePublish} disabled={isLoading}>
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button size="lg" className="flex-1 bg-foreground text-background hover:bg-foreground/90" onClick={handlePublish} disabled={isLoading}>
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Submit my item
                 </Button>
             </div>
