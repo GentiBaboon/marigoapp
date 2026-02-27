@@ -10,7 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import imageCompression from 'browser-image-compression';
-import type { ImageFile } from '@/lib/types';
+import type { ImageFile, FirestoreSettings } from '@/lib/types';
+import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 type ImageFileState = ImageFile & {
   id: string;
@@ -30,6 +32,11 @@ const fileToDataUrl = (file: Blob): Promise<string> => {
 export function PhotosStep() {
   const { formData, setFormData, nextStep } = useSellForm();
   const { toast } = useToast();
+  const firestore = useFirestore();
+
+  // Fetch dynamic compression settings from Firestore
+  const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'global') : null, [firestore]);
+  const { data: settings } = useDoc<FirestoreSettings>(settingsRef);
 
   const [imageFiles, setImageFiles] = useState<ImageFileState[]>(
     formData.images?.map((img, i) => ({ 
@@ -56,10 +63,13 @@ export function PhotosStep() {
           setImageFiles(current => [...current, { id: fileId, url: tempUrl, name: file.name, type: file.type, isLoading: true }]);
 
           try {
-              // Best way possible: WebP compression, High Quality (0.8MB max), 1920px width
+              // Use dynamic settings if available, else fallback to defaults
+              const maxSizeMB = settings?.imageMaxSizeMB || 0.8;
+              const maxWidthOrHeight = settings?.imageMaxDimension || 1920;
+
               const webpFile = await imageCompression(file, { 
-                  maxSizeMB: 0.8, 
-                  maxWidthOrHeight: 1920, 
+                  maxSizeMB: maxSizeMB, 
+                  maxWidthOrHeight: maxWidthOrHeight, 
                   useWebWorker: true, 
                   fileType: 'image/webp' 
               });
@@ -75,7 +85,7 @@ export function PhotosStep() {
           }
       });
     },
-    [toast]
+    [toast, settings]
   );
   
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

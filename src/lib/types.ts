@@ -433,6 +433,9 @@ export type FirestoreAdminLog = z.infer<typeof firestoreAdminLogSchema> & { id: 
 export const firestoreSettingsSchema = z.object({
   commissionRate: z.number(),
   maintenanceMode: z.boolean(),
+  imageCompressionQuality: z.number().optional(),
+  imageMaxDimension: z.number().optional(),
+  imageMaxSizeMB: z.number().optional(),
 });
 export type FirestoreSettings = z.infer<typeof firestoreSettingsSchema>;
 
