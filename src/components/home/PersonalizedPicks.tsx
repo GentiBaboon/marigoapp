@@ -8,6 +8,7 @@ import { ProductCard } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getRecommendations, RecommendationInput } from '@/ai/flows/get-recommendations';
 import { useWishlist } from '@/context/WishlistContext';
+import { Loader2 } from 'lucide-react';
 
 function ProductCardSkeleton() {
     return (
