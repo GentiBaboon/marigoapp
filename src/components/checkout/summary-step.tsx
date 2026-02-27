@@ -42,8 +42,8 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
     if (!user || !firestore || !shippingAddress || !paymentMethod) {
         toast({
             variant: 'destructive',
-            title: 'Error',
-            description: 'Missing required information to place order.',
+            title: 'Missing information',
+            description: 'Please select a shipping address and payment method.',
         });
         return;
     }
@@ -64,8 +64,8 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
         shippingAddress,
     };
 
-    if (paymentMethod === 'cod') {
-        try {
+    try {
+        if (paymentMethod === 'cod') {
             const createOrder = httpsCallable(functions, 'createOrder');
             const result: any = await createOrder(orderPayload);
             const { orderId } = result.data;
@@ -77,44 +77,26 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             });
             clearCart();
             router.push(`/checkout/success/${orderId}`);
-        } catch(error: any) {
-             console.error("Error placing COD order:", error);
-             toast({
-                variant: 'destructive',
-                title: 'Uh oh! Something went wrong.',
-                description: error.message || 'Could not place your order. Please try again.',
-             });
-        } finally {
-            setIsLoading(false);
+            return;
         }
-        return;
-    }
 
-    // Handle Stripe payment
-    if (!stripe || !elements) {
-        toast({ variant: 'destructive', title: 'Stripe not loaded.' });
-        setIsLoading(false);
-        return;
-    }
+        // Stripe Payment Flow
+        if (!stripe || !elements) {
+            throw new Error("Stripe is not initialized yet.");
+        }
 
-    try {
         const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
-        const result: any = await createPaymentIntent(orderPayload);
-
-        const { clientSecret, orderId } = result.data;
+        const intentResult: any = await createPaymentIntent(orderPayload);
+        const { clientSecret, orderId } = intentResult.data;
         
         const cardElement = elements.getElement(CardElement);
-        if (!cardElement) {
-            throw new Error("Card element not found");
-        }
+        if (!cardElement) throw new Error("Credit card field not found.");
 
         const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
             payment_method: { card: cardElement },
         });
 
-        if (error) {
-            throw new Error(error.message);
-        }
+        if (error) throw new Error(error.message);
 
         if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing' || paymentIntent.status === 'requires_capture') {
             toast({
@@ -125,15 +107,15 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             clearCart();
             router.push(`/checkout/success/${orderId}`);
         } else {
-             throw new Error(`Payment failed with status: ${paymentIntent.status}`);
+             throw new Error(`Payment status: ${paymentIntent.status}`);
         }
 
     } catch (error: any) {
-        console.error("Payment failed:", error);
+        console.error("Checkout failed:", error);
         toast({
             variant: 'destructive',
-            title: 'Payment Failed',
-            description: error.message || 'An unexpected error occurred.',
+            title: 'Checkout Failed',
+            description: error.message || 'An unexpected error occurred. Please try again.',
         });
     } finally {
         setIsLoading(false);
@@ -142,10 +124,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
 
   const paymentMethodLabels: { [key: string]: string } = {
     cod: 'Cash on Delivery',
-    apple_pay: 'Apple Pay',
-    saved_card: 'Saved Card (Visa **** 4242)',
-    new_card: 'New Credit/Debit Card',
-    paypal: 'PayPal',
+    new_card: 'Credit or Debit Card',
   };
 
   return (
@@ -153,57 +132,60 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
       <CardHeader>
         <CardTitle>Review Your Order</CardTitle>
         <CardDescription>
-          Please check the details below before completing your purchase.
+          Check your details carefully before confirming.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="rounded-lg border p-4 space-y-4">
            <div className="flex items-start gap-4">
                 <MapPin className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
-                <div>
+                <div className="flex-1">
                     <h4 className="font-semibold">Shipping Address</h4>
                     {shippingAddress ? (
-                        <p className="text-sm text-muted-foreground">{shippingAddress.fullName}, {shippingAddress.address}, {shippingAddress.city} {shippingAddress.postal}, {shippingAddress.country}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {shippingAddress.fullName}<br />
+                            {shippingAddress.address}, {shippingAddress.city}<br />
+                            {shippingAddress.postal}, {shippingAddress.country}
+                        </p>
                     ) : (
-                        <p className="text-sm text-destructive">No address selected.</p>
+                        <p className="text-sm text-destructive font-medium">No address selected.</p>
                     )}
                 </div>
-                <Button variant="link" size="sm" className="ml-auto" onClick={() => onPrevStep(1)}>Change</Button>
+                <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onPrevStep(1)}>Edit</Button>
             </div>
             <Separator />
             <div className="flex items-start gap-4">
                 <CreditCard className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
-                <div>
+                <div className="flex-1">
                     <h4 className="font-semibold">Payment Method</h4>
-                    <p className="text-sm text-muted-foreground">{paymentMethod ? paymentMethodLabels[paymentMethod] : 'No payment method selected'}</p>
+                    <p className="text-sm text-muted-foreground">{paymentMethod ? paymentMethodLabels[paymentMethod] : 'None selected'}</p>
                 </div>
-                <Button variant="link" size="sm" className="ml-auto" onClick={() => onPrevStep(2)}>Change</Button>
+                <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onPrevStep(2)}>Edit</Button>
             </div>
         </div>
         
-        <p className="text-xs text-muted-foreground">
-            By clicking "Pay Now", you agree to MarigoApp's Terms of Service and Privacy Policy.
+        <p className="text-[11px] text-muted-foreground leading-relaxed text-center px-4">
+            By confirming your order, you agree to our <a href="#" className="underline">Terms of Service</a> and <a href="#" className="underline">Privacy Policy</a>.
         </p>
 
       </CardContent>
-      <CardFooter className="flex-col-reverse md:flex-row gap-4 !pt-0">
+      <CardFooter className="flex flex-col gap-3">
           <Button
             size="lg"
-            variant="outline"
+            className="w-full bg-black text-white hover:bg-black/90 h-14 text-base font-bold"
+            onClick={handlePay}
+            disabled={isLoading || !shippingAddress || !paymentMethod}
+          >
+            {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+            Pay {formatPrice(grandTotal)}
+          </Button>
+          <Button
+            variant="ghost"
             className="w-full"
             onClick={() => onPrevStep(2)}
             disabled={isLoading}
           >
-            Back to Payment
-          </Button>
-          <Button
-            size="lg"
-            className="w-full"
-            onClick={handlePay}
-            disabled={isLoading || !shippingAddress || !paymentMethod || (paymentMethod === 'new_card' && !stripe)}
-          >
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Pay Now - {formatPrice(grandTotal)}
+            Back
           </Button>
       </CardFooter>
     </Card>

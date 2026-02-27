@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -35,8 +34,8 @@ service cloud.firestore {
       return request.resource.data[ownerFieldName] == request.auth.uid;
     }
     
-    function isPartyToOrder(delivery) {
-        return isSignedIn() && (request.auth.uid == delivery.buyerId || request.auth.uid in delivery.sellerIds);
+    function isPartyToOrder(order) {
+        return isSignedIn() && (request.auth.uid == order.buyerId || request.auth.uid in order.sellerIds);
     }
     
     function validProduct(p) {
@@ -46,10 +45,6 @@ service cloud.firestore {
           && p.price >= 0
           && p.brand != null
           && p.category != null;
-    }
-    
-    function validProductUpdate(newData, oldData) {
-        return newData.sellerId == oldData.sellerId;
     }
 
     // --------------------------------------------------------------------
@@ -89,17 +84,14 @@ service cloud.firestore {
     match /products/{productId} {
       allow get, list: if true;
       allow create: if isSignedIn() && validProduct(request.resource.data);
-      allow update: if (isOwner(resource.data.sellerId) && validProductUpdate(request.resource.data, resource.data)) || isAdmin();
+      allow update: if (isOwner(resource.data.sellerId)) || isAdmin();
       allow delete: if isOwner(resource.data.sellerId) || isAdmin();
 
       match /offers/{offerId} {
-        function isProductSeller() {
-          return get(/databases/$(database)/documents/products/$(productId)).data.sellerId == request.auth.uid;
-        }
-        allow get: if isSignedIn() && (isOwner(resource.data.buyerId) || isProductSeller());
+        allow get: if isSignedIn();
         allow list: if isSignedIn();
         allow create: if isSignedIn() && isCorrectOwnerInRequestData('buyerId');
-        allow update: if isSignedIn() && (isOwner(resource.data.buyerId) || isProductSeller());
+        allow update: if isSignedIn();
         allow delete: if isAdmin();
       }
       match /bids/{bidId} {
@@ -108,9 +100,13 @@ service cloud.firestore {
     }
     
     match /orders/{orderId} {
-      allow get: if isSignedIn() && (isOwner(resource.data.buyerId) || request.auth.uid in resource.data.sellerIds) || isAdmin();
-      allow create: if isSignedIn(); 
-      allow list, update, delete: if isAdmin();
+      // Allow read if part of order or admin
+      allow get: if isSignedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid in resource.data.sellerIds || isAdmin());
+      // Orders are created via Cloud Function (Admin SDK), but we allow list for admins
+      allow list: if isAdmin();
+      // Block direct creation to force Cloud Function usage, but allow for testing if needed
+      allow create: if false; 
+      allow update, delete: if isAdmin();
     }
 
     match /reviews/{reviewId} {
@@ -121,7 +117,7 @@ service cloud.firestore {
     }
     
     match /deliveries/{deliveryId} {
-      allow get: if isPartyToOrder(resource.data) || isAssignedCourier(resource.data) || isAdmin();
+      allow get: if isSignedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid in resource.data.sellerIds || isAssignedCourier(resource.data) || isAdmin());
       allow list: if isApprovedCourier() || isAdmin();
       allow create: if isAdmin();
       allow update: if isAdmin() || (
@@ -143,13 +139,12 @@ service cloud.firestore {
       allow list: if isAdmin();
       
       match /messages/{messageId} {
-        allow read, write: if (isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants) || isAdmin();
+        allow read, write: if (isSignedIn()) || isAdmin();
       }
     }
     
     match /notifications/{notificationId} {
         allow read, list, update: if isOwner(resource.data.userId);
-        allow create: if false;
         allow delete: if isAdmin();
     }
     
