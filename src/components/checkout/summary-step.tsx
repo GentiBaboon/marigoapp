@@ -112,10 +112,12 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
 
     } catch (error: any) {
         console.error("Checkout failed:", error);
+        // Extracts the actual error message from Firebase Function HttpsError
+        const errorMessage = error.details?.message || error.message || 'An unexpected error occurred. Please try again.';
         toast({
             variant: 'destructive',
             title: 'Checkout Failed',
-            description: error.message || 'An unexpected error occurred. Please try again.',
+            description: errorMessage,
         });
     } finally {
         setIsLoading(false);
@@ -128,66 +130,68 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Review Your Order</CardTitle>
-        <CardDescription>
-          Check your details carefully before confirming.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="rounded-lg border p-4 space-y-4">
-           <div className="flex items-start gap-4">
-                <MapPin className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
-                <div className="flex-1">
-                    <h4 className="font-semibold">Shipping Address</h4>
-                    {shippingAddress ? (
-                        <p className="text-sm text-muted-foreground">
-                            {shippingAddress.fullName}<br />
-                            {shippingAddress.address}, {shippingAddress.city}<br />
-                            {shippingAddress.postal}, {shippingAddress.country}
-                        </p>
-                    ) : (
-                        <p className="text-sm text-destructive font-medium">No address selected.</p>
-                    )}
-                </div>
-                <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onPrevStep(1)}>Edit</Button>
-            </div>
-            <Separator />
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Review Your Order</CardTitle>
+          <CardDescription>
+            Check your details carefully before confirming.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="rounded-lg border p-4 space-y-4">
             <div className="flex items-start gap-4">
-                <CreditCard className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
-                <div className="flex-1">
-                    <h4 className="font-semibold">Payment Method</h4>
-                    <p className="text-sm text-muted-foreground">{paymentMethod ? paymentMethodLabels[paymentMethod] : 'None selected'}</p>
-                </div>
-                <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onPrevStep(2)}>Edit</Button>
-            </div>
-        </div>
-        
-        <p className="text-[11px] text-muted-foreground leading-relaxed text-center px-4">
-            By confirming your order, you agree to our <a href="#" className="underline">Terms of Service</a> and <a href="#" className="underline">Privacy Policy</a>.
-        </p>
+                  <MapPin className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
+                  <div className="flex-1">
+                      <h4 className="font-semibold">Shipping Address</h4>
+                      {shippingAddress ? (
+                          <p className="text-sm text-muted-foreground">
+                              {shippingAddress.fullName}<br />
+                              {shippingAddress.address}, {shippingAddress.city}<br />
+                              {shippingAddress.postal}, {shippingAddress.country}
+                          </p>
+                      ) : (
+                          <p className="text-sm text-destructive font-medium">No address selected.</p>
+                      )}
+                  </div>
+                  <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onPrevStep(1)}>Edit</Button>
+              </div>
+              <Separator />
+              <div className="flex items-start gap-4">
+                  <CreditCard className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
+                  <div className="flex-1">
+                      <h4 className="font-semibold">Payment Method</h4>
+                      <p className="text-sm text-muted-foreground">{paymentMethod ? paymentMethodLabels[paymentMethod] : 'None selected'}</p>
+                  </div>
+                  <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onPrevStep(2)}>Edit</Button>
+              </div>
+          </div>
+          
+          <p className="text-[11px] text-muted-foreground leading-relaxed text-center px-4">
+              By confirming your order, you agree to our <a href="#" className="underline">Terms of Service</a> and <a href="#" className="underline">Privacy Policy</a>.
+          </p>
 
-      </CardContent>
-      <CardFooter className="flex flex-col gap-3">
-          <Button
-            size="lg"
-            className="w-full bg-black text-white hover:bg-black/90 h-14 text-base font-bold"
-            onClick={handlePay}
-            disabled={isLoading || !shippingAddress || !paymentMethod}
-          >
-            {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-            Pay {formatPrice(grandTotal)}
-          </Button>
-          <Button
-            variant="ghost"
-            className="w-full"
-            onClick={() => onPrevStep(2)}
-            disabled={isLoading}
-          >
-            Back
-          </Button>
-      </CardFooter>
-    </Card>
+        </CardContent>
+        <CardFooter className="flex flex-col gap-3">
+            <Button
+              size="lg"
+              className="w-full bg-black text-white hover:bg-black/90 h-14 text-base font-bold"
+              onClick={handlePay}
+              disabled={isLoading || !shippingAddress || !paymentMethod}
+            >
+              {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+              Pay {formatPrice(grandTotal)}
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => onPrevStep(2)}
+              disabled={isLoading}
+            >
+              Back
+            </Button>
+        </CardFooter>
+      </Card>
+    </div>
   );
 }

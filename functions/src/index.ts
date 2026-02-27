@@ -80,20 +80,27 @@ export const createPaymentIntent = onCall({minInstances: 1}, async (request) => 
     const productRef = db.collection("products").doc(item.id);
     const productSnap = await productRef.get();
 
-    if (!productSnap.exists || productSnap.data()?.status !== "active") {
-      throw new HttpsError("failed-precondition", `Product ${item.id} is not available.`);
+    if (!productSnap.exists) {
+      throw new HttpsError("not-found", `Product ${item.id} not found.`);
     }
-    const price = productSnap.data()?.price || 0;
+    
+    const pData = productSnap.data();
+    // Allow 'active' or 'pending_review' for testing newly created items
+    if (pData?.status !== "active" && pData?.status !== "pending_review") {
+      throw new HttpsError("failed-precondition", `Product ${item.id} is no longer available.`);
+    }
+
+    const price = pData?.price || 0;
     totalAmount += price;
     orderItems.push({
       productId: item.id,
       sellerId: item.sellerId,
-      title: item.title,
-      brand: item.brand,
-      image: item.image,
-      price: item.price,
-      quantity: item.quantity,
-      size: item.size || null,
+      title: item.title || pData?.title || "Untitled",
+      brand: item.brand || pData?.brand || "Generic",
+      image: item.image || pData?.images?.[0] || "",
+      price: price,
+      quantity: item.quantity || 1,
+      size: item.size || pData?.size || null,
     });
   }
 
@@ -149,20 +156,27 @@ export const createOrder = onCall(async (request) => {
     const productRef = db.collection("products").doc(item.id);
     const productSnap = await productRef.get();
 
-    if (!productSnap.exists || productSnap.data()?.status !== "active") {
-      throw new HttpsError("failed-precondition", `Product ${item.id} is not available.`);
+    if (!productSnap.exists) {
+      throw new HttpsError("not-found", `Product ${item.id} not found.`);
     }
-    const price = productSnap.data()?.price || 0;
+    
+    const pData = productSnap.data();
+    // Allow 'active' or 'pending_review' for testing newly created items
+    if (pData?.status !== "active" && pData?.status !== "pending_review") {
+      throw new HttpsError("failed-precondition", `Product ${item.id} is no longer available.`);
+    }
+
+    const price = pData?.price || 0;
     totalAmount += price;
     orderItems.push({
       productId: productSnap.id,
-      sellerId: productSnap.data()?.sellerId,
-      title: productSnap.data()?.title,
-      brand: productSnap.data()?.brand,
-      image: productSnap.data()?.images?.[0],
+      sellerId: pData?.sellerId || item.sellerId,
+      title: pData?.title || item.title || "Untitled",
+      brand: pData?.brand || item.brand || "Generic",
+      image: pData?.images?.[0] || item.image || "",
       price: price,
       quantity: item.quantity || 1,
-      size: item.size || null,
+      size: item.size || pData?.size || null,
     });
   }
 
@@ -179,7 +193,7 @@ export const createOrder = onCall(async (request) => {
       status: "processing",
       paymentMethod: "cod",
       paymentStatus: "pending",
-      shippingAddress,
+      shippingAddress: shippingAddress || null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
