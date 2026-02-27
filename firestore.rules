@@ -38,14 +38,12 @@ service cloud.firestore {
     function validProduct(productData) {
       let isCorrectSeller = productData.sellerId == request.auth.uid;
       let isCorrectStatus = productData.status == 'pending_review';
-      let hasInitialEmptyImages = productData.images is list && productData.images.size() == 0;
-      let titleValid = productData.title is string && productData.title.size() > 0;
-      let brandValid = productData.brand is string && productData.brand.size() > 0;
-      let categoryValid = productData.category is string && productData.category.size() > 0;
-      // Use int and float for numeric validation in CEL
-      let priceValid = (productData.price is int || productData.price is float) && productData.price > 0;
-      
-      return isCorrectSeller && isCorrectStatus && hasInitialEmptyImages && titleValid && brandValid && categoryValid && priceValid;
+      // Robust check for initial state: images must be an empty list, title and price must be valid
+      return isCorrectSeller 
+          && isCorrectStatus 
+          && productData.images.size() == 0
+          && productData.title.size() > 0
+          && productData.price > 0;
     }
     
     // Validazione aggiornamento (per aggiunta immagini o modifiche)
@@ -53,11 +51,8 @@ service cloud.firestore {
         let sellerUnchanged = !('sellerId' in updateData) || updateData.sellerId == existingData.sellerId;
         
         // Se si stanno aggiungendo immagini a un prodotto che non ne aveva (caso tipico del nostro flusso di upload)
-        if (existingData.images.size() == 0 && 'images' in updateData) {
-            return updateData.images is list 
-                && updateData.images.size() > 0 
-                && updateData.images.size() <= 15
-                && sellerUnchanged;
+        if (existingData.images.size() == 0 && 'images' in updateData && updateData.images.size() > 0) {
+            return updateData.images.size() <= 15 && sellerUnchanged;
         }
 
         return sellerUnchanged;

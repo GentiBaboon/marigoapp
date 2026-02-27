@@ -82,7 +82,6 @@ export function ReviewStep() {
     setIsLoading(true);
 
     // Prepare clean data for the shell document
-    // Ensuring numeric price and simple strings for title/desc
     const productData = {
         title: String(formData.title).trim(),
         description: String(formData.description).trim(),
@@ -108,49 +107,49 @@ export function ReviewStep() {
 
     const productRef = doc(firestore, 'products', formData.productId);
 
-    try {
-        // 1. Create the product shell first (triggers validProduct rule)
-        await setDoc(productRef, productData);
-        
-        // 2. Upload images to storage
-        let imageUrls: string[] = [];
-        if (formData.images && formData.images.length > 0) {
-            const storage = getStorage(firebaseApp);
-            const uploadPromises = formData.images.map(async (imageFile, index) => {
-              const fileName = `img_${Date.now()}_${index}.webp`;
-              const storageRef = ref(storage, `products/${formData.productId}/${fileName}`);
-              // Using uploadString for data URLs from our compression logic
-              const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
-              return getDownloadURL(snapshot.ref);
+    // Use sequential logic but catch errors non-blockingly
+    setDoc(productRef, productData)
+        .then(async () => {
+            // Document shell created, now upload images
+            let imageUrls: string[] = [];
+            if (formData.images && formData.images.length > 0) {
+                const storage = getStorage(firebaseApp);
+                const uploadPromises = formData.images.map(async (imageFile, index) => {
+                    const fileName = `img_${Date.now()}_${index}.webp`;
+                    const storageRef = ref(storage, `products/${formData.productId}/${fileName}`);
+                    const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
+                    return getDownloadURL(snapshot.ref);
+                });
+                imageUrls = await Promise.all(uploadPromises);
+            }
+
+            // Update with image URLs
+            if (imageUrls.length > 0) {
+                await updateDoc(productRef, { images: imageUrls });
+            }
+            
+            toast({ title: 'Success!', description: 'Your item has been submitted for review.' });
+            setIsLoading(false);
+            nextStep(); // Go to step 8 (SuccessStep)
+        })
+        .catch(async (error: any) => {
+            console.error("Publishing error:", error);
+            setIsLoading(false);
+            
+            // Emit contextual error for developer debugging
+            const permissionError = new FirestorePermissionError({
+                path: `products/${formData.productId}`,
+                operation: 'create',
+                requestResourceData: productData,
             });
-            imageUrls = await Promise.all(uploadPromises);
-        }
-
-        // 3. Update the document with actual image URLs (triggers validProductUpdate rule)
-        if (imageUrls.length > 0) {
-            await updateDoc(productRef, { images: imageUrls });
-        }
-        
-        toast({ title: 'Success!', description: 'Your item has been submitted for review.' });
-        nextStep(); // Go to step 8 (SuccessStep)
-
-    } catch (error: any) {
-        console.error("Publishing error:", error);
-        setIsLoading(false);
-        // This emits a rich contextual error for the Firebase Studio overlay
-        const permissionError = new FirestorePermissionError({
-            path: `products/${formData.productId}`,
-            operation: 'create',
-            requestResourceData: productData,
+            errorEmitter.emit('permission-error', permissionError);
+            
+            toast({
+                variant: 'destructive',
+                title: 'Submission failed',
+                description: 'There was a problem saving your listing. Please try again.',
+            });
         });
-        errorEmitter.emit('permission-error', permissionError);
-        
-        toast({
-            variant: 'destructive',
-            title: 'Submission failed',
-            description: 'There was a problem saving your listing. Please try again.',
-        });
-    }
   };
 
   const handleSaveDraft = () => {
