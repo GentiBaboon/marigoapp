@@ -1,3 +1,4 @@
+
 import * as admin from "firebase-admin";
 import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
@@ -97,7 +98,7 @@ export const createPaymentIntent = onCall({minInstances: 1}, async (request) => 
       sellerId: item.sellerId,
       title: item.title || pData?.title || "Untitled",
       brand: item.brand || pData?.brand || "Generic",
-      image: item.image || pData?.images?.[0] || "",
+      image: pData?.images?.[0] || item.image || "",
       price: price,
       quantity: item.quantity || 1,
       size: item.size || pData?.size || null,

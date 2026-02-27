@@ -1,3 +1,4 @@
+
 'use client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -17,7 +18,7 @@ export function OrderSummary() {
       <CardContent className="space-y-4">
         <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
             {items.map(item => {
-                // Determine the correct image source (URL or placeholder)
+                // Handle different image formats (internal placeholders or external/Firebase URLs)
                 const imageUrl = item.image || 'https://placehold.co/100x100?text=No+Image';
                 
                 return (

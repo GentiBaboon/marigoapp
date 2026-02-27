@@ -1,3 +1,4 @@
+
 'use client';
 import { Sprout, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ export function SuccessStep() {
     const { formData, deleteActiveDraft } = useSellForm();
     const { formatPrice } = useCurrency();
 
+    // Use safe fallbacks in case formData is partially cleared
     const title = formData?.title || 'Product submitted';
     const brand = formData?.brand || 'Luxury Item';
     const price = formData?.price || 0;

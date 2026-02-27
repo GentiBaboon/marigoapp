@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -97,7 +98,7 @@ export function ReviewStep() {
             const storagePath = `products/${user.uid}/${formData.productId}/${fileName}`;
             const storageRef = ref(storage, storagePath);
             
-            // Use fetch to get a Blob from the Data URI. This is more memory-efficient than atob().
+            // Efficient conversion from Data URI to Blob
             const response = await fetch(imageFile.url);
             const blob = await response.blob();
 
@@ -111,7 +112,7 @@ export function ReviewStep() {
                     (snapshot) => {
                         const fileProgress = (snapshot.bytesTransferred / snapshot.totalBytes) * weight;
                         const currentTotal = Math.round((i * weight) + fileProgress);
-                        setUploadProgress(currentTotal);
+                        setUploadProgress(Math.min(currentTotal, 99)); // Keep at 99 until final link is ready
                     }, 
                     (error) => reject(error), 
                     async () => {
@@ -152,6 +153,7 @@ export function ReviewStep() {
         // Final publication to Firestore
         await setDoc(productRef, productData);
         
+        setUploadProgress(100);
         setIsLoading(false);
         nextStep();
 
