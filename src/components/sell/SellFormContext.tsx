@@ -24,7 +24,7 @@ interface SellFormContextType {
 
 const SellFormContext = createContext<SellFormContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'marigo_sell_drafts_v2';
+const STORAGE_KEY = 'marigo_sell_drafts_v3';
 
 export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [drafts, setDrafts] = useState<SellDraft[]>([]);
@@ -42,33 +42,39 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
         setDrafts(parsedDrafts);
       }
     } catch (error) {
-      console.error("Failed to load drafts", error);
+      // If parsing fails, just start fresh
     }
     setIsInitialized(true);
   }, []);
 
-  // Save drafts with size optimization
+  // Save drafts with strict size management to avoid blocking the UI
   useEffect(() => {
     if (!isInitialized) return;
-    try {
-      if (drafts.length > 0) {
-        // Keep only the most recent 5 drafts to prevent localStorage overflow
-        const recentDrafts = drafts
-            .sort((a, b) => b.lastModified - a.lastModified)
-            .slice(0, 5);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(recentDrafts));
-      } else {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    } catch (error) {
-      console.warn("LocalStorage full. Removing images from older drafts.", error);
-      try {
-          const minimalDrafts = drafts.map(d => 
-            d.id === activeDraftId ? d : { ...d, formData: { ...d.formData, images: [] } }
-          );
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(minimalDrafts));
-      } catch (e) {}
-    }
+    
+    const saveToLocalStorage = (data: SellDraft[]) => {
+        try {
+            // Keep only the most recent 3 drafts to prevent localStorage overflow
+            const recentDrafts = [...data]
+                .sort((a, b) => b.lastModified - a.lastModified)
+                .slice(0, 3);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(recentDrafts));
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+                // If the active draft itself is too big because of images, we try saving it without images for persistence
+                const minimalDrafts = data.map(d => 
+                    d.id === activeDraftId ? d : { ...d, formData: { ...d.formData, images: [] } }
+                );
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(minimalDrafts.slice(0, 2)));
+                } catch (e) {
+                    localStorage.removeItem(STORAGE_KEY);
+                }
+            }
+        }
+    };
+
+    const timeout = setTimeout(() => saveToLocalStorage(drafts), 1000);
+    return () => clearTimeout(timeout);
   }, [drafts, isInitialized, activeDraftId]);
 
   const activeDraft = useMemo(() => drafts.find(d => d.id === activeDraftId), [drafts, activeDraftId]);
@@ -88,7 +94,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
     const newDraftId = `draft_${Date.now()}`;
     const newDraft: SellDraft = {
         id: newDraftId,
-        formData: { productId: newProductId, listingCreated: undefined },
+        formData: { productId: newProductId },
         currentStep: 1,
         lastModified: Date.now(),
     };

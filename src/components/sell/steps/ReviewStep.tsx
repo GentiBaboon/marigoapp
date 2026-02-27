@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -14,18 +13,6 @@ import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useColle
 import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { FirestoreAddress } from '@/lib/types';
-
-// Helper to convert Data URI to Blob without fetch() overhead
-const dataURItoBlob = (dataURI: string) => {
-    const byteString = atob(dataURI.split(',')[1]);
-    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i);
-    }
-    return new Blob([ab], { type: mimeString });
-};
 
 const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode; }) => (
     <div className="space-y-2">
@@ -102,8 +89,6 @@ export function ReviewStep() {
     try {
         const totalImages = formData.images?.length || 0;
         const imageUrls: string[] = [];
-        
-        // Progress per-image weights (e.g. if 3 images, each is 33%)
         const weight = 100 / totalImages;
 
         for (let i = 0; i < totalImages; i++) {
@@ -112,19 +97,21 @@ export function ReviewStep() {
             const storagePath = `products/${user.uid}/${formData.productId}/${fileName}`;
             const storageRef = ref(storage, storagePath);
             
-            const blob = dataURItoBlob(imageFile.url);
+            // Use fetch to get a Blob from the Data URI. This is more memory-efficient than atob().
+            const response = await fetch(imageFile.url);
+            const blob = await response.blob();
+
             const uploadTask = uploadBytesResumable(storageRef, blob, {
                 contentType: 'image/webp',
                 customMetadata: { productId: formData.productId! }
             });
 
-            // Wait for individual upload while tracking progress
             const downloadUrl = await new Promise<string>((resolve, reject) => {
                 uploadTask.on('state_changed', 
                     (snapshot) => {
                         const fileProgress = (snapshot.bytesTransferred / snapshot.totalBytes) * weight;
-                        const totalProgress = Math.round((i * weight) + fileProgress);
-                        setUploadProgress(totalProgress);
+                        const currentTotal = Math.round((i * weight) + fileProgress);
+                        setUploadProgress(currentTotal);
                     }, 
                     (error) => reject(error), 
                     async () => {
@@ -161,6 +148,8 @@ export function ReviewStep() {
         };
 
         const productRef = doc(firestore, 'products', formData.productId);
+        
+        // Final publication to Firestore
         await setDoc(productRef, productData);
         
         setIsLoading(false);
@@ -168,8 +157,6 @@ export function ReviewStep() {
 
     } catch (error: any) {
         setIsLoading(false);
-        console.error("Submission failed:", error);
-        
         if (error.code === 'storage/unauthorized' || error.code === 'permission-denied') {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: `products/${formData.productId}`,
@@ -179,8 +166,8 @@ export function ReviewStep() {
         } else {
             toast({ 
                 variant: 'destructive', 
-                title: 'Upload failed', 
-                description: error.message || 'An error occurred during upload. Please try again.' 
+                title: 'Submission failed', 
+                description: 'We encountered an error while saving your listing. Please check your connection and try again.' 
             });
         }
     }
