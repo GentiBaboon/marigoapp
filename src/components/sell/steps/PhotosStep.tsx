@@ -56,7 +56,13 @@ export function PhotosStep() {
           setImageFiles(current => [...current, { id: fileId, url: tempUrl, name: file.name, type: file.type, isLoading: true }]);
 
           try {
-              const webpFile = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1280, useWebWorker: true, fileType: 'image/webp' });
+              // Best way possible: WebP compression, High Quality (0.8MB max), 1920px width
+              const webpFile = await imageCompression(file, { 
+                  maxSizeMB: 0.8, 
+                  maxWidthOrHeight: 1920, 
+                  useWebWorker: true, 
+                  fileType: 'image/webp' 
+              });
               const dataUrl = await fileToDataUrl(webpFile);
 
               URL.revokeObjectURL(tempUrl);
@@ -75,6 +81,7 @@ export function PhotosStep() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': [] },
+    maxFiles: 15
   });
 
   const removeFile = (idToRemove: string) => {

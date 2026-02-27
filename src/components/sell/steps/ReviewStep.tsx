@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { productCategories, productConditions } from '@/lib/mock-data';
 import Link from 'next/link';
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
-import { doc, setDoc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { FirestoreAddress } from '@/lib/types';
 
@@ -60,18 +60,18 @@ export function ReviewStep() {
   }, [addresses, formData.shippingFromAddressId]);
 
   const validateData = () => {
-    if (!formData.title || !formData.description || !formData.brand || !formData.category || !formData.price || !formData.condition || !formData.material || !formData.color) {
+    if (!formData.title || !formData.description || !formData.brand || !formData.category || !formData.price || !formData.condition || !formData.material || !formData.color || !formData.images || formData.images.length < 3) {
         toast({
             variant: 'destructive',
             title: 'Missing information',
-            description: 'Please go back and complete all required fields.',
+            description: 'Please go back and complete all required fields, including at least 3 photos.',
         });
         return false;
     }
     return true;
   };
 
-  const handlePublish = async () => {
+  const handlePublish = () => {
     if (!user || !firestore || !formData.productId) {
         toast({ variant: 'destructive', title: 'Session error. Please restart.' });
         return;
@@ -80,74 +80,69 @@ export function ReviewStep() {
     if (!validateData()) return;
 
     setIsLoading(true);
+    const storage = getStorage(firebaseApp);
 
-    const productData = {
-        title: String(formData.title).trim(),
-        description: String(formData.description).trim(),
-        brand: String(formData.brand).trim(),
-        category: String(formData.category).trim(),
-        price: Number(formData.price),
-        condition: String(formData.condition).trim(),
-        material: String(formData.material).trim(),
-        color: String(formData.color).trim(),
-        sellerId: user.uid,
-        status: 'pending_review' as const,
-        images: [], // Initial empty array as required by security rules
-        listingCreated: serverTimestamp(),
-        keywords: Array.from(new Set([
-          ...(formData.title || '').toLowerCase().split(/\s+/),
-          ...(formData.brand || '').toLowerCase().split(/\s+/),
-          ...(formData.category || '').toLowerCase().split(/\s+/)
-        ].filter(k => k.length > 2))),
-        ...(formData.sizeValue && { size: `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() }),
-        ...(formData.pattern && { pattern: formData.pattern }),
-        ...(formData.vintage !== undefined && { vintage: formData.vintage }),
-    };
+    // 1. First upload all images to Storage to get permanent URLs
+    // Best practice: use a path that includes user ID for secure direct upload
+    const uploadPromises = (formData.images || []).map(async (imageFile, index) => {
+        const fileName = `img_${Date.now()}_${index}.webp`;
+        const storageRef = ref(storage, `products/${user.uid}/${formData.productId}/${fileName}`);
+        const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
+        return getDownloadURL(snapshot.ref);
+    });
 
-    const productRef = doc(firestore, 'products', formData.productId);
+    Promise.all(uploadPromises)
+        .then((imageUrls) => {
+            // 2. Prepare final product data with confirmed URLs
+            const productData = {
+                title: String(formData.title).trim(),
+                description: String(formData.description).trim(),
+                brand: String(formData.brand).trim(),
+                category: String(formData.category).trim(),
+                price: Number(formData.price),
+                condition: String(formData.condition).trim(),
+                material: String(formData.material).trim(),
+                color: String(formData.color).trim(),
+                sellerId: user.uid,
+                status: 'pending_review' as const,
+                images: imageUrls, // No longer empty!
+                listingCreated: serverTimestamp(),
+                keywords: Array.from(new Set([
+                  ...(formData.title || '').toLowerCase().split(/\s+/),
+                  ...(formData.brand || '').toLowerCase().split(/\s+/),
+                  ...(formData.category || '').toLowerCase().split(/\s+/)
+                ].filter(k => k.length > 2))),
+                ...(formData.sizeValue && { size: `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() }),
+                ...(formData.pattern && { pattern: formData.pattern }),
+                ...(formData.vintage !== undefined && { vintage: formData.vintage }),
+            };
 
-    try {
-        // Step 1: Create the product document shell
-        await setDoc(productRef, productData);
+            const productRef = doc(firestore, 'products', formData.productId);
 
-        // Step 2: Upload images if any
-        let imageUrls: string[] = [];
-        if (formData.images && formData.images.length > 0) {
-            const storage = getStorage(firebaseApp);
-            const uploadPromises = formData.images.map(async (imageFile, index) => {
-                const fileName = `img_${Date.now()}_${index}.webp`;
-                const storageRef = ref(storage, `products/${formData.productId}/${fileName}`);
-                const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
-                return getDownloadURL(snapshot.ref);
-            });
-            imageUrls = await Promise.all(uploadPromises);
-        }
-
-        // Step 3: Update document with final image URLs
-        if (imageUrls.length > 0) {
-            await updateDoc(productRef, { images: imageUrls });
-        }
-        
-        toast({ title: 'Success!', description: 'Your item has been submitted for review.' });
-        setIsLoading(false);
-        nextStep(); // Advance to SuccessStep
-    } catch (error: any) {
-        setIsLoading(false);
-        
-        // Emit rich contextual error for the development overlay
-        const permissionError = new FirestorePermissionError({
-            path: `products/${formData.productId}`,
-            operation: 'create',
-            requestResourceData: productData,
+            // 3. Save the atomic, final document to Firestore (Non-blocking)
+            setDoc(productRef, productData)
+                .then(() => {
+                    toast({ title: 'Success!', description: 'Your item has been submitted.' });
+                    setIsLoading(false);
+                    nextStep(); // This now correctly shows SuccessStep
+                })
+                .catch((error) => {
+                    setIsLoading(false);
+                    // Emit rich contextual error for debugging
+                    const permissionError = new FirestorePermissionError({
+                        path: productRef.path,
+                        operation: 'create',
+                        requestResourceData: productData,
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
+                    toast({ variant: 'destructive', title: 'Submission failed', description: 'Could not save the listing.' });
+                });
+        })
+        .catch((error) => {
+            console.error("Upload error:", error);
+            setIsLoading(false);
+            toast({ variant: 'destructive', title: 'Upload failed', description: 'Could not upload images. Please try again.' });
         });
-        errorEmitter.emit('permission-error', permissionError);
-        
-        toast({
-            variant: 'destructive',
-            title: 'Submission failed',
-            description: 'There was a problem saving your listing. Please check the error details.',
-        });
-    }
   };
 
   const handleSaveDraft = () => {

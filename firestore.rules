@@ -34,15 +34,14 @@ service cloud.firestore {
         return isSignedIn() && (request.auth.uid == delivery.buyerId || request.auth.uid in delivery.sellerIds);
     }
     
-    // Prodotto valido per la creazione (shell iniziale)
+    // Prodotto valido per la creazione
     function validProduct(p) {
       return p.sellerId == request.auth.uid 
           && p.status == 'pending_review' 
           && p.images is list
-          && p.images.size() == 0
+          && p.images.size() <= 15
           && p.title is string
           && p.title.size() > 0
-          && p.price is number
           && p.price > 0
           && p.brand is string
           && p.category is string
@@ -50,14 +49,10 @@ service cloud.firestore {
           && p.description is string;
     }
     
-    // Validazione aggiornamento (per aggiunta immagini o modifiche)
+    // Validazione aggiornamento
     function validProductUpdate(newData, oldData) {
         return (newData.sellerId == oldData.sellerId)
-            && (
-                (oldData.images.size() == 0 && newData.images.size() > 0)
-                ? (newData.images.size() <= 15)
-                : true
-            );
+            && (newData.images.size() <= 15);
     }
 
     // --------------------------------------------------------------------

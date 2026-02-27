@@ -1,11 +1,9 @@
-
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
 
     // By default, allow files to be read by anyone, but not written.
-    // This allows product images, etc., to be publicly visible.
     allow read: if true;
     allow write: if false;
 
@@ -25,24 +23,20 @@ service firebase.storage {
     }
 
     // Users can only write to their own profile folder.
-    // e.g., /users/{userId}/profile.jpg
     match /users/{userId}/{fileName} {
       allow write: if isSignedIn() 
                   && request.auth.uid == userId 
                   && isAllowedImage(5);
     }
 
-    // Product images can only be written by the product's seller.
-    // Note: This rule requires the Firestore product document to exist before the image is uploaded.
-    // e.g., /products/{productId}/image1.jpg
-    match /products/{productId}/{fileName} {
+    // Product images: secure path including user ID for atomic uploads
+    match /products/{userId}/{productId}/{fileName} {
       allow write: if isSignedIn()
-                  && get(/databases/$(database)/documents/products/$(productId)).data.sellerId == request.auth.uid
+                  && request.auth.uid == userId
                   && isAllowedImage(10);
     }
 
     // Delivery proofs can only be written by the assigned courier.
-    // e.g., /deliveries/{deliveryId}/proof.jpg
     match /deliveries/{deliveryId}/{fileName} {
       allow write: if isSignedIn()
                   && get(/databases/$(database)/documents/deliveries/$(deliveryId)).data.courierId == request.auth.uid
