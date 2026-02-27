@@ -15,7 +15,11 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (request.auth.token.admin == true || request.auth.uid == '2C81RVoXZWZuSWXEEueehqbHkMu1');
+      return isSignedIn() && (
+        request.auth.token.admin == true || 
+        request.auth.uid == '2C81RVoXZWZuSWXEEueehqbHkMu1' || 
+        request.auth.uid == 'v521MWW9rmPYchVBc91DheeRU5j2'
+      );
     }
     
     function isApprovedCourier() {

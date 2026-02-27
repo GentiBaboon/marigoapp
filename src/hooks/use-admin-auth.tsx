@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 
-// Define a developer admin UID for testing purposes
-const DEV_ADMIN_UID = '2C81RVoXZWZuSWXEEueehqbHkMu1';
+// Define a developer admin UIDs for testing purposes
+const DEV_ADMIN_UIDS = ['2C81RVoXZWZuSWXEEueehqbHkMu1', 'v521MWW9rmPYchVBc91DheeRU5j2'];
 
 export function useAdminAuth() {
   const { user, isUserLoading } = useUser();
@@ -23,8 +23,8 @@ export function useAdminAuth() {
       return;
     }
     
-    // For development: check for a specific UID to grant admin access
-    if (process.env.NODE_ENV === 'development' && user.uid === DEV_ADMIN_UID) {
+    // For development: check for specific UIDs to grant admin access
+    if (process.env.NODE_ENV === 'development' && DEV_ADMIN_UIDS.includes(user.uid)) {
         setIsAdmin(true);
         setIsLoading(false);
         return; // Bypass token check for the dev admin
@@ -34,14 +34,14 @@ export function useAdminAuth() {
     // Check for admin claim, with a forced refresh as a fallback.
     user.getIdTokenResult()
       .then((idTokenResult) => {
-        if (idTokenResult.claims.admin) {
+        if (idTokenResult.claims.admin || DEV_ADMIN_UIDS.includes(user.uid)) {
           setIsAdmin(true);
           setIsLoading(false);
         } else {
           // If no admin claim, force a refresh of the token and check again.
           // This is useful when custom claims have just been set.
           user.getIdTokenResult(true).then((refreshedTokenResult) => {
-             if (refreshedTokenResult.claims.admin) {
+             if (refreshedTokenResult.claims.admin || DEV_ADMIN_UIDS.includes(user.uid)) {
                 setIsAdmin(true);
              } else {
                 setIsAdmin(false);
