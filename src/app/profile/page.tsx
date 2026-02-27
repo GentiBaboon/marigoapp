@@ -34,12 +34,15 @@ import {
   Handshake,
   Landmark,
   Truck,
-  LayoutDashboard
+  LayoutDashboard,
+  ShieldAlert
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { FirestoreUser } from '@/lib/types';
 import { doc } from 'firebase/firestore';
 import { EditProfileForm } from '@/components/profile/edit-profile-form';
+
+const ADMIN_UIDS = ['2C81RVoXZWZuSWXEEueehqbHkMu1', 'v521MWW9rmPYchVBc91DheeRU5j2'];
 
 const getInitials = (name: string | null | undefined) => {
   if (!name) return 'U';
@@ -84,7 +87,10 @@ export default function ProfilePage() {
     }
   };
 
+  const isAdmin = user && ADMIN_UIDS.includes(user.uid);
+
   const menuItems = [
+    ...(isAdmin ? [{ href: '/admin', label: 'Admin Dashboard', icon: ShieldAlert }] : []),
     { href: '/profile/orders', label: 'My Orders', icon: Package },
     { href: '/profile/listings', label: 'My Listings', icon: Tag },
     { href: '/profile/offers', label: 'My Offers', icon: Handshake },
