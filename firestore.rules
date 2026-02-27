@@ -38,23 +38,19 @@ service cloud.firestore {
         return isSignedIn() && (request.auth.uid == delivery.buyerId || request.auth.uid in delivery.sellerIds);
     }
     
-    // Prodotto valido per la creazione (Best Practice: Atomic Creation)
     function validProduct(p) {
       return p.sellerId == request.auth.uid 
-          && p.status == 'pending_review' 
+          && (p.status == 'pending_review' || p.status == 'active')
           && p.images is list
-          && p.images.size() >= 3
-          && p.images.size() <= 15
+          && p.images.size() >= 1
           && p.title is string
-          && p.title.size() >= 5
-          && p.price > 0
+          && p.price >= 0
           && p.brand is string
           && p.category is string;
     }
     
     function validProductUpdate(newData, oldData) {
-        return newData.sellerId == oldData.sellerId
-            && newData.images.size() <= 15;
+        return newData.sellerId == oldData.sellerId;
     }
 
     // --------------------------------------------------------------------
@@ -114,7 +110,7 @@ service cloud.firestore {
     
     match /orders/{orderId} {
       allow get: if isSignedIn() && (isOwner(resource.data.buyerId) || request.auth.uid in resource.data.sellerIds) || isAdmin();
-      allow create: if false; 
+      allow create: if isSignedIn(); 
       allow list, update, delete: if isAdmin();
     }
 

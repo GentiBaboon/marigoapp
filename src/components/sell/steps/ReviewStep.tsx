@@ -6,21 +6,21 @@ import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Pencil, Info, Loader2, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Pencil, Info, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { productCategories, productConditions } from '@/lib/mock-data';
 import Link from 'next/link';
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
-import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FirestoreAddress } from '@/lib/types';
 
 const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode; }) => (
-    <div>
-        <div className="flex justify-between items-start mb-2">
+    <div className="space-y-2">
+        <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">{title}</h3>
-            <Button variant="ghost" onClick={onEdit} className="flex items-center gap-1.5 text-sm text-muted-foreground h-auto p-0 hover:bg-transparent hover:text-primary">
-                <Pencil className="h-3 w-3" />
+            <Button variant="ghost" size="sm" onClick={onEdit} className="text-muted-foreground hover:text-primary">
+                <Pencil className="h-3 w-3 mr-1.5" />
                 Edit
             </Button>
         </div>
@@ -29,7 +29,7 @@ const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () 
 );
 
 const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-    <div className="flex justify-between items-center">
+    <div className="flex justify-between items-center py-0.5">
         <span className="text-muted-foreground">{label}:</span>
         <span className="font-medium text-right">{value}</span>
     </div>
@@ -61,11 +61,14 @@ export function ReviewStep() {
   }, [addresses, formData.shippingFromAddressId]);
 
   const validateData = () => {
-    if (!formData.title || !formData.brand || !formData.category || !formData.price || !formData.condition || !formData.images || formData.images.length < 3) {
+    const required = ['title', 'brand', 'category', 'price', 'condition'];
+    const missing = required.filter(k => !formData[k as keyof typeof formData]);
+    
+    if (missing.length > 0 || !formData.images || formData.images.length < 3) {
         toast({
             variant: 'destructive',
             title: 'Missing information',
-            description: 'Please go back and complete all required fields, including at least 3 photos.',
+            description: 'Please complete all required fields and upload at least 3 photos.',
         });
         return false;
     }
@@ -85,32 +88,41 @@ export function ReviewStep() {
     const storage = getStorage(firebaseApp);
 
     try {
-        // 1. Upload images in parallel with progress tracking
         const totalImages = formData.images?.length || 0;
         let uploadedCount = 0;
 
-        const uploadPromises = (formData.images || []).map(async (imageFile, index) => {
-            const fileName = `img_${Date.now()}_${index}.webp`;
+        // Upload images in sequence to accurately track progress and prevent browser hang
+        const imageUrls: string[] = [];
+        
+        for (let i = 0; i < totalImages; i++) {
+            const imageFile = formData.images![i];
+            const fileName = `img_${Date.now()}_${i}.webp`;
             const storagePath = `products/${user.uid}/${formData.productId}/${fileName}`;
             const storageRef = ref(storage, storagePath);
             
-            // Use uploadString for dataURL (Base64)
-            const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
+            // Robust conversion from Data URL to Blob
+            const response = await fetch(imageFile.url);
+            const blob = await response.blob();
+            
+            const snapshot = await uploadBytes(storageRef, blob, {
+                contentType: 'image/webp',
+                customMetadata: {
+                    originalName: imageFile.name,
+                    productId: formData.productId
+                }
+            });
+            
             const downloadUrl = await getDownloadURL(snapshot.ref);
+            imageUrls.push(downloadUrl);
             
             uploadedCount++;
             setUploadProgress(Math.round((uploadedCount / totalImages) * 100));
-            
-            return downloadUrl;
-        });
-
-        const imageUrls = await Promise.all(uploadPromises);
+        }
 
         if (imageUrls.length < 3) {
             throw new Error("Failed to upload minimum required images.");
         }
 
-        // 2. Prepare final product data with confirmed URLs
         const productData = {
             title: String(formData.title).trim(),
             description: String(formData.description || '').trim(),
@@ -121,7 +133,7 @@ export function ReviewStep() {
             material: String(formData.material || '').trim(),
             color: String(formData.color || '').trim(),
             sellerId: user.uid,
-            status: 'pending_review' as const,
+            status: 'pending_review',
             images: imageUrls,
             listingCreated: serverTimestamp(),
             keywords: Array.from(new Set([
@@ -135,32 +147,27 @@ export function ReviewStep() {
         };
 
         const productRef = doc(firestore, 'products', formData.productId);
-
-        // 3. Atomic save to Firestore
         await setDoc(productRef, productData);
         
-        toast({ title: 'Success!', description: 'Your item has been submitted.' });
         setIsLoading(false);
-        nextStep(); // CORRECT: Move to SuccessStep
+        nextStep();
 
     } catch (error: any) {
         setIsLoading(false);
         console.error("Submission failed:", error);
         
         const isPermissionError = error.code === 'permission-denied' || error.message?.includes('permissions');
-        
         if (isPermissionError) {
-            const permissionError = new FirestorePermissionError({
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: `products/${formData.productId}`,
                 operation: 'create',
                 requestResourceData: formData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            }));
         } else {
             toast({ 
                 variant: 'destructive', 
-                title: 'Submission failed', 
-                description: error.message || 'Could not save the listing. Please try again.' 
+                title: 'Upload failed', 
+                description: 'An error occurred during upload. Please check your connection and try again.' 
             });
         }
     }
@@ -193,16 +200,14 @@ export function ReviewStep() {
   
   return (
     <div className="space-y-8">
-        <div>
-            <h2 className="text-2xl font-bold">Review before listing</h2>
-        </div>
+        <h2 className="text-2xl font-bold tracking-tight">Review before listing</h2>
 
-        <Alert className="bg-amber-50 border-amber-200">
-            <Info className="h-4 w-4 text-amber-600"/>
-            <AlertDescription className="text-amber-900 text-sm">
+        <div className="bg-amber-50 border border-amber-100 rounded-lg p-4 flex gap-3">
+            <Info className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-amber-900 text-sm">
                 Double check everything: after listing, you can only add photos and lower the price.
-            </AlertDescription>
-        </Alert>
+            </p>
+        </div>
         
         <div className="space-y-6">
             <ReviewSection title="Details" onEdit={() => goToStep(2)}>
@@ -213,7 +218,7 @@ export function ReviewStep() {
                  <DetailRow label="Pattern" value={formData.pattern || 'Plain'} />
             </ReviewSection>
 
-            <Separator/>
+            <Separator />
 
             <ReviewSection title="Photos" onEdit={() => goToStep(3)}>
                 <div className="grid grid-cols-3 gap-2 mt-2">
@@ -225,13 +230,13 @@ export function ReviewStep() {
                 </div>
             </ReviewSection>
 
-            <Separator/>
+            <Separator />
             
              <ReviewSection title="Description" onEdit={() => goToStep(4)}>
-                <p className="line-clamp-3">{formData.description || 'No description provided.'}</p>
+                <p className="line-clamp-3 text-muted-foreground">{formData.description || 'No description provided.'}</p>
             </ReviewSection>
 
-            <Separator/>
+            <Separator />
 
             <ReviewSection title="Address" onEdit={() => goToStep(5)}>
                  {selectedAddress ? (
@@ -244,29 +249,42 @@ export function ReviewStep() {
                  )}
             </ReviewSection>
             
-            <Separator/>
+            <Separator />
 
             <ReviewSection title="Price" onEdit={() => goToStep(6)}>
-                <p className="font-semibold text-lg">{formatPriceLocal(formData.price)} (you earn {formatPriceLocal(formData.sellerEarning)})</p>
+                <div className="flex flex-col">
+                    <p className="font-bold text-lg">{formatPriceLocal(formData.price)}</p>
+                    <p className="text-sm text-muted-foreground">You will earn approx. {formatPriceLocal(formData.sellerEarning)}</p>
+                </div>
             </ReviewSection>
 
-            <Separator/>
+            <Separator />
         </div>
         
         <div className="space-y-4 pt-4">
-             <p className="text-xs text-center text-muted-foreground">
+             <p className="text-[11px] text-center text-muted-foreground leading-relaxed">
                 By clicking on "Submit my item", I confirm that the information provided complies with the <Link href="#" className="underline">general terms of use</Link>.
              </p>
             <div className="flex flex-col gap-3">
-                <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90 h-14" onClick={handlePublish} disabled={isLoading}>
+                <Button 
+                    size="lg" 
+                    className="w-full h-14 text-base bg-foreground text-background hover:bg-foreground/90 transition-all" 
+                    onClick={handlePublish} 
+                    disabled={isLoading}
+                >
                     {isLoading ? (
-                        <>
-                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                            Uploading {uploadProgress}%
-                        </>
+                        <div className="flex items-center gap-2">
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>Uploading {uploadProgress}%</span>
+                        </div>
                     ) : 'Submit my item'}
                 </Button>
-                <button type="button" className="text-muted-foreground font-medium text-sm hover:underline py-2" onClick={handleSaveDraft} disabled={isLoading}>
+                <button 
+                    type="button" 
+                    className="text-muted-foreground font-medium text-sm hover:underline py-2 disabled:opacity-50" 
+                    onClick={handleSaveDraft} 
+                    disabled={isLoading}
+                >
                     Save as draft and exit
                 </button>
             </div>
