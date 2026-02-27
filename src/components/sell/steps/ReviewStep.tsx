@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,12 +11,10 @@ import { Pencil, Info, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { productCategories, productConditions } from '@/lib/mock-data';
 import Link from 'next/link';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
 import { doc, collection, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { FirestoreAddress } from '@/lib/types';
-import { z } from 'zod';
 
 const ReviewSection = ({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode; }) => (
     <div>
@@ -38,7 +37,7 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
 );
 
 export function ReviewStep() {
-  const { formData, nextStep, goToStep, unselectDraft, deleteActiveDraft } = useSellForm();
+  const { formData, nextStep, goToStep, unselectDraft } = useSellForm();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -61,28 +60,37 @@ export function ReviewStep() {
     }
   }, [addresses, formData.shippingFromAddressId]);
 
-  const handlePublish = async () => {
-    if (!user || !firestore || !formData.productId) {
+  const validateData = () => {
+    if (!formData.title || !formData.description || !formData.brand || !formData.category || !formData.price || !formData.condition || !formData.material || !formData.color) {
         toast({
             variant: 'destructive',
-            title: 'Error',
-            description: 'Session error. Please restart the listing.',
+            title: 'Missing information',
+            description: 'Please go back and complete all required fields.',
         });
+        return false;
+    }
+    return true;
+  };
+
+  const handlePublish = async () => {
+    if (!user || !firestore || !formData.productId) {
+        toast({ variant: 'destructive', title: 'Session error. Please restart.' });
         return;
     }
     
+    if (!validateData()) return;
+
     setIsLoading(true);
 
-    // Dati per il primo salvataggio (guscio vuoto di immagini come richiesto dalle regole)
     const productData = {
-        title: String(formData.title || '').trim(),
-        description: String(formData.description || '').trim(),
-        brand: String(formData.brand || '').trim(),
-        category: String(formData.category || '').trim(),
-        price: Number(formData.price) || 0,
-        condition: String(formData.condition || '').trim(),
-        material: String(formData.material || '').trim(),
-        color: String(formData.color || '').trim(),
+        title: String(formData.title).trim(),
+        description: String(formData.description).trim(),
+        brand: String(formData.brand).trim(),
+        category: String(formData.category).trim(),
+        price: Number(formData.price),
+        condition: String(formData.condition).trim(),
+        material: String(formData.material).trim(),
+        color: String(formData.color).trim(),
         sellerId: user.uid,
         status: 'pending_review' as const,
         images: [], 
@@ -100,52 +108,40 @@ export function ReviewStep() {
     const productRef = doc(firestore, 'products', formData.productId);
 
     try {
-        // 1. Crea il documento shell
         await setDoc(productRef, productData);
         
-        // 2. Carica le immagini su Storage
         let imageUrls: string[] = [];
         if (formData.images && formData.images.length > 0) {
             const storage = getStorage(firebaseApp);
             const uploadPromises = formData.images.map(async (imageFile, index) => {
               const fileName = `img_${Date.now()}_${index}.webp`;
               const storageRef = ref(storage, `products/${formData.productId}/${fileName}`);
-              // Carica la stringa data_url (base64) salvata nel form
               const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
               return getDownloadURL(snapshot.ref);
             });
             imageUrls = await Promise.all(uploadPromises);
         }
 
-        // 3. Aggiorna il documento con i link definitivi
         if (imageUrls.length > 0) {
             await updateDoc(productRef, { images: imageUrls });
         }
         
-        toast({
-            title: 'Success!',
-            description: 'Your item has been submitted for review.',
-        });
-
-        // Elimina la bozza e reindirizza alla lista annunci del profilo
-        deleteActiveDraft();
-        router.push('/profile/listings');
+        toast({ title: 'Success!', description: 'Your item has been submitted for review.' });
+        nextStep();
 
     } catch (error: any) {
         console.error("Publishing error:", error);
         setIsLoading(false);
-        
         const permissionError = new FirestorePermissionError({
             path: `products/${formData.productId}`,
-            operation: 'write',
+            operation: 'create',
             requestResourceData: productData,
         });
         errorEmitter.emit('permission-error', permissionError);
-        
         toast({
             variant: 'destructive',
             title: 'Submission failed',
-            description: 'There was a problem saving your listing or images. Please try again.',
+            description: 'There was a problem saving your listing. Please try again.',
         });
     }
   };

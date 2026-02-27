@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, createContext, useContext, ReactNode, useEffect, useCallback, useMemo } from 'react';
@@ -28,7 +29,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [drafts, setDrafts] = useState<SellDraft[]>([]);
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const totalSteps = 7;
+  const totalSteps = 8;
   const firestore = useFirestore();
 
   // Caricamento bozze all'avvio
