@@ -14,9 +14,8 @@ import { MapPin, CreditCard, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
-import { useUser, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
-import type { FirestoreAddress, FirestoreOrder } from '@/lib/types';
-import { doc, updateDoc } from 'firebase/firestore';
+import { useUser, useFirestore } from '@/firebase';
+import type { FirestoreAddress } from '@/lib/types';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useCurrency } from '@/context/CurrencyContext';
@@ -51,34 +50,25 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
 
     setIsLoading(true);
 
-    if (paymentMethod === 'cod') {
-        // Handle Cash on Delivery
-        const newOrder: Omit<FirestoreOrder, 'id'> = {
-            orderNumber: `MRG-${Date.now()}`,
-            buyerId: user.uid,
-            sellerIds: [...new Set(items.map(item => item.sellerId))],
-            items: items.map(item => ({
-                productId: item.id,
-                sellerId: item.sellerId,
-                title: item.title,
-                brand: item.brand,
-                image: item.image,
-                price: item.price,
-                quantity: item.quantity,
-                size: item.selectedSize || null,
-            })),
-            totalAmount: grandTotal,
-            paymentStatus: 'pending',
-            paymentMethod,
-            status: 'processing', // Or 'pending_cod_confirmation'
-            shippingAddress,
-            createdAt: new Date(),
-        };
+    const orderPayload = {
+        items: items.map(item => ({
+            id: item.id,
+            sellerId: item.sellerId,
+            title: item.title,
+            brand: item.brand,
+            image: item.image,
+            price: item.price,
+            quantity: item.quantity,
+            size: item.selectedSize || null,
+        })),
+        shippingAddress,
+    };
 
+    if (paymentMethod === 'cod') {
         try {
-            // This would call a function to save the order
-            const createOrder = httpsCallable(functions, 'createOrder'); // Assuming a generic order creation function for COD
-            await createOrder({ orderData: newOrder });
+            const createOrder = httpsCallable(functions, 'createOrder');
+            const result: any = await createOrder(orderPayload);
+            const { orderId } = result.data;
             
             toast({
               title: 'Order Placed!',
@@ -86,14 +76,13 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
               variant: 'success',
             });
             clearCart();
-            // Redirect to a different success page for COD if needed
-            router.push(`/checkout/success/cod-order`);
+            router.push(`/checkout/success/${orderId}`);
         } catch(error: any) {
              console.error("Error placing COD order:", error);
              toast({
                 variant: 'destructive',
                 title: 'Uh oh! Something went wrong.',
-                description: 'Could not place your order. Please try again.',
+                description: error.message || 'Could not place your order. Please try again.',
              });
         } finally {
             setIsLoading(false);
@@ -110,7 +99,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
 
     try {
         const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
-        const result: any = await createPaymentIntent({ items: items.map(i => ({ id: i.id, quantity: i.quantity, sellerId: i.sellerId, title: i.title, brand: i.brand, image: i.image, price: i.price })) });
+        const result: any = await createPaymentIntent(orderPayload);
 
         const { clientSecret, orderId } = result.data;
         
@@ -128,10 +117,6 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
         }
 
         if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing' || paymentIntent.status === 'requires_capture') {
-            await updateDoc(doc(firestore, "orders", orderId), {
-                shippingAddress: shippingAddress
-            });
-
             toast({
                 title: 'Payment Successful!',
                 description: 'Your order is being processed.',
@@ -218,7 +203,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             disabled={isLoading || !shippingAddress || !paymentMethod || (paymentMethod === 'new_card' && !stripe)}
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Pay Now - {formatPrice(grandTotal, 'EUR')}
+            Pay Now - {formatPrice(grandTotal)}
           </Button>
       </CardFooter>
     </Card>

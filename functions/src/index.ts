@@ -14,7 +14,6 @@ initializeApp();
 const db = admin.firestore();
 
 // Initialize Stripe SDK
-// Make sure to set the stripe.secret_key in your Firebase environment config
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20",
 });
@@ -68,7 +67,7 @@ export const createPaymentIntent = onCall({minInstances: 1}, async (request) => 
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be logged in.");
   }
-  const {items} = request.data;
+  const {items, shippingAddress} = request.data;
   const {uid: buyerId} = request.auth;
 
   if (!items || items.length === 0) {
@@ -96,7 +95,8 @@ export const createPaymentIntent = onCall({minInstances: 1}, async (request) => 
     if (!productSnap.exists || productSnap.data()?.status !== "active") {
       throw new HttpsError("failed-precondition", `Product ${item.id} is not available for purchase.`);
     }
-    totalAmount += productSnap.data()?.price || 0;
+    const price = productSnap.data()?.price || 0;
+    totalAmount += price;
     orderItems.push({
       productId: item.id,
       sellerId: item.sellerId,
@@ -105,17 +105,18 @@ export const createPaymentIntent = onCall({minInstances: 1}, async (request) => 
       image: item.image,
       price: item.price,
       quantity: item.quantity,
+      size: item.size || null,
     });
   }
 
   const shippingFee = 500; // 5.00 EUR in cents
-  totalAmount = (totalAmount * 100) + shippingFee;
+  const totalInCents = (totalAmount * 100) + shippingFee;
 
-  const commission = Math.round(totalAmount * 0.15);
+  const commission = Math.round(totalInCents * 0.15);
 
   try {
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: totalAmount,
+      amount: totalInCents,
       currency: "eur",
       capture_method: "manual", // Escrow hold
       application_fee_amount: commission,
@@ -129,9 +130,11 @@ export const createPaymentIntent = onCall({minInstances: 1}, async (request) => 
       buyerId,
       sellerIds: [sellerId],
       items: orderItems,
-      totalAmount: totalAmount / 100,
+      totalAmount: totalInCents / 100,
       status: "pending_payment",
+      paymentMethod: "card",
       paymentIntentId: paymentIntent.id,
+      shippingAddress: shippingAddress || null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -139,6 +142,71 @@ export const createPaymentIntent = onCall({minInstances: 1}, async (request) => 
   } catch (error) {
     logger.error("Error creating PaymentIntent:", error);
     throw new HttpsError("internal", "Could not create payment intent.");
+  }
+});
+
+/**
+ * createOrder
+ * Creates an order for Cash on Delivery (COD).
+ */
+export const createOrder = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
+  const {items, shippingAddress} = request.data;
+  const {uid: buyerId} = request.auth;
+
+  if (!items || items.length === 0) {
+    throw new HttpsError("invalid-argument", "No items provided.");
+  }
+
+  const sellerId = items[0].sellerId;
+
+  let totalAmount = 0;
+  const orderItems = [];
+
+  for (const item of items) {
+    const productRef = db.collection("products").doc(item.id);
+    const productSnap = await productRef.get();
+
+    if (!productSnap.exists || productSnap.data()?.status !== "active") {
+      throw new HttpsError("failed-precondition", `Product ${item.id} is not available.`);
+    }
+    const price = productSnap.data()?.price || 0;
+    totalAmount += price;
+    orderItems.push({
+      productId: productSnap.id,
+      sellerId: productSnap.data()?.sellerId,
+      title: productSnap.data()?.title,
+      brand: productSnap.data()?.brand,
+      image: productSnap.data()?.images?.[0],
+      price: price,
+      quantity: item.quantity || 1,
+      size: item.size || null,
+    });
+  }
+
+  const shippingFee = 5; 
+  totalAmount += shippingFee;
+
+  try {
+    const orderRef = await db.collection("orders").add({
+      orderNumber: `MRG-${Date.now()}`,
+      buyerId,
+      sellerIds: [sellerId],
+      items: orderItems,
+      totalAmount: totalAmount,
+      status: "processing",
+      paymentMethod: "cod",
+      paymentStatus: "pending",
+      shippingAddress,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {orderId: orderRef.id};
+  } catch (error) {
+    logger.error("Error creating COD order:", error);
+    throw new HttpsError("internal", "Could not place your order.");
   }
 });
 
@@ -174,7 +242,6 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET"]
       if (!ordersQuerySucceeded.empty) {
         const orderDoc = ordersQuerySucceeded.docs[0];
         await orderDoc.ref.update({status: "processing"});
-        // Add logic to notify seller (FCM/Email)
       }
       break;
     case "payment_intent.payment_failed":
@@ -183,7 +250,6 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET"]
       if (!ordersQueryFailed.empty) {
         const orderDoc = ordersQueryFailed.docs[0];
         await orderDoc.ref.update({status: "payment_failed", error: paymentIntent.last_payment_error?.message});
-        // Add logic to notify buyer
       }
       break;
     case "charge.refunded":
@@ -192,7 +258,6 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET"]
       if (!ordersQueryRefunded.empty) {
         const orderDoc = ordersQueryRefunded.docs[0];
         await orderDoc.ref.update({status: "refunded"});
-        // Add logic to notify both parties
       }
       break;
     default:
@@ -208,7 +273,6 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET"]
  * Captures the held payment for an order.
  */
 export const capturePayment = onCall(async (request) => {
-  // Add admin/system auth check here
   const {orderId} = request.data;
   if (!orderId) {
     throw new HttpsError("invalid-argument", "Missing orderId.");
@@ -242,7 +306,6 @@ export const capturePayment = onCall(async (request) => {
  * Processes a refund for a given order.
  */
 export const processRefund = onCall(async (request) => {
-  // Add admin auth check here
   const {orderId, amount} = request.data;
   if (!orderId) {
     throw new HttpsError("invalid-argument", "Missing orderId.");
@@ -263,7 +326,6 @@ export const processRefund = onCall(async (request) => {
       payment_intent: order.paymentIntentId,
       amount: amount ? amount * 100 : undefined, // amount in cents if provided
     });
-    // Webhook will handle order status update
     return {success: true};
   } catch (error) {
     logger.error(`Failed to process refund for order ${orderId}:`, error);
@@ -272,8 +334,7 @@ export const processRefund = onCall(async (request) => {
 });
 
 /**
- * [NEW] getMyOrders
- * Fetches all orders where the calling user is the buyer.
+ * getMyOrders
  */
 export const getMyOrders = onCall(async (request) => {
   if (!request.auth) {
@@ -293,8 +354,7 @@ export const getMyOrders = onCall(async (request) => {
 });
 
 /**
- * [NEW] getMySales
- * Fetches all sales where the calling user is a seller.
+ * getMySales
  */
 export const getMySales = onCall(async (request) => {
   if (!request.auth) {
@@ -316,7 +376,6 @@ export const getMySales = onCall(async (request) => {
 
 /**
  * 6. releaseEscrow (Scheduled)
- * Automatically releases payments for delivered orders.
  */
 export const releaseEscrow = onSchedule("every 1 hours", async () => {
   const threeDaysAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 72 * 60 * 60 * 1000);
@@ -351,20 +410,14 @@ export const releaseEscrow = onSchedule("every 1 hours", async () => {
 // Delivery & Courier Functions
 // =================================================================
 
-/**
- * [NEW] calculateDeliveryFee
- * Calculates a delivery fee based on distance.
- * NOTE: This is a placeholder. A real implementation would use the
- * Google Maps Distance Matrix API and require an API key.
- */
 export const calculateDeliveryFee = onCall(async (request) => {
-  const {distanceKm, isRush} = request.data; // distance in kilometers
+  const {distanceKm, isRush} = request.data;
   if (typeof distanceKm !== "number") {
     throw new HttpsError("invalid-argument", "Distance must be a number.");
   }
 
-  const BASE_FEE = 3.00; // EUR
-  const PER_KM_FEE = 0.50; // EUR
+  const BASE_FEE = 3.00; 
+  const PER_KM_FEE = 0.50; 
   const RUSH_MULTIPLIER = 1.5;
 
   let fee = BASE_FEE + (distanceKm * PER_KM_FEE);
@@ -375,17 +428,10 @@ export const calculateDeliveryFee = onCall(async (request) => {
   return {fee: parseFloat(fee.toFixed(2))};
 });
 
-/**
- * [NEW] assignCourier
- * Finds an available courier and assigns them to a delivery.
- * NOTE: This is a simplified version. A real implementation would use
- * geospatial queries (e.g., with GeoFire) to find the *nearest* courier.
- */
 export const assignCourier = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be an admin.");
   }
-  // TODO: Add admin role check
   const {deliveryId} = request.data;
   if (!deliveryId) {
     throw new HttpsError("invalid-argument", "deliveryId is required.");
@@ -394,7 +440,7 @@ export const assignCourier = onCall(async (request) => {
   try {
     const availableCouriersSnap = await db.collection("courier_profiles")
       .where("isAvailable", "==", true)
-      .limit(1) // Get the first available courier
+      .limit(1)
       .get();
 
     if (availableCouriersSnap.empty) {
@@ -409,8 +455,6 @@ export const assignCourier = onCall(async (request) => {
       status: "assigned",
     });
 
-    // TODO: Add notification logic to inform the courier.
-
     logger.info(`Assigned courier ${courierId} to delivery ${deliveryId}`);
     return {success: true, courierId};
   } catch (error) {
@@ -420,10 +464,6 @@ export const assignCourier = onCall(async (request) => {
 });
 
 
-/**
- * [NEW] updateCourierLocation
- * Updates the courier's real-time location on a delivery document.
- */
 export const updateCourierLocation = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be a courier.");
@@ -453,10 +493,6 @@ export const updateCourierLocation = onCall(async (request) => {
   }
 });
 
-/**
- * [NEW] completeDelivery
- * Finalizes a delivery, saves proof, and updates status.
- */
 export const completeDelivery = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be a courier.");
@@ -485,7 +521,6 @@ export const completeDelivery = onCall(async (request) => {
       buyerSignature: buyerSignatureUrl || null,
     });
 
-    // Also update the main order status
     const orderId = deliverySnap.data()?.orderId;
     if (orderId) {
         await db.doc(`orders/${orderId}`).update({
@@ -502,17 +537,10 @@ export const completeDelivery = onCall(async (request) => {
   }
 });
 
-/**
- * [NEW] getExchangeRates (Scheduled)
- * Fetches the latest currency exchange rates and saves them to Firestore.
- * This should be scheduled to run daily.
- */
 export const getExchangeRates = onSchedule("every 24 hours", async (context) => {
-    // IMPORTANT: Add your ExchangeRate-API key to your Firebase environment variables.
-    // You can get a free key from https://www.exchangerate-api.com/
     const apiKey = process.env.EXCHANGERATE_API_KEY;
     if (!apiKey) {
-        logger.error("ExchangeRate-API key is not set in environment variables. Skipping currency update.");
+        logger.error("ExchangeRate-API key is not set. Skipping currency update.");
         return null;
     }
     const url = `https://v6.exchangerate-api.com/v6/${apiKey}/latest/EUR`;
@@ -548,7 +576,6 @@ export const getExchangeRates = onSchedule("every 24 hours", async (context) => 
 // AI Functions
 // =================================================================
 
-// Initialize VertexAI
 const vertexAI = new VertexAI({
   project: process.env.GCLOUD_PROJECT,
   location: "us-central1",
@@ -562,38 +589,24 @@ export const moderateProductImage = onDocumentWritten("products/{productId}", as
   const snapshotAfter = event.data?.after;
   const productData = snapshotAfter?.data();
 
-  // Exit if the document was deleted or doesn't exist.
-  if (!productData || !snapshotAfter) {
-    logger.info(`Product ${event.params.productId} deleted or does not exist.`);
-    return;
-  }
+  if (!productData || !snapshotAfter) return;
 
-  // Only run moderation if the status is 'pending_review'
-  if (productData.status !== "pending_review") {
-      logger.info(`Product ${snapshotAfter.id} is not pending review. Skipping moderation.`);
-      return;
-  }
+  if (productData.status !== "pending_review") return;
 
-  const images = productData.images as string[]; // Array of Storage URLs
+  const images = productData.images as string[]; 
   const finalUpdateData: any = {};
 
-  if (!images || images.length === 0) {
-    logger.info(`Product ${snapshotAfter.id} has no images to moderate yet. This may be temporary.`);
-    // Don't auto-approve. Wait for the image URLs to be added.
-    return;
-  }
+  if (!images || images.length === 0) return;
 
   try {
     let overallModerationResult = "approved";
     const moderationReasons: string[] = [];
     const bucket = getStorage().bucket();
 
-    // Convert storage URLs to base64 image data for Vertex AI
     const imageParts = await Promise.all(
         images.map(async (imageUrl) => {
             try {
                 const url = new URL(imageUrl);
-                // gs://<bucket>/<filePath>
                 const filePath = decodeURIComponent(url.pathname.split("/o/")[1].split("?")[0]);
                 const file = bucket.file(filePath);
                 const [buffer] = await file.download();
@@ -604,8 +617,7 @@ export const moderateProductImage = onDocumentWritten("products/{productId}", as
                     inlineData: { data: base64Data, mimeType },
                 };
             } catch (e) {
-                logger.error(`Failed to download image ${imageUrl}`, e);
-                return null; // Skip failed downloads
+                return null; 
             }
         })
     );
@@ -640,7 +652,6 @@ export const moderateProductImage = onDocumentWritten("products/{productId}", as
         }
     }
 
-    // --- Authenticity Check Logic ---
     if (productData.price > 200 && validImageParts.length > 0) {
         try {
             const authenticityPrompt = `You are a highly-trained authenticator for luxury fashion items. Your task is to perform a pre-check for authenticity based on user-provided images and details. Do not make a definitive "authentic" or "fake" judgment. Instead, provide a confidence level (high, medium, or low) and the reasons for it in a JSON format: {"confidence": "high" | "medium" | "low", "findings": ["finding 1", "finding 2"]}. Analyze the following details and images, paying close attention to: Logo, Stitching, Hardware, Material, and Serial Number. Product Details: Title: ${productData.title}, Brand: ${productData.brand}, Description: ${productData.description}.`;
@@ -658,11 +669,9 @@ export const moderateProductImage = onDocumentWritten("products/{productId}", as
                     findings: authResult.findings,
                     checkedAt: admin.firestore.FieldValue.serverTimestamp(),
                 };
-            } else {
-                throw new Error("No JSON response from authenticity check.");
             }
         } catch (authError) {
-            logger.error(`Error during authenticity check for product ${snapshotAfter.id}:`, authError);
+            logger.error(`Error during authenticity check:`, authError);
             finalUpdateData.authenticityCheck = {
                 status: "failed",
                 confidence: "low",
@@ -672,7 +681,6 @@ export const moderateProductImage = onDocumentWritten("products/{productId}", as
         }
     }
 
-    // Update Firestore document based on moderation results
     if (overallModerationResult === "rejected") {
         finalUpdateData.status = "rejected";
         finalUpdateData.moderation = {
@@ -680,28 +688,23 @@ export const moderateProductImage = onDocumentWritten("products/{productId}", as
             reasons: moderationReasons,
             checkedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
-        logger.warn(`Product ${snapshotAfter.id} rejected due to: ${moderationReasons.join(", ")}`);
     } else if (overallModerationResult === "needs_review") {
-        // Keep status as pending_review
         finalUpdateData.moderation = {
             status: "needs_review",
             reasons: moderationReasons,
             checkedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
-        logger.info(`Product ${snapshotAfter.id} flagged for admin review.`);
     } else {
         finalUpdateData.status = "active";
         finalUpdateData.moderation = {
             status: "approved",
             checkedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
-        logger.info(`Product ${snapshotAfter.id} approved automatically.`);
     }
 
     await snapshotAfter.ref.update(finalUpdateData);
   } catch (error) {
-      logger.error(`Error during image moderation for product ${snapshotAfter.id}:`, error);
-      // Fallback: keep for manual review in case of AI API error
+      logger.error(`Error during moderation:`, error);
       await snapshotAfter.ref.update({
           moderation: {
               status: "needs_review",
@@ -718,7 +721,7 @@ export const moderateProductImage = onDocumentWritten("products/{productId}", as
 
 export const exportUserData = onCall(async (request) => {
   if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be logged in to export your data.");
+    throw new HttpsError("unauthenticated", "You must be logged in.");
   }
   const userId = request.auth.uid;
 
@@ -743,7 +746,7 @@ export const exportUserData = onCall(async (request) => {
 
     const [signedUrl] = await file.getSignedUrl({
       action: "read",
-      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+      expires: Date.now() + 15 * 60 * 1000, 
     });
 
     return {downloadUrl: signedUrl};
@@ -756,23 +759,13 @@ export const exportUserData = onCall(async (request) => {
 
 export const deleteAccount = onCall(async (request) => {
   if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be logged in to delete your account.");
+    throw new HttpsError("unauthenticated", "You must be logged in.");
   }
   const userId = request.auth.uid;
 
   try {
-    // Delete user from Firebase Authentication
     await admin.auth().deleteUser(userId);
-
-    // Delete user's main profile document from Firestore
     await db.collection("users").doc(userId).delete();
-
-    // IMPORTANT: This does NOT delete subcollections or other user-related data
-    // (e.g., products, orders). A more robust solution would involve a recursive
-    // delete function or background process, which is more complex.
-    // For now, this removes primary access and personal info.
-
-    logger.info(`Successfully deleted account and profile for user ${userId}.`);
     return {success: true};
   } catch (error) {
     logger.error(`Error deleting account for user ${userId}:`, error);
