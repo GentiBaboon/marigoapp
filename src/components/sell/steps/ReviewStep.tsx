@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -12,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { productCategories, productConditions } from '@/lib/mock-data';
 import Link from 'next/link';
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
-import { doc, collection, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { FirestoreAddress } from '@/lib/types';
 
@@ -82,6 +81,8 @@ export function ReviewStep() {
 
     setIsLoading(true);
 
+    // Prepare clean data for the shell document
+    // Ensuring numeric price and simple strings for title/desc
     const productData = {
         title: String(formData.title).trim(),
         description: String(formData.description).trim(),
@@ -93,7 +94,7 @@ export function ReviewStep() {
         color: String(formData.color).trim(),
         sellerId: user.uid,
         status: 'pending_review' as const,
-        images: [], 
+        images: [], // Initial empty array as required by security rules
         listingCreated: serverTimestamp(),
         keywords: Array.from(new Set([
           ...(formData.title || '').toLowerCase().split(/\s+/),
@@ -108,36 +109,42 @@ export function ReviewStep() {
     const productRef = doc(firestore, 'products', formData.productId);
 
     try {
+        // 1. Create the product shell first (triggers validProduct rule)
         await setDoc(productRef, productData);
         
+        // 2. Upload images to storage
         let imageUrls: string[] = [];
         if (formData.images && formData.images.length > 0) {
             const storage = getStorage(firebaseApp);
             const uploadPromises = formData.images.map(async (imageFile, index) => {
               const fileName = `img_${Date.now()}_${index}.webp`;
               const storageRef = ref(storage, `products/${formData.productId}/${fileName}`);
+              // Using uploadString for data URLs from our compression logic
               const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
               return getDownloadURL(snapshot.ref);
             });
             imageUrls = await Promise.all(uploadPromises);
         }
 
+        // 3. Update the document with actual image URLs (triggers validProductUpdate rule)
         if (imageUrls.length > 0) {
             await updateDoc(productRef, { images: imageUrls });
         }
         
         toast({ title: 'Success!', description: 'Your item has been submitted for review.' });
-        nextStep();
+        nextStep(); // Go to step 8 (SuccessStep)
 
     } catch (error: any) {
         console.error("Publishing error:", error);
         setIsLoading(false);
+        // This emits a rich contextual error for the Firebase Studio overlay
         const permissionError = new FirestorePermissionError({
             path: `products/${formData.productId}`,
             operation: 'create',
             requestResourceData: productData,
         });
         errorEmitter.emit('permission-error', permissionError);
+        
         toast({
             variant: 'destructive',
             title: 'Submission failed',
@@ -238,7 +245,7 @@ export function ReviewStep() {
                 By clicking on "Submit my item", I confirm that the information provided complies with the <Link href="#" className="underline">general terms of use</Link>.
              </p>
             <div className="flex items-center justify-between gap-4">
-                <Button variant="link" className="text-foreground font-semibold px-0" onClick={handleSaveDraft}>Save draft</Button>
+                <button type="button" className="text-foreground font-semibold px-0 text-sm hover:underline" onClick={handleSaveDraft}>Save draft</button>
                 <Button size="lg" className="flex-1 bg-foreground text-background hover:bg-foreground/90" onClick={handlePublish} disabled={isLoading}>
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Submit my item

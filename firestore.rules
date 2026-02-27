@@ -36,20 +36,23 @@ service cloud.firestore {
     
     // Prodotto valido per la creazione (shell iniziale)
     function validProduct(productData) {
-      return productData.sellerId == request.auth.uid
-        && productData.status == 'pending_review'
-        && (productData.images == [] || productData.images.size() == 0)
-        && productData.title is string && productData.title.size() > 0
-        && productData.brand is string && productData.brand.size() > 0
-        && productData.category is string && productData.category.size() > 0
-        && (productData.price is number || productData.price is float) && productData.price > 0;
+      let isCorrectSeller = productData.sellerId == request.auth.uid;
+      let isCorrectStatus = productData.status == 'pending_review';
+      let hasInitialEmptyImages = productData.images is list && productData.images.size() == 0;
+      let titleValid = productData.title is string && productData.title.size() > 0;
+      let brandValid = productData.brand is string && productData.brand.size() > 0;
+      let categoryValid = productData.category is string && productData.category.size() > 0;
+      // Use int and float for numeric validation in CEL
+      let priceValid = (productData.price is int || productData.price is float) && productData.price > 0;
+      
+      return isCorrectSeller && isCorrectStatus && hasInitialEmptyImages && titleValid && brandValid && categoryValid && priceValid;
     }
     
     // Validazione aggiornamento (per aggiunta immagini o modifiche)
     function validProductUpdate(updateData, existingData) {
         let sellerUnchanged = !('sellerId' in updateData) || updateData.sellerId == existingData.sellerId;
         
-        // Se si stanno aggiungendo immagini a un prodotto che non ne aveva
+        // Se si stanno aggiungendo immagini a un prodotto che non ne aveva (caso tipico del nostro flusso di upload)
         if (existingData.images.size() == 0 && 'images' in updateData) {
             return updateData.images is list 
                 && updateData.images.size() > 0 
