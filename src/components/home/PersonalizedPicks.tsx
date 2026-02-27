@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, limit, documentId, getDocs, QueryConstraint } from 'firebase/firestore';
-import type { FirestoreProduct, FirestoreUser } from '@/lib/types';
+import type { FirestoreProduct } from '@/lib/types';
 import { ProductCard } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getRecommendations, RecommendationInput } from '@/ai/flows/get-recommendations';
@@ -27,27 +27,30 @@ export function PersonalizedPicks() {
 
     const [recommendations, setRecommendations] = React.useState<{ products: FirestoreProduct[], title: string } | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
+    const hasFetchedRef = React.useRef(false);
 
     React.useEffect(() => {
-        if (!user || isWishlistLoading) {
-            if (!isWishlistLoading) setIsLoading(false);
+        // Prevent multiple simultaneous AI calls or re-fetches if data is already loaded for this user
+        if (!user || isWishlistLoading || hasFetchedRef.current) {
+            if (!isWishlistLoading && !user) setIsLoading(false);
             return;
         }
 
         const generateAndFetchRecommendations = async () => {
-            setIsLoading(true);
-
             if (wishlistItems.length === 0) {
                 setIsLoading(false);
                 return;
             }
 
+            setIsLoading(true);
+            hasFetchedRef.current = true;
+
             try {
                 // 1. Build user taste profile from wishlist
-                const wishlistedProductIds = wishlistItems.map(item => item.id);
+                const wishlistedProductIds = wishlistItems.map(item => item.id).slice(0, 10);
                 const productsRef = collection(firestore, 'products');
-                const q = query(productsRef, where(documentId(), 'in', wishlistedProductIds.slice(0, 10)));
-                const wishlistProductsSnapshot = await getDocs(q);
+                
+                const wishlistProductsSnapshot = await getDocs(query(productsRef, where(documentId(), 'in', wishlistedProductIds)));
                 const wishlistProducts = wishlistProductsSnapshot.docs.map(doc => doc.data() as FirestoreProduct);
 
                 const tasteProfile: RecommendationInput = {
@@ -60,46 +63,37 @@ export function PersonalizedPicks() {
                     return;
                 }
 
-                // 2. Get recommendation query from AI
+                // 2. Get recommendation query from AI (Latency optimized)
                 const recommendationQuery = await getRecommendations(tasteProfile);
                 
                 // 3. Fetch products based on AI query
-                const queryConstraints: QueryConstraint[] = [];
+                const queryConstraints: QueryConstraint[] = [where('status', '==', 'active')];
+                
                 if (recommendationQuery.query.brands && recommendationQuery.query.brands.length > 0) {
                     queryConstraints.push(where('brand', 'in', recommendationQuery.query.brands.slice(0, 10)));
-                }
-                if (recommendationQuery.query.categories && recommendationQuery.query.categories.length > 0) {
+                } else if (recommendationQuery.query.categories && recommendationQuery.query.categories.length > 0) {
                     queryConstraints.push(where('category', 'in', recommendationQuery.query.categories.slice(0, 10)));
                 }
 
-                if (queryConstraints.length === 0) {
+                if (queryConstraints.length <= 1) {
                     setIsLoading(false);
                     return;
                 }
                 
-                // Exclude items already in the user's wishlist
-                if (wishlistedProductIds.length > 0) {
-                    // 'not-in' queries are limited to 10 items. This is a potential issue but fine for a demo.
-                    queryConstraints.push(where(documentId(), 'not-in', wishlistedProductIds.slice(0, 10)));
-                }
-                queryConstraints.push(limit(20)); // Fetch more to filter
+                queryConstraints.push(limit(12));
 
-                const finalQuery = query(productsRef, ...queryConstraints);
-                const recommendedProductsSnapshot = await getDocs(finalQuery);
-                
-                const fetchedProducts = recommendedProductsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreProduct));
-
-                // Filter for active products on the client
-                const products = fetchedProducts.filter(p => p.status === 'active').slice(0, 10);
-
+                const recommendedProductsSnapshot = await getDocs(query(productsRef, ...queryConstraints));
+                const fetchedProducts = recommendedProductsSnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() } as FirestoreProduct))
+                    .filter(p => !wishlistedProductIds.includes(p.id)); // Exclude already wishlisted
 
                 setRecommendations({
-                    products: products,
-                    title: recommendationQuery.reasoning || "Picks for You"
+                    products: fetchedProducts.slice(0, 8),
+                    title: recommendationQuery.reasoning || "Curated for You"
                 });
 
             } catch (error) {
-                console.error("Failed to get personalized recommendations:", error);
+                console.warn("Failed to get personalized recommendations:", error);
             } finally {
                 setIsLoading(false);
             }
@@ -114,9 +108,14 @@ export function PersonalizedPicks() {
     }
 
     return (
-         <section>
-            <h2 className="text-xl md:text-2xl font-serif mb-6">
-                {isLoading ? 'Curating your picks...' : recommendations?.title}
+         <section className="animate-in fade-in duration-700">
+            <h2 className="text-xl md:text-2xl font-serif mb-6 flex items-center gap-2">
+                {isLoading ? (
+                    <span className="flex items-center gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                        Curating your picks...
+                    </span>
+                ) : recommendations?.title}
             </h2>
             
             {isLoading ? (

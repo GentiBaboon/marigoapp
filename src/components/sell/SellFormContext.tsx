@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, createContext, useContext, ReactNode, useEffect, useCallback, useMemo } from 'react';
@@ -25,6 +24,8 @@ interface SellFormContextType {
 
 const SellFormContext = createContext<SellFormContextType | undefined>(undefined);
 
+const STORAGE_KEY = 'marigo_sell_drafts_v2';
+
 export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [drafts, setDrafts] = useState<SellDraft[]>([]);
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
@@ -32,22 +33,13 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   const totalSteps = 8;
   const firestore = useFirestore();
 
-  // Caricamento bozze all'avvio
+  // Load drafts on init
   useEffect(() => {
     try {
-      const savedDrafts = localStorage.getItem('sell_form_drafts');
+      const savedDrafts = localStorage.getItem(STORAGE_KEY);
       if (savedDrafts) {
         const parsedDrafts: SellDraft[] = JSON.parse(savedDrafts);
-        
-        // Sanificazione dati obsoleti
-        const sanitizedDrafts = parsedDrafts.map(draft => {
-            const formData = { ...draft.formData };
-            if (formData.title && typeof formData.title === 'object') formData.title = '';
-            if (formData.description && typeof formData.description === 'object') formData.description = '';
-            return { ...draft, formData };
-        });
-
-        setDrafts(sanitizedDrafts);
+        setDrafts(parsedDrafts);
       }
     } catch (error) {
       console.error("Failed to load drafts", error);
@@ -55,24 +47,29 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
     setIsInitialized(true);
   }, []);
 
-  // Salvataggio bozze persistente (incluso immagini WebP)
+  // Save drafts with size optimization
   useEffect(() => {
     if (!isInitialized) return;
     try {
       if (drafts.length > 0) {
-        localStorage.setItem('sell_form_drafts', JSON.stringify(drafts));
+        // Keep only the most recent 5 drafts to prevent localStorage overflow
+        const recentDrafts = drafts
+            .sort((a, b) => b.lastModified - a.lastModified)
+            .slice(0, 5);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(recentDrafts));
       } else {
-        localStorage.removeItem('sell_form_drafts');
+        localStorage.removeItem(STORAGE_KEY);
       }
     } catch (error) {
-      console.error("LocalStorage save error. Drafts might be too large.", error);
-      // Fallback: se lo storage è pieno, prova a salvare senza immagini
+      console.warn("LocalStorage full. Removing images from older drafts.", error);
       try {
-          const fallbackDrafts = drafts.map(d => ({ ...d, formData: { ...d.formData, images: [] } }));
-          localStorage.setItem('sell_form_drafts', JSON.stringify(fallbackDrafts));
+          const minimalDrafts = drafts.map(d => 
+            d.id === activeDraftId ? d : { ...d, formData: { ...d.formData, images: [] } }
+          );
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(minimalDrafts));
       } catch (e) {}
     }
-  }, [drafts, isInitialized]);
+  }, [drafts, isInitialized, activeDraftId]);
 
   const activeDraft = useMemo(() => drafts.find(d => d.id === activeDraftId), [drafts, activeDraftId]);
   
@@ -91,7 +88,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
     const newDraftId = `draft_${Date.now()}`;
     const newDraft: SellDraft = {
         id: newDraftId,
-        formData: { productId: newProductId },
+        formData: { productId: newProductId, listingCreated: undefined },
         currentStep: 1,
         lastModified: Date.now(),
     };
@@ -118,7 +115,10 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
     ));
   }, [activeDraftId, totalSteps]);
 
-  const nextStep = useCallback(() => goToStep((activeDraft?.currentStep || 0) + 1), [activeDraft, goToStep]);
+  const nextStep = useCallback(() => {
+      const next = (activeDraft?.currentStep || 0) + 1;
+      goToStep(next);
+  }, [activeDraft, goToStep]);
   
   const prevStep = useCallback(() => {
      if (activeDraft?.currentStep === 1) unselectDraft();

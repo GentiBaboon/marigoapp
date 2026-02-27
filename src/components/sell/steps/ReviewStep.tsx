@@ -6,8 +6,8 @@ import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Pencil, Info, Loader2 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Pencil, Info, Loader2, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { productCategories, productConditions } from '@/lib/mock-data';
 import Link from 'next/link';
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
@@ -38,6 +38,7 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
 export function ReviewStep() {
   const { formData, nextStep, goToStep, unselectDraft } = useSellForm();
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
   const router = useRouter();
   const { user } = useUser();
@@ -60,7 +61,7 @@ export function ReviewStep() {
   }, [addresses, formData.shippingFromAddressId]);
 
   const validateData = () => {
-    if (!formData.title || !formData.description || !formData.brand || !formData.category || !formData.price || !formData.condition || !formData.material || !formData.color || !formData.images || formData.images.length < 3) {
+    if (!formData.title || !formData.brand || !formData.category || !formData.price || !formData.condition || !formData.images || formData.images.length < 3) {
         toast({
             variant: 'destructive',
             title: 'Missing information',
@@ -71,7 +72,7 @@ export function ReviewStep() {
     return true;
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!user || !firestore || !formData.productId) {
         toast({ variant: 'destructive', title: 'Session error. Please restart.' });
         return;
@@ -80,69 +81,89 @@ export function ReviewStep() {
     if (!validateData()) return;
 
     setIsLoading(true);
+    setUploadProgress(0);
     const storage = getStorage(firebaseApp);
 
-    // 1. First upload all images to Storage to get permanent URLs
-    // Best practice: use a path that includes user ID for secure direct upload
-    const uploadPromises = (formData.images || []).map(async (imageFile, index) => {
-        const fileName = `img_${Date.now()}_${index}.webp`;
-        const storageRef = ref(storage, `products/${user.uid}/${formData.productId}/${fileName}`);
-        const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
-        return getDownloadURL(snapshot.ref);
-    });
+    try {
+        // 1. Upload images in parallel with progress tracking
+        const totalImages = formData.images?.length || 0;
+        let uploadedCount = 0;
 
-    Promise.all(uploadPromises)
-        .then((imageUrls) => {
-            // 2. Prepare final product data with confirmed URLs
-            const productData = {
-                title: String(formData.title).trim(),
-                description: String(formData.description).trim(),
-                brand: String(formData.brand).trim(),
-                category: String(formData.category).trim(),
-                price: Number(formData.price),
-                condition: String(formData.condition).trim(),
-                material: String(formData.material).trim(),
-                color: String(formData.color).trim(),
-                sellerId: user.uid,
-                status: 'pending_review' as const,
-                images: imageUrls, // No longer empty!
-                listingCreated: serverTimestamp(),
-                keywords: Array.from(new Set([
-                  ...(formData.title || '').toLowerCase().split(/\s+/),
-                  ...(formData.brand || '').toLowerCase().split(/\s+/),
-                  ...(formData.category || '').toLowerCase().split(/\s+/)
-                ].filter(k => k.length > 2))),
-                ...(formData.sizeValue && { size: `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() }),
-                ...(formData.pattern && { pattern: formData.pattern }),
-                ...(formData.vintage !== undefined && { vintage: formData.vintage }),
-            };
-
-            const productRef = doc(firestore, 'products', formData.productId);
-
-            // 3. Save the atomic, final document to Firestore (Non-blocking)
-            setDoc(productRef, productData)
-                .then(() => {
-                    toast({ title: 'Success!', description: 'Your item has been submitted.' });
-                    setIsLoading(false);
-                    nextStep(); // This now correctly shows SuccessStep
-                })
-                .catch((error) => {
-                    setIsLoading(false);
-                    // Emit rich contextual error for debugging
-                    const permissionError = new FirestorePermissionError({
-                        path: productRef.path,
-                        operation: 'create',
-                        requestResourceData: productData,
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
-                    toast({ variant: 'destructive', title: 'Submission failed', description: 'Could not save the listing.' });
-                });
-        })
-        .catch((error) => {
-            console.error("Upload error:", error);
-            setIsLoading(false);
-            toast({ variant: 'destructive', title: 'Upload failed', description: 'Could not upload images. Please try again.' });
+        const uploadPromises = (formData.images || []).map(async (imageFile, index) => {
+            const fileName = `img_${Date.now()}_${index}.webp`;
+            const storagePath = `products/${user.uid}/${formData.productId}/${fileName}`;
+            const storageRef = ref(storage, storagePath);
+            
+            // Use uploadString for dataURL (Base64)
+            const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
+            const downloadUrl = await getDownloadURL(snapshot.ref);
+            
+            uploadedCount++;
+            setUploadProgress(Math.round((uploadedCount / totalImages) * 100));
+            
+            return downloadUrl;
         });
+
+        const imageUrls = await Promise.all(uploadPromises);
+
+        if (imageUrls.length < 3) {
+            throw new Error("Failed to upload minimum required images.");
+        }
+
+        // 2. Prepare final product data with confirmed URLs
+        const productData = {
+            title: String(formData.title).trim(),
+            description: String(formData.description || '').trim(),
+            brand: String(formData.brand).trim(),
+            category: String(formData.category).trim(),
+            price: Number(formData.price),
+            condition: String(formData.condition).trim(),
+            material: String(formData.material || '').trim(),
+            color: String(formData.color || '').trim(),
+            sellerId: user.uid,
+            status: 'pending_review' as const,
+            images: imageUrls,
+            listingCreated: serverTimestamp(),
+            keywords: Array.from(new Set([
+              ...(formData.title || '').toLowerCase().split(/\s+/),
+              ...(formData.brand || '').toLowerCase().split(/\s+/),
+              ...(formData.category || '').toLowerCase().split(/\s+/)
+            ].filter(k => k.length > 2))),
+            ...(formData.sizeValue && { size: `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() }),
+            ...(formData.pattern && { pattern: formData.pattern }),
+            ...(formData.vintage !== undefined && { vintage: formData.vintage }),
+        };
+
+        const productRef = doc(firestore, 'products', formData.productId);
+
+        // 3. Atomic save to Firestore
+        await setDoc(productRef, productData);
+        
+        toast({ title: 'Success!', description: 'Your item has been submitted.' });
+        setIsLoading(false);
+        nextStep(); // CORRECT: Move to SuccessStep
+
+    } catch (error: any) {
+        setIsLoading(false);
+        console.error("Submission failed:", error);
+        
+        const isPermissionError = error.code === 'permission-denied' || error.message?.includes('permissions');
+        
+        if (isPermissionError) {
+            const permissionError = new FirestorePermissionError({
+                path: `products/${formData.productId}`,
+                operation: 'create',
+                requestResourceData: formData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        } else {
+            toast({ 
+                variant: 'destructive', 
+                title: 'Submission failed', 
+                description: error.message || 'Could not save the listing. Please try again.' 
+            });
+        }
+    }
   };
 
   const handleSaveDraft = () => {
@@ -207,7 +228,7 @@ export function ReviewStep() {
             <Separator/>
             
              <ReviewSection title="Description" onEdit={() => goToStep(4)}>
-                <p className="line-clamp-3">{formData.description}</p>
+                <p className="line-clamp-3">{formData.description || 'No description provided.'}</p>
             </ReviewSection>
 
             <Separator/>
@@ -236,12 +257,18 @@ export function ReviewStep() {
              <p className="text-xs text-center text-muted-foreground">
                 By clicking on "Submit my item", I confirm that the information provided complies with the <Link href="#" className="underline">general terms of use</Link>.
              </p>
-            <div className="flex items-center justify-between gap-4">
-                <button type="button" className="text-foreground font-semibold px-0 text-sm hover:underline" onClick={handleSaveDraft}>Save draft</button>
-                <Button size="lg" className="flex-1 bg-foreground text-background hover:bg-foreground/90" onClick={handlePublish} disabled={isLoading}>
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Submit my item
+            <div className="flex flex-col gap-3">
+                <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90 h-14" onClick={handlePublish} disabled={isLoading}>
+                    {isLoading ? (
+                        <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Uploading {uploadProgress}%
+                        </>
+                    ) : 'Submit my item'}
                 </Button>
+                <button type="button" className="text-muted-foreground font-medium text-sm hover:underline py-2" onClick={handleSaveDraft} disabled={isLoading}>
+                    Save as draft and exit
+                </button>
             </div>
         </div>
     </div>

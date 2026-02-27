@@ -38,25 +38,23 @@ service cloud.firestore {
         return isSignedIn() && (request.auth.uid == delivery.buyerId || request.auth.uid in delivery.sellerIds);
     }
     
-    // Prodotto valido per la creazione
+    // Prodotto valido per la creazione (Best Practice: Atomic Creation)
     function validProduct(p) {
       return p.sellerId == request.auth.uid 
           && p.status == 'pending_review' 
           && p.images is list
+          && p.images.size() >= 3
           && p.images.size() <= 15
           && p.title is string
-          && p.title.size() > 0
+          && p.title.size() >= 5
           && p.price > 0
           && p.brand is string
-          && p.category is string
-          && p.condition is string
-          && p.description is string;
+          && p.category is string;
     }
     
-    // Validazione aggiornamento
     function validProductUpdate(newData, oldData) {
-        return (newData.sellerId == oldData.sellerId)
-            && (newData.images.size() <= 15);
+        return newData.sellerId == oldData.sellerId
+            && newData.images.size() <= 15;
     }
 
     // --------------------------------------------------------------------
