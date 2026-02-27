@@ -106,60 +106,48 @@ export function ReviewStep() {
 
     const productRef = doc(firestore, 'products', formData.productId);
 
-    // Follow Pattern 1: Non-blocking Firestore Mutation
-    setDoc(productRef, productData)
-        .then(async () => {
-            // Document shell created successfully, proceed to image uploads
-            let imageUrls: string[] = [];
-            try {
-                if (formData.images && formData.images.length > 0) {
-                    const storage = getStorage(firebaseApp);
-                    const uploadPromises = formData.images.map(async (imageFile, index) => {
-                        const fileName = `img_${Date.now()}_${index}.webp`;
-                        const storageRef = ref(storage, `products/${formData.productId}/${fileName}`);
-                        const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
-                        return getDownloadURL(snapshot.ref);
-                    });
-                    imageUrls = await Promise.all(uploadPromises);
-                }
+    try {
+        // Step 1: Create the product document shell
+        await setDoc(productRef, productData);
 
-                // Update document with final image URLs
-                if (imageUrls.length > 0) {
-                    // This update is also sequential but following the shell creation
-                    await updateDoc(productRef, { images: imageUrls });
-                }
-                
-                toast({ title: 'Success!', description: 'Your item has been submitted for review.' });
-                setIsLoading(false);
-                nextStep(); // Advance to SuccessStep
-            } catch (imageError) {
-                // Handle image upload failures separately if the doc was already created
-                setIsLoading(false);
-                toast({ 
-                    variant: 'destructive', 
-                    title: 'Partial Success', 
-                    description: 'Your item was listed, but some images failed to upload. You can edit it later.' 
-                });
-                nextStep();
-            }
-        })
-        .catch(async (error: any) => {
-            setIsLoading(false);
-            
-            // Emit rich contextual error for the development overlay
-            const permissionError = new FirestorePermissionError({
-                path: `products/${formData.productId}`,
-                operation: 'create',
-                requestResourceData: productData,
+        // Step 2: Upload images if any
+        let imageUrls: string[] = [];
+        if (formData.images && formData.images.length > 0) {
+            const storage = getStorage(firebaseApp);
+            const uploadPromises = formData.images.map(async (imageFile, index) => {
+                const fileName = `img_${Date.now()}_${index}.webp`;
+                const storageRef = ref(storage, `products/${formData.productId}/${fileName}`);
+                const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
+                return getDownloadURL(snapshot.ref);
             });
-            errorEmitter.emit('permission-error', permissionError);
-            
-            toast({
-                variant: 'destructive',
-                title: 'Submission failed',
-                description: 'There was a problem saving your listing. Please try again.',
-            });
+            imageUrls = await Promise.all(uploadPromises);
+        }
+
+        // Step 3: Update document with final image URLs
+        if (imageUrls.length > 0) {
+            await updateDoc(productRef, { images: imageUrls });
+        }
+        
+        toast({ title: 'Success!', description: 'Your item has been submitted for review.' });
+        setIsLoading(false);
+        nextStep(); // Advance to SuccessStep
+    } catch (error: any) {
+        setIsLoading(false);
+        
+        // Emit rich contextual error for the development overlay
+        const permissionError = new FirestorePermissionError({
+            path: `products/${formData.productId}`,
+            operation: 'create',
+            requestResourceData: productData,
         });
+        errorEmitter.emit('permission-error', permissionError);
+        
+        toast({
+            variant: 'destructive',
+            title: 'Submission failed',
+            description: 'There was a problem saving your listing. Please check the error details.',
+        });
+    }
   };
 
   const handleSaveDraft = () => {

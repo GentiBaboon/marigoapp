@@ -38,10 +38,16 @@ service cloud.firestore {
     function validProduct(p) {
       return p.sellerId == request.auth.uid 
           && p.status == 'pending_review' 
+          && p.images is list
           && p.images.size() == 0
           && p.title is string
           && p.title.size() > 0
-          && p.price > 0;
+          && p.price is number
+          && p.price > 0
+          && p.brand is string
+          && p.category is string
+          && p.condition is string
+          && p.description is string;
     }
     
     // Validazione aggiornamento (per aggiunta immagini o modifiche)

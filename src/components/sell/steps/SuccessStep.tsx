@@ -1,4 +1,3 @@
-
 'use client';
 import { Sprout, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,12 +11,12 @@ export function SuccessStep() {
     const { formData, deleteActiveDraft } = useSellForm();
     const { formatPrice } = useCurrency();
 
-    // Mocking values for display consistency with the requested design
-    const buyerServiceFee = 6;
-    const title = formData.title || 'Cloth handbag';
-    const brand = formData.brand || 'NON SIGNÉ / UNSIGNED';
+    // Safely get information for display
+    const title = formData.title || 'Product submitted';
+    const brand = formData.brand || 'Luxury Item';
     const price = formData.price || 0;
     const earnings = formData.sellerEarning || 0;
+    const buyerServiceFee = 6; // Mock service fee for consistency
 
     const handleFinish = () => {
         deleteActiveDraft();
@@ -32,7 +31,7 @@ export function SuccessStep() {
             <div className="space-y-2">
                 <h1 className="text-2xl font-bold font-headline">Item submitted</h1>
                 <p className="text-muted-foreground text-sm max-w-xs mx-auto">
-                    We'll review your listing, edit the main photo, and email you an update soon.
+                    We'll review your listing and email you an update once it's live on the marketplace.
                 </p>
             </div>
 
@@ -56,11 +55,11 @@ export function SuccessStep() {
                 </div>
                 <div className="flex-1 space-y-0.5">
                     <p className="font-bold uppercase text-sm tracking-tight">{brand}</p>
-                    <p className="text-muted-foreground text-sm">{title}</p>
+                    <p className="text-muted-foreground text-sm truncate">{title}</p>
                     <p className="font-semibold text-base">
-                        {formatPrice(price)} <span className="text-muted-foreground font-normal">(You earn {formatPrice(earnings)})</span>
+                        {formatPrice(price)} <span className="text-muted-foreground font-normal text-sm">(You earn {formatPrice(earnings)})</span>
                     </p>
-                    <p className="text-xs text-muted-foreground">The buyer will also pay a {formatPrice(buyerServiceFee)} service fee.</p>
+                    <p className="text-xs text-muted-foreground">The buyer will also pay a small service fee.</p>
                 </div>
             </div>
 
@@ -72,7 +71,7 @@ export function SuccessStep() {
                  </div>
                  <div className="space-y-0.5">
                     <p className="font-semibold text-sm">You're supporting sustainability</p>
-                    <p className="text-xs text-green-800">82% of items sold with us replace a new purchase.</p>
+                    <p className="text-xs text-green-800">82% of items sold with us replace a new purchase, reducing waste.</p>
                  </div>
             </div>
             
