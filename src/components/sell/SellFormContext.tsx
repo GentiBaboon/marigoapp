@@ -38,7 +38,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (savedDrafts) {
         const parsedDrafts: SellDraft[] = JSON.parse(savedDrafts);
         
-        // Sanificazione dati obsoleti (es. se title era un oggetto)
+        // Sanificazione dati obsoleti
         const sanitizedDrafts = parsedDrafts.map(draft => {
             const formData = { ...draft.formData };
             if (formData.title && typeof formData.title === 'object') formData.title = '';
@@ -54,7 +54,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
     setIsInitialized(true);
   }, []);
 
-  // Salvataggio bozze persistente
+  // Salvataggio bozze persistente (incluso immagini WebP)
   useEffect(() => {
     if (!isInitialized) return;
     try {
@@ -64,10 +64,12 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.removeItem('sell_form_drafts');
       }
     } catch (error) {
-      console.error("Failed to save drafts to localStorage. Storage may be full.", error);
-      // Se lo storage è pieno, proviamo a salvare senza immagini come fallback
-      const lightDrafts = drafts.map(d => ({ ...d, formData: { ...d.formData, images: [] } }));
-      localStorage.setItem('sell_form_drafts', JSON.stringify(lightDrafts));
+      console.error("LocalStorage save error. Drafts might be too large.", error);
+      // Fallback: se lo storage è pieno, prova a salvare senza immagini
+      try {
+          const fallbackDrafts = drafts.map(d => ({ ...d, formData: { ...d.formData, images: [] } }));
+          localStorage.setItem('sell_form_drafts', JSON.stringify(fallbackDrafts));
+      } catch (e) {}
     }
   }, [drafts, isInitialized]);
 

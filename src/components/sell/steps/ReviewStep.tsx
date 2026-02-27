@@ -38,7 +38,7 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
 );
 
 export function ReviewStep() {
-  const { formData, nextStep, goToStep, unselectDraft } = useSellForm();
+  const { formData, nextStep, goToStep, unselectDraft, deleteActiveDraft } = useSellForm();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -73,7 +73,7 @@ export function ReviewStep() {
     
     setIsLoading(true);
 
-    // Preparazione dati puliti per Firestore
+    // Dati per il primo salvataggio (guscio vuoto di immagini come richiesto dalle regole)
     const productData = {
         title: String(formData.title || '').trim(),
         description: String(formData.description || '').trim(),
@@ -85,7 +85,7 @@ export function ReviewStep() {
         color: String(formData.color || '').trim(),
         sellerId: user.uid,
         status: 'pending_review' as const,
-        images: [], // Le regole richiedono un array vuoto alla creazione
+        images: [], 
         listingCreated: serverTimestamp(),
         keywords: Array.from(new Set([
           ...(formData.title || '').toLowerCase().split(/\s+/),
@@ -97,62 +97,39 @@ export function ReviewStep() {
         ...(formData.vintage !== undefined && { vintage: formData.vintage }),
     };
 
-    // Validazione finale pre-invio
-    const creationSchema = z.object({
-        title: z.string().min(1, 'Title is required.').max(99),
-        brand: z.string().min(1, 'Brand is required.'),
-        category: z.string().min(1, 'Category is required.'),
-        price: z.number().gt(0, 'Price must be greater than 0.'),
-        condition: z.string().min(1, 'Condition is required.'),
-        material: z.string().min(1, 'Material is required.'),
-        color: z.string().min(1, 'Color is required.'),
-    });
-
-    const validation = creationSchema.safeParse(productData);
-
-    if (!validation.success) {
-        const errorField = validation.error.issues[0].path[0] as string;
-        const fieldToStep: Record<string, number> = {
-            'title': 4, 'brand': 1, 'category': 1, 'price': 6,
-            'condition': 2, 'material': 2, 'color': 2
-        };
-        
-        toast({
-          variant: 'destructive',
-          title: 'Missing information',
-          description: validation.error.issues[0].message,
-        });
-
-        if (fieldToStep[errorField]) goToStep(fieldToStep[errorField]);
-        setIsLoading(false);
-        return;
-    }
-
     const productRef = doc(firestore, 'products', formData.productId);
 
     try {
-        // 1. Crea il guscio del prodotto
+        // 1. Crea il documento shell
         await setDoc(productRef, productData);
         
-        // 2. Carica le immagini se presenti
+        // 2. Carica le immagini su Storage
         let imageUrls: string[] = [];
         if (formData.images && formData.images.length > 0) {
             const storage = getStorage(firebaseApp);
             const uploadPromises = formData.images.map(async (imageFile, index) => {
               const fileName = `img_${Date.now()}_${index}.webp`;
               const storageRef = ref(storage, `products/${formData.productId}/${fileName}`);
+              // Carica la stringa data_url (base64) salvata nel form
               const snapshot = await uploadString(storageRef, imageFile.url, 'data_url');
               return getDownloadURL(snapshot.ref);
             });
             imageUrls = await Promise.all(uploadPromises);
         }
 
-        // 3. Aggiorna con gli URL definitivi
+        // 3. Aggiorna il documento con i link definitivi
         if (imageUrls.length > 0) {
             await updateDoc(productRef, { images: imageUrls });
         }
         
-        nextStep(); // Vai al successo
+        toast({
+            title: 'Success!',
+            description: 'Your item has been submitted for review.',
+        });
+
+        // Elimina la bozza e reindirizza alla lista annunci del profilo
+        deleteActiveDraft();
+        router.push('/profile/listings');
 
     } catch (error: any) {
         console.error("Publishing error:", error);
@@ -160,7 +137,7 @@ export function ReviewStep() {
         
         const permissionError = new FirestorePermissionError({
             path: `products/${formData.productId}`,
-            operation: 'create',
+            operation: 'write',
             requestResourceData: productData,
         });
         errorEmitter.emit('permission-error', permissionError);
@@ -168,7 +145,7 @@ export function ReviewStep() {
         toast({
             variant: 'destructive',
             title: 'Submission failed',
-            description: 'There was a problem saving your listing. Please try again.',
+            description: 'There was a problem saving your listing or images. Please try again.',
         });
     }
   };
