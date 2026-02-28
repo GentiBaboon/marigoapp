@@ -46,6 +46,7 @@ export function ReviewStep() {
   const firebaseApp = useFirebaseApp();
   const [selectedAddress, setSelectedAddress] = useState<FirestoreAddress | null>(null);
 
+  // Ensure we have a Product ID before publishing
   useEffect(() => {
     if (!formData.productId && firestore) {
         const newId = doc(collection(firestore, 'products')).id;
@@ -98,12 +99,13 @@ export function ReviewStep() {
         const totalImages = formData.images?.length || 0;
         const progresses = new Array(totalImages).fill(0);
 
+        // 1. Upload all images in parallel
         const uploadPromises = formData.images!.map(async (imageFile, index) => {
             const fileName = `prod_${Date.now()}_${index}.webp`;
             const storagePath = `products/${user.uid}/${formData.productId}/${fileName}`;
             const storageRef = ref(storage, storagePath);
             
-            // Efficient async conversion from Data URI to Blob
+            // Robust conversion from Data URI to Blob
             const response = await fetch(imageFile.url);
             const blob = await response.blob();
             
@@ -116,9 +118,8 @@ export function ReviewStep() {
                 uploadTask.on('state_changed', 
                     (snapshot) => {
                         const bytes = snapshot.totalBytes > 0 ? (snapshot.bytesTransferred / snapshot.totalBytes) : 0;
-                        const progress = bytes * 100;
-                        progresses[index] = progress;
-                        const avgProgress = Math.round(progresses.reduce((a, b) => a + b, 0) / totalImages);
+                        progresses[index] = bytes * 100;
+                        const avgProgress = Math.round(progresses.reduce((a, b) => a + b, 0) / (totalImages || 1));
                         setUploadProgress(Math.min(avgProgress, 99));
                     }, 
                     (error) => reject(error), 
@@ -132,13 +133,14 @@ export function ReviewStep() {
 
         const imageUrls = await Promise.all(uploadPromises);
 
+        // 2. Prepare the final product document
         const productData = {
-            title: String(formData.title).trim(),
+            title: String(formData.title || '').trim(),
             description: String(formData.description || '').trim(),
-            brand: String(formData.brand).trim(),
-            category: String(formData.category).trim(),
+            brand: String(formData.brand || '').trim(),
+            category: String(formData.category || '').trim(),
             price: Number(formData.price),
-            condition: String(formData.condition).trim(),
+            condition: String(formData.condition || '').trim(),
             material: String(formData.material || '').trim(),
             color: String(formData.color || '').trim(),
             sellerId: user.uid,
@@ -158,11 +160,22 @@ export function ReviewStep() {
         };
 
         const productRef = doc(firestore, 'products', formData.productId);
-        await setDoc(productRef, productData);
+
+        // 3. Initiate the save (Non-blocking as per guidelines)
+        setDoc(productRef, productData)
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: productRef.path,
+                    operation: 'create',
+                    requestResourceData: productData,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
         
+        // 4. Move to confirmation page immediately
         setUploadProgress(100);
         setIsLoading(false);
-        nextStep();
+        nextStep(); // Goes to step 8 (SuccessStep)
 
     } catch (error: any) {
         console.error("Publishing failed:", error);

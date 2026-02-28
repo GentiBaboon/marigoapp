@@ -12,13 +12,14 @@ export function SuccessStep() {
     const { formData, deleteActiveDraft } = useSellForm();
     const { formatPrice } = useCurrency();
 
-    // Safe fallbacks for display after submission
+    // Use stored data for display since the draft might be cleared soon
     const title = formData?.title || 'Item Submitted';
     const brand = formData?.brand || 'Designer Item';
     const price = formData?.price || 0;
     const earnings = formData?.sellerEarning || 0;
     const firstImage = formData?.images?.[0]?.url;
 
+    // We clear the draft only when the user navigates away to ensure they see the data here
     const handleFinish = () => {
         deleteActiveDraft();
     };
