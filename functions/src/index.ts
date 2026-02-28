@@ -15,11 +15,12 @@ const db = admin.firestore();
 // Lazy initialization helper for Stripe to ensure secrets are available
 let stripeInstance: Stripe | null = null;
 const getStripe = () => {
+  const key = process.env.STRIPE_SECRET_KEY || "";
+  if (!key) {
+    logger.error("STRIPE_SECRET_KEY is missing from environment variables.");
+    throw new HttpsError("failed-precondition", "Payment provider is not correctly configured (missing API Key).");
+  }
   if (!stripeInstance) {
-    const key = process.env.STRIPE_SECRET_KEY || "";
-    if (!key) {
-      throw new Error("STRIPE_SECRET_KEY is not configured in Firebase secrets.");
-    }
     stripeInstance = new Stripe(key, {
       apiVersion: "2024-06-20",
     });
@@ -73,7 +74,7 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
   const stripe = getStripe();
 
   if (!items || items.length === 0) {
-    throw new HttpsError("invalid-argument", "No items provided.");
+    throw new HttpsError("invalid-argument", "Your bag is empty.");
   }
 
   try {
@@ -99,7 +100,6 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
       }
       
       const pData = productSnap.data();
-      // Permissive check: allow products in review for testing
       const isAvailable = pData?.status === "active" || pData?.status === "pending_review";
       if (!isAvailable) {
         throw new HttpsError("failed-precondition", `Product "${pData?.title || item.id}" is no longer available.`);
@@ -122,7 +122,6 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
     const shippingFee = 10.90; 
     const totalInCents = Math.round((totalAmount + (shippingFee * items.length)) * 100);
     
-    // Check if seller is ready for transfers
     const hasStripeAccount = !!sellerData?.stripeAccountId && sellerData?.stripeOnboardingComplete !== false;
     const commission = hasStripeAccount ? Math.round(totalInCents * 0.15) : undefined;
 
@@ -137,8 +136,7 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
       paymentIntentParams.application_fee_amount = commission;
       paymentIntentParams.transfer_data = { destination: sellerData!.stripeAccountId };
     } else {
-        // Log this warning but proceed (payout will need to be handled manually or later)
-        logger.warn(`Seller ${sellerId} is not ready for automatic transfer.`);
+        logger.warn(`Seller ${sellerId} is not ready for automatic transfer. Proceeding without commission calculation.`);
     }
 
     const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);

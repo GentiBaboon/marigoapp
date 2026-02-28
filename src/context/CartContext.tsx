@@ -6,7 +6,6 @@ import { useToast } from '@/hooks/use-toast';
 
 export type ShippingMethod = 'direct' | 'authentication';
 
-// Update CartItem to handle multilingual titles
 export type CartItem = Product & {
     quantity: number;
     selectedSize?: string;
@@ -40,13 +39,17 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     useEffect(() => {
         const savedCart = localStorage.getItem('marigo_cart');
         if (savedCart) {
-            // When loading from storage, enforce direct shipping
-            const parsedItems: CartItem[] = JSON.parse(savedCart);
-            const correctedItems = parsedItems.map(item => ({
-                ...item,
-                shippingMethod: 'direct' as ShippingMethod,
-            }));
-            setItems(correctedItems);
+            try {
+                const parsedItems: CartItem[] = JSON.parse(savedCart);
+                const correctedItems = parsedItems.map(item => ({
+                    ...item,
+                    shippingMethod: 'direct' as ShippingMethod,
+                    directShippingFee: 10.90 // Ensure fee consistency
+                }));
+                setItems(correctedItems);
+            } catch (e) {
+                console.error("Failed to parse cart", e);
+            }
         }
     }, []);
 
@@ -70,7 +73,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     ...product,
                     quantity,
                     ...options,
-                    shippingMethod: 'direct', // Always direct shipping
+                    shippingMethod: 'direct',
                     authenticationFee: 0, 
                     directShippingFee: 10.90, 
                     authShippingFee: 0,
@@ -78,10 +81,9 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 return [...prevItems, newItem];
             }
         });
-        const titleText = product.title;
         toast({
-            title: "Added to Cart",
-            description: `${titleText} has been added to your shopping bag.`,
+            title: "Added to Bag",
+            description: `${product.brand} ${product.title} has been added to your shopping bag.`,
         });
     }, [toast]);
 
@@ -103,13 +105,14 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     const clearCart = useCallback(() => {
         setItems([]);
+        localStorage.removeItem('marigo_cart');
     }, []);
 
     const subtotal = useMemo(() => items.reduce((acc, item) => acc + item.price * item.quantity, 0), [items]);
     const totalItems = useMemo(() => items.reduce((acc, item) => acc + item.quantity, 0), [items]);
     
     const totalShipping = useMemo(() => items.reduce((acc, item) => {
-        return acc + item.directShippingFee;
+        return acc + (item.directShippingFee * item.quantity);
     }, 0), [items]);
 
     const totalAuthentication = useMemo(() => 0, []);

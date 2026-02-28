@@ -1,14 +1,20 @@
-
 'use client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useCart } from '@/context/CartContext';
 import Image from 'next/image';
 import { useCurrency } from '@/context/CurrencyContext';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export function OrderSummary() {
   const { items, subtotal, totalShipping, grandTotal } = useCart();
   const { formatPrice } = useCurrency();
+
+  const getProductImage = (image: string) => {
+    if (image.startsWith('http') || image.startsWith('data:')) return image;
+    const placeholder = PlaceHolderImages.find(p => p.id === image);
+    return placeholder?.imageUrl || 'https://placehold.co/100x100?text=No+Image';
+  }
 
   return (
     <Card className="sticky top-24">
@@ -18,8 +24,7 @@ export function OrderSummary() {
       <CardContent className="space-y-4">
         <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
             {items.map(item => {
-                // Handle different image formats (internal placeholders or external/Firebase URLs)
-                const imageUrl = item.image || 'https://placehold.co/100x100?text=No+Image';
+                const imageUrl = getProductImage(item.image);
                 
                 return (
                     <div key={item.id} className="flex gap-4 items-center">
