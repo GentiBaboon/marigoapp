@@ -41,7 +41,7 @@ service cloud.firestore {
     
     function validProduct(p) {
       return p.sellerId == request.auth.uid 
-          && p.title is string && p.title.size() >= 5
+          && p.title is string && p.title.size() >= 3
           && p.brand is string
           && p.category is string
           && p.price is number && p.price >= 0;
@@ -102,7 +102,7 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow get: if isSignedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid in resource.data.sellerIds || isAdmin());
       allow list: if isAdmin();
-      allow create: if isSignedIn(); // Allow creation via client for flexibility, validation occurs in functions if preferred
+      allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
 

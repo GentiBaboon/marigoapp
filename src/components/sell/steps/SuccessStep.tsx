@@ -12,11 +12,12 @@ export function SuccessStep() {
     const { formData, deleteActiveDraft } = useSellForm();
     const { formatPrice } = useCurrency();
 
-    // Use safe fallbacks in case formData is partially cleared
-    const title = formData?.title || 'Product submitted';
-    const brand = formData?.brand || 'Luxury Item';
+    // Safe fallbacks for display after submission
+    const title = formData?.title || 'Item Submitted';
+    const brand = formData?.brand || 'Designer Item';
     const price = formData?.price || 0;
     const earnings = formData?.sellerEarning || 0;
+    const firstImage = formData?.images?.[0]?.url;
 
     const handleFinish = () => {
         deleteActiveDraft();
@@ -39,9 +40,9 @@ export function SuccessStep() {
 
             <div className="flex items-center gap-4 w-full text-left bg-muted/30 p-4 rounded-xl">
                 <div className="relative h-20 w-20 flex-shrink-0 bg-muted rounded-lg overflow-hidden shadow-sm">
-                    {formData?.images && formData.images.length > 0 ? (
+                    {firstImage ? (
                         <Image
-                            src={formData.images[0].url}
+                            src={firstImage}
                             alt={title}
                             fill
                             sizes="80px"
@@ -49,7 +50,7 @@ export function SuccessStep() {
                         />
                     ) : (
                          <div className="h-full w-full bg-muted flex items-center justify-center">
-                            <span className="text-[10px] text-muted-foreground">Preview</span>
+                            <span className="text-[10px] text-muted-foreground">V.</span>
                          </div>
                     )}
                 </div>

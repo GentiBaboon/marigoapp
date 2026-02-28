@@ -1,13 +1,13 @@
 
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Pencil, Info, Loader2, AlertCircle } from 'lucide-react';
+import { Pencil, Info, Loader2 } from 'lucide-react';
 import { productCategories, productConditions } from '@/lib/mock-data';
 import Link from 'next/link';
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
@@ -35,25 +35,8 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
     </div>
 );
 
-/**
- * Robust conversion of Data URL to Blob for reliable Storage uploads
- */
-function dataURLtoBlob(dataurl: string) {
-    const arr = dataurl.split(',');
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    if (!mimeMatch) throw new Error("Invalid image data");
-    const mime = mimeMatch[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], { type: mime });
-}
-
 export function ReviewStep() {
-  const { formData, nextStep, goToStep, unselectDraft, setFormData, activeDraft } = useSellForm();
+  const { formData, nextStep, goToStep, unselectDraft, setFormData } = useSellForm();
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
@@ -63,7 +46,6 @@ export function ReviewStep() {
   const firebaseApp = useFirebaseApp();
   const [selectedAddress, setSelectedAddress] = useState<FirestoreAddress | null>(null);
 
-  // Ensure productId exists (fallback for legacy drafts)
   useEffect(() => {
     if (!formData.productId && firestore) {
         const newId = doc(collection(firestore, 'products')).id;
@@ -93,7 +75,7 @@ export function ReviewStep() {
         toast({
             variant: 'destructive',
             title: 'Incomplete Listing',
-            description: 'Please go back and complete all required fields and upload at least 3 photos.',
+            description: 'Please complete all required fields and upload at least 3 photos.',
         });
         return false;
     }
@@ -102,7 +84,7 @@ export function ReviewStep() {
 
   const handlePublish = async () => {
     if (!user || !firestore || !formData.productId) {
-        toast({ variant: 'destructive', title: 'Session Error', description: 'Could not identify product ID. Please refresh and try again.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Session expired or missing data. Please refresh.' });
         return;
     }
     
@@ -116,13 +98,15 @@ export function ReviewStep() {
         const totalImages = formData.images?.length || 0;
         const progresses = new Array(totalImages).fill(0);
 
-        // Upload images in parallel for better performance
         const uploadPromises = formData.images!.map(async (imageFile, index) => {
             const fileName = `prod_${Date.now()}_${index}.webp`;
             const storagePath = `products/${user.uid}/${formData.productId}/${fileName}`;
             const storageRef = ref(storage, storagePath);
             
-            const blob = dataURLtoBlob(imageFile.url);
+            // Efficient async conversion from Data URI to Blob
+            const response = await fetch(imageFile.url);
+            const blob = await response.blob();
+            
             const uploadTask = uploadBytesResumable(storageRef, blob, {
                 contentType: 'image/webp',
                 customMetadata: { productId: formData.productId!, sellerId: user.uid }
@@ -131,15 +115,13 @@ export function ReviewStep() {
             return new Promise<string>((resolve, reject) => {
                 uploadTask.on('state_changed', 
                     (snapshot) => {
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        const bytes = snapshot.totalBytes > 0 ? (snapshot.bytesTransferred / snapshot.totalBytes) : 0;
+                        const progress = bytes * 100;
                         progresses[index] = progress;
                         const avgProgress = Math.round(progresses.reduce((a, b) => a + b, 0) / totalImages);
                         setUploadProgress(Math.min(avgProgress, 99));
                     }, 
-                    (error) => {
-                        console.error(`Upload error for image ${index}:`, error);
-                        reject(error);
-                    }, 
+                    (error) => reject(error), 
                     async () => {
                         const url = await getDownloadURL(uploadTask.snapshot.ref);
                         resolve(url);
@@ -176,8 +158,6 @@ export function ReviewStep() {
         };
 
         const productRef = doc(firestore, 'products', formData.productId);
-        
-        // Final publication to Firestore
         await setDoc(productRef, productData);
         
         setUploadProgress(100);
@@ -185,22 +165,13 @@ export function ReviewStep() {
         nextStep();
 
     } catch (error: any) {
-        console.error("Publishing process failed:", error);
+        console.error("Publishing failed:", error);
         setIsLoading(false);
-        
-        if (error.code === 'storage/unauthorized' || error.code === 'permission-denied') {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: `products/${formData.productId}`,
-                operation: 'create',
-                requestResourceData: formData,
-            }));
-        } else {
-            toast({ 
-                variant: 'destructive', 
-                title: 'Submission Failed', 
-                description: 'We encountered an error while saving your listing. Please check your connection and try again.' 
-            });
-        }
+        toast({ 
+            variant: 'destructive', 
+            title: 'Upload Failed', 
+            description: 'There was a problem submitting your item. Please try again.' 
+        });
     }
   };
 
