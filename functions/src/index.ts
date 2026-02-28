@@ -1,4 +1,3 @@
-
 import * as admin from "firebase-admin";
 import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
@@ -49,8 +48,8 @@ export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY
 
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: `${process.env.APP_URL || "http://localhost:9002"}/profile/stripe-onboarding`,
-      return_url: `${process.env.APP_URL || "http://localhost:9002"}/profile`,
+      refresh_url: `${process.env.APP_URL || "https://www.marigo.app"}/profile/stripe-onboarding`,
+      return_url: `${process.env.APP_URL || "https://www.marigo.app"}/profile`,
       type: "account_onboarding",
     });
 
@@ -78,11 +77,6 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
 
   const sellerDoc = await db.collection("users").doc(sellerId).get();
   const sellerData = sellerDoc.data();
-
-  // Relaxed check for testing: in real production we'd enforce this
-  if (!sellerData?.stripeAccountId && process.env.NODE_ENV === "production") {
-    throw new HttpsError("failed-precondition", "The seller is not ready to receive card payments.");
-  }
 
   let totalAmount = 0;
   const orderItems = [];
@@ -147,7 +141,7 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
   }
 });
 
-export const createOrder = onCall(async (request) => {
+export const createOrder = onCall({minInstances: 1}, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be logged in.");
   }

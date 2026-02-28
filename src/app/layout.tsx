@@ -20,8 +20,24 @@ const ChatbotWidget = dynamic(() => import('@/components/ai/ChatbotWidget').then
 
 
 export const metadata: Metadata = {
-  title: 'MarigoApp',
-  description: 'The luxury fashion marketplace for Albania and the EU.',
+  title: 'MarigoApp | Luxury Fashion Marketplace for Albania & EU',
+  description: 'Buy and sell authentic luxury fashion. MarigoApp connects style enthusiasts across Albania, Italy, and Europe with a curated selection of pre-loved treasures.',
+  keywords: 'luxury fashion, albania, marketplace, second hand, designer brands, chanel, hermes, gucci',
+  openGraph: {
+    title: 'MarigoApp | Discover Luxury Fashion',
+    description: 'The trusted marketplace for authentic pre-owned luxury.',
+    url: 'https://www.marigo.app',
+    siteName: 'MarigoApp',
+    images: [
+      {
+        url: 'https://www.marigo.app/og-image.jpg',
+        width: 1200,
+        height: 630,
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({
@@ -29,6 +45,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "MarigoApp",
+    "url": "https://www.marigo.app",
+    "logo": "https://www.marigo.app/icons/icon-512x512.png",
+    "sameAs": [
+      "https://www.instagram.com/marigoapp",
+      "https://www.facebook.com/marigoapp"
+    ]
+  };
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -46,6 +74,10 @@ export default function RootLayout({
         <link
           href="https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap"
           rel="stylesheet"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
       <body className={cn('font-body antialiased')}>

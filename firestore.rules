@@ -38,13 +38,12 @@ service cloud.firestore {
         return isSignedIn() && (request.auth.uid == order.buyerId || request.auth.uid in order.sellerIds);
     }
     
-    // Unified product validation for creation and updates
     function validProduct(p) {
       return p.sellerId == request.auth.uid 
-          && p.title != null 
-          && p.brand != null 
-          && p.category != null 
-          && p.price >= 0;
+          && p.title is string && p.title.size() >= 5
+          && p.brand is string
+          && p.category is string
+          && p.price is number && p.price >= 0;
     }
 
     // --------------------------------------------------------------------
@@ -88,10 +87,10 @@ service cloud.firestore {
       allow delete: if (isSignedIn() && (resource.data.sellerId == request.auth.uid || isAdmin()));
 
       match /offers/{offerId} {
-        allow get: if isSignedIn();
+        allow get: if isSignedIn() && (isOwner(resource.data.buyerId) || isOwner(resource.data.sellerId) || isAdmin());
         allow list: if isSignedIn();
         allow create: if isSignedIn() && isCorrectOwnerInRequestData('buyerId');
-        allow update: if isSignedIn();
+        allow update: if isSignedIn() && (isOwner(resource.data.buyerId) || isOwner(resource.data.sellerId) || isAdmin());
         allow delete: if isAdmin();
       }
       match /bids/{bidId} {
@@ -136,7 +135,7 @@ service cloud.firestore {
       allow list: if isAdmin();
       
       match /messages/{messageId} {
-        allow read, write: if (isSignedIn()) || isAdmin();
+        allow read, write: if (isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants) || isAdmin();
       }
     }
     
@@ -146,11 +145,11 @@ service cloud.firestore {
     }
     
     match /support_chats/{chatId} {
-      allow read, create, update: if isOwner(resource.data.userId);
+      allow read, create, update: if isOwner(resource.data.userId) || isAdmin();
       allow list, delete: if isAdmin();
 
       match /messages/{messageId} {
-        allow read, create: if isOwner(get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId);
+        allow read, create: if isOwner(get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId) || isAdmin();
         allow list, update, delete: if isAdmin();
       }
     }

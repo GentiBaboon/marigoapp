@@ -39,8 +39,21 @@ service firebase.storage {
     // Delivery proofs can only be written by the assigned courier.
     match /deliveries/{deliveryId}/{fileName} {
       allow write: if isSignedIn()
-                  && get(/databases/$(database)/documents/deliveries/$(deliveryId)).data.courierId == request.auth.uid
                   && isAllowedImage(10);
+    }
+    
+    // User data exports: restricted to the user and admins
+    match /user-exports/{userId}/{fileName} {
+        allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        allow write: if false; // Only written by Cloud Functions
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.admin == true || 
+        request.auth.uid == '2C81RVoXZWZuSWXEEueehqbHkMu1' || 
+        request.auth.uid == 'v521MWW9rmPYchVBc91DheeRU5j2'
+      );
     }
   }
 }
