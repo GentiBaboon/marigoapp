@@ -113,8 +113,8 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
 
     } catch (error: any) {
         console.error("Checkout failed:", error);
-        // Extracts the actual error message from Firebase Function HttpsError
-        const errorMessage = error.details?.message || error.message || 'An unexpected error occurred. Please try again.';
+        // Extracts the actual developer-facing error message from Firebase Function
+        const errorMessage = error?.message || 'An unexpected error occurred. Please try again.';
         toast({
             variant: 'destructive',
             title: 'Checkout Failed',

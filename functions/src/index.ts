@@ -13,15 +13,24 @@ import {getStorage} from "firebase-admin/storage";
 initializeApp();
 const db = admin.firestore();
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-06-20",
-});
+// Lazy initialization helper for Stripe to ensure secrets are available
+let stripeInstance: Stripe | null = null;
+const getStripe = () => {
+  if (!stripeInstance) {
+    const key = process.env.STRIPE_SECRET_KEY || "";
+    stripeInstance = new Stripe(key, {
+      apiVersion: "2024-06-20",
+    });
+  }
+  return stripeInstance;
+};
 
-export const createStripeConnectedAccount = onCall(async (request) => {
+export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be logged in.");
   }
   const {uid} = request.auth;
+  const stripe = getStripe();
 
   try {
     const account = await stripe.accounts.create({
@@ -40,24 +49,25 @@ export const createStripeConnectedAccount = onCall(async (request) => {
 
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: `${process.env.APP_URL}/profile/stripe-onboarding`,
-      return_url: `${process.env.APP_URL}/profile`,
+      refresh_url: `${process.env.APP_URL || "http://localhost:9002"}/profile/stripe-onboarding`,
+      return_url: `${process.env.APP_URL || "http://localhost:9002"}/profile`,
       type: "account_onboarding",
     });
 
     return {url: accountLink.url};
-  } catch (error) {
+  } catch (error: any) {
     logger.error("Error creating Stripe account:", error);
-    throw new HttpsError("internal", "Could not create Stripe account.");
+    throw new HttpsError("internal", error.message || "Could not create Stripe account.");
   }
 });
 
-export const createPaymentIntent = onCall({minInstances: 1}, async (request) => {
+export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minInstances: 1}, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be logged in.");
   }
   const {items, shippingAddress} = request.data;
   const {uid: buyerId} = request.auth;
+  const stripe = getStripe();
 
   if (!items || items.length === 0) {
     throw new HttpsError("invalid-argument", "No items provided.");
@@ -71,7 +81,7 @@ export const createPaymentIntent = onCall({minInstances: 1}, async (request) => 
 
   // Relaxed check for testing: in real production we'd enforce this
   if (!sellerData?.stripeAccountId && process.env.NODE_ENV === "production") {
-    throw new HttpsError("failed-precondition", "The seller is not ready to receive payments.");
+    throw new HttpsError("failed-precondition", "The seller is not ready to receive card payments.");
   }
 
   let totalAmount = 0;
@@ -86,16 +96,15 @@ export const createPaymentIntent = onCall({minInstances: 1}, async (request) => 
     }
     
     const pData = productSnap.data();
-    // Allow 'active' or 'pending_review' for testing newly created items
     if (pData?.status !== "active" && pData?.status !== "pending_review") {
       throw new HttpsError("failed-precondition", `Product ${item.id} is no longer available.`);
     }
 
-    const price = pData?.price || 0;
+    const price = pData?.price || item.price || 0;
     totalAmount += price;
     orderItems.push({
       productId: item.id,
-      sellerId: item.sellerId,
+      sellerId: item.sellerId || pData?.sellerId,
       title: item.title || pData?.title || "Untitled",
       brand: item.brand || pData?.brand || "Generic",
       image: pData?.images?.[0] || item.image || "",
@@ -162,15 +171,14 @@ export const createOrder = onCall(async (request) => {
     }
     
     const pData = productSnap.data();
-    // Allow 'active' or 'pending_review' for testing newly created items
     if (pData?.status !== "active" && pData?.status !== "pending_review") {
       throw new HttpsError("failed-precondition", `Product ${item.id} is no longer available.`);
     }
 
-    const price = pData?.price || 0;
+    const price = pData?.price || item.price || 0;
     totalAmount += price;
     orderItems.push({
-      productId: productSnap.id,
+      productId: item.id,
       sellerId: pData?.sellerId || item.sellerId,
       title: pData?.title || item.title || "Untitled",
       brand: pData?.brand || item.brand || "Generic",
@@ -205,9 +213,10 @@ export const createOrder = onCall(async (request) => {
   }
 });
 
-export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET"], minInstances: 1}, async (req, res) => {
+export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET", "STRIPE_SECRET_KEY"], minInstances: 1}, async (req, res) => {
   const signature = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const stripe = getStripe();
 
   if (!signature || !webhookSecret) {
     res.status(400).send("Webhook secret not configured.");
@@ -243,9 +252,10 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET"]
   res.status(200).send();
 });
 
-export const capturePayment = onCall(async (request) => {
+export const capturePayment = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
   const {orderId} = request.data;
   if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId.");
+  const stripe = getStripe();
 
   const orderRef = db.collection("orders").doc(orderId);
   const orderSnap = await orderRef.get();
@@ -258,15 +268,16 @@ export const capturePayment = onCall(async (request) => {
     await stripe.paymentIntents.capture(order.paymentIntentId);
     await orderRef.update({status: "completed"});
     return {success: true};
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`Failed to capture payment for order ${orderId}:`, error);
-    throw new HttpsError("internal", "Could not capture payment.");
+    throw new HttpsError("internal", error.message || "Could not capture payment.");
   }
 });
 
-export const processRefund = onCall(async (request) => {
+export const processRefund = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
   const {orderId, amount} = request.data;
   if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId.");
+  const stripe = getStripe();
 
   const orderRef = db.collection("orders").doc(orderId);
   const orderSnap = await orderRef.get();
@@ -281,9 +292,9 @@ export const processRefund = onCall(async (request) => {
     });
     await orderRef.update({status: "refunded"});
     return {success: true};
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`Failed to process refund for order ${orderId}:`, error);
-    throw new HttpsError("internal", "Could not process refund.");
+    throw new HttpsError("internal", error.message || "Could not process refund.");
   }
 });
 
@@ -317,8 +328,9 @@ export const getMySales = onCall(async (request) => {
   }
 });
 
-export const releaseEscrow = onSchedule("every 1 hours", async () => {
+export const releaseEscrow = onSchedule({schedule: "every 1 hours", secrets: ["STRIPE_SECRET_KEY"]}, async (event) => {
   const threeDaysAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 72 * 60 * 60 * 1000);
+  const stripe = getStripe();
   const query = db.collection("orders")
     .where("status", "==", "delivered")
     .where("deliveredAt", "<=", threeDaysAgo);
@@ -341,7 +353,6 @@ export const releaseEscrow = onSchedule("every 1 hours", async () => {
   await Promise.all(promises);
 });
 
-// AI, GDPR, and Logistics functions remain unchanged as they were already robust
 const vertexAI = new VertexAI({
   project: process.env.GCLOUD_PROJECT,
   location: "us-central1",
@@ -439,7 +450,7 @@ export const completeDelivery = onCall(async (request) => {
   return {success: true};
 });
 
-export const getExchangeRates = onSchedule("every 24 hours", async () => {
+export const getExchangeRates = onSchedule("every 24 hours", async (event) => {
     const apiKey = process.env.EXCHANGERATE_API_KEY;
     if (!apiKey) return null;
     const response = await fetch(`https://v6.exchangerate-api.com/v6/${apiKey}/latest/EUR`);
