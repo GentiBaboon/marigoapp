@@ -42,11 +42,12 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
   
   const handlePay = async () => {
     if (!user || !firestore || !shippingAddress || !paymentMethod) {
-        toast({
-            variant: 'destructive',
-            title: 'Informazioni mancanti',
-            description: 'Assicurati di aver selezionato indirizzo e metodo di pagamento.',
-        });
+        setErrorMsg("Informazioni mancanti: assicurati di aver selezionato indirizzo e pagamento.");
+        return;
+    }
+
+    if (items.length === 0) {
+        setErrorMsg("Il carrello è vuoto.");
         return;
     }
 
@@ -84,9 +85,10 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
         }
 
         if (!stripe || !elements) {
-            throw new Error("Stripe non è pronto. Ricarica la pagina.");
+            throw new Error("Stripe non è pronto. Per favore ricarica la pagina.");
         }
 
+        // 1. Chiama la Cloud Function per creare il PaymentIntent
         const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
         const intentResult: any = await createPaymentIntent(orderPayload);
         const { clientSecret, orderId } = intentResult.data;
@@ -94,13 +96,16 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
         const cardElement = elements.getElement(CardElement);
         if (!cardElement) throw new Error("Campo carta non trovato.");
 
-        const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        // 2. Conferma il pagamento con Stripe (gestisce 3D Secure se necessario)
+        const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
             payment_method: { card: cardElement },
         });
 
-        if (error) throw new Error(error.message);
+        if (stripeError) {
+            throw new Error(stripeError.message);
+        }
 
-        if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture' || paymentIntent.status === 'processing')) {
+        if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture')) {
             clearCart();
             router.push(`/checkout/success/${orderId}`);
         } else {
@@ -108,16 +113,19 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
         }
 
     } catch (error: any) {
-        console.error("Checkout error:", error);
-        let message = "Si è verificato un errore durante il checkout.";
+        console.error("Detailed Checkout Error:", error);
         
-        if (error.details?.message) message = error.details.message;
-        else if (error.message) message = error.message;
+        // Estrai il messaggio di errore reale dalla Firebase Function
+        let message = "Errore durante il checkout.";
+        if (error.message) {
+            // Rimuovi il prefisso generico di Firebase se presente
+            message = error.message.replace("internal, ", "");
+        }
         
         setErrorMsg(message);
         toast({
             variant: 'destructive',
-            title: 'Pagamento fallito',
+            title: 'Transazione fallita',
             description: message,
         });
     } finally {
@@ -142,10 +150,10 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
         <CardContent className="space-y-6">
           
           {errorMsg && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" className="animate-in fade-in slide-in-from-top-1">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Errore</AlertTitle>
-                  <AlertDescription>{errorMsg}</AlertDescription>
+                  <AlertDescription className="font-medium">{errorMsg}</AlertDescription>
               </Alert>
           )}
 
