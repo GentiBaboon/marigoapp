@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -105,7 +104,7 @@ export function ReviewStep() {
             const storagePath = `products/${user.uid}/${formData.productId}/${fileName}`;
             const storageRef = ref(storage, storagePath);
             
-            // Robust conversion from Data URI to Blob
+            // Convert to Blob
             const response = await fetch(imageFile.url);
             const blob = await response.blob();
             
@@ -133,7 +132,7 @@ export function ReviewStep() {
 
         const imageUrls = await Promise.all(uploadPromises);
 
-        // 2. Prepare the final product document
+        // 2. Prepare product data
         const productData = {
             title: String(formData.title || '').trim(),
             description: String(formData.description || '').trim(),
@@ -161,21 +160,20 @@ export function ReviewStep() {
 
         const productRef = doc(firestore, 'products', formData.productId);
 
-        // 3. Initiate the save (Non-blocking as per guidelines)
+        // 3. Set document (Non-blocking)
         setDoc(productRef, productData)
             .catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: productRef.path,
                     operation: 'create',
                     requestResourceData: productData,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
         
-        // 4. Move to confirmation page immediately
+        // 4. Move to confirmation immediately
         setUploadProgress(100);
         setIsLoading(false);
-        nextStep(); // Goes to step 8 (SuccessStep)
+        nextStep(); 
 
     } catch (error: any) {
         console.error("Publishing failed:", error);

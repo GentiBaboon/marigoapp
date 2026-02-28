@@ -50,8 +50,15 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
 
     setIsLoading(true);
 
-    // Clean address data for storage
-    const { id, isDefault, ...cleanAddress } = shippingAddress as any;
+    // Clean address data for function payload
+    const cleanAddress = {
+        fullName: shippingAddress.fullName,
+        phone: shippingAddress.phone,
+        address: shippingAddress.address,
+        city: shippingAddress.city,
+        postal: shippingAddress.postal,
+        country: shippingAddress.country,
+    };
 
     const orderPayload = {
         items: items.map(item => ({
@@ -83,9 +90,9 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             return;
         }
 
-        // Stripe Payment Flow
+        // Card Payment Flow
         if (!stripe || !elements) {
-            throw new Error("Stripe is not initialized yet.");
+            throw new Error("Stripe context not found. Please refresh.");
         }
 
         const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
@@ -93,7 +100,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
         const { clientSecret, orderId } = intentResult.data;
         
         const cardElement = elements.getElement(CardElement);
-        if (!cardElement) throw new Error("Credit card field not found.");
+        if (!cardElement) throw new Error("Card field not found.");
 
         const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
             payment_method: { card: cardElement },
@@ -110,17 +117,19 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             clearCart();
             router.push(`/checkout/success/${orderId}`);
         } else {
-             throw new Error(`Payment status: ${paymentIntent.status}`);
+             throw new Error(`Unexpected payment status: ${paymentIntent.status}`);
         }
 
     } catch (error: any) {
-        console.error("Checkout failed:", error);
-        // Extracts the actual descriptive error message if it's a Firebase HttpsError
-        const errorMessage = error?.details?.message || error?.message || 'An unexpected error occurred. Please try again.';
+        console.error("Checkout processing error:", error);
+        // Map common errors
+        let displayMessage = error.message || 'An unexpected error occurred.';
+        if (error.details?.message) displayMessage = error.details.message;
+        
         toast({
             variant: 'destructive',
             title: 'Checkout Failed',
-            description: errorMessage,
+            description: displayMessage,
         });
     } finally {
         setIsLoading(false);
@@ -146,10 +155,10 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             <div className="flex items-start gap-4">
                   <MapPin className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
                   <div className="flex-1">
-                      <h4 className="font-semibold">Shipping Address</h4>
+                      <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Shipping Address</h4>
                       {shippingAddress ? (
-                          <p className="text-sm text-muted-foreground">
-                              {shippingAddress.fullName}<br />
+                          <p className="text-sm mt-1">
+                              <strong>{shippingAddress.fullName}</strong><br />
                               {shippingAddress.address}, {shippingAddress.city}<br />
                               {shippingAddress.postal}, {shippingAddress.country}
                           </p>
@@ -163,8 +172,8 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
               <div className="flex items-start gap-4">
                   <CreditCard className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
                   <div className="flex-1">
-                      <h4 className="font-semibold">Payment Method</h4>
-                      <p className="text-sm text-muted-foreground">{paymentMethod ? paymentMethodLabels[paymentMethod] : 'None selected'}</p>
+                      <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Payment Method</h4>
+                      <p className="text-sm mt-1">{paymentMethod ? paymentMethodLabels[paymentMethod] : 'None selected'}</p>
                   </div>
                   <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onPrevStep(2)}>Edit</Button>
               </div>
@@ -183,7 +192,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
               disabled={isLoading || !shippingAddress || !paymentMethod}
             >
               {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-              Pay {formatPrice(grandTotal)}
+              Confirm & Pay {formatPrice(grandTotal)}
             </Button>
             <Button
               variant="ghost"

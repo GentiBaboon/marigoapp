@@ -99,8 +99,9 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
       }
       
       const pData = productSnap.data();
-      // Allow active or products in review for testing
-      if (pData?.status !== "active" && pData?.status !== "pending_review") {
+      // Permissive check: allow products in review for testing
+      const isAvailable = pData?.status === "active" || pData?.status === "pending_review";
+      if (!isAvailable) {
         throw new HttpsError("failed-precondition", `Product "${pData?.title || item.id}" is no longer available.`);
       }
 
@@ -121,9 +122,8 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
     const shippingFee = 10.90; 
     const totalInCents = Math.round((totalAmount + (shippingFee * items.length)) * 100);
     
-    // Stripe logic: application_fee_amount requires a destination (Connect)
-    // If seller hasn't onboarded, we can't take a commission automatically via transfer_data
-    const hasStripeAccount = !!sellerData?.stripeAccountId;
+    // Check if seller is ready for transfers
+    const hasStripeAccount = !!sellerData?.stripeAccountId && sellerData?.stripeOnboardingComplete !== false;
     const commission = hasStripeAccount ? Math.round(totalInCents * 0.15) : undefined;
 
     const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
@@ -136,6 +136,9 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
     if (hasStripeAccount) {
       paymentIntentParams.application_fee_amount = commission;
       paymentIntentParams.transfer_data = { destination: sellerData!.stripeAccountId };
+    } else {
+        // Log this warning but proceed (payout will need to be handled manually or later)
+        logger.warn(`Seller ${sellerId} is not ready for automatic transfer.`);
     }
 
     const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
@@ -186,7 +189,8 @@ export const createOrder = onCall({minInstances: 1}, async (request) => {
       }
       
       const pData = productSnap.data();
-      if (pData?.status !== "active" && pData?.status !== "pending_review") {
+      const isAvailable = pData?.status === "active" || pData?.status === "pending_review";
+      if (!isAvailable) {
         throw new HttpsError("failed-precondition", `Product "${pData?.title || item.id}" is no longer available.`);
       }
 
