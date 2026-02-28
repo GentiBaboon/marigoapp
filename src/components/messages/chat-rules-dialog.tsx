@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -24,9 +25,12 @@ export function ChatRulesDialog({ isOpen, onAccept, isAccepting }: ChatRulesDial
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-center">Chat rules</DialogTitle>
+          <DialogDescription className="text-center">
+            Please review and accept our community rules before starting a conversation.
+          </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-6">
-          <p className="text-muted-foreground text-center">
+          <p className="text-muted-foreground text-center text-sm">
             To keep our community safe, we require that all members follow the chat rules against:
           </p>
           <ul className="space-y-4 text-sm">

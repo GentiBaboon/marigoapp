@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -18,6 +17,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
@@ -144,6 +144,9 @@ export default function ProfilePage() {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Edit Profile</DialogTitle>
+                        <DialogDescription>
+                            Update your name and phone number to keep your profile current.
+                        </DialogDescription>
                     </DialogHeader>
                     <EditProfileForm onSuccess={() => setIsEditDialogOpen(false)} />
                 </DialogContent>

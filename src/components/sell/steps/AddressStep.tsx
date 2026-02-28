@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Edit } from 'lucide-react';
 import { AddressForm } from '@/components/profile/address-form';
@@ -127,6 +127,9 @@ export function AddressStep() {
                 <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{editingAddress ? 'Edit Address' : 'Add New Address'}</DialogTitle>
+                    <DialogDescription>
+                        {editingAddress ? 'Modify your shipping address.' : 'Enter the details for your new shipping location.'}
+                    </DialogDescription>
                 </DialogHeader>
                 {user && (
                     <AddressForm

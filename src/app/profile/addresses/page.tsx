@@ -40,7 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AddressForm } from '@/components/profile/address-form';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -237,6 +237,9 @@ export default function AddressesPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingAddress ? 'Edit Address' : 'Add New Address'}</DialogTitle>
+            <DialogDescription>
+                {editingAddress ? 'Modify your saved address details.' : 'Provide the details for your new shipping address.'}
+            </DialogDescription>
           </DialogHeader>
           {addressesCollection && (
             <AddressForm

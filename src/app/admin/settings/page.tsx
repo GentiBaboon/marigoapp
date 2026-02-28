@@ -83,6 +83,9 @@ const CategoryDialog = ({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{category ? 'Edit Category' : 'Add Category'}</DialogTitle>
+                    <DialogDescription>
+                        {category ? 'Update the details for this category.' : 'Create a new product category.'}
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
@@ -167,6 +170,9 @@ const BrandDialog = ({ open, onOpenChange, brand }: { open: boolean; onOpenChang
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{brand ? 'Edit Brand' : 'Add Brand'}</DialogTitle>
+                    <DialogDescription>
+                        {brand ? 'Update the details for this brand.' : 'Add a new designer brand to the marketplace.'}
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
