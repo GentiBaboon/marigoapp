@@ -1,4 +1,3 @@
-
 'use client';
 import { useState } from 'react';
 import {
@@ -51,6 +50,9 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
 
     setIsLoading(true);
 
+    // Clean address data for storage
+    const { id, isDefault, ...cleanAddress } = shippingAddress as any;
+
     const orderPayload = {
         items: items.map(item => ({
             id: item.id,
@@ -62,7 +64,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             quantity: item.quantity,
             size: item.selectedSize || null,
         })),
-        shippingAddress,
+        shippingAddress: cleanAddress,
     };
 
     try {
@@ -113,8 +115,8 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
 
     } catch (error: any) {
         console.error("Checkout failed:", error);
-        // Extracts the actual developer-facing error message from Firebase Function
-        const errorMessage = error?.message || 'An unexpected error occurred. Please try again.';
+        // Extracts the actual descriptive error message if it's a Firebase HttpsError
+        const errorMessage = error?.details?.message || error?.message || 'An unexpected error occurred. Please try again.';
         toast({
             variant: 'destructive',
             title: 'Checkout Failed',

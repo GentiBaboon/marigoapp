@@ -17,6 +17,9 @@ let stripeInstance: Stripe | null = null;
 const getStripe = () => {
   if (!stripeInstance) {
     const key = process.env.STRIPE_SECRET_KEY || "";
+    if (!key) {
+      throw new Error("STRIPE_SECRET_KEY is not configured in Firebase secrets.");
+    }
     stripeInstance = new Stripe(key, {
       apiVersion: "2024-06-20",
     });
@@ -64,6 +67,7 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be logged in.");
   }
+  
   const {items, shippingAddress} = request.data;
   const {uid: buyerId} = request.auth;
   const stripe = getStripe();
@@ -72,54 +76,69 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
     throw new HttpsError("invalid-argument", "No items provided.");
   }
 
-  const firstItem = items[0];
-  const sellerId = firstItem.sellerId;
-
-  const sellerDoc = await db.collection("users").doc(sellerId).get();
-  const sellerData = sellerDoc.data();
-
-  let totalAmount = 0;
-  const orderItems = [];
-
-  for (const item of items) {
-    const productRef = db.collection("products").doc(item.id);
-    const productSnap = await productRef.get();
-
-    if (!productSnap.exists) {
-      throw new HttpsError("not-found", `Product ${item.id} not found.`);
-    }
-    
-    const pData = productSnap.data();
-    if (pData?.status !== "active" && pData?.status !== "pending_review") {
-      throw new HttpsError("failed-precondition", `Product ${item.id} is no longer available.`);
-    }
-
-    const price = pData?.price || item.price || 0;
-    totalAmount += price;
-    orderItems.push({
-      productId: item.id,
-      sellerId: item.sellerId || pData?.sellerId,
-      title: item.title || pData?.title || "Untitled",
-      brand: item.brand || pData?.brand || "Generic",
-      image: pData?.images?.[0] || item.image || "",
-      price: price,
-      quantity: item.quantity || 1,
-      size: item.size || pData?.size || null,
-    });
-  }
-
-  const shippingFee = 10.90; 
-  const totalInCents = Math.round((totalAmount + (shippingFee * items.length)) * 100);
-  const commission = Math.round(totalInCents * 0.15);
-
   try {
-    const paymentIntent = await stripe.paymentIntents.create({
+    const firstItem = items[0];
+    const sellerId = firstItem.sellerId;
+
+    if (!sellerId) {
+      throw new HttpsError("invalid-argument", "Missing seller information for items.");
+    }
+
+    const sellerDoc = await db.collection("users").doc(sellerId).get();
+    const sellerData = sellerDoc.data();
+
+    let totalAmount = 0;
+    const orderItems = [];
+
+    for (const item of items) {
+      const productRef = db.collection("products").doc(item.id);
+      const productSnap = await productRef.get();
+
+      if (!productSnap.exists) {
+        throw new HttpsError("not-found", `Product ${item.id} not found.`);
+      }
+      
+      const pData = productSnap.data();
+      // Allow active or products in review for testing
+      if (pData?.status !== "active" && pData?.status !== "pending_review") {
+        throw new HttpsError("failed-precondition", `Product "${pData?.title || item.id}" is no longer available.`);
+      }
+
+      const price = pData?.price || item.price || 0;
+      totalAmount += price;
+      orderItems.push({
+        productId: item.id,
+        sellerId: pData?.sellerId || item.sellerId,
+        title: pData?.title || item.title || "Untitled",
+        brand: pData?.brand || item.brand || "Generic",
+        image: pData?.images?.[0] || item.image || "",
+        price: price,
+        quantity: item.quantity || 1,
+        size: item.size || pData?.size || null,
+      });
+    }
+
+    const shippingFee = 10.90; 
+    const totalInCents = Math.round((totalAmount + (shippingFee * items.length)) * 100);
+    
+    // Stripe logic: application_fee_amount requires a destination (Connect)
+    // If seller hasn't onboarded, we can't take a commission automatically via transfer_data
+    const hasStripeAccount = !!sellerData?.stripeAccountId;
+    const commission = hasStripeAccount ? Math.round(totalInCents * 0.15) : undefined;
+
+    const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
       amount: totalInCents,
       currency: "eur",
       capture_method: "manual",
-      application_fee_amount: commission,
-      transfer_data: sellerData?.stripeAccountId ? { destination: sellerData.stripeAccountId } : undefined,
-    });
+      metadata: { buyerId, sellerId, orderType: 'marketplace' }
+    };
+
+    if (hasStripeAccount) {
+      paymentIntentParams.application_fee_amount = commission;
+      paymentIntentParams.transfer_data = { destination: sellerData!.stripeAccountId };
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
 
     const orderRef = await db.collection("orders").add({
       orderNumber: `MRG-${Date.now()}`,
@@ -136,8 +155,9 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
 
     return {clientSecret: paymentIntent.client_secret, orderId: orderRef.id};
   } catch (error: any) {
-    logger.error("Error creating PaymentIntent:", error);
-    throw new HttpsError("internal", error.message || "Could not create payment intent.");
+    logger.error("Checkout PaymentIntent Error:", error);
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", error.message || "Failed to initiate payment.");
   }
 });
 
@@ -152,41 +172,41 @@ export const createOrder = onCall({minInstances: 1}, async (request) => {
     throw new HttpsError("invalid-argument", "No items provided.");
   }
 
-  const sellerId = items[0].sellerId;
-  let totalAmount = 0;
-  const orderItems = [];
-
-  for (const item of items) {
-    const productRef = db.collection("products").doc(item.id);
-    const productSnap = await productRef.get();
-
-    if (!productSnap.exists) {
-      throw new HttpsError("not-found", `Product ${item.id} not found.`);
-    }
-    
-    const pData = productSnap.data();
-    if (pData?.status !== "active" && pData?.status !== "pending_review") {
-      throw new HttpsError("failed-precondition", `Product ${item.id} is no longer available.`);
-    }
-
-    const price = pData?.price || item.price || 0;
-    totalAmount += price;
-    orderItems.push({
-      productId: item.id,
-      sellerId: pData?.sellerId || item.sellerId,
-      title: pData?.title || item.title || "Untitled",
-      brand: pData?.brand || item.brand || "Generic",
-      image: pData?.images?.[0] || item.image || "",
-      price: price,
-      quantity: item.quantity || 1,
-      size: item.size || pData?.size || null,
-    });
-  }
-
-  const shippingFee = 10.90 * items.length; 
-  totalAmount += shippingFee;
-
   try {
+    const sellerId = items[0].sellerId;
+    let totalAmount = 0;
+    const orderItems = [];
+
+    for (const item of items) {
+      const productRef = db.collection("products").doc(item.id);
+      const productSnap = await productRef.get();
+
+      if (!productSnap.exists) {
+        throw new HttpsError("not-found", `Product ${item.id} not found.`);
+      }
+      
+      const pData = productSnap.data();
+      if (pData?.status !== "active" && pData?.status !== "pending_review") {
+        throw new HttpsError("failed-precondition", `Product "${pData?.title || item.id}" is no longer available.`);
+      }
+
+      const price = pData?.price || item.price || 0;
+      totalAmount += price;
+      orderItems.push({
+        productId: item.id,
+        sellerId: pData?.sellerId || item.sellerId,
+        title: pData?.title || item.title || "Untitled",
+        brand: pData?.brand || item.brand || "Generic",
+        image: pData?.images?.[0] || item.image || "",
+        price: price,
+        quantity: item.quantity || 1,
+        size: item.size || pData?.size || null,
+      });
+    }
+
+    const shippingFee = 10.90 * items.length; 
+    totalAmount += shippingFee;
+
     const orderRef = await db.collection("orders").add({
       orderNumber: `MRG-${Date.now()}`,
       buyerId,
@@ -202,7 +222,8 @@ export const createOrder = onCall({minInstances: 1}, async (request) => {
 
     return {orderId: orderRef.id};
   } catch (error: any) {
-    logger.error("Error creating COD order:", error);
+    logger.error("COD Order Error:", error);
+    if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", error.message || "Could not place your order.");
   }
 });
