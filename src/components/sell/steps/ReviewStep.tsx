@@ -104,7 +104,7 @@ export function ReviewStep() {
             const storagePath = `products/${user.uid}/${formData.productId}/${fileName}`;
             const storageRef = ref(storage, storagePath);
             
-            // Convert to Blob
+            // Convert to Blob using native fetch for performance
             const response = await fetch(imageFile.url);
             const blob = await response.blob();
             
@@ -160,17 +160,10 @@ export function ReviewStep() {
 
         const productRef = doc(firestore, 'products', formData.productId);
 
-        // 3. Set document (Non-blocking)
-        setDoc(productRef, productData)
-            .catch(async (serverError) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: productRef.path,
-                    operation: 'create',
-                    requestResourceData: productData,
-                }));
-            });
+        // 3. Set document and wait for confirmation
+        await setDoc(productRef, productData);
         
-        // 4. Move to confirmation immediately
+        // 4. Success
         setUploadProgress(100);
         setIsLoading(false);
         nextStep(); 
@@ -181,7 +174,7 @@ export function ReviewStep() {
         toast({ 
             variant: 'destructive', 
             title: 'Upload Failed', 
-            description: 'There was a problem submitting your item. Please try again.' 
+            description: error.message || 'There was a problem submitting your item. Please try again.' 
         });
     }
   };

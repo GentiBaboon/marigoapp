@@ -51,6 +51,7 @@ export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY
       await db.collection("users").doc(uid).update({
         stripeAccountId: accountId,
         stripeOnboardingComplete: false,
+        isSeller: true,
       });
     }
 
@@ -92,9 +93,8 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
     const sellerDoc = await db.collection("users").doc(sellerId).get();
     const sellerData = sellerDoc.data();
 
-    // Verifica se il venditore è pronto per ricevere pagamenti (Necessario per transfer_data)
-    if (!sellerData?.stripeAccountId || sellerData?.stripeOnboardingComplete === false) {
-        throw new HttpsError("failed-precondition", "Il venditore non ha ancora configurato il suo account per ricevere pagamenti. Ti suggeriamo di contattarlo via chat.");
+    if (!sellerData?.stripeAccountId) {
+        throw new HttpsError("failed-precondition", "Il venditore non ha ancora configurato il suo account Stripe per ricevere pagamenti.");
     }
 
     let totalAmount = 0;
@@ -136,10 +136,10 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
     const paymentIntent = await stripe.paymentIntents.create({
       amount: totalInCents,
       currency: "eur",
-      capture_method: "manual", // Fondi bloccati sulla carta
+      capture_method: "manual",
       transfer_data: { 
         destination: sellerData.stripeAccountId,
-        amount: totalInCents - commission, // Al venditore va il totale meno la commissione
+        amount: totalInCents - commission, 
       },
       metadata: { buyerId, sellerId, orderType: 'marketplace' }
     });
@@ -244,7 +244,6 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET",
       const ordersQuery = await db.collection("orders").where("paymentIntentId", "==", paymentIntent.id).get();
       if (!ordersQuery.empty) {
         await ordersQuery.docs[0].ref.update({status: "processing", paymentStatus: "paid"});
-        // Aggiorna lo stato dei prodotti a "sold"
         const orderData = ordersQuery.docs[0].data();
         for (const item of orderData.items) {
             await db.collection("products").doc(item.productId).update({ status: "sold" });
@@ -281,27 +280,6 @@ export const capturePayment = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (re
   } catch (error: any) {
     logger.error(`Fallimento cattura pagamento ${orderId}:`, error);
     throw new HttpsError("internal", error.message || "Impossibile incassare il pagamento.");
-  }
-});
-
-export const processRefund = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
-  const {orderId, amount} = request.data;
-  if (!orderId) throw new HttpsError("invalid-argument", "ID ordine mancante.");
-  const stripe = getStripe();
-
-  const orderSnap = await db.collection("orders").doc(orderId).get();
-  const order = orderSnap.data();
-
-  try {
-    await stripe.refunds.create({
-      payment_intent: order?.paymentIntentId,
-      amount: amount ? Math.round(amount * 100) : undefined,
-    });
-    await orderSnap.ref.update({status: "refunded"});
-    return {success: true};
-  } catch (error: any) {
-    logger.error(`Errore rimborso ${orderId}:`, error);
-    throw new HttpsError("internal", error.message || "Errore durante il rimborso.");
   }
 });
 

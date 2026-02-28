@@ -53,7 +53,6 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
     setIsLoading(true);
     setErrorMsg(null);
 
-    // Dati ordine per il backend
     const orderPayload = {
         items: items.map(item => ({
             id: item.id,
@@ -84,7 +83,6 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             return;
         }
 
-        // Flusso Stripe
         if (!stripe || !elements) {
             throw new Error("Stripe non è pronto. Ricarica la pagina.");
         }
@@ -113,7 +111,6 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
         console.error("Checkout error:", error);
         let message = "Si è verificato un errore durante il checkout.";
         
-        // Estrae messaggio specifico da Firebase Functions
         if (error.details?.message) message = error.details.message;
         else if (error.message) message = error.message;
         

@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -41,7 +40,7 @@ service cloud.firestore {
     
     function validProduct(p) {
       return p.sellerId == request.auth.uid 
-          && p.title is string && p.title.size() >= 3
+          && p.title is string
           && p.brand is string
           && p.category is string
           && p.price is number && p.price >= 0;
