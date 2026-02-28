@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
@@ -138,9 +139,9 @@ export function PricingStep() {
                             {...field} 
                             onChange={e => field.onChange(parseFloat(e.target.value) || undefined)}
                             value={field.value ?? ''} 
-                            className="h-16 text-lg pl-12"
+                            className="h-16 text-lg pl-16"
                          />
-                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-muted-foreground">EUR</span>
+                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-muted-foreground font-medium">EUR</span>
                     </div>
                   <FormMessage />
                   </FormItem>
