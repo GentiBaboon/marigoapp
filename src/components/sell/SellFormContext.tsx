@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, createContext, useContext, ReactNode, useEffect, useCallback, useMemo } from 'react';
@@ -90,6 +91,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   const startNewDraft = useCallback(() => {
     if (!firestore) return;
+    // Pre-generate a Firestore ID for the product
     const newProductId = doc(collection(firestore, 'products')).id;
     const newDraftId = `draft_${Date.now()}`;
     const newDraft: SellDraft = {

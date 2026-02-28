@@ -1,13 +1,13 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Pencil, Info, Loader2 } from 'lucide-react';
+import { Pencil, Info, Loader2, AlertCircle } from 'lucide-react';
 import { productCategories, productConditions } from '@/lib/mock-data';
 import Link from 'next/link';
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
@@ -35,8 +35,25 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
     </div>
 );
 
+/**
+ * Robust conversion of Data URL to Blob for reliable Storage uploads
+ */
+function dataURLtoBlob(dataurl: string) {
+    const arr = dataurl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) throw new Error("Invalid image data");
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+}
+
 export function ReviewStep() {
-  const { formData, nextStep, goToStep, unselectDraft } = useSellForm();
+  const { formData, nextStep, goToStep, unselectDraft, setFormData, activeDraft } = useSellForm();
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
@@ -45,6 +62,14 @@ export function ReviewStep() {
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
   const [selectedAddress, setSelectedAddress] = useState<FirestoreAddress | null>(null);
+
+  // Ensure productId exists (fallback for legacy drafts)
+  useEffect(() => {
+    if (!formData.productId && firestore) {
+        const newId = doc(collection(firestore, 'products')).id;
+        setFormData({ productId: newId });
+    }
+  }, [formData.productId, firestore, setFormData]);
 
   const addressesCollection = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -67,8 +92,8 @@ export function ReviewStep() {
     if (missing.length > 0 || !formData.images || formData.images.length < 3) {
         toast({
             variant: 'destructive',
-            title: 'Missing information',
-            description: 'Please complete all required fields and upload at least 3 photos.',
+            title: 'Incomplete Listing',
+            description: 'Please go back and complete all required fields and upload at least 3 photos.',
         });
         return false;
     }
@@ -77,7 +102,7 @@ export function ReviewStep() {
 
   const handlePublish = async () => {
     if (!user || !firestore || !formData.productId) {
-        toast({ variant: 'destructive', title: 'Session error. Please restart.' });
+        toast({ variant: 'destructive', title: 'Session Error', description: 'Could not identify product ID. Please refresh and try again.' });
         return;
     }
     
@@ -89,41 +114,41 @@ export function ReviewStep() {
 
     try {
         const totalImages = formData.images?.length || 0;
-        const imageUrls: string[] = [];
-        const weight = 100 / totalImages;
+        const progresses = new Array(totalImages).fill(0);
 
-        for (let i = 0; i < totalImages; i++) {
-            const imageFile = formData.images![i];
-            const fileName = `img_${Date.now()}_${i}.webp`;
+        // Upload images in parallel for better performance
+        const uploadPromises = formData.images!.map(async (imageFile, index) => {
+            const fileName = `prod_${Date.now()}_${index}.webp`;
             const storagePath = `products/${user.uid}/${formData.productId}/${fileName}`;
             const storageRef = ref(storage, storagePath);
             
-            // Efficient conversion from Data URI to Blob
-            const response = await fetch(imageFile.url);
-            const blob = await response.blob();
-
+            const blob = dataURLtoBlob(imageFile.url);
             const uploadTask = uploadBytesResumable(storageRef, blob, {
                 contentType: 'image/webp',
-                customMetadata: { productId: formData.productId! }
+                customMetadata: { productId: formData.productId!, sellerId: user.uid }
             });
 
-            const downloadUrl = await new Promise<string>((resolve, reject) => {
+            return new Promise<string>((resolve, reject) => {
                 uploadTask.on('state_changed', 
                     (snapshot) => {
-                        const fileProgress = (snapshot.bytesTransferred / snapshot.totalBytes) * weight;
-                        const currentTotal = Math.round((i * weight) + fileProgress);
-                        setUploadProgress(Math.min(currentTotal, 99)); // Keep at 99 until final link is ready
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        progresses[index] = progress;
+                        const avgProgress = Math.round(progresses.reduce((a, b) => a + b, 0) / totalImages);
+                        setUploadProgress(Math.min(avgProgress, 99));
                     }, 
-                    (error) => reject(error), 
+                    (error) => {
+                        console.error(`Upload error for image ${index}:`, error);
+                        reject(error);
+                    }, 
                     async () => {
                         const url = await getDownloadURL(uploadTask.snapshot.ref);
                         resolve(url);
                     }
                 );
             });
+        });
 
-            imageUrls.push(downloadUrl);
-        }
+        const imageUrls = await Promise.all(uploadPromises);
 
         const productData = {
             title: String(formData.title).trim(),
@@ -146,6 +171,8 @@ export function ReviewStep() {
             ...(formData.sizeValue && { size: `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() }),
             ...(formData.pattern && { pattern: formData.pattern }),
             ...(formData.vintage !== undefined && { vintage: formData.vintage }),
+            views: 0,
+            likes: 0
         };
 
         const productRef = doc(firestore, 'products', formData.productId);
@@ -158,7 +185,9 @@ export function ReviewStep() {
         nextStep();
 
     } catch (error: any) {
+        console.error("Publishing process failed:", error);
         setIsLoading(false);
+        
         if (error.code === 'storage/unauthorized' || error.code === 'permission-denied') {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: `products/${formData.productId}`,
@@ -168,7 +197,7 @@ export function ReviewStep() {
         } else {
             toast({ 
                 variant: 'destructive', 
-                title: 'Submission failed', 
+                title: 'Submission Failed', 
                 description: 'We encountered an error while saving your listing. Please check your connection and try again.' 
             });
         }
@@ -265,7 +294,7 @@ export function ReviewStep() {
         
         <div className="space-y-4 pt-4">
              <p className="text-[11px] text-center text-muted-foreground leading-relaxed">
-                By clicking on "Submit my item", I confirm that the information provided complies with the <Link href="#" className="underline">general terms of use</Link>.
+                By clicking on "Submit my item", I confirm that the information provided complies with the <Link href="/terms" className="underline">general terms of use</Link>.
              </p>
             <div className="flex flex-col gap-3">
                 <Button 
