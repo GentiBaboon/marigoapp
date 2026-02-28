@@ -12,46 +12,50 @@ import {getStorage} from "firebase-admin/storage";
 initializeApp();
 const db = admin.firestore();
 
-// Lazy initialization helper for Stripe to ensure secrets are available
-let stripeInstance: Stripe | null = null;
+// Helper per inizializzare Stripe con i segreti iniettati
 const getStripe = () => {
   const key = process.env.STRIPE_SECRET_KEY || "";
   if (!key) {
-    logger.error("STRIPE_SECRET_KEY is missing from environment variables.");
-    throw new HttpsError("failed-precondition", "Payment provider is not correctly configured (missing API Key).");
+    logger.error("STRIPE_SECRET_KEY non configurata. Esegui 'firebase functions:secrets:set STRIPE_SECRET_KEY'");
+    throw new HttpsError("failed-precondition", "Il provider di pagamento non è configurato correttamente sul server.");
   }
-  if (!stripeInstance) {
-    stripeInstance = new Stripe(key, {
-      apiVersion: "2024-06-20",
-    });
-  }
-  return stripeInstance;
+  return new Stripe(key, {
+    apiVersion: "2024-06-20",
+  });
 };
 
 export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
   if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be logged in.");
+    throw new HttpsError("unauthenticated", "Devi essere loggato per configurare i pagamenti.");
   }
   const {uid} = request.auth;
   const stripe = getStripe();
 
   try {
-    const account = await stripe.accounts.create({
-      type: "express",
-      email: request.auth.token.email,
-      capabilities: {
-        card_payments: {requested: true},
-        transfers: {requested: true},
-      },
-    });
+    const userDoc = await db.collection("users").doc(uid).get();
+    const userData = userDoc.data();
 
-    await db.collection("users").doc(uid).update({
-      stripeAccountId: account.id,
-      stripeOnboardingComplete: false,
-    });
+    let accountId = userData?.stripeAccountId;
+
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: "express",
+        email: request.auth.token.email,
+        capabilities: {
+          card_payments: {requested: true},
+          transfers: {requested: true},
+        },
+        metadata: { userId: uid }
+      });
+      accountId = account.id;
+      await db.collection("users").doc(uid).update({
+        stripeAccountId: accountId,
+        stripeOnboardingComplete: false,
+      });
+    }
 
     const accountLink = await stripe.accountLinks.create({
-      account: account.id,
+      account: accountId,
       refresh_url: `${process.env.APP_URL || "https://www.marigo.app"}/profile/stripe-onboarding`,
       return_url: `${process.env.APP_URL || "https://www.marigo.app"}/profile`,
       type: "account_onboarding",
@@ -59,14 +63,14 @@ export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY
 
     return {url: accountLink.url};
   } catch (error: any) {
-    logger.error("Error creating Stripe account:", error);
-    throw new HttpsError("internal", error.message || "Could not create Stripe account.");
+    logger.error("Errore creazione account Stripe:", error);
+    throw new HttpsError("internal", error.message || "Impossibile creare l'account Stripe.");
   }
 });
 
 export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minInstances: 1}, async (request) => {
   if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be logged in.");
+    throw new HttpsError("unauthenticated", "Accesso negato.");
   }
   
   const {items, shippingAddress} = request.data;
@@ -74,7 +78,7 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
   const stripe = getStripe();
 
   if (!items || items.length === 0) {
-    throw new HttpsError("invalid-argument", "Your bag is empty.");
+    throw new HttpsError("invalid-argument", "Il carrello è vuoto.");
   }
 
   try {
@@ -82,11 +86,16 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
     const sellerId = firstItem.sellerId;
 
     if (!sellerId) {
-      throw new HttpsError("invalid-argument", "Missing seller information for items.");
+      throw new HttpsError("invalid-argument", "Informazioni venditore mancanti.");
     }
 
     const sellerDoc = await db.collection("users").doc(sellerId).get();
     const sellerData = sellerDoc.data();
+
+    // Verifica se il venditore è pronto per ricevere pagamenti (Necessario per transfer_data)
+    if (!sellerData?.stripeAccountId || sellerData?.stripeOnboardingComplete === false) {
+        throw new HttpsError("failed-precondition", "Il venditore non ha ancora configurato il suo account per ricevere pagamenti. Ti suggeriamo di contattarlo via chat.");
+    }
 
     let totalAmount = 0;
     const orderItems = [];
@@ -96,50 +105,44 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
       const productSnap = await productRef.get();
 
       if (!productSnap.exists) {
-        throw new HttpsError("not-found", `Product ${item.id} not found.`);
+        throw new HttpsError("not-found", `Prodotto ${item.id} non trovato.`);
       }
       
       const pData = productSnap.data();
-      const isAvailable = pData?.status === "active" || pData?.status === "pending_review";
+      const isAvailable = ["active", "pending_review", "reserved"].includes(pData?.status);
       if (!isAvailable) {
-        throw new HttpsError("failed-precondition", `Product "${pData?.title || item.id}" is no longer available.`);
+        throw new HttpsError("failed-precondition", `L'articolo "${pData?.title || "selezionato"}" non è più disponibile.`);
       }
 
-      const price = pData?.price || item.price || 0;
+      const price = pData?.price || 0;
       totalAmount += price;
       orderItems.push({
         productId: item.id,
-        sellerId: pData?.sellerId || item.sellerId,
-        title: pData?.title || item.title || "Untitled",
-        brand: pData?.brand || item.brand || "Generic",
-        image: pData?.images?.[0] || item.image || "",
+        sellerId: pData?.sellerId,
+        title: pData?.title,
+        brand: pData?.brand,
+        image: pData?.images?.[0] || "",
         price: price,
-        quantity: item.quantity || 1,
-        size: item.size || pData?.size || null,
+        quantity: 1,
+        size: pData?.size || null,
       });
     }
 
     const shippingFee = 10.90; 
     const totalInCents = Math.round((totalAmount + (shippingFee * items.length)) * 100);
-    
-    const hasStripeAccount = !!sellerData?.stripeAccountId && sellerData?.stripeOnboardingComplete !== false;
-    const commission = hasStripeAccount ? Math.round(totalInCents * 0.15) : undefined;
+    const commission = Math.round(totalInCents * 0.15); // 15% commissione piattaforma
 
-    const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
+    // Creazione PaymentIntent con cattura manuale (ESCROW)
+    const paymentIntent = await stripe.paymentIntents.create({
       amount: totalInCents,
       currency: "eur",
-      capture_method: "manual",
+      capture_method: "manual", // Fondi bloccati sulla carta
+      transfer_data: { 
+        destination: sellerData.stripeAccountId,
+        amount: totalInCents - commission, // Al venditore va il totale meno la commissione
+      },
       metadata: { buyerId, sellerId, orderType: 'marketplace' }
-    };
-
-    if (hasStripeAccount) {
-      paymentIntentParams.application_fee_amount = commission;
-      paymentIntentParams.transfer_data = { destination: sellerData!.stripeAccountId };
-    } else {
-        logger.warn(`Seller ${sellerId} is not ready for automatic transfer. Proceeding without commission calculation.`);
-    }
-
-    const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
+    });
 
     const orderRef = await db.collection("orders").add({
       orderNumber: `MRG-${Date.now()}`,
@@ -156,53 +159,39 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
 
     return {clientSecret: paymentIntent.client_secret, orderId: orderRef.id};
   } catch (error: any) {
-    logger.error("Checkout PaymentIntent Error:", error);
+    logger.error("Errore creazione PaymentIntent:", error);
     if (error instanceof HttpsError) throw error;
-    throw new HttpsError("internal", error.message || "Failed to initiate payment.");
+    throw new HttpsError("internal", error.message || "Errore durante l'inizializzazione del pagamento.");
   }
 });
 
 export const createOrder = onCall({minInstances: 1}, async (request) => {
   if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be logged in.");
+    throw new HttpsError("unauthenticated", "Accesso negato.");
   }
   const {items, shippingAddress} = request.data;
   const {uid: buyerId} = request.auth;
 
-  if (!items || items.length === 0) {
-    throw new HttpsError("invalid-argument", "No items provided.");
-  }
-
   try {
-    const sellerId = items[0].sellerId;
     let totalAmount = 0;
     const orderItems = [];
 
     for (const item of items) {
       const productRef = db.collection("products").doc(item.id);
       const productSnap = await productRef.get();
-
-      if (!productSnap.exists) {
-        throw new HttpsError("not-found", `Product ${item.id} not found.`);
-      }
+      if (!productSnap.exists) continue;
       
       const pData = productSnap.data();
-      const isAvailable = pData?.status === "active" || pData?.status === "pending_review";
-      if (!isAvailable) {
-        throw new HttpsError("failed-precondition", `Product "${pData?.title || item.id}" is no longer available.`);
-      }
-
-      const price = pData?.price || item.price || 0;
-      totalAmount += price;
+      totalAmount += pData?.price || 0;
       orderItems.push({
         productId: item.id,
-        sellerId: pData?.sellerId || item.sellerId,
-        title: pData?.title || item.title || "Untitled",
-        brand: pData?.brand || item.brand || "Generic",
-        image: pData?.images?.[0] || item.image || "",
-        price: price,
-        quantity: item.quantity || 1,
-        size: item.size || pData?.size || null,
+        sellerId: pData?.sellerId,
+        title: pData?.title,
+        brand: pData?.brand,
+        image: pData?.images?.[0] || "",
+        price: pData?.price || 0,
+        quantity: 1,
+        size: pData?.size || null,
       });
     }
 
@@ -210,9 +199,9 @@ export const createOrder = onCall({minInstances: 1}, async (request) => {
     totalAmount += shippingFee;
 
     const orderRef = await db.collection("orders").add({
-      orderNumber: `MRG-${Date.now()}`,
+      orderNumber: `MRG-COD-${Date.now()}`,
       buyerId,
-      sellerIds: [sellerId],
+      sellerIds: [items[0].sellerId],
       items: orderItems,
       totalAmount: totalAmount,
       status: "processing",
@@ -224,9 +213,8 @@ export const createOrder = onCall({minInstances: 1}, async (request) => {
 
     return {orderId: orderRef.id};
   } catch (error: any) {
-    logger.error("COD Order Error:", error);
-    if (error instanceof HttpsError) throw error;
-    throw new HttpsError("internal", error.message || "Could not place your order.");
+    logger.error("Errore ordine COD:", error);
+    throw new HttpsError("internal", "Impossibile completare l'ordine.");
   }
 });
 
@@ -236,7 +224,7 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET",
   const stripe = getStripe();
 
   if (!signature || !webhookSecret) {
-    res.status(400).send("Webhook secret not configured.");
+    res.status(400).send("Configurazione webhook mancante.");
     return;
   }
 
@@ -244,7 +232,7 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET",
   try {
     event = stripe.webhooks.constructEvent(req.rawBody, signature, webhookSecret);
   } catch (err: any) {
-    logger.error("Webhook signature verification failed.", err.message);
+    logger.error("Firma webhook non valida.", err.message);
     res.status(400).send(`Webhook Error: ${err.message}`);
     return;
   }
@@ -253,15 +241,20 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET",
 
   switch (event.type) {
     case "payment_intent.succeeded":
-      const ordersQuerySucceeded = await db.collection("orders").where("paymentIntentId", "==", paymentIntent.id).get();
-      if (!ordersQuerySucceeded.empty) {
-        await ordersQuerySucceeded.docs[0].ref.update({status: "processing", paymentStatus: "paid"});
+      const ordersQuery = await db.collection("orders").where("paymentIntentId", "==", paymentIntent.id).get();
+      if (!ordersQuery.empty) {
+        await ordersQuery.docs[0].ref.update({status: "processing", paymentStatus: "paid"});
+        // Aggiorna lo stato dei prodotti a "sold"
+        const orderData = ordersQuery.docs[0].data();
+        for (const item of orderData.items) {
+            await db.collection("products").doc(item.productId).update({ status: "sold" });
+        }
       }
       break;
     case "payment_intent.payment_failed":
-      const ordersQueryFailed = await db.collection("orders").where("paymentIntentId", "==", paymentIntent.id).get();
-      if (!ordersQueryFailed.empty) {
-        await ordersQueryFailed.docs[0].ref.update({status: "payment_failed", error: paymentIntent.last_payment_error?.message});
+      const ordersFailQuery = await db.collection("orders").where("paymentIntentId", "==", paymentIntent.id).get();
+      if (!ordersFailQuery.empty) {
+        await ordersFailQuery.docs[0].ref.update({status: "payment_failed", error: paymentIntent.last_payment_error?.message});
       }
       break;
   }
@@ -271,83 +264,51 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET",
 
 export const capturePayment = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
   const {orderId} = request.data;
-  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId.");
+  if (!orderId) throw new HttpsError("invalid-argument", "ID ordine mancante.");
   const stripe = getStripe();
 
   const orderRef = db.collection("orders").doc(orderId);
   const orderSnap = await orderRef.get();
-  if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found.");
+  if (!orderSnap.exists) throw new HttpsError("not-found", "Ordine non trovato.");
 
   const order = orderSnap.data();
-  if (!order?.paymentIntentId) throw new HttpsError("failed-precondition", "Order has no payment intent.");
+  if (!order?.paymentIntentId) throw new HttpsError("failed-precondition", "L'ordine non ha un pagamento Stripe associato.");
 
   try {
     await stripe.paymentIntents.capture(order.paymentIntentId);
     await orderRef.update({status: "completed"});
     return {success: true};
   } catch (error: any) {
-    logger.error(`Failed to capture payment for order ${orderId}:`, error);
-    throw new HttpsError("internal", error.message || "Could not capture payment.");
+    logger.error(`Fallimento cattura pagamento ${orderId}:`, error);
+    throw new HttpsError("internal", error.message || "Impossibile incassare il pagamento.");
   }
 });
 
 export const processRefund = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
   const {orderId, amount} = request.data;
-  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId.");
+  if (!orderId) throw new HttpsError("invalid-argument", "ID ordine mancante.");
   const stripe = getStripe();
 
-  const orderRef = db.collection("orders").doc(orderId);
-  const orderSnap = await orderRef.get();
-  if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found.");
+  const orderSnap = await db.collection("orders").doc(orderId).get();
   const order = orderSnap.data();
-  if (!order?.paymentIntentId) throw new HttpsError("failed-precondition", "Order has no payment intent.");
 
   try {
     await stripe.refunds.create({
-      payment_intent: order.paymentIntentId,
+      payment_intent: order?.paymentIntentId,
       amount: amount ? Math.round(amount * 100) : undefined,
     });
-    await orderRef.update({status: "refunded"});
+    await orderSnap.ref.update({status: "refunded"});
     return {success: true};
   } catch (error: any) {
-    logger.error(`Failed to process refund for order ${orderId}:`, error);
-    throw new HttpsError("internal", error.message || "Could not process refund.");
-  }
-});
-
-export const getMyOrders = onCall(async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "You must be logged in.");
-  const {uid: buyerId} = request.auth;
-
-  try {
-    const ordersQuery = db.collection("orders").where("buyerId", "==", buyerId).orderBy("createdAt", "desc");
-    const snapshot = await ordersQuery.get();
-    const orders = snapshot.docs.map((doc) => ({id: doc.id, ...doc.data()}));
-    return {orders};
-  } catch (error) {
-    logger.error(`Error fetching orders for buyer ${buyerId}:`, error);
-    throw new HttpsError("internal", "Could not fetch orders.");
-  }
-});
-
-export const getMySales = onCall(async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "You must be logged in.");
-  const {uid: sellerId} = request.auth;
-
-  try {
-    const salesQuery = db.collection("orders").where("sellerIds", "array-contains", sellerId).orderBy("createdAt", "desc");
-    const snapshot = await salesQuery.get();
-    const sales = snapshot.docs.map((doc) => ({id: doc.id, ...doc.data()}));
-    return {sales};
-  } catch (error) {
-    logger.error(`Error fetching sales for seller ${sellerId}:`, error);
-    throw new HttpsError("internal", "Could not fetch sales.");
+    logger.error(`Errore rimborso ${orderId}:`, error);
+    throw new HttpsError("internal", error.message || "Errore durante il rimborso.");
   }
 });
 
 export const releaseEscrow = onSchedule({schedule: "every 1 hours", secrets: ["STRIPE_SECRET_KEY"]}, async (event) => {
   const threeDaysAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 72 * 60 * 60 * 1000);
   const stripe = getStripe();
+  
   const query = db.collection("orders")
     .where("status", "==", "delivered")
     .where("deliveredAt", "<=", threeDaysAgo);
@@ -362,7 +323,7 @@ export const releaseEscrow = onSchedule({schedule: "every 1 hours", secrets: ["S
         await stripe.paymentIntents.capture(order.paymentIntentId);
         await doc.ref.update({status: "completed"});
       } catch (error) {
-        logger.error(`Auto-capture failed for ${doc.id}:`, error);
+        logger.error(`Auto-capture fallito per ${doc.id}:`, error);
       }
     }
   });
@@ -370,6 +331,7 @@ export const releaseEscrow = onSchedule({schedule: "every 1 hours", secrets: ["S
   await Promise.all(promises);
 });
 
+// IA Moderation
 const vertexAI = new VertexAI({
   project: process.env.GCLOUD_PROJECT,
   location: "us-central1",
@@ -465,21 +427,6 @@ export const completeDelivery = onCall(async (request) => {
       await db.doc(`orders/${deliverySnap.data()?.orderId}`).update({ status: "delivered", deliveredAt: admin.firestore.FieldValue.serverTimestamp() });
   }
   return {success: true};
-});
-
-export const getExchangeRates = onSchedule("every 24 hours", async (event) => {
-    const apiKey = process.env.EXCHANGERATE_API_KEY;
-    if (!apiKey) return null;
-    const response = await fetch(`https://v6.exchangerate-api.com/v6/${apiKey}/latest/EUR`);
-    const data: any = await response.json();
-    if (data.result === "success") {
-        await db.collection("config").doc("exchangeRates").set({
-            base: "EUR",
-            rates: { EUR: data.conversion_rates.EUR, USD: data.conversion_rates.USD, ALL: data.conversion_rates.ALL },
-            lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-        });
-    }
-    return null;
 });
 
 export const exportUserData = onCall(async (request) => {
