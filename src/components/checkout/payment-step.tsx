@@ -1,15 +1,13 @@
 'use client';
 import { useState } from 'react';
-import {
-  Card,
-  CardContent,
-} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { CreditCard, Wallet, Apple, Landmark } from 'lucide-react';
+import { CreditCard, Wallet, Apple, Landmark, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CardElement } from '@stripe/react-stripe-js';
 
 type PaymentStepProps = {
   onNextStep: (paymentMethod: string) => void;
@@ -17,21 +15,37 @@ type PaymentStepProps = {
 };
 
 const paymentMethods = [
+    { id: 'card', title: 'Credit or Debit Card', icon: CreditCard, subtitle: 'Secure payment via Stripe Escrow' },
     { id: 'cod', title: 'Cash on Delivery', icon: Wallet, subtitle: 'Pay when you receive the item' },
-    { id: 'apple_pay', title: 'Apple Pay', icon: Apple, subtitle: 'Fast and secure checkout' },
-    { id: 'saved_card', title: 'Saved Visa ending in 4242', icon: CreditCard, subtitle: 'Pay with your saved card' },
-    { id: 'card', title: 'Credit or Debit Card', icon: CreditCard, subtitle: 'Visa, Mastercard, Amex' },
-    { id: 'paypal', title: 'PayPal', icon: Landmark, subtitle: 'Standard PayPal checkout' },
+    { id: 'apple_pay', title: 'Apple Pay', icon: Apple, subtitle: 'Fast one-tap checkout' },
 ];
 
+const CARD_ELEMENT_OPTIONS = {
+  style: {
+    base: {
+      color: "#32325d",
+      fontFamily: '"Inter", sans-serif',
+      fontSmoothing: "antialiased",
+      fontSize: "16px",
+      "::placeholder": {
+        color: "#aab7c4"
+      }
+    },
+    invalid: {
+      color: "#fa755a",
+      iconColor: "#fa755a"
+    }
+  }
+};
+
 export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
-  const [selectedMethod, setSelectedMethod] = useState('cod');
+  const [selectedMethod, setSelectedMethod] = useState('card');
 
   return (
     <div className="space-y-6">
         <div className="space-y-1">
             <h2 className="text-2xl font-bold font-headline">Payment Method</h2>
-            <p className="text-muted-foreground text-sm">Choose how you would like to pay.</p>
+            <p className="text-muted-foreground text-sm">Choose your preferred payment option.</p>
         </div>
         
         <RadioGroup
@@ -70,10 +84,13 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
                     exit={{ opacity: 0, height: 0 }}
                     className="overflow-hidden"
                 >
-                    <Card className="border-primary/20 bg-muted/10 shadow-inner mt-2">
+                    <Card className="border-primary/20 bg-background shadow-md mt-2">
                         <CardContent className="p-6">
-                            <p className="text-sm text-muted-foreground text-center">
-                                Stripe card entry will appear here in the final version.
+                            <div className="p-4 border rounded-md bg-muted/10">
+                                <CardElement options={CARD_ELEMENT_OPTIONS} />
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-4 text-center">
+                                Your payment details are encrypted and processed by Stripe. Marigo Luxe never stores your card information.
                             </p>
                         </CardContent>
                     </Card>
@@ -88,14 +105,14 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
             className="flex-1 h-14 rounded-full font-semibold"
             onClick={onPrevStep}
           >
-            Back to Address
+            Back
           </Button>
           <Button
             size="lg"
             className="flex-1 h-14 rounded-full text-base font-bold shadow-lg"
             onClick={() => onNextStep(selectedMethod)}
           >
-            Continue to Review
+            Review Order
           </Button>
         </div>
     </div>
