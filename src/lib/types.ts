@@ -37,6 +37,12 @@ export const firestoreUserSchema = z.object({
   createdAt: z.any().optional(),
   lastLoginAt: z.any().optional(),
   status: z.enum(['active', 'banned']).default("active"),
+  hasAcceptedChatRules: z.boolean().optional(),
+  emailPreferences: z.object({
+    marketing: z.boolean().default(true),
+    productUpdates: z.boolean().default(true),
+    orderUpdates: z.boolean().default(true),
+  }).optional(),
 });
 export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
 
@@ -152,6 +158,13 @@ export type FirestoreProduct = {
   isAuthenticated: boolean;
   createdAt: any;
   updatedAt: any;
+  authenticityCheck?: {
+    status: 'pending' | 'completed';
+    confidence: 'high' | 'medium' | 'low';
+    findings: string[];
+  };
+  vintage?: boolean;
+  pattern?: string;
 };
 
 export type FirestoreOrder = {
@@ -212,6 +225,9 @@ export type FirestoreOffer = {
     counterAmount?: number;
     expiresAt?: any;
     createdAt: any;
+    sellerId: string;
+    offerAmount: number;
+    history?: any[];
 };
 
 export type FirestoreDelivery = {
@@ -229,6 +245,9 @@ export type FirestoreDelivery = {
         delivery: FirestoreAddress;
     };
     history?: { status: string; timestamp: any }[];
+    proofOfPickup?: string;
+    pickupSignature?: string;
+    pickupNotes?: string;
 };
 
 export type FirestoreCourierProfile = {
@@ -293,4 +312,24 @@ export type ProofFile = {
     url: string;
     name: string;
     type: string;
+};
+
+export type FirestoreReview = {
+    id: string;
+    orderId: string;
+    productId: string;
+    reviewerId: string;
+    revieweeId: string;
+    rating: number;
+    content: string;
+    createdAt: any;
+};
+
+export type FirestorePaymentMethod = {
+    id: string;
+    stripePaymentMethodId: string;
+    type: string;
+    last4: string;
+    brand: string;
+    isDefault: boolean;
 };

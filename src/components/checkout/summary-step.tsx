@@ -1,8 +1,9 @@
+
 'use client';
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, CreditCard, Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { MapPin, CreditCard, Loader2, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
@@ -17,9 +18,10 @@ type SummaryStepProps = {
   onPrevStep: (step: number) => void;
   shippingAddress: FirestoreAddress | null;
   paymentMethod: string | null;
+  savedMethodId?: string | null;
 };
 
-export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: SummaryStepProps) {
+export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedMethodId }: SummaryStepProps) {
   const { toast } = useToast();
   const router = useRouter();
   const { items, grandTotal, clearCart } = useCart();
@@ -39,7 +41,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
     setIsLoading(true);
     setErrorMessage(null);
 
-    // 1. If Cash on Delivery, use the existing logic
+    // 1. Handle Cash on Delivery
     if (paymentMethod === 'cod') {
         try {
             const createOrder = httpsCallable(functions, 'createOrder');
@@ -52,52 +54,72 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             router.push(`/checkout/success/${result.data.orderId}`);
             return;
         } catch (e: any) {
-            setErrorMessage(e.message);
+            setErrorMessage(e.message || "Could not process COD order.");
             setIsLoading(false);
             return;
         }
     }
 
-    // 2. Stripe Payment Logic
-    if (!stripe || !elements) return;
+    // 2. Handle Card Payments (New or Saved)
+    if (!stripe) return;
 
     try {
         const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
         const intentResult: any = await createPaymentIntent({
             items: items.map(i => ({ id: i.id, sellerId: i.sellerId, title: i.title })),
-            shippingAddress
+            shippingAddress,
+            paymentMethodId: selectedPaymentMethodId // Pass ID if using saved card
         });
 
-        const { clientSecret, orderId } = intentResult.data;
+        const { clientSecret, orderId, requiresAction } = intentResult.data;
 
-        const result = await stripe.confirmCardPayment(clientSecret, {
-            payment_method: {
-                card: elements.getElement(CardElement)!,
-                billing_details: {
-                    name: shippingAddress.fullName,
-                    email: user.email || undefined,
+        if (requiresAction) {
+            // Handle 3D Secure for saved cards or specific cases
+            const actionResult = await stripe.handleCardAction(clientSecret);
+            if (actionResult.error) {
+                throw new Error(actionResult.error.message);
+            }
+        }
+
+        // For new cards, we need the CardElement
+        let confirmResult;
+        if (paymentMethod === 'card' && elements) {
+            confirmResult = await stripe.confirmCardPayment(clientSecret, {
+                payment_method: {
+                    card: elements.getElement(CardElement)!,
+                    billing_details: {
+                        name: shippingAddress.fullName,
+                        email: user.email || undefined,
+                    },
                 },
-            },
-        });
-
-        if (result.error) {
-            setErrorMessage(result.error.message || "Payment failed");
+            });
         } else {
-            if (result.paymentIntent.status === 'requires_capture' || result.paymentIntent.status === 'succeeded') {
+            // For saved cards where createPaymentIntent already attached the PM
+            confirmResult = await stripe.confirmCardPayment(clientSecret);
+        }
+
+        if (confirmResult.error) {
+            setErrorMessage(confirmResult.error.message || "Payment failed");
+        } else {
+            if (confirmResult.paymentIntent.status === 'requires_capture' || confirmResult.paymentIntent.status === 'succeeded') {
                 clearCart();
                 toast({ title: "Order Placed!", description: "Funds held in escrow successfully." });
                 router.push(`/checkout/success/${orderId}`);
+            } else {
+                setErrorMessage(`Unexpected status: ${confirmResult.paymentIntent.status}`);
             }
         }
     } catch (error: any) {
-        setErrorMessage(error.message || "An unexpected error occurred.");
+        console.error("Payment error:", error);
+        setErrorMessage(error.message || "An unexpected error occurred during payment.");
     } finally {
         setIsLoading(false);
     }
   }
 
   const paymentLabel = {
-      card: 'Credit or Debit Card',
+      card: 'New Credit or Debit Card',
+      saved_card: 'Saved Credit Card',
       cod: 'Cash on Delivery',
       apple_pay: 'Apple Pay',
       paypal: 'PayPal',
@@ -111,7 +133,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
       </div>
 
       <div className="grid gap-6">
-          <Card className="border-none bg-muted/20 shadow-sm">
+          <Card className="border-none bg-muted/20 shadow-sm overflow-hidden">
               <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
@@ -132,7 +154,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
               </CardContent>
           </Card>
 
-          <Card className="border-none bg-muted/20 shadow-sm">
+          <Card className="border-none bg-muted/20 shadow-sm overflow-hidden">
               <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
@@ -143,7 +165,8 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
                       </div>
                       <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onPrevStep(2)}>Change</Button>
                   </div>
-                  <div className="text-sm font-medium bg-background px-4 py-3 rounded-lg border">
+                  <div className="flex items-center gap-3 text-sm font-medium bg-background px-4 py-3 rounded-lg border">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
                       {paymentLabel}
                   </div>
               </CardContent>
@@ -151,7 +174,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
       </div>
 
       {errorMessage && (
-          <Alert variant="destructive" className="bg-destructive/5 border-destructive/20">
+          <Alert variant="destructive" className="bg-destructive/5 border-destructive/20 animate-in fade-in slide-in-from-top-2">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="font-medium">{errorMessage}</AlertDescription>
           </Alert>
@@ -180,7 +203,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
                     <span>Processing...</span>
                 </div>
             ) : (
-                `Confirm & Pay — ${formatPrice(grandTotal)}`
+                `Pay Now — ${formatPrice(grandTotal)}`
             )}
           </Button>
       </div>
