@@ -4,7 +4,7 @@
     "User": {
       "title": "User",
       "type": "object",
-      "description": "Represents a user in the MarigoApp marketplace.",
+      "description": "Represents a user in the Marigo Luxe marketplace.",
       "properties": {
         "email": {
           "type": "string",
@@ -16,19 +16,24 @@
           "description": "The user's full name."
         },
         "phone": {
-            "type": "string",
-            "description": "The user's phone number."
+          "type": "string",
+          "description": "The user's phone number."
         },
         "role": {
           "type": "string",
-          "enum": ["buyer", "seller", "courier", "admin"],
+          "enum": [
+            "buyer",
+            "seller",
+            "courier",
+            "admin"
+          ],
           "default": "buyer",
           "description": "The user's primary role in the platform."
         },
         "profileImage": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL of the user's profile picture stored in Storage."
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the user's profile picture stored in Storage."
         },
         "bio": {
           "type": "string",
@@ -36,13 +41,21 @@
         },
         "language": {
           "type": "string",
-          "enum": ["sq", "en", "it"],
+          "enum": [
+            "sq",
+            "en",
+            "it"
+          ],
           "default": "en",
           "description": "The user's preferred language."
         },
         "currency": {
           "type": "string",
-          "enum": ["EUR", "ALL", "USD"],
+          "enum": [
+            "EUR",
+            "ALL",
+            "USD"
+          ],
           "default": "EUR",
           "description": "The user's preferred currency for display."
         },
@@ -76,7 +89,10 @@
         },
         "status": {
           "type": "string",
-          "enum": ["active", "banned"],
+          "enum": [
+            "active",
+            "banned"
+          ],
           "default": "active",
           "description": "The user's account status."
         }
@@ -87,248 +103,88 @@
         "role"
       ]
     },
-    "CartItem": {
-      "title": "CartItem",
-      "type": "object",
-      "description": "Represents a product in a user's shopping cart.",
-      "properties": {
-        "id": { "type": "string" },
-        "brand": { "type": "string" },
-        "title": { "type": "string" },
-        "price": { "type": "number" },
-        "image": { "type": "string", "format": "uri" },
-        "sellerId": { "type": "string" },
-        "quantity": { "type": "number" },
-        "selectedSize": { "type": ["string", "null"] },
-        "selectedColor": { "type": ["string", "null"] },
-        "shippingMethod": { "type": "string", "enum": ["direct", "authentication"] },
-        "directShippingFee": { "type": "number" }
-      },
-      "required": ["id", "brand", "title", "price", "image", "sellerId", "quantity", "shippingMethod", "directShippingFee"]
-    },
-    "Address": {
-      "title": "Address",
-      "type": "object",
-      "description": "Represents a user's address.",
-      "properties": {
-        "fullName": { "type": "string" },
-        "phone": { "type": "string" },
-        "address": { "type": "string" },
-        "city": { "type": "string" },
-        "postal": { "type": "string" },
-        "country": { "type": "string" },
-        "isDefault": { "type": "boolean" }
-      },
-      "required": ["fullName", "address", "city", "postal", "country"]
-    },
-    "PaymentMethod": {
-      "title": "PaymentMethod",
-      "type": "object",
-      "description": "Represents a user's payment method.",
-      "properties": {
-        "type": { "type": "string" },
-        "stripePaymentMethodId": { "type": "string" },
-        "last4": { "type": "string" },
-        "brand": { "type": "string" },
-        "isDefault": { "type": "boolean" }
-      },
-      "required": ["stripePaymentMethodId", "last4", "brand"]
-    },
-    "WishlistItem": {
-        "title": "WishlistItem",
-        "type": "object",
-        "description": "Represents a product in a user's wishlist.",
-        "properties": {
-            "addedAt": { "type": "string", "format": "date-time" }
-        },
-        "required": ["addedAt"]
-    },
-    "Category": {
-      "title": "Category",
-      "type": "object",
-      "description": "Represents a product category.",
-      "properties": {
-        "name": { "type": "string" },
-        "slug": { "type": "string" },
-        "parentId": { "type": "string" },
-        "icon": { "type": "string" },
-        "image": { "type": "string", "format": "uri" },
-        "position": { "type": "number" },
-        "isActive": { "type": "boolean" }
-      },
-      "required": ["name", "slug", "isActive"]
-    },
-    "Brand": {
-      "title": "Brand",
-      "type": "object",
-      "description": "Represents a product brand.",
-      "properties": {
-        "name": { "type": "string" },
-        "slug": { "type": "string" },
-        "logoUrl": { "type": "string", "format": "uri" },
-        "verified": { "type": "boolean" },
-        "productCount": { "type": "number" }
-      },
-      "required": ["name", "slug"]
-    },
     "Product": {
       "title": "Product",
       "type": "object",
-      "description": "Represents a product listed on the marketplace.",
+      "description": "Represents a luxury product listed on the marketplace.",
       "properties": {
-        "sellerId": { "type": "string", "description": "Reference to the user who is selling the item." },
+        "sellerId": { "type": "string" },
         "title": { "type": "string" },
         "description": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "subcategoryId": { "type": "string" },
+        "brandId": { "type": "string" },
+        "condition": { "type": "string", "enum": ["new", "like_new", "good", "fair"] },
+        "listingType": { "type": "string", "enum": ["fixed_price", "auction"] },
         "price": { "type": "number" },
-        "category": { "type": "string" },
-        "subCategory": { "type": "string" },
-        "images": { "type": "array", "items": { "type": "string", "format": "uri" } },
-        "status": { "type": "string", "enum": ["active", "sold", "reserved", "pending_review", "rejected", "draft"] },
-        "listingCreated": { "type": "string", "format": "date-time" },
-        "keywords": { "type": "array", "items": { "type": "string" }, "description": "Keywords for search." },
-        "brand": { "type": "string" },
+        "originalPrice": { "type": "number" },
+        "currency": { "type": "string", "default": "EUR" },
         "size": { "type": "string" },
-        "condition": { "type": "string" },
-        "material": { "type": "string" },
         "color": { "type": "string" },
-        "pattern": { "type": "string" },
-        "vintage": { "type": "boolean" },
-        "moderation": {
+        "material": { "type": "string" },
+        "gender": { "type": "string", "enum": ["women", "men", "children", "unisex"] },
+        "images": {
+          "type": "array",
+          "items": {
             "type": "object",
-            "description": "Image moderation status.",
             "properties": {
-                "status": {
-                    "type": "string",
-                    "enum": ["approved", "rejected", "needs_review"]
-                },
-                "reasons": {
-                    "type": "array",
-                    "items": { "type": "string" }
-                },
-                "checkedAt": {
-                    "type": "string",
-                    "format": "date-time"
-                }
+              "url": { "type": "string", "format": "uri" },
+              "thumbnailUrl": { "type": "string", "format": "uri" },
+              "position": { "type": "number" }
             }
+          }
         },
-        "authenticityCheck": {
-            "type": "object",
-            "description": "AI-powered authenticity pre-check results.",
-            "properties": {
-                "status": {
-                    "type": "string",
-                    "enum": ["unchecked", "pending", "completed", "failed"]
-                },
-                "confidence": {
-                    "type": "string",
-                    "enum": ["low", "medium", "high"]
-                },
-                "findings": {
-                    "type": "array",
-                    "items": { "type": "string" }
-                },
-                "checkedAt": {
-                    "type": "string",
-                    "format": "date-time"
-                }
-            }
-        }
+        "status": { "type": "string", "enum": ["draft", "pending_review", "active", "sold", "removed", "expired"] },
+        "views": { "type": "number", "default": 0 },
+        "wishlistCount": { "type": "number", "default": 0 },
+        "isFeatured": { "type": "boolean", "default": false },
+        "isAuthenticated": { "type": "boolean", "default": false },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["sellerId", "title", "description", "price", "category", "images", "status", "listingCreated"]
+      "required": ["sellerId", "title", "price", "status", "createdAt", "images"]
     },
     "Offer": {
       "title": "Offer",
       "type": "object",
       "description": "Represents an offer made on a product.",
       "properties": {
-        "productId": { "type": "string", "$ref": "#/entities/Product" },
-        "buyerId": { "type": "string", "$ref": "#/entities/User" },
-        "sellerId": { "type": "string", "$ref": "#/entities/User" },
-        "originalListingPrice": { "type": "number" },
-        "offerAmount": { "type": "number" },
-        "offerType": { "type": "string", "enum": ["preset_1", "preset_2", "preset_3", "custom"] },
-        "status": { "type": "string", "enum": ["pending", "accepted", "declined", "countered"] },
-        "counterOfferAmount": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "history": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "action": { "type": "string" },
-              "amount": { "type": "number" },
-              "byUser": { "type": "string" },
-              "timestamp": { "type": "string", "format": "date-time" }
-            },
-            "required": ["action", "amount", "byUser", "timestamp"]
-          }
-        }
-      },
-      "required": ["productId", "buyerId", "sellerId", "offerAmount", "status", "createdAt"]
-    },
-    "Order": {
-      "title": "Order",
-      "type": "object",
-      "description": "Represents an order.",
-      "properties": {
-        "orderNumber": { "type": "string" },
         "buyerId": { "type": "string" },
-        "sellerIds": { "type": "array", "items": { "type": "string" } },
-        "items": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "productId": { "type": "string" },
-              "sellerId": { "type": "string" },
-              "title": { "type": "string" },
-              "brand": { "type": "string" },
-              "image": { "type": "string" },
-              "price": { "type": "number" },
-              "quantity": { "type": "number" },
-              "size": { "type": "string" }
-            },
-            "required": ["productId", "sellerId", "title", "price", "quantity"]
-          }
-        },
-        "shippingPrice": { "type": "number" },
-        "totalAmount": { "type": "number" },
-        "paymentStatus": { "type": "string" },
-        "paymentMethod": { "type": "string" },
-        "paymentIntentId": { "type": "string" },
-        "status": { "type": "string" },
-        "shippingAddress": { "$ref": "#/entities/Address" },
-        "trackingNumber": { "type": "string" },
-        "courierCompany": { "type": "string" },
-        "deliveredAt": { "type": "string", "format": "date-time" },
+        "amount": { "type": "number" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected", "countered", "withdrawn", "expired"] },
+        "counterAmount": { "type": "number" },
+        "expiresAt": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["orderNumber", "buyerId", "sellerIds", "items", "totalAmount", "status", "createdAt"]
+      "required": ["buyerId", "amount", "status", "createdAt"]
     }
   },
   "auth": {
-    "providers": ["password", "google.com", "apple.com"]
+    "providers": [
+      "password",
+      "google.com",
+      "apple.com"
+    ]
   },
   "firestore": {
     "/users/{userId}": {
-      "schema": { "$ref": "#/entities/User" },
+      "schema": {
+        "$ref": "#/entities/User"
+      },
       "description": "Stores user profiles and core information."
     },
-    "/users/{userId}/addresses/{addressId}": {
-      "schema": { "$ref": "#/entities/Address" },
-      "description": "Subcollection for a user's shipping addresses."
+    "/products/{productId}": {
+      "schema": {
+        "$ref": "#/entities/Product"
+      },
+      "description": "Main collection for products."
     },
-    "/users/{userId}/paymentMethods/{methodId}": {
-      "schema": { "$ref": "#/entities/PaymentMethod" },
-      "description": "Subcollection for a user's payment methods."
-    },
-    "/users/{userId}/wishlist/{productId}": {
-      "schema": { "$ref": "#/entities/WishlistItem" },
-      "description": "Subcollection for a user's wishlist/favorites."
-    },
-    "/users/{userId}/cart/{productId}": {
-      "schema": { "$ref": "#/entities/CartItem" },
-      "description": "Subcollection for a user's synchronized shopping cart."
+    "/products/{productId}/offers/{offerId}": {
+      "schema": {
+        "$ref": "#/entities/Offer"
+      },
+      "description": "Subcollection for offers on a specific product."
     }
   }
 }

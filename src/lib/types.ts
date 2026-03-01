@@ -25,9 +25,9 @@ export const firestoreUserSchema = z.object({
   name: z.string().optional().nullable(),
   email: z.string().email().optional().nullable(),
   phone: z.string().optional().nullable(),
+  role: z.enum(["buyer", "seller", "courier", "admin"]).default("buyer"),
   profileImage: z.string().url().optional().nullable(),
   bio: z.string().optional().nullable(),
-  role: z.enum(["buyer", "seller", "courier", "admin"]).default("buyer"),
   language: z.enum(["sq", "en", "it"]).default("en"),
   currency: z.enum(["EUR", "ALL", "USD"]).default("EUR"),
   stripeCustomerId: z.string().optional().nullable(),
@@ -46,14 +46,16 @@ export const sellStep1Schema = z.object({
     url: z.string(),
     name: z.string(),
     type: z.string(),
+    thumbnailUrl: z.string().optional(),
+    position: z.number(),
   })).min(3, "At least 3 photos are required").max(8, "Maximum 8 photos allowed"),
 });
 
 export const sellStep2Schema = z.object({
-  gender: z.string().min(1, "Please select a gender"),
-  category: z.string().min(1, "Category is required"),
-  subCategory: z.string().min(1, "Subcategory is required"),
-  brand: z.string().min(1, "Brand is required"),
+  gender: z.enum(["women", "men", "children", "unisex"]),
+  categoryId: z.string().min(1, "Category is required"),
+  subcategoryId: z.string().min(1, "Subcategory is required"),
+  brandId: z.string().min(1, "Brand is required"),
 });
 
 export const sellStep3Schema = z.object({
@@ -66,9 +68,10 @@ export const sellStep3Schema = z.object({
 });
 
 export const sellStep4Schema = z.object({
-  condition: z.string().min(1, "Condition is required"),
+  condition: z.enum(["new", "like_new", "good", "fair"]),
   material: z.string().min(1, "Material is required"),
   color: z.string().min(1, "Color is required"),
+  size: z.string().optional(),
   sizeStandard: z.string().optional(),
   sizeValue: z.string().optional(),
   pattern: z.string().optional(),
@@ -78,6 +81,8 @@ export const sellStep4Schema = z.object({
 
 export const sellStep5Schema = z.object({
   price: z.number().min(1, "Price must be at least 1 EUR"),
+  originalPrice: z.number().optional(),
+  listingType: z.enum(["fixed_price", "auction"]).default("fixed_price"),
   allowOffers: z.boolean().default(true),
   shippingMethod: z.enum(['baboon', 'other', 'free']).optional(),
 });
@@ -122,24 +127,31 @@ export type FirestoreProduct = {
   id: string;
   sellerId: string;
   title: string;
-  brand: string;
   description: string;
+  categoryId: string;
+  subcategoryId: string;
+  brandId: string;
+  condition: "new" | "like_new" | "good" | "fair";
+  listingType: "fixed_price" | "auction";
   price: number;
-  category: string;
-  subCategory: string;
-  images: string[];
-  status: 'active' | 'sold' | 'reserved' | 'pending_review' | 'rejected' | 'draft';
-  listingCreated: any;
-  condition: string;
+  originalPrice?: number;
+  currency: "EUR";
+  size?: string;
   color?: string;
   material?: string;
-  size?: string;
-  authenticityCheck?: {
-    status: 'unchecked' | 'pending' | 'completed' | 'failed';
-    confidence: 'low' | 'medium' | 'high';
-    findings: string[];
-    checkedAt: any;
-  };
+  gender: "women" | "men" | "children" | "unisex";
+  images: {
+    url: string;
+    thumbnailUrl?: string;
+    position: number;
+  }[];
+  status: "draft" | "pending_review" | "active" | "sold" | "removed" | "expired";
+  views: number;
+  wishlistCount: number;
+  isFeatured: boolean;
+  isAuthenticated: boolean;
+  createdAt: any;
+  updatedAt: any;
 };
 
 export type FirestoreOrder = {
@@ -193,20 +205,13 @@ export type FirestoreMessage = {
 
 export type FirestoreOffer = {
     id: string;
-    productId: string;
     buyerId: string;
-    sellerId: string;
-    offerAmount: number;
-    originalListingPrice: number;
-    status: 'pending' | 'accepted' | 'declined' | 'countered' | 'withdrawn' | 'expired';
-    counterOfferAmount?: number;
+    amount: number;
+    message?: string;
+    status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'withdrawn' | 'expired';
+    counterAmount?: number;
+    expiresAt?: any;
     createdAt: any;
-    history: {
-        action: string;
-        amount: number;
-        byUser: string;
-        timestamp: any;
-    }[];
 };
 
 export type FirestoreDelivery = {

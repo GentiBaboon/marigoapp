@@ -24,26 +24,18 @@ service cloud.firestore {
     }
     
     function isApprovedCourier() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.courierStatus == 'approved';
-    }
-    
-    function isAssignedCourier(delivery) {
-      return delivery.courierId == request.auth.uid;
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'courier';
     }
 
     function isCorrectOwnerInRequestData(ownerFieldName) {
       return request.resource.data[ownerFieldName] == request.auth.uid;
     }
     
-    function isPartyToOrder(order) {
-        return isSignedIn() && (request.auth.uid == order.buyerId || request.auth.uid in order.sellerIds);
-    }
-    
     function validProduct(p) {
       return p.sellerId == request.auth.uid 
           && p.title is string
-          && p.brand is string
-          && p.category is string;
+          && p.price is number
+          && p.status in ['draft', 'pending_review', 'active', 'sold', 'removed', 'expired'];
     }
 
     // --------------------------------------------------------------------
@@ -90,14 +82,10 @@ service cloud.firestore {
       allow delete: if (isSignedIn() && (resource.data.sellerId == request.auth.uid || isAdmin()));
 
       match /offers/{offerId} {
-        allow get: if isSignedIn() && (isOwner(resource.data.buyerId) || isOwner(resource.data.sellerId) || isAdmin());
-        allow list: if isSignedIn();
+        allow read: if isSignedIn() && (isOwner(resource.data.buyerId) || isOwner(get(/databases/$(database)/documents/products/$(productId)).data.sellerId) || isAdmin());
         allow create: if isSignedIn() && isCorrectOwnerInRequestData('buyerId');
-        allow update: if isSignedIn() && (isOwner(resource.data.buyerId) || isOwner(resource.data.sellerId) || isAdmin());
+        allow update: if isSignedIn() && (isOwner(resource.data.buyerId) || isOwner(get(/databases/$(database)/documents/products/$(productId)).data.sellerId) || isAdmin());
         allow delete: if isAdmin();
-      }
-      match /bids/{bidId} {
-         allow read, write: if isSignedIn();
       }
     }
     
@@ -108,40 +96,6 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    match /reviews/{reviewId} {
-      allow get, list: if true;
-      allow create: if isSignedIn() && isCorrectOwnerInRequestData('reviewerId');
-      allow update: if isOwner(resource.data.reviewerId) || isAdmin();
-      allow delete: if isAdmin();
-    }
-    
-    match /deliveries/{deliveryId} {
-      allow get: if isSignedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid in resource.data.sellerIds || isAssignedCourier(resource.data) || isAdmin());
-      allow list: if isApprovedCourier() || isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin() || (
-        isApprovedCourier() && (
-          (resource.data.courierId == null && request.resource.data.courierId == request.auth.uid && request.resource.data.status == 'assigned') ||
-          (isAssignedCourier(resource.data) && request.resource.data.courierId == resource.data.courierId)
-        )
-      );
-      allow delete: if isAdmin();
-    }
-
-    match /courier_profiles/{userId} {
-        allow read, create, update: if isOwner(userId) || isAdmin();
-        allow list, delete: if isAdmin();
-    }
-
-    match /conversations/{conversationId} {
-      allow get, write: if (isSignedIn() && request.auth.uid in resource.data.participants) || isAdmin();
-      allow list: if isAdmin();
-      
-      match /messages/{messageId} {
-        allow read, write: if (isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants) || isAdmin();
-      }
-    }
-    
     match /notifications/{notificationId} {
         allow read, list, update: if isOwner(resource.data.userId);
         allow delete: if isAdmin();
@@ -157,15 +111,6 @@ service cloud.firestore {
       }
     }
     
-    match /reports/{reportId} {
-        allow create: if isSignedIn() && isCorrectOwnerInRequestData('reporterId');
-        allow read, list, update, delete: if isAdmin();
-    }
-
-    match /roles_admin/{userId} {
-      allow read, write: if isAdmin();
-    }
-    
     match /admin_logs/{logId} {
       allow get, list: if isAdmin();
       allow create: if isAdmin();
@@ -173,11 +118,6 @@ service cloud.firestore {
     }
 
     match /settings/{docId} {
-        allow read: if true;
-        allow write: if isAdmin();
-    }
-
-    match /coupons/{couponId} {
         allow read: if true;
         allow write: if isAdmin();
     }
