@@ -105,6 +105,73 @@ export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY
 });
 
 /**
+ * Gets the Stripe balance for a connected seller account.
+ */
+export const getSellerBalance = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
+  const stripe = getStripe();
+  const uid = request.auth.uid;
+
+  try {
+    const userDoc = await db.collection("users").doc(uid).get();
+    const accountId = userDoc.data()?.stripeAccountId;
+
+    if (!accountId) {
+      return { available: 0, pending: 0, currency: "eur" };
+    }
+
+    const balance = await stripe.balance.retrieve({
+      stripeAccount: accountId,
+    });
+
+    const available = balance.available.reduce((sum, b) => sum + b.amount, 0) / 100;
+    const pending = balance.pending.reduce((sum, b) => sum + b.amount, 0) / 100;
+
+    return { available, pending, currency: balance.available[0]?.currency || "eur" };
+  } catch (error: any) {
+    logger.error("getSellerBalance Error:", error);
+    throw new HttpsError("internal", error.message);
+  }
+});
+
+/**
+ * Requests a manual payout for a connected account.
+ */
+export const requestPayout = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
+  const stripe = getStripe();
+  const uid = request.auth.uid;
+
+  try {
+    const userDoc = await db.collection("users").doc(uid).get();
+    const accountId = userDoc.data()?.stripeAccountId;
+
+    if (!accountId) throw new HttpsError("failed-precondition", "Stripe account not configured.");
+
+    const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
+    const availableAmount = balance.available.find(b => b.currency === "eur")?.amount || 0;
+
+    if (availableAmount <= 0) {
+      throw new HttpsError("failed-precondition", "No funds available for payout.");
+    }
+
+    // Manual payout with idempotency key
+    const payout = await stripe.payouts.create({
+      amount: availableAmount,
+      currency: "eur",
+    }, {
+      stripeAccount: accountId,
+      idempotencyKey: `payout_${uid}_${Date.now()}`
+    });
+
+    return { success: true, payoutId: payout.id };
+  } catch (error: any) {
+    logger.error("requestPayout Error:", error);
+    throw new HttpsError("internal", error.message);
+  }
+});
+
+/**
  * Creates a PaymentIntent with manual capture for Escrow.
  */
 export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minInstances: 1}, async (request) => {

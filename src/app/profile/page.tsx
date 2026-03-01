@@ -36,7 +36,8 @@ import {
   Landmark,
   Truck,
   LayoutDashboard,
-  ShieldAlert
+  ShieldAlert,
+  Coins
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { FirestoreUser } from '@/lib/types';
@@ -96,7 +97,7 @@ export default function ProfilePage() {
 
   const role = firestoreUser?.role || 'buyer';
   const isAdmin = role === 'admin';
-  const isSeller = role === 'seller' || isAdmin;
+  const isSeller = role === 'seller' || isAdmin || firestoreUser?.isSeller;
   const isCourier = role === 'courier';
 
   const menuItems = [
@@ -104,6 +105,7 @@ export default function ProfilePage() {
     { href: '/profile/orders', label: 'My Orders', icon: Package },
     { href: '/profile/listings', label: 'My Listings', icon: Tag },
     { href: '/profile/offers', label: 'My Offers', icon: Handshake },
+    ...(isSeller ? [{ href: '/profile/earnings', label: 'My Earnings', icon: Coins }] : []),
     { href: '/profile/stripe-onboarding', label: 'Setup Payouts (Sellers)', icon: Landmark },
     ...(isCourier ? [{ href: '/courier/dashboard', label: 'Courier Dashboard', icon: LayoutDashboard }] : []),
     ...(role === 'buyer' ? [{ href: '/delivery-partner', label: 'Become a Delivery Partner', icon: Truck }] : []),
