@@ -7,20 +7,21 @@ import { DescriptionStep } from '@/components/sell/steps/DescriptionStep';
 import { DetailsStep } from '@/components/sell/steps/DetailsStep';
 import { PricingStep } from '@/components/sell/steps/PricingStep';
 import { ReviewStep } from '@/components/sell/steps/ReviewStep';
+import { SuccessStep } from '@/components/sell/steps/SuccessStep';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Tag, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function SellPage() {
-  const { activeDraft, drafts, startNewDraft, selectDraft, currentStep, nextStep, totalSteps } = useSellForm();
+  const { activeDraft, drafts, startNewDraft, selectDraft, currentStep, totalSteps } = useSellForm();
 
   if (!activeDraft) {
     return (
       <div className="container mx-auto max-w-2xl py-12 px-4 space-y-8">
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold font-headline">Sell on Marigo</h1>
-          <p className="text-muted-foreground text-lg">Turn your luxury items into cash in 6 easy steps.</p>
+          <p className="text-muted-foreground text-lg">Turn your luxury items into cash in easy steps.</p>
         </div>
 
         <Button className="w-full h-20 text-xl gap-4 bg-black hover:bg-black/90" onClick={startNewDraft}>
@@ -68,18 +69,16 @@ export default function SellPage() {
       case 4: return <DetailsStep />;
       case 5: return <PricingStep />;
       case 6: return <ReviewStep />;
-      default: return (
-        <div className="text-center py-20 space-y-4">
-          <h2 className="text-xl font-bold">Step {currentStep}</h2>
-          <Button onClick={nextStep}>Skip to next step</Button>
-        </div>
-      );
+      case 7: return <SuccessStep />;
+      default: return <PhotosStep />;
     }
   };
 
+  const showHeader = currentStep <= 6;
+
   return (
     <div className="min-h-screen bg-background">
-      <SellProgressHeader />
+      {showHeader && <SellProgressHeader />}
       <main className="container mx-auto max-w-xl px-4 py-8">
         <AnimatePresence mode="wait">
           <motion.div

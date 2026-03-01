@@ -11,7 +11,7 @@ export function OrderSummary() {
   const { formatPrice } = useCurrency();
 
   const getProductImage = (image: string) => {
-    if (image.startsWith('http') || image.startsWith('data:')) return image;
+    if (image.startsWith('http') || image.startsWith('data:') || image.startsWith('blob:')) return image;
     const placeholder = PlaceHolderImages.find(p => p.id === image);
     return placeholder?.imageUrl || 'https://placehold.co/100x100?text=No+Image';
   }
@@ -35,6 +35,7 @@ export function OrderSummary() {
                                 fill 
                                 className="object-cover" 
                                 sizes="64px"
+                                unoptimized={imageUrl.startsWith('blob:')}
                             />
                         </div>
                         <div className="flex-1 min-w-0">

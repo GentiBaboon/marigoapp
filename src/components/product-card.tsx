@@ -24,7 +24,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
   let imageHint: string | undefined;
 
   const isUrl =
-    product.image?.startsWith('http') || product.image?.startsWith('data:');
+    product.image?.startsWith('http') || product.image?.startsWith('data:') || product.image?.startsWith('blob:');
 
   if (isUrl) {
     imageUrl = product.image;
@@ -48,11 +48,10 @@ export function ProductCard({ product, className }: ProductCardProps) {
 
   const displayTitle = product.title;
 
-
   return (
     <div className={cn('group', className)}>
       <Link href={`/products/${product.id}`} className="block mb-2">
-        <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
+        <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted rounded-lg">
           {imageUrl ? (
             <Image
               src={imageUrl}
@@ -61,9 +60,12 @@ export function ProductCard({ product, className }: ProductCardProps) {
               sizes="(max-width: 768px) 50vw, 33vw"
               className="object-cover"
               data-ai-hint={imageHint}
+              unoptimized={imageUrl.startsWith('blob:')}
             />
           ) : (
-            <div className="aspect-square w-full bg-muted" />
+            <div className="aspect-square w-full bg-muted flex items-center justify-center text-muted-foreground text-[10px]">
+                NO PHOTO
+            </div>
           )}
           {product.vintage && (
              <Badge variant="outline" className="absolute top-2 left-2 bg-background/80 font-normal">VINTAGE</Badge>
@@ -73,36 +75,31 @@ export function ProductCard({ product, className }: ProductCardProps) {
       <div className="px-1">
         <div className="flex justify-between items-start">
           <div className="text-sm">
-            <p className="font-bold uppercase">{product.brand}</p>
-            <p className="text-muted-foreground">{displayTitle}</p>
+            <p className="font-bold uppercase text-[11px] tracking-wider truncate max-w-[120px]">{product.brand}</p>
+            <p className="text-muted-foreground truncate max-w-[140px]">{displayTitle}</p>
             {product.size && (
-              <p className="text-muted-foreground">{product.size}</p>
+              <p className="text-muted-foreground text-xs">{product.size}</p>
             )}
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
             aria-label="Add to wishlist"
             onClick={handleToggleFavorite}
           >
             <Heart className={cn("h-5 w-5", favorite && "fill-destructive text-destructive")} />
           </Button>
         </div>
-        <div className="mt-2">
+        <div className="mt-1">
           {product.originalPrice && (
-            <p className="text-sm text-muted-foreground line-through">
+            <p className="text-[11px] text-muted-foreground line-through">
               {formatPrice(product.originalPrice)}
             </p>
           )}
-          <p className="font-semibold">
+          <p className="font-bold">
             {formatPrice(product.price)}
           </p>
-          {product.sellerLocation && (
-            <p className="text-sm text-muted-foreground mt-1">
-              {product.sellerLocation}
-            </p>
-          )}
         </div>
       </div>
     </div>

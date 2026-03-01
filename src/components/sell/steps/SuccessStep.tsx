@@ -1,25 +1,30 @@
-
 'use client';
-import { Sprout, Check } from 'lucide-react';
+import { Sprout, Check, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import Image from 'next/image';
 import { Separator } from '@/components/ui/separator';
 import { useCurrency } from '@/context/CurrencyContext';
+import React from 'react';
 
 export function SuccessStep() {
-    const { formData, deleteActiveDraft } = useSellForm();
+    const { formData, deleteActiveDraft, activeDraft } = useSellForm();
     const { formatPrice } = useCurrency();
 
-    // Use stored data for display since the draft might be cleared soon
-    const title = formData?.title || 'Item Submitted';
-    const brand = formData?.brand || 'Designer Item';
-    const price = formData?.price || 0;
-    const earnings = formData?.sellerEarning || 0;
-    const firstImage = formData?.images?.[0]?.url;
+    // Store essential data locally before the draft is potentially cleared
+    const [finalData] = React.useState({
+        title: formData?.title || 'Item Submitted',
+        brand: formData?.brand || 'Designer Item',
+        price: formData?.price || 0,
+        image: formData?.images?.[0]?.url,
+        id: activeDraft?.id
+    });
 
-    // We clear the draft only when the user navigates away to ensure they see the data here
+    const platformFeeRate = 0.15;
+    const earnings = finalData.price * (1 - platformFeeRate);
+
+    // We clear the draft when they move away
     const handleFinish = () => {
         deleteActiveDraft();
     };
@@ -33,21 +38,22 @@ export function SuccessStep() {
             <div className="space-y-2">
                 <h1 className="text-3xl font-bold font-headline">Item submitted</h1>
                 <p className="text-muted-foreground text-sm max-w-xs mx-auto">
-                    We'll review your listing and email you an update once it's live on the marketplace.
+                    Your listing is now live! It may take a few minutes to appear in all search results.
                 </p>
             </div>
 
             <Separator className="w-full opacity-50" />
 
-            <div className="flex items-center gap-4 w-full text-left bg-muted/30 p-4 rounded-xl">
+            <div className="flex items-center gap-4 w-full text-left bg-muted/30 p-4 rounded-xl border">
                 <div className="relative h-20 w-20 flex-shrink-0 bg-muted rounded-lg overflow-hidden shadow-sm">
-                    {firstImage ? (
+                    {finalData.image ? (
                         <Image
-                            src={firstImage}
-                            alt={title}
+                            src={finalData.image}
+                            alt={finalData.title}
                             fill
                             sizes="80px"
                             className="object-cover"
+                            unoptimized={finalData.image.startsWith('blob:')}
                         />
                     ) : (
                          <div className="h-full w-full bg-muted flex items-center justify-center">
@@ -56,16 +62,24 @@ export function SuccessStep() {
                     )}
                 </div>
                 <div className="flex-1 space-y-0.5 min-w-0">
-                    <p className="font-bold uppercase text-xs tracking-widest text-primary">{brand}</p>
-                    <p className="text-foreground text-sm font-medium truncate">{title}</p>
+                    <p className="font-bold uppercase text-xs tracking-widest text-primary">{finalData.brand}</p>
+                    <p className="text-foreground text-sm font-medium truncate">{finalData.title}</p>
                     <div className="pt-1">
                         <p className="font-bold text-base leading-none">
-                            {formatPrice(price)}
+                            {formatPrice(finalData.price)}
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-1">Estimated earning: {formatPrice(earnings)}</p>
                     </div>
                 </div>
             </div>
+
+            {finalData.id && (
+                <Button variant="link" asChild className="text-sm font-medium">
+                    <Link href={`/products/${finalData.id}`} target="_blank">
+                        View live listing <ExternalLink className="ml-1 h-3 w-3" />
+                    </Link>
+                </Button>
+            )}
 
             <Separator className="w-full opacity-50" />
 
