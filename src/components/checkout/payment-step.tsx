@@ -58,7 +58,7 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
   useEffect(() => {
     if (stripe && grandTotal > 0) {
       const pr = stripe.paymentRequest({
-        country: 'AL',
+        country: 'IT', // Changed from AL to IT because AL is not currently supported for Stripe PaymentRequest
         currency: 'eur',
         total: {
           label: 'Marigo Luxe Order',
@@ -124,7 +124,7 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
                         key={card.id}
                         htmlFor={card.id}
                         className={cn(
-                            'relative flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all duration-200',
+                            'relative flex items-start p-4 rounded-xl border-2 cursor-pointer transition-all duration-200',
                             selectedMethod === 'saved_card' && selectedSavedCardId === card.id 
                                 ? 'border-primary bg-primary/5 ring-1 ring-primary' 
                                 : 'border-muted bg-background hover:bg-muted/30'
