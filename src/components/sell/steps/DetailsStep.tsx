@@ -27,7 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSellForm } from '@/components/sell/SellFormContext';
-import { sellStep2Schema } from '@/lib/types';
+import { sellStep4Schema } from '@/lib/types';
 import type { z } from 'zod';
 import { StepActions } from '@/components/sell/StepActions';
 import {
@@ -46,7 +46,7 @@ import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import type { ProofFile } from '@/lib/types';
 
-type Step2Values = z.infer<typeof sellStep2Schema>;
+type Step4Values = z.infer<typeof sellStep4Schema>;
 
 type ProofFileState = {
     id: string;
@@ -78,15 +78,15 @@ export function DetailsStep() {
             }
         }
     }
-    return slug; // fallback
+    return slug || '';
   }, []);
 
-  const form = useForm<Step2Values>({
-    resolver: zodResolver(sellStep2Schema),
+  const form = useForm<Step4Values>({
+    resolver: zodResolver(sellStep4Schema),
     defaultValues: {
-      condition: formData.condition,
-      sizeStandard: formData.sizeStandard,
-      sizeValue: formData.sizeValue,
+      condition: formData.condition || '',
+      sizeStandard: formData.sizeStandard || '',
+      sizeValue: formData.sizeValue || '',
       material: formData.material || '',
       color: formData.color || '',
       pattern: formData.pattern || '',
@@ -138,8 +138,10 @@ export function DetailsStep() {
   }, [isSizingApplicable, isClothing, isShoes, selectedSizeStandard]);
 
   useEffect(() => {
-    form.setValue('sizeValue', undefined);
-  }, [selectedSizeStandard, form]);
+    if (isSizingApplicable) {
+        form.setValue('sizeValue', '');
+    }
+  }, [selectedSizeStandard, form, isSizingApplicable]);
 
   const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
     if (rejectedFiles.length > 0) {
@@ -152,11 +154,11 @@ export function DetailsStep() {
 
     const newFilesToProcess = acceptedFiles.map(file => ({
         id: `${file.name}-${file.lastModified}-${Math.random()}`,
-        url: file.type.startsWith('image/') ? URL.createObjectURL(file) : '', // Create blob only for images
+        url: file.type.startsWith('image/') ? URL.createObjectURL(file) : '',
         name: file.name,
         type: file.type,
         isLoading: true,
-        file: file, // Keep original file for processing
+        file: file,
     }));
     
     setProofFiles(current => [...current, ...newFilesToProcess]);
@@ -211,17 +213,7 @@ export function DetailsStep() {
   }, [proofFiles]);
 
 
-  const onSubmit = (data: Step2Values) => {
-    if (isSizingApplicable) {
-        if (!data.sizeStandard) {
-            form.setError('sizeStandard', {type: 'manual', message: 'Standard is required.'});
-            return;
-        }
-        if (!data.sizeValue) {
-            form.setError('sizeValue', {type: 'manual', message: 'Value is required.'});
-            return;
-        }
-    }
+  const onSubmit = (data: Step4Values) => {
     setFormData(data);
     nextStep();
   };
@@ -229,7 +221,7 @@ export function DetailsStep() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <h2 className="text-2xl font-semibold tracking-tight">Item details</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Condition & Additional Details</h2>
 
         <FormItem>
           <FormLabel>Category</FormLabel>

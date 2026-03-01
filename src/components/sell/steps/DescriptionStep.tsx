@@ -21,7 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useSellForm } from '@/components/sell/SellFormContext';
-import { sellStep4Schema } from '@/lib/types';
+import { sellStep3Schema } from '@/lib/types';
 import type { z } from 'zod';
 import { StepActions } from '@/components/sell/StepActions';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -44,7 +44,7 @@ import { productCategories } from '@/lib/mock-data';
 import { generateDescription, type GenerateDescriptionInput } from '@/ai/flows/generate-description';
 
 
-type Step4Values = z.infer<typeof sellStep4Schema>;
+type Step3Values = z.infer<typeof sellStep3Schema>;
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 30 }, (_, i) => String(currentYear - i));
@@ -67,13 +67,13 @@ export function DescriptionStep() {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const { toast } = useToast();
 
-  const form = useForm<Step4Values>({
-    resolver: zodResolver(sellStep4Schema),
+  const form = useForm<Step3Values>({
+    resolver: zodResolver(sellStep3Schema),
     defaultValues: {
-      title: typeof formData.title === 'string' ? formData.title : '',
-      description: typeof formData.description === 'string' ? formData.description : '',
-      origin: formData.origin,
-      yearOfPurchase: formData.yearOfPurchase,
+      title: formData.title || '',
+      description: formData.description || '',
+      origin: formData.origin || '',
+      yearOfPurchase: formData.yearOfPurchase || '',
       serialNumber: formData.serialNumber || '',
       packaging: formData.packaging || [],
     },
@@ -108,8 +108,8 @@ export function DescriptionStep() {
       const categoryName = getCategoryName(formData.gender, formData.category);
 
       const input: GenerateDescriptionInput = {
-        title: typeof formData.title === 'string' ? formData.title : '',
-        brand: formData.brand,
+        title: formData.title || '',
+        brand: formData.brand || '',
         category: categoryName,
         condition: formData.condition,
         images: formData.images.map(img => img.url),
@@ -134,7 +134,7 @@ export function DescriptionStep() {
   };
 
 
-  const onSubmit = (data: Step4Values) => {
+  const onSubmit = (data: Step3Values) => {
     setFormData(data);
     nextStep();
   };
@@ -142,7 +142,7 @@ export function DescriptionStep() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Description</CardTitle>
+        <CardTitle>Details</CardTitle>
         <CardDescription>
           Add details about your item to attract buyers.
         </CardDescription>

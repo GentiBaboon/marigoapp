@@ -54,27 +54,28 @@ export const sellStep2Schema = z.object({
 
 export const sellStep3Schema = z.object({
   title: z.string().min(5, "Title too short").max(80, "Title too long"),
-  model: z.string().optional(),
-  color: z.string().min(1, "Color is required"),
-  material: z.string().min(1, "Material is required"),
-  size: z.string().min(1, "Size is required"),
-  year: z.string().optional(),
   description: z.string().min(50, "Description must be at least 50 characters"),
-  authenticity: z.array(z.string()).optional(),
+  origin: z.string().optional(),
+  yearOfPurchase: z.string().min(1, "Year is required"),
+  serialNumber: z.string().optional(),
+  packaging: z.array(z.string()).optional(),
 });
 
 export const sellStep4Schema = z.object({
-  condition: z.enum(['new_tags', 'new_no_tags', 'excellent', 'very_good', 'good']),
-  defects: z.string().optional(),
+  condition: z.string().min(1, "Condition is required"),
+  material: z.string().min(1, "Material is required"),
+  color: z.string().min(1, "Color is required"),
+  sizeStandard: z.string().optional(),
+  sizeValue: z.string().optional(),
+  pattern: z.string().optional(),
+  vintage: z.boolean().optional(),
+  proofOfOrigin: z.array(z.any()).optional(),
 });
 
 export const sellStep5Schema = z.object({
   price: z.number().min(1, "Price must be at least 1 EUR"),
   allowOffers: z.boolean().default(true),
-  minOfferPrice: z.number().optional(),
-  shippingFrom: z.string().min(1, "City is required"),
-  shippingMethod: z.enum(['baboon', 'other', 'free']),
-  dispatchTime: z.enum(['1_day', '2_3_days', '1_week']),
+  shippingMethod: z.enum(['baboon', 'other', 'free']).optional(),
 });
 
 export const sellFormSchema = sellStep1Schema
@@ -121,6 +122,12 @@ export type FirestoreProduct = {
   color?: string;
   material?: string;
   size?: string;
+  authenticityCheck?: {
+    status: 'unchecked' | 'pending' | 'completed' | 'failed';
+    confidence: 'low' | 'medium' | 'high';
+    findings: string[];
+    checkedAt: any;
+  };
 };
 
 export type FirestoreOrder = {
@@ -133,4 +140,130 @@ export type FirestoreOrder = {
   status: string;
   paymentMethod: string;
   createdAt: any;
+};
+
+export type FirestoreNotification = {
+    id: string;
+    userId: string;
+    type: string;
+    title: string;
+    message: string;
+    data?: any;
+    read: boolean;
+    createdAt: any;
+};
+
+export type FirestoreConversation = {
+    id: string;
+    participants: string[];
+    participantDetails: {
+        userId: string;
+        name: string;
+        avatar: string;
+    }[];
+    productId: string;
+    productTitle: string;
+    productImage: string;
+    lastMessage: string;
+    lastMessageAt: any;
+    unreadCount: Record<string, number>;
+};
+
+export type FirestoreMessage = {
+    id: string;
+    senderId: string;
+    content: string;
+    createdAt: any;
+    read: boolean;
+};
+
+export type FirestoreReview = {
+    id: string;
+    orderId: string;
+    reviewerId: string;
+    revieweeId: string;
+    rating: number;
+    content: string;
+    createdAt: any;
+};
+
+export type FirestoreDelivery = {
+    id: string;
+    orderId: string;
+    courierId: string;
+    status: string;
+    deliveryFee: number;
+    packageSize: string;
+    distance?: number;
+    timeEstimate?: number;
+    specialInstructions?: string;
+    addresses: {
+        pickup: FirestoreAddress;
+        delivery: FirestoreAddress;
+    };
+    history?: { status: string; timestamp: any }[];
+};
+
+export type FirestoreCourierProfile = {
+    id: string;
+    userId: string;
+    legalName: string;
+    vehicleType: string;
+    isAvailable: boolean;
+};
+
+export type FirestoreReport = {
+    id: string;
+    reporterId: string;
+    type: 'product' | 'user' | 'message' | 'review';
+    itemId: string;
+    reason: string;
+    status: 'pending' | 'resolved';
+};
+
+export type FirestoreAdminLog = {
+    id: string;
+    adminId: string;
+    adminName: string;
+    actionType: string;
+    details: string;
+    targetId: string;
+    timestamp: any;
+};
+
+export type FirestoreSettings = {
+    commissionRate: number;
+    maintenanceMode: boolean;
+    imageMaxSizeMB?: number;
+    imageMaxDimension?: number;
+    imageCompressionQuality?: number;
+};
+
+export type FirestoreCategory = {
+    id: string;
+    name: string;
+    slug: string;
+    parentId?: string | null;
+    isActive: boolean;
+};
+
+export type FirestoreBrand = {
+    id: string;
+    name: string;
+    slug: string;
+    verified: boolean;
+};
+
+export type FirestoreCoupon = {
+    id: string;
+    code: string;
+    discountType: 'percentage' | 'fixed';
+    discountValue: number;
+    status: string;
+};
+
+export type ProofFile = {
+    url: string;
+    name: string;
+    type: string;
 };
