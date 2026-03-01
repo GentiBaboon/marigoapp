@@ -43,8 +43,7 @@ service cloud.firestore {
       return p.sellerId == request.auth.uid 
           && p.title is string
           && p.brand is string
-          && p.category is string
-          && p.price is number && p.price >= 0;
+          && p.category is string;
     }
 
     // --------------------------------------------------------------------

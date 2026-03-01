@@ -1,3 +1,4 @@
+
 'use client';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { Check, Edit2, Loader2, Upload } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useUser, useStorage } from '@/firebase';
+import { useFirestore, useUser, useStorage, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
@@ -35,17 +36,14 @@ export function ReviewStep() {
       const images = formData.images || [];
       if (images.length === 0) throw new Error("No images to upload");
 
-      // We track individual progress for all images
       const imageProgress = new Array(images.length).fill(0);
 
       const uploadImage = async (img: typeof images[0], index: number) => {
-        // If it's already a permanent URL (robustness)
         if (img.url.startsWith('http') && !img.url.includes('blob')) {
           imageProgress[index] = 100;
           return img.url;
         }
 
-        // Convert blob URL to Blob object
         const response = await fetch(img.url);
         const blob = await response.blob();
         
@@ -54,7 +52,6 @@ export function ReviewStep() {
         const storagePath = `products/${user.uid}/${productId}/${fileName}`;
         const storageRef = ref(storage, storagePath);
         
-        // Use Resumable upload for better tracking and reliability
         const uploadTask = uploadBytesResumable(storageRef, blob, {
             contentType: img.type
         });
@@ -64,7 +61,6 @@ export function ReviewStep() {
                 (snapshot) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                     imageProgress[index] = progress;
-                    // Calculate overall progress: 5% initial + up to 85% from uploads
                     const totalLoaded = imageProgress.reduce((a, b) => a + b, 0);
                     const averageProgress = totalLoaded / images.length;
                     setUploadProgress(5 + Math.round(averageProgress * 0.85));
@@ -78,12 +74,9 @@ export function ReviewStep() {
         });
       };
 
-      // Upload images in parallel for speed
       const uploadedUrls = await Promise.all(images.map((img, i) => uploadImage(img, i)));
       finalImageUrls.push(...uploadedUrls);
 
-      // 2. Prepare and save product document to Firestore
-      // Important: Remove the temporary blob image objects from the saved data
       const { images: _, ...listingData } = formData;
       
       const productRef = doc(firestore, 'products', productId);
@@ -93,17 +86,21 @@ export function ReviewStep() {
         sellerId: user.uid,
         status: 'active',
         listingCreated: serverTimestamp(),
-        images: finalImageUrls, // These are now permanent URLs
+        images: finalImageUrls,
         views: 0,
         likes: 0
       };
 
-      await setDoc(productRef, productData);
+      setDoc(productRef, productData).catch(err => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: productRef.path,
+              operation: 'create',
+              requestResourceData: productData
+          }));
+      });
       
       setUploadProgress(100);
       toast({ title: "Listing Published!", variant: "success" });
-      
-      // Move to Success Step
       nextStep();
     } catch (e: any) {
       console.error("Publish error:", e);

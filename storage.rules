@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service firebase.storage {
@@ -24,22 +25,17 @@ service firebase.storage {
 
     // Users can only write to their own profile folder.
     match /users/{userId}/{fileName} {
-      allow write: if isSignedIn() 
-                  && request.auth.uid == userId 
-                  && isAllowedImage(5);
+      allow write: if isOwner(userId) && isAllowedImage(5);
     }
 
     // Product images: secure path including user ID for atomic uploads
     match /products/{userId}/{productId}/{fileName} {
-      allow write: if isSignedIn()
-                  && request.auth.uid == userId
-                  && isAllowedImage(10);
+      allow write: if isOwner(userId) && isAllowedImage(10);
     }
 
     // Delivery proofs can only be written by the assigned courier.
     match /deliveries/{deliveryId}/{fileName} {
-      allow write: if isSignedIn()
-                  && isAllowedImage(10);
+      allow write: if isSignedIn() && isAllowedImage(10);
     }
     
     // User data exports: restricted to the user and admins
@@ -48,6 +44,10 @@ service firebase.storage {
         allow write: if false; // Only written by Cloud Functions
     }
     
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.admin == true || 
