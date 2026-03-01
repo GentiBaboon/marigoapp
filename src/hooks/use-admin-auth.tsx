@@ -1,20 +1,27 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
+import { doc } from 'firebase/firestore';
+import type { FirestoreUser } from '@/lib/types';
 
 // Define a developer admin UIDs for testing purposes
 const DEV_ADMIN_UIDS = ['2C81RVoXZWZuSWXEEueehqbHkMu1', 'v521MWW9rmPYchVBc91DheeRU5j2'];
 
 export function useAdminAuth() {
   const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
+  const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const { data: firestoreUser, isLoading: isDocLoading } = useDoc<FirestoreUser>(userRef);
+
   useEffect(() => {
-    if (isUserLoading) {
+    if (isUserLoading || isDocLoading) {
       return; // Wait for user state to be determined
     }
 
@@ -23,45 +30,17 @@ export function useAdminAuth() {
       return;
     }
     
-    // For development: check for specific UIDs to grant admin access
-    if (process.env.NODE_ENV === 'development' && DEV_ADMIN_UIDS.includes(user.uid)) {
+    // Grant access based on 'role' field in Firestore or dev UIDs
+    if (firestoreUser?.role === 'admin' || DEV_ADMIN_UIDS.includes(user.uid)) {
         setIsAdmin(true);
         setIsLoading(false);
-        return; // Bypass token check for the dev admin
-    }
-
-
-    // Check for admin claim, with a forced refresh as a fallback.
-    user.getIdTokenResult()
-      .then((idTokenResult) => {
-        if (idTokenResult.claims.admin || DEV_ADMIN_UIDS.includes(user.uid)) {
-          setIsAdmin(true);
-          setIsLoading(false);
-        } else {
-          // If no admin claim, force a refresh of the token and check again.
-          // This is useful when custom claims have just been set.
-          user.getIdTokenResult(true).then((refreshedTokenResult) => {
-             if (refreshedTokenResult.claims.admin || DEV_ADMIN_UIDS.includes(user.uid)) {
-                setIsAdmin(true);
-             } else {
-                setIsAdmin(false);
-                router.replace('/home');
-             }
-          }).catch(() => {
-             setIsAdmin(false);
-             router.replace('/home');
-          }).finally(() => {
-             setIsLoading(false);
-          });
-        }
-      })
-      .catch(() => {
+    } else {
         setIsAdmin(false);
-        router.replace('/home');
         setIsLoading(false);
-      });
+        router.replace('/home');
+    }
       
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, firestoreUser, isDocLoading, router]);
 
-  return { isAdmin, isLoading: isUserLoading || isLoading };
+  return { isAdmin, isLoading: isUserLoading || isDocLoading || isLoading };
 }

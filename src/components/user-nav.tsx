@@ -1,7 +1,8 @@
+
 'use client';
 
 import React, { useState } from 'react';
-import { useUser, useAuth } from '@/firebase';
+import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOutUser } from '@/firebase/auth/actions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,8 @@ import {
   Bell
 } from 'lucide-react';
 import { useCurrency, type Currency } from '@/context/CurrencyContext';
+import { doc } from 'firebase/firestore';
+import type { FirestoreUser } from '@/lib/types';
 
 
 const getInitials = (name: string | null | undefined) => {
@@ -45,9 +48,12 @@ const getInitials = (name: string | null | undefined) => {
 export function UserNav() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
-  const [shoppingPreference, setShoppingPreference] = useState('menswear');
   const { currency, setCurrency } = useCurrency();
+
+  const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const { data: firestoreUser } = useDoc<FirestoreUser>(userRef);
 
   const handleSignOut = async () => {
     await signOutUser(auth);
@@ -66,6 +72,9 @@ export function UserNav() {
     );
   }
 
+  const displayName = firestoreUser?.name || user.displayName || 'User';
+  const displayImage = firestoreUser?.profileImage || user.photoURL || '';
+
   return (
     <div className="flex items-center gap-2">
       <Button asChild variant="ghost" size="icon" aria-label="Notifications">
@@ -76,7 +85,6 @@ export function UserNav() {
       
       <Button asChild variant="ghost" size="icon" aria-label="Shopping Cart" className="relative">
         <Link href="/cart">
-          {/* Cart item count can be added here */}
           <ShoppingCart className="h-6 w-6" />
         </Link>
       </Button>
@@ -86,16 +94,16 @@ export function UserNav() {
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <Avatar className="h-8 w-8">
               <AvatarImage
-                src={user.photoURL || ''}
-                alt={user.displayName || 'User'}
+                src={displayImage}
+                alt={displayName}
               />
-              <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+              <AvatarFallback>{getInitials(displayName)}</AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-80" align="end" forceMount>
-          <DropdownMenuLabel className="font-serif text-3xl font-normal py-3">
-            {user?.displayName}
+          <DropdownMenuLabel className="font-serif text-3xl font-normal py-3 truncate">
+            {displayName}
           </DropdownMenuLabel>
 
           <DropdownMenuGroup>
@@ -108,27 +116,6 @@ export function UserNav() {
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
 
-          <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider flex items-center px-2 py-1.5">
-            Shopping Preference
-            <Info className="ml-1 h-3 w-3" />
-          </DropdownMenuLabel>
-
-          <DropdownMenuItem
-            onSelect={() => setShoppingPreference('womenswear')}
-            className="flex justify-between items-center"
-          >
-            Womenswear
-            {shoppingPreference === 'womenswear' ? <CircleDot /> : <Circle />}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => setShoppingPreference('menswear')}
-            className="flex justify-between items-center"
-          >
-            Menswear
-            {shoppingPreference === 'menswear' ? <CircleDot /> : <Circle />}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-
           <DropdownMenuGroup>
             <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1.5">
               Buying
@@ -137,10 +124,7 @@ export function UserNav() {
               <Link href="/profile/orders">Orders</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="#">Buying offers</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="#">Saved searches</Link>
+              <Link href="/profile/offers">My Offers</Link>
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
@@ -153,17 +137,7 @@ export function UserNav() {
               <Link href="/profile/listings">Listings</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="#">Selling offers</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="#">Sales</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="#">Get paid</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Calendar className="mr-2 h-4 w-4" />
-              <span>Vacation mode</span>
+              <Link href="/sell">Sell an item</Link>
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />

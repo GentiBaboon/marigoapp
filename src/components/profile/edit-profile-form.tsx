@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -34,29 +35,32 @@ export function EditProfileForm({ onSuccess }: EditProfileFormProps) {
   const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: firestoreUser } = useDoc<FirestoreUser>(userDocRef);
 
-  const nameParts = user?.displayName?.split(' ') || ['', ''];
-  const firstName = nameParts[0];
-  const lastName = nameParts.slice(1).join(' ');
-
   const form = useForm<EditProfileValues>({
     resolver: zodResolver(editProfileSchema),
     defaultValues: {
-      firstName: firstName || '',
-      lastName: lastName || '',
-      phone: firestoreUser?.phone || '',
+      firstName: '',
+      lastName: '',
+      phone: '',
     },
   });
   
   useEffect(() => {
     if (firestoreUser) {
-        const nameParts = firestoreUser.displayName?.split(' ') || [firestoreUser.displayName || ''];
+        const nameParts = firestoreUser.name?.split(' ') || [firestoreUser.name || ''];
         form.reset({
-            firstName: nameParts[0],
-            lastName: nameParts.slice(1).join(' '),
+            firstName: nameParts[0] || '',
+            lastName: nameParts.slice(1).join(' ') || '',
             phone: firestoreUser.phone || '',
         })
+    } else if (user) {
+        const nameParts = user.displayName?.split(' ') || [user.displayName || ''];
+        form.reset({
+            firstName: nameParts[0] || '',
+            lastName: nameParts.slice(1).join(' ') || '',
+            phone: '',
+        });
     }
-  }, [firestoreUser, form]);
+  }, [firestoreUser, user, form]);
 
   async function onSubmit(data: EditProfileValues) {
     if (!user || !auth.currentUser) {
@@ -65,16 +69,16 @@ export function EditProfileForm({ onSuccess }: EditProfileFormProps) {
     }
     setLoading(true);
 
-    const displayName = `${data.firstName} ${data.lastName}`.trim();
+    const fullUserName = `${data.firstName} ${data.lastName}`.trim();
 
     try {
         // Update Firebase Auth profile
-        await updateProfile(auth.currentUser, { displayName });
+        await updateProfile(auth.currentUser, { displayName: fullUserName });
         
         // Update Firestore user document
         const userDocRef = doc(firestore, 'users', user.uid);
         await setDoc(userDocRef, { 
-            displayName: displayName,
+            name: fullUserName,
             phone: data.phone,
          }, { merge: true });
 

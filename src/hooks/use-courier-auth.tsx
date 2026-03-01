@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -27,11 +28,12 @@ export function useCourierAuth() {
       return;
     }
     
-    if (firestoreUser?.isCourier && firestoreUser?.courierStatus === 'approved') {
+    // Check for 'courier' role in the user document
+    if (firestoreUser?.role === 'courier') {
         setIsCourier(true);
     } else {
         setIsCourier(false);
-        router.replace('/profile'); // Redirect if not an approved courier
+        router.replace('/profile'); // Redirect if not a courier
     }
     
     setIsLoading(false);

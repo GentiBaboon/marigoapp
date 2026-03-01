@@ -1,3 +1,4 @@
+
 'use client';
 import { z } from "zod";
 
@@ -21,17 +22,21 @@ export type SignupValues = z.infer<typeof signupSchema>;
 // --- User & Profile ---
 export const firestoreUserSchema = z.object({
   id: z.string(),
-  displayName: z.string().optional().nullable(),
+  name: z.string().optional().nullable(),
   email: z.string().email().optional().nullable(),
   phone: z.string().optional().nullable(),
-  photoURL: z.string().url().optional().nullable(),
-  macroCategoryPreference: z.enum(["womenswear", "menswear"]).optional(),
-  isSeller: z.boolean().optional(),
+  profileImage: z.string().url().optional().nullable(),
+  bio: z.string().optional().nullable(),
+  role: z.enum(["buyer", "seller", "courier", "admin"]).default("buyer"),
+  language: z.enum(["sq", "en", "it"]).default("en"),
+  currency: z.enum(["EUR", "ALL", "USD"]).default("EUR"),
+  stripeCustomerId: z.string().optional().nullable(),
+  stripeAccountId: z.string().optional().nullable(),
+  rating: z.number().default(0),
+  reviewCount: z.number().default(0),
   createdAt: z.any().optional(),
-  status: z.enum(['active', 'banned']).optional(),
-  isCourier: z.boolean().optional(),
-  courierStatus: z.enum(['pending_approval', 'approved', 'rejected']).optional(),
-  hasAcceptedChatRules: z.boolean().optional(),
+  lastLoginAt: z.any().optional(),
+  status: z.enum(['active', 'banned']).default("active"),
 });
 export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
 

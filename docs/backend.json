@@ -6,86 +6,85 @@
       "type": "object",
       "description": "Represents a user in the MarigoApp marketplace.",
       "properties": {
-        "displayName": {
-          "type": "string",
-          "description": "The user's display name."
-        },
         "email": {
           "type": "string",
           "format": "email",
           "description": "The user's email address."
         },
+        "name": {
+          "type": "string",
+          "description": "The user's full name."
+        },
         "phone": {
             "type": "string",
             "description": "The user's phone number."
         },
-        "photoURL": {
+        "role": {
+          "type": "string",
+          "enum": ["buyer", "seller", "courier", "admin"],
+          "default": "buyer",
+          "description": "The user's primary role in the platform."
+        },
+        "profileImage": {
             "type": "string",
             "format": "uri",
-            "description": "URL of the user's profile picture."
+            "description": "URL of the user's profile picture stored in Storage."
         },
-        "macroCategoryPreference": {
+        "bio": {
           "type": "string",
-          "enum": [
-            "womenswear",
-            "menswear"
-          ],
-          "description": "The user's preferred shopping category."
+          "description": "A short biography of the user."
         },
         "language": {
           "type": "string",
           "enum": ["sq", "en", "it"],
+          "default": "en",
           "description": "The user's preferred language."
         },
-        "hasAcceptedChatRules": {
-          "type": "boolean",
-          "description": "Whether the user has accepted the chat rules."
-        },
-        "isSeller": {
-          "type": "boolean",
-          "description": "Whether the user is a seller."
-        },
-        "isCourier": {
-          "type": "boolean",
-          "description": "Whether the user has applied to be a courier."
-        },
-        "courierStatus": {
+        "currency": {
           "type": "string",
-          "enum": ["pending_approval", "approved", "rejected"],
-          "description": "The status of the user's courier application."
+          "enum": ["EUR", "ALL", "USD"],
+          "default": "EUR",
+          "description": "The user's preferred currency for display."
+        },
+        "stripeCustomerId": {
+          "type": "string",
+          "description": "The user's Stripe Customer ID for buying."
         },
         "stripeAccountId": {
           "type": "string",
-          "description": "The user's Stripe Connected Account ID."
+          "description": "The user's Stripe Connected Account ID for selling."
         },
-        "stripeOnboardingComplete": {
-            "type": "boolean",
-            "description": "Whether the user has completed Stripe onboarding."
+        "rating": {
+          "type": "number",
+          "default": 0,
+          "description": "The average rating score of the user."
+        },
+        "reviewCount": {
+          "type": "number",
+          "default": 0,
+          "description": "Total number of reviews received."
         },
         "createdAt": {
           "type": "string",
           "format": "date-time",
           "description": "Timestamp of user creation."
         },
+        "lastLoginAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the last login."
+        },
         "status": {
           "type": "string",
           "enum": ["active", "banned"],
           "default": "active",
           "description": "The user's account status."
-        },
-        "emailPreferences": {
-            "type": "object",
-            "description": "User's email notification preferences.",
-            "properties": {
-                "marketing": { "type": "boolean", "default": true },
-                "productUpdates": { "type": "boolean", "default": true },
-                "orderUpdates": { "type": "boolean", "default": true }
-            }
         }
       },
       "required": [
         "email",
-        "createdAt"
+        "createdAt",
+        "role"
       ]
     },
     "CartItem": {
@@ -184,7 +183,7 @@
         "category": { "type": "string" },
         "subCategory": { "type": "string" },
         "images": { "type": "array", "items": { "type": "string", "format": "uri" } },
-        "status": { "type": "string", "enum": ["active", "sold", "reserved", "pending_review", "rejected"] },
+        "status": { "type": "string", "enum": ["active", "sold", "reserved", "pending_review", "rejected", "draft"] },
         "listingCreated": { "type": "string", "format": "date-time" },
         "keywords": { "type": "array", "items": { "type": "string" }, "description": "Keywords for search." },
         "brand": { "type": "string" },
@@ -267,19 +266,6 @@
       },
       "required": ["productId", "buyerId", "sellerId", "offerAmount", "status", "createdAt"]
     },
-    "Bid": {
-      "title": "Bid",
-      "type": "object",
-      "description": "Represents a bid on an auction product.",
-      "properties": {
-        "bidderId": { "type": "string" },
-        "amount": { "type": "number" },
-        "isAutoBid": { "type": "boolean" },
-        "maxAutoBidAmount": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["bidderId", "amount", "createdAt"]
-    },
     "Order": {
       "title": "Order",
       "type": "object",
@@ -318,260 +304,6 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["orderNumber", "buyerId", "sellerIds", "items", "totalAmount", "status", "createdAt"]
-    },
-    "Conversation": {
-      "title": "Conversation",
-      "type": "object",
-      "description": "Represents a conversation between users.",
-      "properties": {
-        "participants": { "type": "array", "items": { "type": "string" } },
-        "type": { "type": "string" },
-        "productId": { "type": "string" },
-        "productTitle": { "type": "string" },
-        "lastMessage": { "type": "string" },
-        "lastMessageAt": { "type": "string", "format": "date-time" },
-        "unreadCount": { "type": "object" }
-      },
-      "required": ["participants", "lastMessageAt"]
-    },
-    "Message": {
-      "title": "Message",
-      "type": "object",
-      "description": "Represents a message in a conversation.",
-      "properties": {
-        "senderId": { "type": "string" },
-        "content": { "type": "string" },
-        "type": { "type": "string" },
-        "imageUrl": { "type": "string", "format": "uri" },
-        "read": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["senderId", "content", "createdAt"]
-    },
-    "SupportChat": {
-        "title": "SupportChat",
-        "type": "object",
-        "description": "Represents a support chat session between a user and the AI assistant.",
-        "properties": {
-          "userId": { "type": "string", "description": "The ID of the user who initiated the chat." },
-          "startedAt": { "type": "string", "format": "date-time", "description": "Timestamp when the chat started." },
-          "lastMessageAt": { "type": "string", "format": "date-time", "description": "Timestamp of the last message." },
-          "topic": { "type": "string", "description": "The initial topic or question of the chat." },
-          "status": { "type": "string", "enum": ["open", "resolved"], "description": "The current status of the chat." }
-        },
-        "required": ["userId", "startedAt"]
-    },
-    "SupportMessage": {
-        "title": "SupportMessage",
-        "type": "object",
-        "description": "Represents a single message within a support chat.",
-        "properties": {
-          "sender": { "type": "string", "enum": ["user", "ai"], "description": "Who sent the message." },
-          "content": { "type": "string", "description": "The text content of the message." },
-          "timestamp": { "type": "string", "format": "date-time", "description": "Timestamp of the message." }
-        },
-        "required": ["sender", "content", "timestamp"]
-    },
-    "Review": {
-        "title": "Review",
-        "type": "object",
-        "description": "Represents a review for an order.",
-        "properties": {
-            "orderId": { "type": "string" },
-            "reviewerId": { "type": "string" },
-            "revieweeId": { "type": "string" },
-            "productId": { "type": "string" },
-            "rating": { "type": "number" },
-            "title": { "type": "string" },
-            "content": { "type": "string" }
-        },
-        "required": ["orderId", "reviewerId", "revieweeId", "rating", "content"]
-    },
-    "Notification": {
-        "title": "Notification",
-        "type": "object",
-        "description": "Represents a user notification.",
-        "properties": {
-            "userId": { "type": "string" },
-            "type": { "type": "string" },
-            "title": { "type": "string" },
-            "message": { "type": "string" },
-            "data": { "type": "object" },
-            "read": { "type": "boolean" },
-            "createdAt": { "type": "string", "format": "date-time" }
-        },
-        "required": ["userId", "type", "message", "createdAt"]
-    },
-    "Delivery": {
-      "title": "Delivery",
-      "type": "object",
-      "description": "Represents a delivery assignment.",
-      "properties": {
-        "orderId": { "type": "string" },
-        "buyerId": { "type": "string" },
-        "sellerIds": { "type": "array", "items": { "type": "string" } },
-        "courierId": { "type": "string" },
-        "status": {
-          "type": "string",
-          "enum": [
-            "pending_assignment",
-            "assigned",
-            "arrived_for_pickup",
-            "picked_up",
-            "in_transit",
-            "arrived_for_delivery",
-            "delivered",
-            "cancelled"
-          ]
-        },
-        "addresses": {
-          "type": "object",
-          "properties": {
-            "pickup": { "$ref": "#/entities/Address" },
-            "delivery": { "$ref": "#/entities/Address" }
-          }
-        },
-        "pickupNotes": { "type": "string" },
-        "pickupSignature": { "type": "string", "format": "uri" },
-        "proofOfPickup": { "type": "string", "format": "uri" },
-        "proofOfDelivery": { "type": "string", "format": "uri" },
-        "deliveryFee": { "type": "number" },
-        "packageSize": { "type": "string", "enum": ["small", "medium", "large"] },
-        "timeEstimate": {
-          "type": "number",
-          "description": "Estimated delivery time in minutes"
-        },
-        "specialInstructions": { "type": "string" },
-        "distance": { "type": "number", "description": "Distance in kilometers" },
-        "currentLocation": {
-          "type": "object",
-          "properties": {
-            "latitude": { "type": "number" },
-            "longitude": { "type": "number" }
-          },
-          "description": "The courier's current GPS location."
-        },
-        "history": {
-          "type": "array",
-          "description": "A log of status changes and events for the delivery.",
-          "items": {
-            "type": "object",
-            "properties": {
-              "status": { "type": "string" },
-              "timestamp": { "type": "string", "format": "date-time" },
-              "notes": { "type": "string" }
-            }
-          }
-        }
-      },
-      "required": ["orderId", "status"]
-    },
-    "CourierProfile": {
-      "title": "CourierProfile",
-      "type": "object",
-      "description": "Represents a courier's detailed profile.",
-      "properties": {
-        "userId": { "type": "string" },
-        "legalName": { "type": "string" },
-        "phone": { "type": "string" },
-        "dob": { "type": "string", "format": "date" },
-        "vehicleType": { "type": "string", "enum": ["bicycle", "scooter", "car", "van"] },
-        "licensePlate": { "type": "string" },
-        "serviceAreas": { "type": "string" },
-        "availability": { "type": "array", "items": { "type": "string" } },
-        "isAvailable": { "type": "boolean", "default": true }
-      },
-      "required": ["userId", "legalName", "phone", "dob", "vehicleType", "serviceAreas"]
-    },
-    "Report": {
-        "title": "Report",
-        "type": "object",
-        "description": "Represents a user-submitted report for content moderation.",
-        "properties": {
-          "reporterId": { "type": "string" },
-          "type": { "type": "string", "enum": ["product", "user", "message", "review"] },
-          "itemId": { "type": "string" },
-          "reason": { "type": "string" },
-          "status": { "type": "string", "enum": ["pending", "resolved"], "default": "pending" },
-          "createdAt": { "type": "string", "format": "date-time" }
-        },
-        "required": ["reporterId", "type", "itemId", "reason", "status", "createdAt"]
-    },
-    "AdminLog": {
-        "title": "AdminLog",
-        "type": "object",
-        "description": "Represents an action taken by an administrator.",
-        "properties": {
-            "adminId": { "type": "string" },
-            "adminName": { "type": "string" },
-            "actionType": { "type": "string", "enum": ["product_approved", "product_rejected", "user_banned", "user_unbanned", "user_role_changed", "order_status_updated", "setting_changed", "courier_approved", "courier_rejected"] },
-            "details": { "type": "string" },
-            "targetId": { "type": "string" },
-            "timestamp": { "type": "string", "format": "date-time" }
-        },
-        "required": ["adminId", "actionType", "details", "targetId", "timestamp"]
-    },
-    "Settings": {
-      "title": "Settings",
-      "type": "object",
-      "description": "Global settings for the marketplace.",
-      "properties": {
-        "commissionRate": {
-          "type": "number",
-          "description": "The platform's commission rate as a decimal (e.g., 0.15 for 15%)."
-        },
-        "maintenanceMode": {
-          "type": "boolean",
-          "description": "Whether the site is in maintenance mode."
-        }
-      },
-      "required": ["commissionRate", "maintenanceMode"]
-    },
-    "Coupon": {
-      "title": "Coupon",
-      "type": "object",
-      "description": "Represents a discount coupon.",
-      "properties": {
-        "code": { "type": "string" },
-        "discountType": { "type": "string", "enum": ["percentage", "fixed"] },
-        "discountValue": { "type": "number" },
-        "status": { "type": "string", "enum": ["active", "expired", "disabled"] }
-      },
-      "required": ["code", "discountType", "discountValue", "status"]
-    },
-    "ExchangeRates": {
-      "title": "ExchangeRates",
-      "type": "object",
-      "description": "Stores currency exchange rates relative to a base currency (EUR).",
-      "properties": {
-        "base": {
-          "type": "string",
-          "description": "The base currency code."
-        },
-        "lastUpdated": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "rates": {
-          "type": "object",
-          "properties": {
-            "EUR": {
-              "type": "number"
-            },
-            "USD": {
-              "type": "number"
-            },
-            "ALL": {
-              "type": "number"
-            }
-          }
-        }
-      },
-      "required": [
-        "base",
-        "lastUpdated",
-        "rates"
-      ]
     }
   },
   "auth": {
@@ -597,88 +329,6 @@
     "/users/{userId}/cart/{productId}": {
       "schema": { "$ref": "#/entities/CartItem" },
       "description": "Subcollection for a user's synchronized shopping cart."
-    },
-    "/categories/{categoryId}": {
-      "schema": { "$ref": "#/entities/Category" },
-      "description": "Top-level collection for product categories."
-    },
-    "/brands/{brandId}": {
-      "schema": { "$ref": "#/entities/Brand" },
-      "description": "Top-level collection for product brands."
-    },
-    "/products/{productId}": {
-      "schema": { "$ref": "#/entities/Product" },
-      "description": "Top-level collection for all product listings."
-    },
-    "/products/{productId}/offers/{offerId}": {
-      "schema": { "$ref": "#/entities/Offer" },
-      "description": "Subcollection for offers made on a specific product."
-    },
-    "/products/{productId}/bids/{bidId}": {
-      "schema": { "$ref": "#/entities/Bid" },
-      "description": "Subcollection for bids on an auction product."
-    },
-    "/orders/{orderId}": {
-      "schema": { "$ref": "#/entities/Order" },
-      "description": "Top-level collection for all completed orders."
-    },
-    "/conversations/{conversationId}": {
-      "schema": { "$ref": "#/entities/Conversation" },
-      "description": "Top-level collection for conversations between users."
-    },
-    "/conversations/{conversationId}/messages/{messageId}": {
-      "schema": { "$ref": "#/entities/Message" },
-      "description": "Subcollection for messages within a conversation."
-    },
-    "/support_chats/{chatId}": {
-        "schema": { "$ref": "#/entities/SupportChat" },
-        "description": "Top-level collection for AI support chat sessions."
-    },
-    "/support_chats/{chatId}/messages/{messageId}": {
-        "schema": { "$ref": "#/entities/SupportMessage" },
-        "description": "Subcollection for messages within a support chat."
-    },
-    "/reviews/{reviewId}": {
-      "schema": { "$ref": "#/entities/Review" },
-      "description": "Top-level collection for all reviews."
-    },
-    "/notifications/{notificationId}": {
-      "schema": { "$ref": "#/entities/Notification" },
-      "description": "Top-level collection for user notifications."
-    },
-    "/deliveries/{deliveryId}": {
-      "schema": { "$ref": "#/entities/Delivery" },
-      "description": "Top-level collection for delivery assignments."
-    },
-    "/courier_profiles/{userId}": {
-      "schema": { "$ref": "#/entities/CourierProfile" },
-      "description": "Stores detailed profiles for delivery couriers."
-    },
-    "/reports/{reportId}": {
-      "schema": { "$ref": "#/entities/Report" },
-      "description": "Top-level collection for user-submitted content reports."
-    },
-    "/roles_admin/{userId}": {
-      "schema": { "type": "object", "properties": {} },
-      "description": "Stores admin user roles for access control."
-    },
-    "/admin_logs/{logId}": {
-      "schema": { "$ref": "#/entities/AdminLog" },
-      "description": "Stores a non-deletable audit trail of all administrator actions."
-    },
-    "/settings/global": {
-      "schema": { "$ref": "#/entities/Settings" },
-      "description": "Stores global application settings in a single document."
-    },
-    "/coupons/{couponId}": {
-      "schema": { "$ref": "#/entities/Coupon" },
-      "description": "Collection of all discount coupons."
-    },
-    "/config/exchangeRates": {
-      "schema": {
-        "$ref": "#/entities/ExchangeRates"
-      },
-      "description": "Stores currency exchange rates, updated daily."
     }
   }
 }
