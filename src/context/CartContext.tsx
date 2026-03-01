@@ -16,8 +16,8 @@ export type CartItem = {
     image: string;
     sellerId: string;
     quantity: number;
-    selectedSize?: string;
-    selectedColor?: string;
+    selectedSize?: string | null;
+    selectedColor?: string | null;
     shippingMethod: ShippingMethod;
     directShippingFee: number;
 };
@@ -85,6 +85,11 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const addToCart = useCallback(async (product: any, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => {
         const quantity = options?.quantity || 1;
+        
+        // CRITICAL FIX: Firestore does not allow 'undefined'. Use 'null' instead for optional fields.
+        const size = options?.selectedSize || product.size || null;
+        const color = options?.selectedColor || product.color || null;
+
         const newItem: CartItem = {
             id: product.id,
             brand: product.brand,
@@ -93,8 +98,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             image: product.images?.[0] || product.image,
             sellerId: product.sellerId,
             quantity,
-            selectedSize: options?.selectedSize || product.size,
-            selectedColor: options?.selectedColor || product.color,
+            selectedSize: size,
+            selectedColor: color,
             shippingMethod: 'direct',
             directShippingFee: 10.90,
         };
