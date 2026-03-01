@@ -48,8 +48,11 @@ import type { ProofFile } from '@/lib/types';
 
 type Step2Values = z.infer<typeof sellStep2Schema>;
 
-type ProofFileState = ProofFile & {
+type ProofFileState = {
     id: string;
+    url: string;
+    name: string;
+    type: string;
     isLoading: boolean;
 };
 
@@ -149,7 +152,7 @@ export function DetailsStep() {
 
     const newFilesToProcess = acceptedFiles.map(file => ({
         id: `${file.name}-${file.lastModified}-${Math.random()}`,
-        preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : '', // Create blob only for images
+        url: file.type.startsWith('image/') ? URL.createObjectURL(file) : '', // Create blob only for images
         name: file.name,
         type: file.type,
         isLoading: true,
@@ -169,10 +172,10 @@ export function DetailsStep() {
 
             setProofFiles(current => {
                 const originalFile = current.find(f => f.id === fileState.id);
-                if (originalFile && originalFile.preview.startsWith('blob:')) {
-                    URL.revokeObjectURL(originalFile.preview);
+                if (originalFile && originalFile.url.startsWith('blob:')) {
+                    URL.revokeObjectURL(originalFile.url);
                 }
-                return current.map(f => f.id === fileState.id ? { ...f, preview: dataUrl, isLoading: false } : f);
+                return current.map(f => f.id === fileState.id ? { ...f, url: dataUrl, isLoading: false } : f);
             });
         } catch (error) {
             console.error("File processing error:", error);
@@ -194,15 +197,15 @@ export function DetailsStep() {
   useEffect(() => {
     const filesToSave: ProofFile[] = proofFiles
         .filter(f => !f.isLoading)
-        .map(({ preview, name, type }) => ({ preview, name, type }));
+        .map(({ url, name, type }) => ({ url, name, type }));
     form.setValue('proofOfOrigin', filesToSave);
   }, [proofFiles, form]);
 
 
   useEffect(() => {
     return () => proofFiles.forEach(file => {
-        if(file.preview.startsWith('blob:')) {
-            URL.revokeObjectURL(file.preview)
+        if(file.url.startsWith('blob:')) {
+            URL.revokeObjectURL(file.url)
         }
     });
   }, [proofFiles]);
@@ -436,7 +439,7 @@ export function DetailsStep() {
                          <div key={file.id} className="relative aspect-square">
                            {file.type.startsWith('image/') ? (
                               <Image
-                                src={file.preview}
+                                src={file.url}
                                 alt={`Proof preview ${file.name}`}
                                 fill
                                 sizes="128px"

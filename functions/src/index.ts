@@ -207,13 +207,23 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET",
     return;
   }
 
-  if (event.type === "payment_intent.succeeded") {
+  if (event.type === "payment_intent.succeeded" || event.type === "payment_intent.amount_capturable_updated") {
     const pi = event.data.object as Stripe.PaymentIntent;
     const orders = await db.collection("orders").where("paymentIntentId", "==", pi.id).get();
     if (!orders.empty) {
-      await orders.docs[0].ref.update({status: "processing", paymentStatus: "paid"});
-      for (const item of orders.docs[0].data().items) {
-        await db.collection("products").doc(item.productId).update({ status: "sold" });
+      const orderDoc = orders.docs[0];
+      const orderData = orderDoc.data();
+
+      if (orderData.status === "pending_payment") {
+        await orderDoc.ref.update({
+          status: "processing",
+          paymentStatus: pi.status === "succeeded" ? "paid" : "authorized"
+        });
+
+        // Mark products as sold
+        for (const item of orderData.items) {
+          await db.collection("products").doc(item.productId).update({ status: "sold" });
+        }
       }
     }
   }
