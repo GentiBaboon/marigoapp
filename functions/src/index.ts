@@ -3,6 +3,7 @@ import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
 import Stripe from "stripe";
 
@@ -18,6 +19,46 @@ const getStripe = () => {
     apiVersion: "2024-06-20",
   });
 };
+
+/**
+ * Helper to send notifications (In-app, FCM, and Logged Email)
+ */
+async function sendOrderNotification(userId: string, title: string, message: string, orderId: string, type: string) {
+  try {
+    // 1. In-app notification
+    await db.collection("notifications").add({
+      userId,
+      title,
+      message,
+      type,
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      data: {
+        orderId,
+        link: `/profile/orders/${orderId}`,
+      }
+    });
+
+    // 2. Fetch User Data for FCM and Email
+    const userDoc = await db.collection("users").doc(userId).get();
+    const userData = userDoc.data();
+
+    // 3. FCM Push Notification
+    if (userData?.fcmToken) {
+      await admin.messaging().send({
+        token: userData.fcmToken,
+        notification: { title, body: message },
+        data: { orderId, type },
+      });
+    }
+
+    // 4. Log Email (Placeholder for real SMTP/SendGrid integration)
+    logger.info(`[EMAIL SENT] To: ${userData?.email || "Unknown"} | Subject: ${title} | Body: ${message}`);
+
+  } catch (error) {
+    logger.error("Notification Error:", error);
+  }
+}
 
 /**
  * Creates a Stripe Express Connected Account for a seller.
@@ -76,15 +117,13 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
   const buyerId = request.auth.uid;
 
   try {
-    // 1. Get Seller info (assuming single seller per order for MVP)
     const sellerId = items[0].sellerId;
     const sellerSnap = await db.collection("users").doc(sellerId).get();
     const sellerData = sellerSnap.data();
 
-    // 2. Validate Products and Calculate Total
     let itemsSubtotal = 0;
     const orderItems = [];
-    const shippingFee = 5.00; // Flat fee per item for MVP
+    const shippingFee = 5.00;
 
     for (const item of items) {
       const pSnap = await db.collection("products").doc(item.id).get();
@@ -107,10 +146,8 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
 
     const totalAmount = itemsSubtotal + (shippingFee * items.length);
     const totalInCents = Math.round(totalAmount * 100);
-    const commissionCents = Math.round(totalInCents * 0.15); // 15% commission
+    const commissionCents = Math.round(totalInCents * 0.15);
 
-    // 3. Create Stripe PaymentIntent
-    // Funds are held (escrow) by using capture_method: manual
     const paymentParams: Stripe.PaymentIntentCreateParams = {
       amount: totalInCents,
       currency: "eur",
@@ -119,7 +156,6 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
       metadata: { buyerId, sellerId, orderType: 'marketplace' }
     };
 
-    // If seller has Stripe Account, set up the transfer
     if (sellerData?.stripeAccountId) {
         paymentParams.transfer_data = {
             destination: sellerData.stripeAccountId,
@@ -129,7 +165,6 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
 
     const paymentIntent = await stripe.paymentIntents.create(paymentParams);
 
-    // 4. Create Order in Firestore
     const orderRef = await db.collection("orders").add({
       orderNumber: `MG-${Date.now()}`,
       buyerId,
@@ -152,6 +187,69 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
 });
 
 /**
+ * Order Automation Trigger
+ * Handles notifications based on order status changes
+ */
+export const onOrderUpdateTrigger = onDocumentUpdated("orders/{orderId}", async (event) => {
+  const newValue = event.data?.after.data();
+  const previousValue = event.data?.before.data();
+
+  if (!newValue || !previousValue) return;
+
+  const orderId = event.params.orderId;
+  const newStatus = newValue.status;
+  const oldStatus = previousValue.status;
+
+  if (newStatus === oldStatus) return;
+
+  const buyerId = newValue.buyerId;
+  const sellerId = newValue.sellerIds[0];
+  const orderNumber = newValue.orderNumber;
+
+  switch (newStatus) {
+    case "paid":
+      await sendOrderNotification(
+        sellerId,
+        "New Order Received!",
+        `Congratulations! Your item has been sold. Order #${orderNumber} is ready for shipping.`,
+        orderId,
+        "item_sold"
+      );
+      break;
+
+    case "shipped":
+      await sendOrderNotification(
+        buyerId,
+        "Your order is on the way!",
+        `Good news! Order #${orderNumber} has been shipped. Track it in your profile.`,
+        orderId,
+        "order_update"
+      );
+      break;
+
+    case "delivered":
+      await sendOrderNotification(
+        buyerId,
+        "Order Delivered",
+        `Order #${orderNumber} has been delivered. Please confirm receipt and leave a review.`,
+        orderId,
+        "order_update"
+      );
+      break;
+
+    case "completed":
+      await sendOrderNotification(
+        sellerId,
+        "Payment Released",
+        `Funds for Order #${orderNumber} have been released to your account.`,
+        orderId,
+        "payment_received"
+      );
+      break;
+  }
+});
+
+/**
  * Stripe Webhook Handler
  */
 export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET", "STRIPE_SECRET_KEY"]}, async (req, res) => {
@@ -160,7 +258,7 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET",
   let event;
 
   try {
-    event = stripe.webhooks.constructEvent(req.rawBody, signature as string, process.env.STRIPE_WEBHOOK_SECRET!);
+    event = stripe.webhooks.constructEvent((req as any).rawBody, signature as string, process.env.STRIPE_WEBHOOK_SECRET!);
   } catch (err: any) {
     res.status(400).send(`Webhook Error: ${err.message}`);
     return;
@@ -174,7 +272,6 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_WEBHOOK_SECRET",
       const orderDoc = orders.docs[0];
       await orderDoc.ref.update({ status: "paid" });
 
-      // Mark products as sold
       const orderData = orderDoc.data();
       for (const item of orderData.items) {
         await db.collection("products").doc(item.productId).update({ status: "sold" });
