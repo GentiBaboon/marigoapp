@@ -2,6 +2,9 @@
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { SellProgressHeader } from '@/components/sell/SellProgressHeader';
 import { PhotosStep } from '@/components/sell/steps/PhotosStep';
+import { CategoryStep } from '@/components/sell/steps/CategoryStep';
+import { DescriptionStep } from '@/components/sell/steps/DescriptionStep';
+import { DetailsStep } from '@/components/sell/steps/DetailsStep';
 import { PricingStep } from '@/components/sell/steps/PricingStep';
 import { ReviewStep } from '@/components/sell/steps/ReviewStep';
 import { Button } from '@/components/ui/button';
@@ -10,7 +13,7 @@ import { Plus, Tag, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function SellPage() {
-  const { activeDraft, drafts, startNewDraft, selectDraft, currentStep } = useSellForm();
+  const { activeDraft, drafts, startNewDraft, selectDraft, currentStep, nextStep, totalSteps } = useSellForm();
 
   if (!activeDraft) {
     return (
@@ -45,7 +48,7 @@ export default function SellPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-semibold text-primary">Step {draft.currentStep} of 6</p>
+                      <p className="text-sm font-semibold text-primary">Step {draft.currentStep} of {totalSteps}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -60,13 +63,15 @@ export default function SellPage() {
   const renderStep = () => {
     switch (currentStep) {
       case 1: return <PhotosStep />;
+      case 2: return <CategoryStep />;
+      case 3: return <DescriptionStep />;
+      case 4: return <DetailsStep />;
       case 5: return <PricingStep />;
       case 6: return <ReviewStep />;
-      // Steps 2,3,4 would be implemented similarly
       default: return (
         <div className="text-center py-20 space-y-4">
-          <h2 className="text-xl font-bold">Step {currentStep} coming soon</h2>
-          <Button onClick={() => useSellForm().nextStep()}>Skip to next step</Button>
+          <h2 className="text-xl font-bold">Step {currentStep}</h2>
+          <Button onClick={nextStep}>Skip to next step</Button>
         </div>
       );
     }

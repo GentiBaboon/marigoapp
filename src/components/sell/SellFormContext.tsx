@@ -10,6 +10,7 @@ interface SellFormContextType {
   startNewDraft: () => void;
   selectDraft: (draftId: string) => void;
   deleteDraft: (draftId: string) => void;
+  deleteActiveDraft: () => void;
   setFormData: (data: Partial<SellFormValues>) => void;
   currentStep: number;
   nextStep: () => void;
@@ -87,6 +88,12 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (activeDraftId === id) setActiveDraftId(null);
   };
 
+  const deleteActiveDraft = useCallback(() => {
+    if (!activeDraftId) return;
+    setDrafts(prev => prev.filter(d => d.id !== activeDraftId));
+    setActiveDraftId(null);
+  }, [activeDraftId]);
+
   const goToStep = (step: number) => {
     if (!activeDraftId) return;
     setDrafts(prev => prev.map(d => d.id === activeDraftId ? { ...d, currentStep: step } : d));
@@ -100,6 +107,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
         startNewDraft, 
         selectDraft, 
         deleteDraft, 
+        deleteActiveDraft,
         setFormData, 
         currentStep: activeDraft?.currentStep || 1,
         formData: activeDraft?.formData || {},

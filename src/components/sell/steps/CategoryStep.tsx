@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useSellForm } from '@/components/sell/SellFormContext';
-import { sellStep1Schema } from '@/lib/types';
+import { sellStep2Schema } from '@/lib/types';
 import type { z } from 'zod';
 import { productCategories } from '@/lib/mock-data';
 import { Label } from '@/components/ui/label';
@@ -21,7 +21,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { brands } from '@/lib/mock-data';
 import { StepActions } from '../StepActions';
 
-type Step1Values = z.infer<typeof sellStep1Schema>;
+type Step2Values = z.infer<typeof sellStep2Schema>;
 
 const categoryItems = productCategories.flatMap(group => 
     group.subcategories.map(item => ({ value: item.slug, label: item.name }))
@@ -30,16 +30,17 @@ const categoryItems = productCategories.flatMap(group =>
 export function CategoryStep() {
   const { formData, setFormData, nextStep } = useSellForm();
 
-  const form = useForm<Step1Values>({
-    resolver: zodResolver(sellStep1Schema),
+  const form = useForm<Step2Values>({
+    resolver: zodResolver(sellStep2Schema),
     defaultValues: {
-      gender: formData.gender,
-      category: formData.category,
-      brand: formData.brand,
+      gender: formData.gender || '',
+      category: formData.category || '',
+      subCategory: formData.subCategory || '',
+      brand: formData.brand || '',
     },
   });
 
-  const onSubmit = (data: Step1Values) => {
+  const onSubmit = (data: Step2Values) => {
     setFormData(data);
     nextStep();
   };
@@ -96,7 +97,10 @@ export function CategoryStep() {
                 <FormControl>
                   <Combobox
                       value={field.value}
-                      onValueChange={field.onChange}
+                      onValueChange={(val) => {
+                          field.onChange(val);
+                          form.setValue('subCategory', val); // Map subCategory to same val for MVP
+                      }}
                       items={categoryItems}
                       placeholder="Select item type"
                       searchPlaceholder="Search categories..."
