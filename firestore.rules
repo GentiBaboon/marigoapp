@@ -91,7 +91,7 @@ service cloud.firestore {
     
     match /orders/{orderId} {
       allow get: if isSignedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid in resource.data.sellerIds || isAdmin());
-      allow list: if isAdmin();
+      allow list: if isSignedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid in resource.data.sellerIds || isAdmin());
       allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
