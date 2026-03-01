@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -86,6 +87,25 @@
         "email",
         "createdAt"
       ]
+    },
+    "CartItem": {
+      "title": "CartItem",
+      "type": "object",
+      "description": "Represents a product in a user's shopping cart.",
+      "properties": {
+        "id": { "type": "string" },
+        "brand": { "type": "string" },
+        "title": { "type": "string" },
+        "price": { "type": "number" },
+        "image": { "type": "string", "format": "uri" },
+        "sellerId": { "type": "string" },
+        "quantity": { "type": "number" },
+        "selectedSize": { "type": ["string", "null"] },
+        "selectedColor": { "type": ["string", "null"] },
+        "shippingMethod": { "type": "string", "enum": ["direct", "authentication"] },
+        "directShippingFee": { "type": "number" }
+      },
+      "required": ["id", "brand", "title", "price", "image", "sellerId", "quantity", "shippingMethod", "directShippingFee"]
     },
     "Address": {
       "title": "Address",
@@ -573,6 +593,10 @@
     "/users/{userId}/wishlist/{productId}": {
       "schema": { "$ref": "#/entities/WishlistItem" },
       "description": "Subcollection for a user's wishlist/favorites."
+    },
+    "/users/{userId}/cart/{productId}": {
+      "schema": { "$ref": "#/entities/CartItem" },
+      "description": "Subcollection for a user's synchronized shopping cart."
     },
     "/categories/{categoryId}": {
       "schema": { "$ref": "#/entities/Category" },

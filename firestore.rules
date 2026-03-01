@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -63,6 +64,9 @@ service cloud.firestore {
         allow read, write: if isOwner(userId) || isAdmin();
       }
       match /wishlist/{productId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+      match /cart/{productId} {
         allow read, write: if isOwner(userId) || isAdmin();
       }
     }
