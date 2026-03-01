@@ -132,12 +132,39 @@ export function ReviewStep() {
 
         const imageUrls = await Promise.all(uploadPromises);
 
+        // 1.5. Upload proof files if any
+        let proofOfOriginUrls: string[] = [];
+        if (formData.proofOfOrigin && formData.proofOfOrigin.length > 0) {
+            const proofUploadPromises = formData.proofOfOrigin.map(async (file, index) => {
+                const fileName = `proof_${Date.now()}_${index}.${file.type.split('/')[1] || 'webp'}`;
+                const storagePath = `products/${user.uid}/${formData.productId}/proofs/${fileName}`;
+                const storageRef = ref(storage, storagePath);
+
+                const response = await fetch(file.url);
+                const blob = await response.blob();
+
+                await uploadBytesResumable(storageRef, blob);
+                return getDownloadURL(storageRef);
+            });
+            proofOfOriginUrls = await Promise.all(proofUploadPromises);
+        }
+
+        const getParentCategoryName = (slug: string | undefined) => {
+            if (!slug) return '';
+            for (const mainCategory of productCategories) {
+                if (mainCategory.subcategories.some(sub => sub.slug === slug)) return mainCategory.name;
+            }
+            return '';
+        };
+
         // 2. Prepare product data
         const productData = {
             title: String(formData.title || '').trim(),
             description: String(formData.description || '').trim(),
             brand: String(formData.brand || '').trim(),
-            category: String(formData.category || '').trim(),
+            category: getParentCategoryName(formData.category),
+            subCategory: String(formData.category || '').trim(),
+            gender: String(formData.gender || '').trim(),
             price: Number(formData.price),
             condition: String(formData.condition || '').trim(),
             material: String(formData.material || '').trim(),
@@ -154,6 +181,12 @@ export function ReviewStep() {
             ...(formData.sizeValue && { size: `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() }),
             ...(formData.pattern && { pattern: formData.pattern }),
             ...(formData.vintage !== undefined && { vintage: formData.vintage }),
+            ...(formData.origin && { origin: formData.origin }),
+            ...(formData.yearOfPurchase && { yearOfPurchase: formData.yearOfPurchase }),
+            ...(formData.serialNumber && { serialNumber: formData.serialNumber }),
+            ...(formData.packaging && { packaging: formData.packaging }),
+            ...(proofOfOriginUrls.length > 0 && { proofOfOrigin: proofOfOriginUrls }),
+            shippingFromAddressId: formData.shippingFromAddressId,
             views: 0,
             likes: 0
         };
