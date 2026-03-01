@@ -8,122 +8,166 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { useCart } from '@/context/CartContext';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { ShoppingCart, Trash2 } from 'lucide-react';
-import { useUser } from '@/firebase';
-import { useRouter } from 'next/navigation';
-
-const currencyFormatter = (value: number) => {
-    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
-};
+import { ShoppingBag, Trash2, Heart, ArrowRight, Loader2 } from 'lucide-react';
+import { useCurrency } from '@/context/CurrencyContext';
+import { useWishlist } from '@/context/WishlistContext';
 
 export default function CartPage() {
-    const { 
-        items, 
-        removeFromCart, 
-        subtotal, 
-        totalShipping,
-        grandTotal
-    } = useCart();
-    const router = useRouter();
-    const { user, isUserLoading } = useUser();
-    
-    React.useEffect(() => {
-        if (!isUserLoading && !user) {
-            router.replace('/auth');
-        }
-    }, [user, isUserLoading, router]);
+    const { items, removeFromCart, updateQuantity, subtotal, totalShipping, grandTotal, isLoading } = useCart();
+    const { formatPrice } = useCurrency();
+    const { addToWishlist } = useWishlist();
 
-    if (isUserLoading || !user) {
+    if (isLoading) {
         return (
-            <div className="flex h-[calc(100vh-8rem)] w-screen items-center justify-center bg-background">
-                <div className="dot-flashing"></div>
+            <div className="flex h-[60vh] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
-    
+
     if (items.length === 0) {
         return (
-            <div className="container mx-auto max-w-4xl px-4 py-8 md:py-12">
-                <div className="text-center py-20">
-                    <ShoppingCart className="mx-auto h-16 w-16 text-muted-foreground" />
-                    <h2 className="mt-6 text-xl font-semibold">Your bag is empty</h2>
-                    <p className="mt-2 text-muted-foreground">Looks like you haven't added anything yet.</p>
-                    <Button asChild className="mt-6">
-                        <Link href="/home">Start Shopping</Link>
-                    </Button>
+            <div className="container mx-auto max-w-4xl px-4 py-20 text-center">
+                <div className="bg-muted/30 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <ShoppingBag className="h-12 w-12 text-muted-foreground" />
                 </div>
+                <h1 className="text-3xl font-bold font-headline mb-2">Your bag is empty</h1>
+                <p className="text-muted-foreground mb-8">Looks like you haven't added anything yet. Discover our latest arrivals!</p>
+                <Button asChild size="lg" className="rounded-full px-8">
+                    <Link href="/home">Start Shopping</Link>
+                </Button>
             </div>
         );
     }
 
+    const handleMoveToWishlist = (item: any) => {
+        addToWishlist(item.id);
+        removeFromCart(item.id);
+    };
+
     return (
-        <div className="container mx-auto max-w-2xl px-4 py-8 md:py-12 pb-32">
-            <h1 className="text-3xl font-bold mb-6">In the Bag</h1>
+        <div className="container mx-auto max-w-6xl px-4 py-8 md:py-12">
+            <h1 className="text-3xl font-bold font-headline mb-8 flex items-center gap-3">
+                Shopping Bag
+                <span className="text-lg font-sans font-normal text-muted-foreground">({items.length} items)</span>
+            </h1>
 
-            <div className="space-y-6">
-                {items.map((item, index) => {
-                    return (
-                        <React.Fragment key={item.id}>
-                            <Card className="overflow-hidden">
-                                <CardContent className="p-4 flex gap-4">
-                                    <div className="relative h-32 w-28 flex-shrink-0">
-                                        {item.image && <Image src={item.image} alt={item.title} fill className="object-cover rounded-md" sizes="112px" />}
-                                    </div>
-                                    <div className="flex-1 space-y-1">
-                                        <div className="flex justify-between">
-                                            <p className="font-bold uppercase text-sm">{item.brand}</p>
-                                            <p className="font-bold">{currencyFormatter(item.price)}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                <div className="lg:col-span-2 space-y-6">
+                    {items.map((item) => (
+                        <Card key={item.id} className="overflow-hidden border-none shadow-sm bg-muted/20">
+                            <CardContent className="p-4 sm:p-6">
+                                <div className="flex gap-4 sm:gap-6">
+                                    <Link href={`/products/${item.id}`} className="relative h-32 w-24 sm:h-40 sm:w-32 flex-shrink-0 overflow-hidden rounded-md bg-muted">
+                                        <Image
+                                            src={item.image}
+                                            alt={item.title}
+                                            fill
+                                            className="object-cover"
+                                            sizes="128px"
+                                        />
+                                    </Link>
+                                    <div className="flex-1 flex flex-col justify-between">
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="font-bold text-xs uppercase tracking-widest text-primary">{item.brand}</p>
+                                                    <h3 className="font-medium text-lg leading-tight">{item.title}</h3>
+                                                </div>
+                                                <p className="font-bold text-lg">{formatPrice(item.price)}</p>
+                                            </div>
+                                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-2">
+                                                {item.selectedSize && <span>Size: <span className="text-foreground font-medium">{item.selectedSize}</span></span>}
+                                                {item.selectedColor && <span>Color: <span className="text-foreground font-medium">{item.selectedColor}</span></span>}
+                                            </div>
                                         </div>
-                                        <p>{item.title}</p>
-                                        <p className="text-sm text-muted-foreground">Size: {item.selectedSize || 'M'}</p>
-                                        <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
-                                         <Button variant="link" className="text-destructive h-auto p-0 text-sm font-normal" onClick={() => removeFromCart(item.id)}>
-                                            <Trash2 className="h-3.5 w-3.5 mr-1"/>
-                                            Remove
-                                        </Button>
+
+                                        <div className="flex items-center justify-between mt-4">
+                                            <div className="flex items-center border rounded-full bg-background px-2">
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-8 w-8 rounded-full"
+                                                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                                >-</Button>
+                                                <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-8 w-8 rounded-full"
+                                                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                                >+</Button>
+                                            </div>
+                                            <div className="flex gap-4">
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm" 
+                                                    className="text-muted-foreground hover:text-primary h-auto p-0"
+                                                    onClick={() => handleMoveToWishlist(item)}
+                                                >
+                                                    <Heart className="h-4 w-4 mr-1.5" />
+                                                    <span className="hidden sm:inline">Wishlist</span>
+                                                </Button>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm" 
+                                                    className="text-muted-foreground hover:text-destructive h-auto p-0"
+                                                    onClick={() => removeFromCart(item.id)}
+                                                >
+                                                    <Trash2 className="h-4 w-4 mr-1.5" />
+                                                    <span className="hidden sm:inline">Remove</span>
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
-                                </CardContent>
-                            </Card>
-                        </React.Fragment>
-                    )
-                })}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
 
-                <Card>
-                    <CardContent className="p-4 space-y-4">
-                        <div className="flex items-center gap-2">
-                            <Input placeholder="Add a gift card or voucher" />
-                            <Button variant="outline">Add</Button>
-                        </div>
-                        <Separator />
-                        <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                                <p className="text-muted-foreground">Subtotal</p>
-                                <p>{currencyFormatter(subtotal)}</p>
+                <div className="lg:col-span-1">
+                    <Card className="sticky top-24 border-2 border-primary/10">
+                        <CardContent className="p-6 space-y-6">
+                            <h2 className="text-xl font-bold font-headline">Order Summary</h2>
+                            
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <Input placeholder="Promo code" className="rounded-full" />
+                                    <Button variant="outline" className="rounded-full px-6">Apply</Button>
+                                </div>
+                                <Separator />
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Subtotal</span>
+                                        <span className="font-medium">{formatPrice(subtotal)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Shipping (Direct)</span>
+                                        <span className="font-medium">{formatPrice(totalShipping)}</span>
+                                    </div>
+                                </div>
+                                <Separator />
+                                <div className="flex justify-between items-center pt-2">
+                                    <span className="text-lg font-bold">Total</span>
+                                    <span className="text-2xl font-bold text-primary">{formatPrice(grandTotal)}</span>
+                                </div>
                             </div>
-                             <div className="flex justify-between">
-                                <p className="text-muted-foreground">Savings</p>
-                                <p className="text-green-600">- {currencyFormatter(0)}</p>
-                            </div>
-                             <div className="flex justify-between">
-                                <p className="text-muted-foreground">Shipping</p>
-                                <p>{currencyFormatter(totalShipping)}</p>
-                            </div>
-                        </div>
-                        <Separator />
-                         <div className="flex justify-between font-bold">
-                            <p>Total</p>
-                            <p>{currencyFormatter(grandTotal)}</p>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
 
-            <div className="fixed bottom-16 md:bottom-0 left-0 w-full bg-background/95 backdrop-blur-sm border-t p-4 z-40">
-                <div className="container max-w-2xl mx-auto px-0">
-                    <Button asChild size="lg" className="w-full">
-                        <Link href="/checkout">Continue to checkout</Link>
-                    </Button>
+                            <div className="pt-4">
+                                <Button asChild size="lg" className="w-full rounded-full h-14 text-base font-bold shadow-lg shadow-primary/20">
+                                    <Link href="/checkout">
+                                        Checkout Now
+                                        <ArrowRight className="ml-2 h-5 w-5" />
+                                    </Link>
+                                </Button>
+                            </div>
+
+                            <p className="text-[11px] text-center text-muted-foreground leading-relaxed">
+                                Prices inclusive of VAT. By proceeding to checkout, you agree to our <Link href="/terms" className="underline">Terms of Service</Link>. Your payment is protected by our secure escrow system.
+                            </p>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </div>

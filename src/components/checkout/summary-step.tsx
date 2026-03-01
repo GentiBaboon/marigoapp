@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { MapPin, CreditCard, Loader2, AlertCircle } from 'lucide-react';
+import { MapPin, CreditCard, Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
@@ -19,7 +19,7 @@ import type { FirestoreAddress } from '@/lib/types';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useCurrency } from '@/context/CurrencyContext';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 type SummaryStepProps = {
   onPrevStep: (step: number) => void;
@@ -34,27 +34,19 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
   const { user } = useUser();
   const firestore = useFirestore();
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const stripe = useStripe();
   const elements = useElements();
   const functions = getFunctions();
   const { formatPrice } = useCurrency();
   
-  const handlePay = async () => {
-    if (!user || !firestore || !shippingAddress || !paymentMethod) {
-        setErrorMsg("Missing information: make sure you've selected an address and payment method.");
-        return;
-    }
-
-    if (items.length === 0) {
-        setErrorMsg("The cart is empty.");
-        return;
-    }
-
+  const handleFinaliseOrder = async () => {
+    if (!user || !firestore || !shippingAddress || !paymentMethod) return;
+    
     setIsLoading(true);
-    setErrorMsg(null);
+    setErrorMessage(null);
 
-    const orderPayload = {
+    const orderData = {
         items: items.map(item => ({
             id: item.id,
             sellerId: item.sellerId,
@@ -62,7 +54,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             brand: item.brand,
             image: item.image,
             price: item.price,
-            quantity: 1,
+            quantity: item.quantity,
             size: item.selectedSize || null,
         })),
         shippingAddress: {
@@ -73,149 +65,164 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod }: Summ
             postal: shippingAddress.postal,
             country: shippingAddress.country,
         },
+        paymentMethod,
     };
 
     try {
         if (paymentMethod === 'cod') {
             const createOrder = httpsCallable(functions, 'createOrder');
-            const result: any = await createOrder(orderPayload);
+            const result: any = await createOrder(orderData);
             clearCart();
             router.push(`/checkout/success/${result.data.orderId}`);
             return;
         }
 
-        if (!stripe || !elements) {
-            throw new Error("Stripe is not ready. Please reload the page.");
-        }
+        if (!stripe || !elements) throw new Error("Payment system not ready. Please refresh.");
 
-        // 1. Call Cloud Function to create PaymentIntent
+        // 1. Create PaymentIntent on Backend
         const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
-        const intentResult: any = await createPaymentIntent(orderPayload);
+        const intentResult: any = await createPaymentIntent(orderData);
         const { clientSecret, orderId } = intentResult.data;
-        
-        const cardElement = elements.getElement(CardElement);
-        if (!cardElement) throw new Error("Card element not found.");
 
-        // 2. Confirm payment with Stripe (handles 3D Secure if needed)
+        // 2. Confirm Payment with Stripe Elements
+        const cardElement = elements.getElement(CardElement);
+        if (!cardElement) throw new Error("Card information missing.");
+
         const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-            payment_method: { card: cardElement },
+            payment_method: {
+                card: cardElement,
+                billing_details: {
+                    name: shippingAddress.fullName,
+                    email: user.email || '',
+                    phone: shippingAddress.phone,
+                    address: {
+                        line1: shippingAddress.address,
+                        city: shippingAddress.city,
+                        postal_code: shippingAddress.postal,
+                        country: 'AL', // Defaulting to AL for MVP
+                    }
+                }
+            }
         });
 
         if (stripeError) {
             throw new Error(stripeError.message);
         }
 
-        if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture')) {
+        if (paymentIntent && paymentIntent.status === 'succeeded') {
             clearCart();
             router.push(`/checkout/success/${orderId}`);
         } else {
-             throw new Error(`Unexpected payment status: ${paymentIntent?.status}`);
+            throw new Error("Payment was not successful. Please try again.");
         }
 
     } catch (error: any) {
-        console.error("Detailed Checkout Error:", error);
-        
-        // Extract real error message from Firebase Function
-        let message = "Error during checkout.";
-        if (error.message) {
-            // Remove generic Firebase prefix if present
-            message = error.message.replace("internal, ", "");
-        }
-        
-        setErrorMsg(message);
+        console.error("Order error:", error);
+        setErrorMessage(error.message || "An unexpected error occurred during checkout.");
         toast({
             variant: 'destructive',
-            title: 'Transaction failed',
-            description: message,
+            title: 'Checkout Failed',
+            description: error.message || "Could not complete your order.",
         });
     } finally {
         setIsLoading(false);
     }
   }
 
-  const paymentMethodLabels: { [key: string]: string } = {
-    cod: 'Cash on Delivery',
-    new_card: 'Credit or Debit Card',
-  };
+  const paymentLabel = {
+      card: 'Credit Card (Stripe)',
+      apple_pay: 'Apple/Google Pay',
+      cod: 'Cash on Delivery',
+  }[paymentMethod || 'card'];
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Summary and Confirmation</CardTitle>
-          <CardDescription>
-            Review your details before proceeding to secure payment.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          
-          {errorMsg && (
-              <Alert variant="destructive" className="animate-in fade-in slide-in-from-top-1">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription className="font-medium">{errorMsg}</AlertDescription>
-              </Alert>
-          )}
+    <div className="space-y-8">
+      <div className="space-y-2">
+        <h2 className="text-2xl font-bold font-headline">Review Your Order</h2>
+        <p className="text-muted-foreground">Almost done! Confirm your details below.</p>
+      </div>
 
-          <div className="rounded-lg border p-4 space-y-4">
-            <div className="flex items-start gap-4">
-                  <MapPin className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
-                  <div className="flex-1">
-                      <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Shipping Address</h4>
-                      {shippingAddress ? (
-                          <div className="text-sm mt-1">
-                              <p className="font-bold">{shippingAddress.fullName}</p>
-                              <p>{shippingAddress.address}, {shippingAddress.city}</p>
-                              <p>{shippingAddress.postal}, {shippingAddress.country}</p>
+      <div className="grid gap-6">
+          {/* Shipping Summary */}
+          <Card className="border-none bg-muted/20 shadow-sm">
+              <CardContent className="p-6">
+                  <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-2">
+                          <div className="bg-primary/10 p-2 rounded-full">
+                            <MapPin className="h-4 w-4 text-primary" />
                           </div>
-                      ) : (
-                          <p className="text-sm text-destructive">No address selected.</p>
-                      )}
+                          <h3 className="font-bold text-sm uppercase tracking-wider">Shipping To</h3>
+                      </div>
+                      <Button variant="link" size="sm" onClick={() => onPrevStep(1)}>Change</Button>
                   </div>
-                  <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onPrevStep(1)}>Edit</Button>
-              </div>
-              <Separator />
-              <div className="flex items-start gap-4">
-                  <CreditCard className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
-                  <div className="flex-1">
-                      <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Payment Method</h4>
-                      <p className="text-sm mt-1">{paymentMethod ? paymentMethodLabels[paymentMethod] : 'None selected'}</p>
+                  {shippingAddress && (
+                      <div className="text-sm space-y-1">
+                          <p className="font-bold">{shippingAddress.fullName}</p>
+                          <p className="text-muted-foreground">{shippingAddress.address}</p>
+                          <p className="text-muted-foreground">{shippingAddress.city}, {shippingAddress.postal}, {shippingAddress.country}</p>
+                          <p className="text-xs text-muted-foreground pt-2">{shippingAddress.phone}</p>
+                      </div>
+                  )}
+              </CardContent>
+          </Card>
+
+          {/* Payment Summary */}
+          <Card className="border-none bg-muted/20 shadow-sm">
+              <CardContent className="p-6">
+                  <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-2">
+                          <div className="bg-primary/10 p-2 rounded-full">
+                            <CreditCard className="h-4 w-4 text-primary" />
+                          </div>
+                          <h3 className="font-bold text-sm uppercase tracking-wider">Payment Method</h3>
+                      </div>
+                      <Button variant="link" size="sm" onClick={() => onPrevStep(2)}>Change</Button>
                   </div>
-                  <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onPrevStep(2)}>Edit</Button>
+                  <div className="text-sm font-medium">
+                      {paymentLabel}
+                  </div>
+              </CardContent>
+          </Card>
+      </div>
+
+      {errorMessage && (
+          <Alert variant="destructive" className="bg-destructive/10 border-destructive/20">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="font-medium">{errorMessage}</AlertDescription>
+          </Alert>
+      )}
+
+      <div className="space-y-6 pt-4">
+          <div className="bg-green-50 border border-green-100 rounded-xl p-4 flex gap-3">
+              <ShieldCheck className="h-6 w-6 text-green-600 flex-shrink-0" />
+              <div className="space-y-1">
+                  <p className="text-sm font-bold text-green-900">Buyer Protection Enabled</p>
+                  <p className="text-xs text-green-800 leading-relaxed">
+                      Your funds are held in a secure escrow account and only released to the seller after you confirm receipt.
+                  </p>
               </div>
           </div>
-          
-          <p className="text-[11px] text-muted-foreground leading-relaxed text-center">
-              By clicking "Pay now", you agree to our <a href="#" className="underline">Terms of Service</a>. Funds will be held securely and released to the seller only after delivery.
-          </p>
 
-        </CardContent>
-        <CardFooter className="flex flex-col gap-3">
-            <Button
-              size="lg"
-              className="w-full bg-black text-white hover:bg-black/90 h-14 text-base font-bold shadow-xl"
-              onClick={handlePay}
-              disabled={isLoading || !shippingAddress || !paymentMethod}
-            >
-              {isLoading ? (
-                  <div className="flex items-center gap-2">
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span>Processing...</span>
-                  </div>
-              ) : (
-                  `Pay now ${formatPrice(grandTotal)}`
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full"
-              onClick={() => onPrevStep(2)}
-              disabled={isLoading}
-            >
-              Back
-            </Button>
-        </CardFooter>
-      </Card>
+          <Button
+            size="lg"
+            className="w-full h-16 rounded-full text-lg font-bold shadow-xl shadow-primary/30"
+            onClick={handleFinaliseOrder}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+                <div className="flex items-center gap-3">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Processing Order...</span>
+                </div>
+            ) : (
+                `Complete Purchase — ${formatPrice(grandTotal)}`
+            )}
+          </Button>
+          
+          <p className="text-[10px] text-center text-muted-foreground px-8 leading-relaxed">
+              By clicking "Complete Purchase", you authorize Marigo Luxe to process this transaction. Orders paid via card are protected by our Money-Back Guarantee.
+          </p>
+      </div>
     </div>
   );
 }

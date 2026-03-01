@@ -31,17 +31,16 @@ export const firestoreUserSchema = z.object({
   status: z.enum(['active', 'banned']).optional(),
   isCourier: z.boolean().optional(),
   courierStatus: z.enum(['pending_approval', 'approved', 'rejected']).optional(),
+  hasAcceptedChatRules: z.boolean().optional(),
 });
 export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
 
-// --- Sell Flow Schemas (6 Steps) ---
-
+// --- Sell Flow Schemas ---
 export const sellStep1Schema = z.object({
   images: z.array(z.object({
     url: z.string(),
     name: z.string(),
     type: z.string(),
-    isProcessed: z.boolean().optional(),
   })).min(3, "At least 3 photos are required").max(8, "Maximum 8 photos allowed"),
 });
 
@@ -95,15 +94,23 @@ export interface SellDraft {
 
 // --- Address ---
 export const addressSchema = z.object({
-  fullName: z.string().min(2),
-  phone: z.string().min(6),
-  address: z.string().min(5),
-  city: z.string().min(2),
-  postal: z.string().min(3),
-  country: z.string().min(2),
+  fullName: z.string().min(2, "Full name is required"),
+  phone: z.string().min(6, "Valid phone number is required"),
+  address: z.string().min(5, "Full street address is required"),
+  city: z.string().min(2, "City is required"),
+  postal: z.string().min(3, "Postal code is required"),
+  country: z.string().min(2, "Country is required"),
 });
 export type AddressFormValues = z.infer<typeof addressSchema>;
 export type FirestoreAddress = AddressFormValues & { id: string; isDefault: boolean; };
+
+// --- Edit Profile ---
+export const editProfileSchema = z.object({
+  firstName: z.string().min(2, "First name is required"),
+  lastName: z.string().min(2, "Last name is required"),
+  phone: z.string().min(6, "Valid phone number is required"),
+});
+export type EditProfileValues = z.infer<typeof editProfileSchema>;
 
 // --- Products & Orders ---
 export type FirestoreProduct = {
@@ -139,6 +146,8 @@ export type FirestoreOrder = {
   totalAmount: number;
   status: string;
   paymentMethod: string;
+  paymentIntentId?: string;
+  shippingAddress: AddressFormValues;
   createdAt: any;
 };
 
@@ -177,14 +186,22 @@ export type FirestoreMessage = {
     read: boolean;
 };
 
-export type FirestoreReview = {
+export type FirestoreOffer = {
     id: string;
-    orderId: string;
-    reviewerId: string;
-    revieweeId: string;
-    rating: number;
-    content: string;
+    productId: string;
+    buyerId: string;
+    sellerId: string;
+    offerAmount: number;
+    originalListingPrice: number;
+    status: 'pending' | 'accepted' | 'declined' | 'countered' | 'withdrawn' | 'expired';
+    counterOfferAmount?: number;
     createdAt: any;
+    history: {
+        action: string;
+        amount: number;
+        byUser: string;
+        timestamp: any;
+    }[];
 };
 
 export type FirestoreDelivery = {

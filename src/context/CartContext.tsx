@@ -1,138 +1,176 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import type { Product } from '@/lib/mock-data';
 import { useToast } from '@/hooks/use-toast';
+import { useUser, useFirestore, errorEmitter } from '@/firebase';
+import { doc, setDoc, deleteDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export type ShippingMethod = 'direct' | 'authentication';
 
-export type CartItem = Product & {
+export type CartItem = {
+    id: string;
+    brand: string;
+    title: string;
+    price: number;
+    image: string;
+    sellerId: string;
     quantity: number;
     selectedSize?: string;
     selectedColor?: string;
     shippingMethod: ShippingMethod;
-    authenticationFee: number;
     directShippingFee: number;
-    authShippingFee: number;
 };
 
 interface CartContextType {
     items: CartItem[];
-    addToCart: (product: Product, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => void;
+    addToCart: (product: any, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => void;
     removeFromCart: (itemId: string) => void;
     updateQuantity: (itemId: string, quantity: number) => void;
     clearCart: () => void;
     subtotal: number;
     totalItems: number;
     totalShipping: number;
-    totalAuthentication: number;
     grandTotal: number;
-    sellers: { sellerId: string, items: CartItem[] }[];
+    isLoading: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [items, setItems] = useState<CartItem[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const { user } = useUser();
+    const firestore = useFirestore();
     const { toast } = useToast();
 
+    // 1. Initial Load from LocalStorage (fast)
     useEffect(() => {
         const savedCart = localStorage.getItem('marigo_cart');
-        if (savedCart) {
+        if (savedCart && !user) {
             try {
-                const parsedItems: CartItem[] = JSON.parse(savedCart);
-                const correctedItems = parsedItems.map(item => ({
-                    ...item,
-                    shippingMethod: 'direct' as ShippingMethod,
-                    directShippingFee: 10.90 // Ensure fee consistency
-                }));
-                setItems(correctedItems);
+                setItems(JSON.parse(savedCart));
             } catch (e) {
-                console.error("Failed to parse cart", e);
+                console.error("Failed to parse local cart", e);
             }
         }
-    }, []);
+        setIsLoading(false);
+    }, [user]);
 
+    // 2. Sync with Firestore if logged in
     useEffect(() => {
-        localStorage.setItem('marigo_cart', JSON.stringify(items));
-    }, [items]);
+        if (!user || !firestore) return;
 
-    const addToCart = useCallback((product: Product, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => {
-        setItems(prevItems => {
-            const existingItem = prevItems.find(item => item.id === product.id);
-            const quantity = options?.quantity || 1;
-
-            if (existingItem) {
-                return prevItems.map(item =>
-                    item.id === product.id
-                        ? { ...item, quantity: item.quantity + quantity }
-                        : item
-                );
-            } else {
-                 const newItem: CartItem = {
-                    ...product,
-                    quantity,
-                    ...options,
-                    shippingMethod: 'direct',
-                    authenticationFee: 0, 
-                    directShippingFee: 10.90, 
-                    authShippingFee: 0,
-                };
-                return [...prevItems, newItem];
-            }
+        setIsLoading(true);
+        const cartRef = collection(firestore, 'users', user.uid, 'cart');
+        
+        const unsubscribe = onSnapshot(cartRef, (snapshot) => {
+            const firestoreItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CartItem));
+            setItems(firestoreItems);
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Cart sync error:", error);
+            setIsLoading(false);
         });
+
+        return () => unsubscribe();
+    }, [user, firestore]);
+
+    // 3. Persist LocalStorage
+    useEffect(() => {
+        if (!user) {
+            localStorage.setItem('marigo_cart', JSON.stringify(items));
+        }
+    }, [items, user]);
+
+    const addToCart = useCallback(async (product: any, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => {
+        const quantity = options?.quantity || 1;
+        const newItem: CartItem = {
+            id: product.id,
+            brand: product.brand,
+            title: product.title,
+            price: product.price,
+            image: product.images?.[0] || product.image,
+            sellerId: product.sellerId,
+            quantity,
+            selectedSize: options?.selectedSize || product.size,
+            selectedColor: options?.selectedColor || product.color,
+            shippingMethod: 'direct',
+            directShippingFee: 10.90,
+        };
+
+        if (user && firestore) {
+            const itemRef = doc(firestore, 'users', user.uid, 'cart', product.id);
+            setDoc(itemRef, newItem, { merge: true }).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: itemRef.path,
+                    operation: 'write',
+                    requestResourceData: newItem
+                }));
+            });
+        } else {
+            setItems(prev => {
+                const existing = prev.find(i => i.id === newItem.id);
+                if (existing) {
+                    return prev.map(i => i.id === newItem.id ? { ...i, quantity: i.quantity + quantity } : i);
+                }
+                return [...prev, newItem];
+            });
+        }
+
         toast({
-            title: "Added to Bag",
-            description: `${product.brand} ${product.title} has been added to your shopping bag.`,
+            title: "Added to bag",
+            description: `${newItem.brand} ${newItem.title} is now in your cart.`,
         });
-    }, [toast]);
+    }, [user, firestore, toast]);
 
-    const removeFromCart = useCallback((itemId: string) => {
-        setItems(prevItems => prevItems.filter(item => item.id !== itemId));
-    }, []);
+    const removeFromCart = useCallback(async (itemId: string) => {
+        if (user && firestore) {
+            const itemRef = doc(firestore, 'users', user.uid, 'cart', itemId);
+            deleteDoc(itemRef).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: itemRef.path,
+                    operation: 'delete'
+                }));
+            });
+        } else {
+            setItems(prev => prev.filter(i => i.id !== itemId));
+        }
+    }, [user, firestore]);
 
-    const updateQuantity = useCallback((itemId: string, quantity: number) => {
+    const updateQuantity = useCallback(async (itemId: string, quantity: number) => {
         if (quantity <= 0) {
             removeFromCart(itemId);
+            return;
+        }
+
+        if (user && firestore) {
+            const itemRef = doc(firestore, 'users', user.uid, 'cart', itemId);
+            setDoc(itemRef, { quantity }, { merge: true });
         } else {
-            setItems(prevItems =>
-                prevItems.map(item =>
-                    item.id === itemId ? { ...item, quantity } : item
-                )
-            );
+            setItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity } : i));
         }
-    }, [removeFromCart]);
-    
-    const clearCart = useCallback(() => {
-        setItems([]);
-        localStorage.removeItem('marigo_cart');
-    }, []);
+    }, [user, firestore, removeFromCart]);
 
-    const subtotal = useMemo(() => items.reduce((acc, item) => acc + item.price * item.quantity, 0), [items]);
+    const clearCart = useCallback(async () => {
+        if (user && firestore) {
+            const cartRef = collection(firestore, 'users', user.uid, 'cart');
+            const snapshot = await getDocs(cartRef);
+            // In a real app we'd use a batch here, but for cart it's small enough
+            snapshot.docs.forEach(d => deleteDoc(d.ref));
+        } else {
+            setItems([]);
+            localStorage.removeItem('marigo_cart');
+        }
+    }, [user, firestore]);
+
+    const subtotal = useMemo(() => items.reduce((acc, item) => acc + (item.price * item.quantity), 0), [items]);
     const totalItems = useMemo(() => items.reduce((acc, item) => acc + item.quantity, 0), [items]);
-    
-    const totalShipping = useMemo(() => items.reduce((acc, item) => {
-        return acc + (item.directShippingFee * item.quantity);
-    }, 0), [items]);
-
-    const totalAuthentication = useMemo(() => 0, []);
-
-    const grandTotal = useMemo(() => subtotal + totalShipping + totalAuthentication, [subtotal, totalShipping, totalAuthentication]);
-
-    const sellers = useMemo(() => {
-        const groups: { [key: string]: CartItem[] } = {};
-        for (const item of items) {
-            if (!groups[item.sellerId]) {
-                groups[item.sellerId] = [];
-            }
-            groups[item.sellerId].push(item);
-        }
-        return Object.entries(groups).map(([sellerId, items]) => ({ sellerId, items }));
-    }, [items]);
-
+    const totalShipping = useMemo(() => items.reduce((acc, item) => acc + (item.directShippingFee * item.quantity), 0), [items]);
+    const grandTotal = useMemo(() => subtotal + totalShipping, [subtotal, totalShipping]);
 
     return (
-        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, clearCart, subtotal, totalItems, totalShipping, totalAuthentication, grandTotal, sellers }}>
+        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, clearCart, subtotal, totalItems, totalShipping, grandTotal, isLoading }}>
             {children}
         </CartContext.Provider>
     );
@@ -140,8 +178,6 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const useCart = () => {
     const context = useContext(CartContext);
-    if (context === undefined) {
-        throw new Error('useCart must be used within a CartProvider');
-    }
+    if (!context) throw new Error('useCart must be used within a CartProvider');
     return context;
 };
