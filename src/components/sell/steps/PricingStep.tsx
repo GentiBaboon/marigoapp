@@ -1,199 +1,93 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import {
-  Tooltip,
-  TooltipProvider,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { useSellForm } from '../SellFormContext';
 import { Input } from '@/components/ui/input';
-import { useSellForm } from '@/components/sell/SellFormContext';
-import { sellStep6Schema } from '@/lib/types';
-import type { z } from 'zod';
-import { StepActions } from '../StepActions';
+import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Info, Wand2, Loader2 } from 'lucide-react';
-import { suggestPrice, type SuggestPriceInput, type SuggestPriceOutput } from '@/ai/flows/ai-suggest-price';
-import { useToast } from '@/hooks/use-toast';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { productCategories } from '@/lib/mock-data';
-
-type Step6Values = z.infer<typeof sellStep6Schema>;
-
-const COMMISSION_RATE = 0.20;
-const FIXED_FEE = 5;
+import { Switch } from '@/components/ui/switch';
+import { Sparkles, Info, Truck } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useState, useEffect } from 'react';
 
 export function PricingStep() {
   const { formData, setFormData, nextStep } = useSellForm();
-  const [earning, setEarning] = useState<number>(0);
-  const { toast } = useToast();
-
-  const [isSuggesting, setIsSuggesting] = useState(false);
-  const [suggestion, setSuggestion] = useState<SuggestPriceOutput | null>(null);
-
-  const form = useForm<Step6Values>({
-    resolver: zodResolver(sellStep6Schema),
-    defaultValues: {
-      price: formData.price,
-    },
-  });
-
-  const priceValue = form.watch('price');
+  const [price, setPrice] = useState(formData.price?.toString() || '');
+  
+  const platformFeeRate = 0.15;
+  const currentPrice = parseFloat(price) || 0;
+  const fee = currentPrice * platformFeeRate;
+  const earnings = currentPrice - fee;
 
   useEffect(() => {
-    if (priceValue && priceValue > 0) {
-        const commission = priceValue * COMMISSION_RATE;
-        const calculatedEarning = priceValue - commission - FIXED_FEE;
-        setEarning(Math.max(0, calculatedEarning));
-    } else {
-        setEarning(0);
-    }
-  }, [priceValue]);
-  
-  const getCategoryName = (gender: string | undefined, categorySlug: string | undefined): string => {
-    if (!gender || !categorySlug) return formData.category || '';
-    const genderName = `${gender.charAt(0).toUpperCase()}${gender.slice(1)}'s`;
-    
-    for (const mainCategory of productCategories) {
-        const sub = mainCategory.subcategories.find(s => s.slug === categorySlug);
-        if (sub) {
-            return `${genderName} ${sub.name}`;
-        }
-    }
-    return `${genderName} ${categorySlug}`;
-  }
-
-
-  const handleSuggestPrice = async () => {
-    setIsSuggesting(true);
-    setSuggestion(null);
-
-    try {
-        if (!formData.title || !formData.brand || !formData.category || !formData.images || formData.images.length === 0) {
-            toast({
-                variant: 'destructive',
-                title: 'Missing Information',
-                description: 'Please provide a title, brand, category, and at least one photo before generating a price suggestion.',
-            });
-            setIsSuggesting(false);
-            return;
-        }
-
-        const categoryName = getCategoryName(formData.gender, formData.category);
-
-        const input: SuggestPriceInput = {
-            title: typeof formData.title === 'string' ? formData.title : '',
-            brand: formData.brand,
-            category: categoryName,
-            condition: formData.condition,
-            images: formData.images.map(img => img.url),
-        };
-        
-        const result = await suggestPrice(input);
-        setSuggestion(result);
-
-    } catch (error) {
-        console.error("AI price suggestion failed:", error);
-        toast({
-            variant: 'destructive',
-            title: 'Suggestion Failed',
-            description: 'Could not generate a price suggestion at this time. Please try again.',
-        });
-    } finally {
-        setIsSuggesting(false);
-    }
-  };
-
-
-  const onSubmit = (data: Step6Values) => {
-    setFormData({ ...data, sellerEarning: earning, currency: 'EUR' });
-    nextStep();
-  };
+    setFormData({ price: currentPrice });
+  }, [price, setFormData, currentPrice]);
 
   return (
-    <div className="space-y-8">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <h3 className="font-semibold text-lg">Price</h3>
-            <FormField
-              control={form.control}
-              name="price"
-              render={({ field }) => (
-                  <FormItem>
-                  <FormLabel>Set your price in EUR</FormLabel>
-                    <div className="relative">
-                        <Input 
-                            type="number" 
-                            placeholder="e.g. 550" 
-                            {...field} 
-                            onChange={e => field.onChange(parseFloat(e.target.value) || undefined)}
-                            value={field.value ?? ''} 
-                            className="h-16 text-lg pl-20"
-                         />
-                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-muted-foreground font-medium">EUR</span>
-                    </div>
-                  <FormMessage />
-                  </FormItem>
-              )}
-            />
+    <div className="space-y-8 pb-20">
+      <div className="space-y-4">
+        <Label className="text-lg font-bold">Set your price</Label>
+        <div className="relative">
+          <Input
+            type="number"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="h-20 text-4xl font-bold pl-12"
+            placeholder="0"
+          />
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground">€</span>
+        </div>
+      </div>
 
-            <Button type="button" variant="outline" onClick={handleSuggestPrice} disabled={isSuggesting} className="w-full">
-                {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                AI Price Suggestion
-            </Button>
-            
-            {suggestion && (
-                <Card className="mt-4 bg-primary/5 border-primary/20">
-                    <CardHeader>
-                        <CardTitle className="text-base">AI Suggestion</CardTitle>
-                        <CardDescription>We suggest a price between €{suggestion.minPrice} and €{suggestion.maxPrice}.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <p className="text-sm text-muted-foreground italic">"{suggestion.reasoning}"</p>
-                        <Button type="button" onClick={() => form.setValue('price', suggestion.recommendedPrice, { shouldValidate: true })} className="w-full">
-                            Apply Recommended Price (€{suggestion.recommendedPrice})
-                        </Button>
-                    </CardContent>
-                </Card>
-            )}
+      <div className="bg-primary/5 rounded-xl p-6 border border-primary/10 space-y-4">
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-muted-foreground">Platform fee (15%)</span>
+          <span className="font-medium text-destructive">- €{fee.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between items-center text-lg font-bold">
+          <span>You will receive</span>
+          <span className="text-green-600">€{earnings.toFixed(2)}</span>
+        </div>
+      </div>
 
-             <div className="bg-muted rounded-lg p-4 flex flex-col justify-center">
-                <FormLabel className="text-sm text-muted-foreground flex items-center">
-                    You earn
-                     <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-4 w-4 ml-1">
-                                    <Info className="h-3 w-3" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                            <p>This is your estimated earning after a 20% commission and a €5 service fee are deducted.</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                </FormLabel>
-                <p className="font-bold text-lg">€{earning.toFixed(2)}</p>
-            </div>
-            <p className="text-sm text-muted-foreground">The buyer will also pay for shipping. <a href="#" className="underline">Learn more</a></p>
-          </form>
-        </Form>
-      
-      <StepActions
-          onNext={form.handleSubmit(onSubmit)}
-          nextText="Continue to review"
-          isNextDisabled={!priceValue || priceValue <= 0}
-        />
+      <div className="p-4 bg-muted/30 rounded-lg space-y-3">
+        <div className="flex items-center gap-2 text-primary font-semibold">
+          <Sparkles className="h-4 w-4" />
+          <span>IA Price Suggestion</span>
+        </div>
+        <p className="text-sm text-muted-foreground">Based on similar {formData.brand} items, we suggest pricing between <span className="font-bold text-foreground">€280 - €350</span> for a faster sale.</p>
+        <Button variant="outline" size="sm" onClick={() => setPrice('320')}>Apply €320</Button>
+      </div>
+
+      <div className="space-y-6">
+        <div className="flex items-center justify-between py-2">
+          <div className="space-y-0.5">
+            <Label className="text-base">Allow offers</Label>
+            <p className="text-sm text-muted-foreground">Let buyers negotiate the price</p>
+          </div>
+          <Switch checked={formData.allowOffers} onCheckedChange={(v) => setFormData({ allowOffers: v })} />
+        </div>
+
+        <div className="space-y-4">
+          <Label className="flex items-center gap-2">
+            <Truck className="h-4 w-4" />
+            Shipping details
+          </Label>
+          <div className="grid gap-4">
+            <select 
+              className="w-full h-12 rounded-md border border-input bg-background px-3"
+              value={formData.shippingMethod}
+              onChange={(e) => setFormData({ shippingMethod: e.target.value as any })}
+            >
+              <option value="baboon">Baboon Delivery (€5.00 - Recommended)</option>
+              <option value="other">Other courier</option>
+              <option value="free">Free shipping</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <Button className="w-full h-14 text-lg" size="lg" disabled={!currentPrice} onClick={nextStep}>
+        Review Listing
+      </Button>
     </div>
   );
 }

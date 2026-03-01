@@ -1,28 +1,11 @@
 'use client';
 import { z } from "zod";
 
-export const priceSuggestionSchema = z.object({
-  category: z.string().min(3, "Category must be at least 3 characters long."),
-  brand: z.string().min(2, "Brand must be at least 2 characters long."),
-  condition: z.enum(["new", "like-new", "used"], {
-    required_error: "You need to select a condition.",
-  }),
-  description: z.string().min(10, "Description must be at least 10 characters.").max(1000),
-  currency: z.enum(["EUR", "ALL"], {
-    required_error: "You need to select a currency.",
-  }),
-});
-
-export type PriceSuggestionFormValues = z.infer<typeof priceSuggestionSchema>;
-
-
 // --- Auth Schemas ---
-
 export const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(1, { message: "Password is required." }),
 });
-
 export type LoginValues = z.infer<typeof loginSchema>;
 
 export const signupSchema = z.object({
@@ -33,23 +16,9 @@ export const signupSchema = z.object({
     message: "You must accept the terms and conditions.",
   }),
 });
-
 export type SignupValues = z.infer<typeof signupSchema>;
 
-export const forgotPasswordSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address." }),
-});
-
-export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
-
-export const editProfileSchema = z.object({
-  firstName: z.string().min(1, "First name is required.").max(50),
-  lastName: z.string().min(1, "Last name is required.").max(50),
-  phone: z.string().optional(),
-});
-export type EditProfileValues = z.infer<typeof editProfileSchema>;
-
-
+// --- User & Profile ---
 export const firestoreUserSchema = z.object({
   id: z.string(),
   displayName: z.string().optional().nullable(),
@@ -57,115 +26,64 @@ export const firestoreUserSchema = z.object({
   phone: z.string().optional().nullable(),
   photoURL: z.string().url().optional().nullable(),
   macroCategoryPreference: z.enum(["womenswear", "menswear"]).optional(),
-  language: z.string().optional(),
-  hasAcceptedChatRules: z.boolean().optional(),
   isSeller: z.boolean().optional(),
   createdAt: z.any().optional(),
-  stripeAccountId: z.string().optional().nullable(),
-  stripeOnboardingComplete: z.boolean().optional(),
   status: z.enum(['active', 'banned']).optional(),
   isCourier: z.boolean().optional(),
   courierStatus: z.enum(['pending_approval', 'approved', 'rejected']).optional(),
-  emailPreferences: z.object({
-    marketing: z.boolean().default(true),
-    productUpdates: z.boolean().default(true),
-    orderUpdates: z.boolean().default(true),
-  }).optional(),
 });
 export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
 
-
-// --- Checkout & Address Schemas ---
-
-export const addressSchema = z.object({
-  fullName: z.string().min(2, "Full name is required."),
-  phone: z.string().min(6, "A valid phone number is required."),
-  address: z.string().min(5, "Street address is required."),
-  city: z.string().min(2, "City is required."),
-  postal: z.string().min(3, "Postal code is required."),
-  country: z.string().min(2, "Country is required."),
-});
-
-export type AddressFormValues = z.infer<typeof addressSchema>;
-
-export type FirestoreAddress = AddressFormValues & {
-  id: string;
-  isDefault: boolean;
-};
-
-// --- Sell Schemas ---
-export const imageFileSchema = z.object({
-  url: z.string(),
-  name: z.string(),
-  type: z.string(),
-});
-export type ImageFile = z.infer<typeof imageFileSchema>;
-
-export const proofFileSchema = z.object({
-  url: z.string(),
-  name: z.string(),
-  type: z.string(),
-});
-export type ProofFile = z.infer<typeof proofFileSchema>;
-
+// --- Sell Flow Schemas (6 Steps) ---
 
 export const sellStep1Schema = z.object({
-  gender: z.enum(['womenswear', 'menswear', 'girlswear', 'boyswear'], { required_error: 'Please select a type.' }),
-  category: z.string().min(1, 'Please select a category.'),
-  brand: z.string().min(1, 'Brand is required.'),
+  images: z.array(z.object({
+    url: z.string(),
+    name: z.string(),
+    type: z.string(),
+    isProcessed: z.boolean().optional(),
+  })).min(3, "At least 3 photos are required").max(8, "Maximum 8 photos allowed"),
 });
 
 export const sellStep2Schema = z.object({
-  condition: z.enum(['new', 'like_new', 'good', 'fair'], { required_error: 'Please select a condition.' }),
-  sizeStandard: z.string().optional(),
-  sizeValue: z.string().optional(),
-  material: z.string().min(1, 'Material is required.'),
-  color: z.string().min(1, 'Color is required.'),
-  pattern: z.string().optional(),
-  vintage: z.boolean().default(false),
-  proofOfOrigin: z.array(proofFileSchema).optional(),
+  gender: z.string().min(1, "Please select a gender"),
+  category: z.string().min(1, "Category is required"),
+  subCategory: z.string().min(1, "Subcategory is required"),
+  brand: z.string().min(1, "Brand is required"),
 });
 
 export const sellStep3Schema = z.object({
-  images: z.array(imageFileSchema).min(3, 'At least three images are required.').max(15, 'You can upload a maximum of 15 images.'),
+  title: z.string().min(5, "Title too short").max(80, "Title too long"),
+  model: z.string().optional(),
+  color: z.string().min(1, "Color is required"),
+  material: z.string().min(1, "Material is required"),
+  size: z.string().min(1, "Size is required"),
+  year: z.string().optional(),
+  description: z.string().min(50, "Description must be at least 50 characters"),
+  authenticity: z.array(z.string()).optional(),
 });
 
 export const sellStep4Schema = z.object({
-    title: z.string().min(5, 'Title must be at least 5 characters long.').max(99, 'Title must be under 100 characters.'),
-    description: z.string().min(20, 'Description must be at least 20 characters long.').max(5000, "Description is too long."),
-    origin: z.enum(['direct', 'private', 'vestiaire', 'other']).optional(),
-    yearOfPurchase: z.string().optional(),
-    serialNumber: z.string().optional(),
-    packaging: z.array(z.string()).optional(),
+  condition: z.enum(['new_tags', 'new_no_tags', 'excellent', 'very_good', 'good']),
+  defects: z.string().optional(),
 });
 
 export const sellStep5Schema = z.object({
-  shippingFromAddressId: z.string({ required_error: 'Please select a shipping address.' }).min(1, 'Please select a shipping address.'),
-});
-
-export const sellStep6Schema = z.object({
-    price: z.preprocess(
-        (a) => {
-            if (typeof a === 'string' && a.trim() !== '') return parseFloat(a);
-            if (typeof a === 'number') return a;
-            return undefined;
-        },
-        z.number({required_error: "Price is required.", invalid_type_error: "Price must be a number."}).min(1, "Price must be at least 1.")
-    ),
+  price: z.number().min(1, "Price must be at least 1 EUR"),
+  allowOffers: z.boolean().default(true),
+  minOfferPrice: z.number().optional(),
+  shippingFrom: z.string().min(1, "City is required"),
+  shippingMethod: z.enum(['baboon', 'other', 'free']),
+  dispatchTime: z.enum(['1_day', '2_3_days', '1_week']),
 });
 
 export const sellFormSchema = sellStep1Schema
   .merge(sellStep2Schema)
   .merge(sellStep3Schema)
   .merge(sellStep4Schema)
-  .merge(sellStep5Schema)
-  .merge(sellStep6Schema);
+  .merge(sellStep5Schema);
 
-export type SellFormValues = z.infer<typeof sellFormSchema> & { 
-    sellerEarning?: number; 
-    currency?: 'EUR';
-    productId?: string;
-};
+export type SellFormValues = z.infer<typeof sellFormSchema>;
 
 export interface SellDraft {
   id: string;
@@ -174,306 +92,45 @@ export interface SellDraft {
   lastModified: number;
 }
 
-
-// --- Courier Schemas ---
-export const courierApplicationSchema = z.object({
-  legalName: z.string().min(3, "Legal name must be at least 3 characters long."),
-  phone: z.string().min(9, "Please enter a valid phone number."),
-  dob: z.date({
-    required_error: "A date of birth is required.",
-  }),
-  vehicleType: z.enum(['bicycle', 'scooter', 'car', 'van'], {
-    required_error: "Please select a vehicle type.",
-  }),
-  licensePlate: z.string().optional(),
-  serviceAreas: z.string().min(3, "Please enter at least one service area."),
-  availability: z.array(z.string()).refine(value => value.some(item => item), {
-    message: "You have to select at least one day.",
-  }),
+// --- Address ---
+export const addressSchema = z.object({
+  fullName: z.string().min(2),
+  phone: z.string().min(6),
+  address: z.string().min(5),
+  city: z.string().min(2),
+  postal: z.string().min(3),
+  country: z.string().min(2),
 });
+export type AddressFormValues = z.infer<typeof addressSchema>;
+export type FirestoreAddress = AddressFormValues & { id: string; isDefault: boolean; };
 
-export type CourierApplicationValues = z.infer<typeof courierApplicationSchema>;
+// --- Products & Orders ---
+export type FirestoreProduct = {
+  id: string;
+  sellerId: string;
+  title: string;
+  brand: string;
+  description: string;
+  price: number;
+  category: string;
+  subCategory: string;
+  images: string[];
+  status: 'active' | 'sold' | 'reserved' | 'pending_review' | 'rejected' | 'draft';
+  listingCreated: any;
+  condition: string;
+  color?: string;
+  material?: string;
+  size?: string;
+};
 
-export const firestoreCourierProfileSchema = z.object({
-  userId: z.string(),
-  legalName: z.string(),
-  phone: z.string(),
-  dob: z.string(),
-  vehicleType: z.enum(['bicycle', 'scooter', 'car', 'van']),
-  licensePlate: z.string().optional(),
-  serviceAreas: z.string(),
-  availability: z.array(z.string()),
-  isAvailable: z.boolean().default(true),
-});
-
-export type FirestoreCourierProfile = z.infer<typeof firestoreCourierProfileSchema> & { id: string };
-
-
-// --- Product & Cart Schemas ---
-
-export const firestoreProductSchema = z.object({
-  sellerId: z.string(),
-  title: z.string(),
-  brand: z.string(),
-  description: z.string(),
-  price: z.number(),
-  category: z.string(),
-  subCategory: z.string(),
-  images: z.array(z.string().url()),
-  status: z.enum(["active", "sold", "reserved", "pending_review", "rejected"]),
-  listingCreated: z.any(),
-  keywords: z.array(z.string()).optional(),
-  condition: z.string().optional(),
-  material: z.string().optional(),
-  color: z.string().optional(),
-  size: z.string().optional(),
-  pattern: z.string().optional(),
-  vintage: z.boolean().optional(),
-  views: z.number().optional(),
-  likes: z.number().optional(),
-  moderation: z.object({
-    status: z.enum(["approved", "rejected", "needs_review"]),
-    reasons: z.array(z.string()).optional(),
-    checkedAt: z.any(),
-  }).optional(),
-  authenticityCheck: z.object({
-      status: z.enum(["unchecked", "pending", "completed", "failed"]),
-      confidence: z.enum(["low", "medium", "high"]),
-      findings: z.array(z.string()),
-      checkedAt: z.any(),
-    }).optional(),
-});
-
-export type FirestoreProduct = z.infer<typeof firestoreProductSchema> & { id: string };
-
-const offerHistoryItemSchema = z.object({
-  action: z.string(),
-  amount: z.number(),
-  byUser: z.string(),
-  timestamp: z.any(),
-});
-
-export const firestoreOfferSchema = z.object({
-  productId: z.string(),
-  buyerId: z.string(),
-  sellerId: z.string(),
-  originalListingPrice: z.number(),
-  offerAmount: z.number(),
-  offerType: z.enum(["preset_1", "preset_2", "preset_3", "custom"]),
-  status: z.enum(['pending', 'accepted', 'declined', 'countered']),
-  counterOfferAmount: z.number().optional(),
-  createdAt: z.any(),
-  history: z.array(offerHistoryItemSchema).optional(),
-});
-export type FirestoreOffer = z.infer<typeof firestoreOfferSchema> & { id: string };
-
-
-// --- Order Schemas ---
-const orderItemSchema = z.object({
-  productId: z.string(),
-  sellerId: z.string(),
-  title: z.string(),
-  brand: z.string(),
-  image: z.string(),
-  price: z.number(),
-  quantity: z.number(),
-  size: z.string().optional().nullable(),
-});
-
-export const firestoreOrderSchema = z.object({
-  orderNumber: z.string(),
-  buyerId: z.string(),
-  sellerIds: z.array(z.string()),
-  items: z.array(orderItemSchema),
-  totalAmount: z.number(),
-  paymentStatus: z.string().optional(),
-  paymentMethod: z.string(),
-  paymentIntentId: z.string().optional().nullable(),
-  status: z.string(),
-  shippingAddress: addressSchema.optional(),
-  trackingNumber: z.string().optional().nullable(),
-  courierCompany: z.string().optional().nullable(),
-  deliveredAt: z.any().optional().nullable(),
-  createdAt: z.any(),
-});
-
-export type FirestoreOrder = z.infer<typeof firestoreOrderSchema> & { id: string };
-
-// --- Delivery Schema ---
-export const firestoreDeliverySchema = z.object({
-    orderId: z.string(),
-    buyerId: z.string(),
-    sellerIds: z.array(z.string()),
-    courierId: z.string().nullable().optional(),
-    status: z.enum([
-        "pending_assignment", 
-        "assigned", 
-        "arrived_for_pickup",
-        "picked_up", 
-        "in_transit",
-        "arrived_for_delivery", 
-        "delivered", 
-        "cancelled"
-    ]),
-    addresses: z.object({
-        pickup: addressSchema,
-        delivery: addressSchema,
-    }),
-    pickupNotes: z.string().optional(),
-    pickupSignature: z.string().url().optional(),
-    proofOfPickup: z.string().url().optional(),
-    proofOfDelivery: z.string().url().optional(),
-    deliveryFee: z.number(),
-    packageSize: z.enum(["small", "medium", "large"]),
-    timeEstimate: z.number().optional(),
-    specialInstructions: z.string().optional(),
-    distance: z.number().optional(),
-    currentLocation: z.object({
-        latitude: z.number(),
-        longitude: z.number(),
-    }).optional().nullable(),
-    history: z.array(z.object({
-        status: z.string(),
-        timestamp: z.any(),
-        notes: z.string().optional(),
-    })).optional(),
-});
-export type FirestoreDelivery = z.infer<typeof firestoreDeliverySchema> & { id: string };
-
-
-// --- Messaging Schemas ---
-export const firestoreMessageSchema = z.object({
-  senderId: z.string(),
-  content: z.string(),
-  createdAt: z.any(),
-  type: z.enum(["text", "image"]).default("text"),
-  imageUrl: z.string().optional(),
-  read: z.boolean().default(false),
-});
-export type FirestoreMessage = z.infer<typeof firestoreMessageSchema> & { id: string };
-
-
-export const firestoreConversationSchema = z.object({
-  participants: z.array(z.string()),
-  participantDetails: z.array(z.object({
-    userId: z.string(),
-    name: z.string(),
-    avatar: z.string().optional(),
-  })),
-  productId: z.string(),
-  productTitle: z.string(),
-  productImage: z.string(),
-  lastMessage: z.string().optional(),
-  lastMessageAt: z.any(),
-  unreadCount: z.record(z.string(), z.number()).default({}), // E.g. { userId1: 2, userId2: 0 }
-});
-export type FirestoreConversation = z.infer<typeof firestoreConversationSchema> & { id: string };
-
-// --- Review Schema ---
-export const firestoreReviewSchema = z.object({
-  orderId: z.string(),
-  productId: z.string(),
-  reviewerId: z.string(), // The one writing the review (buyer)
-  revieweeId: z.string(), // The one being reviewed (seller)
-  rating: z.number().min(1).max(5),
-  content: z.string(),
-  createdAt: z.any(),
-});
-export type FirestoreReview = z.infer<typeof firestoreReviewSchema> & { id: string };
-
-// --- Notification Schema ---
-export const firestoreNotificationSchema = z.object({
-  userId: z.string(),
-  type: z.enum(['offer_received', 'item_sold', 'new_message', 'order_update', 'review_received', 'welcome', 'listing_suggestion', 'price_drop_suggestion', 'item_liked', 'order_reminder']),
-  title: z.string(),
-  message: z.string(),
-  data: z.object({
-    link: z.string().optional(),
-    imageUrl: z.string().optional(),
-  }).optional(),
-  read: z.boolean().default(false),
-  createdAt: z.any(),
-});
-export type FirestoreNotification = z.infer<typeof firestoreNotificationSchema> & { id: string };
-
-// --- Report Schema ---
-export const firestoreReportSchema = z.object({
-    reporterId: z.string(),
-    type: z.enum(['product', 'user', 'message', 'review']),
-    itemId: z.string(), // ID of the reported item/user/etc.
-    reason: z.string(),
-    status: z.enum(['pending', 'resolved']).default('pending'),
-    createdAt: z.any(),
-});
-export type FirestoreReport = z.infer<typeof firestoreReportSchema> & { id: string };
-
-// --- Admin Log Schema ---
-export const firestoreAdminLogSchema = z.object({
-  adminId: z.string(),
-  adminName: z.string(),
-  actionType: z.enum([
-      "product_approved", 
-      "product_rejected", 
-      "user_banned", 
-      "user_unbanned", 
-      "user_role_changed", 
-      "order_status_updated", 
-      "setting_changed",
-      "courier_approved",
-      "courier_rejected"
-    ]),
-  details: z.string(),
-  targetId: z.string(),
-  timestamp: z.any(),
-});
-export type FirestoreAdminLog = z.infer<typeof firestoreAdminLogSchema> & { id: string };
-
-
-// --- Admin Settings & Data ---
-export const firestoreSettingsSchema = z.object({
-  commissionRate: z.number(),
-  maintenanceMode: z.boolean(),
-  imageCompressionQuality: z.number().optional(),
-  imageMaxDimension: z.number().optional(),
-  imageMaxSizeMB: z.number().optional(),
-});
-export type FirestoreSettings = z.infer<typeof firestoreSettingsSchema>;
-
-export const firestoreCouponSchema = z.object({
-  code: z.string(),
-  discountType: z.enum(["percentage", "fixed"]),
-  discountValue: z.number(),
-  status: z.enum(["active", "expired", "disabled"]),
-});
-export type FirestoreCoupon = z.infer<typeof firestoreCouponSchema> & { id: string };
-
-export const firestoreCategorySchema = z.object({
-  name: z.string(),
-  slug: z.string(),
-  parentId: z.string().optional().nullable(),
-  icon: z.string().optional(),
-  image: z.string().url().optional(),
-  position: z.number().optional(),
-  isActive: z.boolean(),
-});
-export type FirestoreCategory = z.infer<typeof firestoreCategorySchema> & { id: string };
-
-export const firestoreBrandSchema = z.object({
-  name: z.string(),
-  slug: z.string(),
-  logoUrl: z.string().url().optional(),
-  verified: z.boolean().optional(),
-  productCount: z.number().optional(),
-});
-export type FirestoreBrand = z.infer<typeof firestoreBrandSchema> & { id: string };
-
-export const firestoreExchangeRatesSchema = z.object({
-  base: z.string(),
-  lastUpdated: z.any(),
-  rates: z.object({
-    EUR: z.number(),
-    USD: z.number(),
-    ALL: z.number(),
-  }),
-});
-export type FirestoreExchangeRates = z.infer<typeof firestoreExchangeRatesSchema>;
+export type FirestoreOrder = {
+  id: string;
+  orderNumber: string;
+  buyerId: string;
+  sellerIds: string[];
+  items: any[];
+  totalAmount: number;
+  status: string;
+  paymentMethod: string;
+  createdAt: any;
+};

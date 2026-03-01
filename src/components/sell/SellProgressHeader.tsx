@@ -1,60 +1,37 @@
 'use client';
 import { useSellForm } from './SellFormContext';
-import { cn } from '@/lib/utils';
-import { Check } from 'lucide-react';
-import { categories } from '@/lib/mock-data';
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { ChevronLeft, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export function SellProgressHeader() {
-  const { formData, currentStep, totalSteps } = useSellForm();
-  
-  const visualSteps = Array.from({ length: 6 }, (_, i) => i + 1);
+  const { currentStep, totalSteps, prevStep } = useSellForm();
+  const router = useRouter();
+  const progress = (currentStep / totalSteps) * 100;
 
-  const getCategoryName = (slug: string | undefined) => {
-    if (!slug) return '';
-    return categories.find(c => c.slug === slug)?.name || '';
-  }
-
-  const getGenderName = (gender: string | undefined) => {
-    if (!gender) return '';
-    return gender.charAt(0).toUpperCase() + gender.slice(1);
-  }
-
-  const stepLabels: { [key: number]: string } = {
-    1: 'Category',
-    2: 'Details',
-    3: 'Photos',
-    4: 'Description',
-    5: 'Address',
-    6: 'Price',
-  };
+  const stepTitles = [
+    "Photos",
+    "Category & Brand",
+    "Details",
+    "Condition",
+    "Pricing",
+    "Preview"
+  ];
 
   return (
-    <div className="text-center space-y-4">
-        <div>
-            <h2 className="font-semibold text-lg">{formData.brand}</h2>
-            <p className="text-muted-foreground">{`${getGenderName(formData.gender)}, ${formData.category}`}</p>
+    <div className="sticky top-16 bg-background z-30 pt-4 pb-2 space-y-4">
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="icon" onClick={currentStep > 1 ? prevStep : () => router.push('/sell')}>
+          {currentStep > 1 ? <ChevronLeft className="h-6 w-6" /> : <X className="h-6 w-6" />}
+        </Button>
+        <div className="text-center">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Step {currentStep} of {totalSteps}</p>
+          <h1 className="font-semibold text-sm">{stepTitles[currentStep - 1]}</h1>
         </div>
-        <div className="flex justify-center items-center gap-4">
-            {visualSteps.map(step => {
-                const isCompleted = currentStep > step;
-                const isActive = currentStep === step;
-                return (
-                    <div key={step} className="flex flex-col items-center gap-2 relative">
-                        <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center border-2 font-semibold transition-all",
-                            isActive && "bg-black border-black text-white scale-110",
-                            isCompleted && "bg-white border-black text-black",
-                            !isActive && !isCompleted && "bg-white border-gray-300 text-gray-400"
-                        )}>
-                           {isCompleted ? <Check className="h-5 w-5" /> : step}
-                        </div>
-                        {isActive && (
-                            <span className="text-xs font-semibold absolute -bottom-5">{stepLabels[step]}</span>
-                        )}
-                    </div>
-                )
-            })}
-        </div>
+        <div className="w-10" /> {/* Spacer */}
+      </div>
+      <Progress value={progress} className="h-1 rounded-none" />
     </div>
   );
 }
