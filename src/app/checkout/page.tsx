@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -16,7 +17,9 @@ import { Toaster } from '@/components/ui/toaster';
 export default function CheckoutPage() {
   const [step, setStep] = React.useState(1);
   const [selectedAddress, setSelectedAddress] = React.useState<FirestoreAddress | null>(null);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<string | null>('card');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<string | null>(null);
+  const [savedMethodId, setSavedMethodId] = React.useState<string | null>(null);
+  
   const { items, isLoading: isCartLoading } = useCart();
   const router = useRouter();
   const { user, isUserLoading } = useUser();
@@ -36,8 +39,9 @@ export default function CheckoutPage() {
     setStep(2);
   };
 
-  const handlePaymentNext = (paymentMethod: string) => {
+  const handlePaymentNext = (paymentMethod: string, savedId?: string) => {
     setSelectedPaymentMethod(paymentMethod);
+    setSavedMethodId(savedId || null);
     setStep(3);
   };
   
@@ -78,6 +82,7 @@ export default function CheckoutPage() {
                             onPrevStep={handleGoToStep}
                             shippingAddress={selectedAddress}
                             paymentMethod={selectedPaymentMethod}
+                            savedMethodId={savedMethodId}
                         />
                     )}
                 </motion.div>

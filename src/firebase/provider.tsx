@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
@@ -90,12 +91,17 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
           getDoc(userDocRef).then(docSnap => {
             if (!docSnap.exists()) {
               setDoc(userDocRef, {
-                displayName: firebaseUser.displayName,
+                name: firebaseUser.displayName,
                 email: firebaseUser.email,
-                photoURL: firebaseUser.photoURL,
-                createdAt: serverTimestamp()
-                // other initial fields can be set here
+                profileImage: firebaseUser.photoURL,
+                role: 'buyer', // Default role
+                status: 'active',
+                createdAt: serverTimestamp(),
+                lastLoginAt: serverTimestamp()
               }, { merge: true }); // use merge to be safe
+            } else {
+              // Update last login
+              setDoc(userDocRef, { lastLoginAt: serverTimestamp() }, { merge: true });
             }
           });
         }

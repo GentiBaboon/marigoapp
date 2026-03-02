@@ -1,3 +1,4 @@
+
 'use client';
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
@@ -20,10 +21,11 @@ export function PhotosStep() {
       return;
     }
 
-    const newImages = acceptedFiles.map(file => ({
+    const newImages = acceptedFiles.map((file, index) => ({
       url: URL.createObjectURL(file),
       name: file.name,
       type: file.type,
+      position: currentImages.length + index,
     }));
 
     setFormData({ images: [...currentImages, ...newImages] });
@@ -38,14 +40,16 @@ export function PhotosStep() {
   const removePhoto = (index: number) => {
     const newImages = [...(formData.images || [])];
     newImages.splice(index, 1);
-    setFormData({ images: newImages });
+    // Re-index remaining images
+    const indexedImages = newImages.map((img, i) => ({ ...img, position: i }));
+    setFormData({ images: indexedImages });
   };
 
   const removeBackground = async (index: number) => {
     setProcessingId(`img-${index}`);
-    // Simulate AI call
+    // Simulate AI call for background removal
     await new Promise(r => setTimeout(r, 2000));
-    toast({ title: "Background removed ✨" });
+    toast({ title: "Background removed ✨ (Demo)" });
     setProcessingId(null);
   };
 

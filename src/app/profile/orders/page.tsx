@@ -1,13 +1,11 @@
+
 'use client';
 
 import * as React from 'react';
 import Link from 'next/link';
-import { User, HelpCircle } from 'lucide-react';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-
-import { useUser } from '@/firebase';
+import { collection, query, where, orderBy } from 'firebase/firestore';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreOrder } from '@/lib/types';
-
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -18,6 +16,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { OrderItem } from '@/components/profile/order-item';
+import { ShoppingBag } from 'lucide-react';
 
 function OrdersSkeleton() {
     return (
@@ -47,15 +46,17 @@ function OrdersSkeleton() {
     );
 }
 
-
 function EmptyState() {
     return (
-        <div className="text-center py-20">
-            <h3 className="text-lg font-semibold">No orders yet</h3>
-            <p className="text-muted-foreground mt-2">
-                You haven't bought any items yet.
+        <div className="text-center py-20 px-4">
+            <div className="bg-muted/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <ShoppingBag className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-bold font-headline">No orders yet</h3>
+            <p className="text-muted-foreground mt-2 max-w-xs mx-auto">
+                Items you buy will appear here. Start exploring our curated selection!
             </p>
-            <Button asChild className="mt-4">
+            <Button asChild className="mt-8 rounded-full px-8">
                 <Link href="/home">Start Shopping</Link>
             </Button>
         </div>
@@ -64,38 +65,19 @@ function EmptyState() {
 
 export default function OrdersPage() {
   const { user, isUserLoading } = useUser();
-  const [orders, setOrders] = React.useState<FirestoreOrder[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const firestore = useFirestore();
 
-  React.useEffect(() => {
-    if (isUserLoading) {
-        return;
-    }
-    if (!user) {
-        setIsLoading(false);
-        return;
-    };
+  const ordersQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(
+        collection(firestore, 'orders'),
+        where('buyerId', '==', user.uid),
+        orderBy('createdAt', 'desc')
+    );
+  }, [user, firestore]);
 
-    const fetchOrders = async () => {
-        setIsLoading(true);
-        try {
-            const functions = getFunctions();
-            const getMyOrders = httpsCallable(functions, 'getMyOrders');
-            const result: any = await getMyOrders();
-            setOrders(result.data.orders);
-        } catch (error) {
-            console.error("Error fetching orders via Cloud Function:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    fetchOrders();
+  const { data: orders, isLoading: areOrdersLoading } = useCollection<FirestoreOrder>(ordersQuery);
 
-  }, [user, isUserLoading]);
-
-  const areDataLoading = isUserLoading || isLoading;
-  
   if (!user && !isUserLoading) {
      return (
       <div className="container mx-auto py-8 px-4 max-w-3xl">
@@ -118,16 +100,16 @@ export default function OrdersPage() {
 
   return (
      <div className="container mx-auto max-w-lg p-0 md:p-4">
-        <div className="px-4 pt-4 md:pt-0">
-            <h1 className="text-2xl font-bold">My Orders</h1>
+        <div className="px-4 pt-8 md:pt-4">
+            <h1 className="text-3xl font-bold font-headline">My Orders</h1>
             <p className="text-muted-foreground">Track and manage your purchases.</p>
         </div>
 
-        <div className="mt-4">
-            {areDataLoading ? (
+        <div className="mt-8">
+            {areOrdersLoading ? (
                 <OrdersSkeleton />
-            ) : orders.length > 0 ? (
-                <div className="px-4 md:px-0">
+            ) : orders && orders.length > 0 ? (
+                <div className="px-4 md:px-0 divide-y">
                     {orders.map(order => (
                         <OrderItem key={order.id} order={order} />
                     ))}

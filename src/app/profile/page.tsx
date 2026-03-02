@@ -36,14 +36,13 @@ import {
   Landmark,
   Truck,
   LayoutDashboard,
-  ShieldAlert
+  ShieldAlert,
+  Coins
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { FirestoreUser } from '@/lib/types';
 import { doc } from 'firebase/firestore';
 import { EditProfileForm } from '@/components/profile/edit-profile-form';
-
-const ADMIN_UIDS = ['2C81RVoXZWZuSWXEEueehqbHkMu1', 'v521MWW9rmPYchVBc91DheeRU5j2'];
 
 const getInitials = (name: string | null | undefined) => {
   if (!name) return 'U';
@@ -88,16 +87,28 @@ export default function ProfilePage() {
     }
   };
 
-  const isAdmin = user && ADMIN_UIDS.includes(user.uid);
+  if (isUserLoading || !user) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background">
+        <div className="dot-flashing"></div>
+      </div>
+    );
+  }
+
+  const role = firestoreUser?.role || 'buyer';
+  const isAdmin = role === 'admin';
+  const isSeller = role === 'seller' || isAdmin || firestoreUser?.isSeller;
+  const isCourier = role === 'courier';
 
   const menuItems = [
     ...(isAdmin ? [{ href: '/admin', label: 'Admin Dashboard', icon: ShieldAlert }] : []),
     { href: '/profile/orders', label: 'My Orders', icon: Package },
     { href: '/profile/listings', label: 'My Listings', icon: Tag },
     { href: '/profile/offers', label: 'My Offers', icon: Handshake },
-    ...(firestoreUser?.isSeller ? [{ href: '/profile/stripe-onboarding', label: 'Setup Payouts', icon: Landmark }] : []),
-    ...(firestoreUser?.courierStatus === 'approved' ? [{ href: '/courier/dashboard', label: 'Courier Dashboard', icon: LayoutDashboard }] : []),
-    ...(!firestoreUser?.isCourier ? [{ href: '/delivery-partner', label: 'Become a Delivery Partner', icon: Truck }] : []),
+    ...(isSeller ? [{ href: '/profile/earnings', label: 'My Earnings', icon: Coins }] : []),
+    { href: '/profile/stripe-onboarding', label: 'Setup Payouts (Sellers)', icon: Landmark },
+    ...(isCourier ? [{ href: '/courier/dashboard', label: 'Courier Dashboard', icon: LayoutDashboard }] : []),
+    ...(role === 'buyer' ? [{ href: '/delivery-partner', label: 'Become a Delivery Partner', icon: Truck }] : []),
     { href: '/sell', label: 'Sell an Item', icon: null, special: true },
     { href: '/profile/addresses', label: 'My Addresses', icon: MapPin },
     { href: '/profile/payments', label: 'Payment Methods', icon: CreditCard },
@@ -109,13 +120,8 @@ export default function ProfilePage() {
     { href: '/about', label: 'About Marigo', icon: Info },
   ];
 
-  if (isUserLoading || !user) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <div className="dot-flashing"></div>
-      </div>
-    );
-  }
+  const displayName = firestoreUser?.name || user.displayName || 'Marigo User';
+  const displayImage = firestoreUser?.profileImage || user.photoURL || '';
 
   return (
     <div className="container mx-auto px-4 py-8 md:py-12 max-w-3xl">
@@ -124,16 +130,21 @@ export default function ProfilePage() {
           <CardHeader className="flex flex-col sm:flex-row items-center gap-4">
             <Avatar className="h-16 w-16 text-2xl">
               <AvatarImage
-                src={user.photoURL || ''}
-                alt={user.displayName || 'User'}
+                src={displayImage}
+                alt={displayName}
               />
-              <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+              <AvatarFallback>{getInitials(displayName)}</AvatarFallback>
             </Avatar>
             <div className="text-center sm:text-left">
               <CardTitle className="font-headline text-2xl">
-                {user.displayName || 'Marigo User'}
+                {displayName}
               </CardTitle>
               <CardDescription>{user.email}</CardDescription>
+              {firestoreUser?.role && (
+                  <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
+                      {firestoreUser.role}
+                  </span>
+              )}
             </div>
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogTrigger asChild>

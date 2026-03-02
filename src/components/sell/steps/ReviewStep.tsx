@@ -1,3 +1,4 @@
+
 'use client';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
@@ -5,10 +6,11 @@ import { Check, Edit2, Loader2, Upload } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useUser, useStorage } from '@/firebase';
+import { useFirestore, useUser, useStorage, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
+import type { FirestoreProduct } from '@/lib/types';
 
 export function ReviewStep() {
   const { formData, goToStep, nextStep, activeDraft } = useSellForm();
@@ -30,22 +32,20 @@ export function ReviewStep() {
 
     try {
       const productId = activeDraft?.id || `prod_${Date.now()}`;
-      const finalImageUrls: string[] = [];
+      const finalImages: FirestoreProduct['images'] = [];
 
       const images = formData.images || [];
       if (images.length === 0) throw new Error("No images to upload");
 
-      // We track individual progress for all images
       const imageProgress = new Array(images.length).fill(0);
 
       const uploadImage = async (img: typeof images[0], index: number) => {
-        // If it's already a permanent URL (robustness)
+        // Skip upload if already a remote URL
         if (img.url.startsWith('http') && !img.url.includes('blob')) {
           imageProgress[index] = 100;
           return img.url;
         }
 
-        // Convert blob URL to Blob object
         const response = await fetch(img.url);
         const blob = await response.blob();
         
@@ -54,7 +54,6 @@ export function ReviewStep() {
         const storagePath = `products/${user.uid}/${productId}/${fileName}`;
         const storageRef = ref(storage, storagePath);
         
-        // Use Resumable upload for better tracking and reliability
         const uploadTask = uploadBytesResumable(storageRef, blob, {
             contentType: img.type
         });
@@ -64,7 +63,6 @@ export function ReviewStep() {
                 (snapshot) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                     imageProgress[index] = progress;
-                    // Calculate overall progress: 5% initial + up to 85% from uploads
                     const totalLoaded = imageProgress.reduce((a, b) => a + b, 0);
                     const averageProgress = totalLoaded / images.length;
                     setUploadProgress(5 + Math.round(averageProgress * 0.85));
@@ -78,32 +76,57 @@ export function ReviewStep() {
         });
       };
 
-      // Upload images in parallel for speed
       const uploadedUrls = await Promise.all(images.map((img, i) => uploadImage(img, i)));
-      finalImageUrls.push(...uploadedUrls);
-
-      // 2. Prepare and save product document to Firestore
-      // Important: Remove the temporary blob image objects from the saved data
-      const { images: _, ...listingData } = formData;
       
-      const productRef = doc(firestore, 'products', productId);
-      const productData = {
-        ...listingData,
+      uploadedUrls.forEach((url, i) => {
+          finalImages.push({
+              url,
+              thumbnailUrl: url, // For MVP simplified
+              position: i
+          });
+      });
+
+      // Prepare final product data mapping from form fields to new FirestoreProduct schema
+      const productData: FirestoreProduct = {
         id: productId,
         sellerId: user.uid,
+        title: formData.title || 'Untitled',
+        description: formData.description || '',
+        categoryId: formData.categoryId || 'uncategorized',
+        subcategoryId: formData.subcategoryId || 'uncategorized',
+        brandId: formData.brandId || 'other',
+        condition: (formData.condition as any) || 'good',
+        listingType: formData.listingType || 'fixed_price',
+        price: formData.price || 0,
+        originalPrice: formData.originalPrice,
+        currency: 'EUR',
+        size: formData.sizeValue || formData.size,
+        color: formData.color,
+        material: formData.material,
+        gender: (formData.gender as any) || 'unisex',
+        images: finalImages,
         status: 'active',
-        listingCreated: serverTimestamp(),
-        images: finalImageUrls, // These are now permanent URLs
         views: 0,
-        likes: 0
+        wishlistCount: 0,
+        isFeatured: false,
+        isAuthenticated: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       };
 
-      await setDoc(productRef, productData);
+      const productRef = doc(firestore, 'products', productId);
+      
+      await setDoc(productRef, productData).catch(err => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: productRef.path,
+              operation: 'create',
+              requestResourceData: productData
+          }));
+          throw err;
+      });
       
       setUploadProgress(100);
       toast({ title: "Listing Published!", variant: "success" });
-      
-      // Move to Success Step
       nextStep();
     } catch (e: any) {
       console.error("Publish error:", e);
@@ -116,6 +139,8 @@ export function ReviewStep() {
       setIsPublishing(false);
     }
   };
+
+  const brandName = formData.brandId || 'Designer Item';
 
   return (
     <div className="space-y-8 pb-20">
@@ -152,13 +177,13 @@ export function ReviewStep() {
       <div className="space-y-6">
         <section className="space-y-2">
           <div className="flex justify-between items-center">
-            <h3 className="font-bold text-2xl uppercase tracking-tighter">{formData.brand}</h3>
+            <h3 className="font-bold text-2xl uppercase tracking-tighter">{brandName}</h3>
             <span className="text-2xl font-bold">€{formData.price}</span>
           </div>
           <p className="text-muted-foreground text-lg">{formData.title}</p>
           <div className="flex gap-2">
-            {formData.sizeValue && <span className="bg-muted px-2 py-1 rounded text-xs uppercase font-bold border">{formData.sizeValue}</span>}
-            <span className="bg-muted px-2 py-1 rounded text-xs uppercase font-bold border">{formData.condition?.replace('_', ' ')}</span>
+            {formData.sizeValue && <span className="bg-muted px-2 py-1 rounded text-[10px] uppercase font-bold border">{formData.sizeValue}</span>}
+            <span className="bg-muted px-2 py-1 rounded text-[10px] uppercase font-bold border">{formData.condition?.replace('_', ' ')}</span>
           </div>
         </section>
 

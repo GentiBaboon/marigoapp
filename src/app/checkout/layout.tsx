@@ -1,4 +1,3 @@
-
 import { CheckoutHeader } from '@/components/checkout/checkout-header';
 import { StripeProvider } from '@/components/providers/stripe-provider';
 

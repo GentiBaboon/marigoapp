@@ -1,3 +1,4 @@
+
 'use client';
 import { z } from "zod";
 
@@ -21,17 +22,27 @@ export type SignupValues = z.infer<typeof signupSchema>;
 // --- User & Profile ---
 export const firestoreUserSchema = z.object({
   id: z.string(),
-  displayName: z.string().optional().nullable(),
+  name: z.string().optional().nullable(),
   email: z.string().email().optional().nullable(),
   phone: z.string().optional().nullable(),
-  photoURL: z.string().url().optional().nullable(),
-  macroCategoryPreference: z.enum(["womenswear", "menswear"]).optional(),
-  isSeller: z.boolean().optional(),
+  role: z.enum(["buyer", "seller", "courier", "admin"]).default("buyer"),
+  profileImage: z.string().url().optional().nullable(),
+  bio: z.string().optional().nullable(),
+  language: z.enum(["sq", "en", "it"]).default("en"),
+  currency: z.enum(["EUR", "ALL", "USD"]).default("EUR"),
+  stripeCustomerId: z.string().optional().nullable(),
+  stripeAccountId: z.string().optional().nullable(),
+  rating: z.number().default(0),
+  reviewCount: z.number().default(0),
   createdAt: z.any().optional(),
-  status: z.enum(['active', 'banned']).optional(),
-  isCourier: z.boolean().optional(),
-  courierStatus: z.enum(['pending_approval', 'approved', 'rejected']).optional(),
+  lastLoginAt: z.any().optional(),
+  status: z.enum(['active', 'banned']).default("active"),
   hasAcceptedChatRules: z.boolean().optional(),
+  emailPreferences: z.object({
+    marketing: z.boolean().default(true),
+    productUpdates: z.boolean().default(true),
+    orderUpdates: z.boolean().default(true),
+  }).optional(),
 });
 export type FirestoreUser = z.infer<typeof firestoreUserSchema>;
 
@@ -41,14 +52,16 @@ export const sellStep1Schema = z.object({
     url: z.string(),
     name: z.string(),
     type: z.string(),
+    thumbnailUrl: z.string().optional(),
+    position: z.number(),
   })).min(3, "At least 3 photos are required").max(8, "Maximum 8 photos allowed"),
 });
 
 export const sellStep2Schema = z.object({
-  gender: z.string().min(1, "Please select a gender"),
-  category: z.string().min(1, "Category is required"),
-  subCategory: z.string().min(1, "Subcategory is required"),
-  brand: z.string().min(1, "Brand is required"),
+  gender: z.enum(["women", "men", "children", "unisex"]),
+  categoryId: z.string().min(1, "Category is required"),
+  subcategoryId: z.string().min(1, "Subcategory is required"),
+  brandId: z.string().min(1, "Brand is required"),
 });
 
 export const sellStep3Schema = z.object({
@@ -61,9 +74,10 @@ export const sellStep3Schema = z.object({
 });
 
 export const sellStep4Schema = z.object({
-  condition: z.string().min(1, "Condition is required"),
+  condition: z.enum(["new", "like_new", "good", "fair"]),
   material: z.string().min(1, "Material is required"),
   color: z.string().min(1, "Color is required"),
+  size: z.string().optional(),
   sizeStandard: z.string().optional(),
   sizeValue: z.string().optional(),
   pattern: z.string().optional(),
@@ -73,6 +87,8 @@ export const sellStep4Schema = z.object({
 
 export const sellStep5Schema = z.object({
   price: z.number().min(1, "Price must be at least 1 EUR"),
+  originalPrice: z.number().optional(),
+  listingType: z.enum(["fixed_price", "auction"]).default("fixed_price"),
   allowOffers: z.boolean().default(true),
   shippingMethod: z.enum(['baboon', 'other', 'free']).optional(),
 });
@@ -117,24 +133,38 @@ export type FirestoreProduct = {
   id: string;
   sellerId: string;
   title: string;
-  brand: string;
   description: string;
+  categoryId: string;
+  subcategoryId: string;
+  brandId: string;
+  condition: "new" | "like_new" | "good" | "fair";
+  listingType: "fixed_price" | "auction";
   price: number;
-  category: string;
-  subCategory: string;
-  images: string[];
-  status: 'active' | 'sold' | 'reserved' | 'pending_review' | 'rejected' | 'draft';
-  listingCreated: any;
-  condition: string;
+  originalPrice?: number;
+  currency: "EUR";
+  size?: string;
   color?: string;
   material?: string;
-  size?: string;
+  gender: "women" | "men" | "children" | "unisex";
+  images: {
+    url: string;
+    thumbnailUrl?: string;
+    position: number;
+  }[];
+  status: "draft" | "pending_review" | "active" | "sold" | "removed" | "expired";
+  views: number;
+  wishlistCount: number;
+  isFeatured: boolean;
+  isAuthenticated: boolean;
+  createdAt: any;
+  updatedAt: any;
   authenticityCheck?: {
-    status: 'unchecked' | 'pending' | 'completed' | 'failed';
-    confidence: 'low' | 'medium' | 'high';
+    status: 'pending' | 'completed';
+    confidence: 'high' | 'medium' | 'low';
     findings: string[];
-    checkedAt: any;
   };
+  vintage?: boolean;
+  pattern?: string;
 };
 
 export type FirestoreOrder = {
@@ -188,20 +218,16 @@ export type FirestoreMessage = {
 
 export type FirestoreOffer = {
     id: string;
-    productId: string;
     buyerId: string;
+    amount: number;
+    message?: string;
+    status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'withdrawn' | 'expired';
+    counterAmount?: number;
+    expiresAt?: any;
+    createdAt: any;
     sellerId: string;
     offerAmount: number;
-    originalListingPrice: number;
-    status: 'pending' | 'accepted' | 'declined' | 'countered' | 'withdrawn' | 'expired';
-    counterOfferAmount?: number;
-    createdAt: any;
-    history: {
-        action: string;
-        amount: number;
-        byUser: string;
-        timestamp: any;
-    }[];
+    history?: any[];
 };
 
 export type FirestoreDelivery = {
@@ -219,6 +245,9 @@ export type FirestoreDelivery = {
         delivery: FirestoreAddress;
     };
     history?: { status: string; timestamp: any }[];
+    proofOfPickup?: string;
+    pickupSignature?: string;
+    pickupNotes?: string;
 };
 
 export type FirestoreCourierProfile = {
@@ -283,4 +312,24 @@ export type ProofFile = {
     url: string;
     name: string;
     type: string;
+};
+
+export type FirestoreReview = {
+    id: string;
+    orderId: string;
+    productId: string;
+    reviewerId: string;
+    revieweeId: string;
+    rating: number;
+    content: string;
+    createdAt: any;
+};
+
+export type FirestorePaymentMethod = {
+    id: string;
+    stripePaymentMethodId: string;
+    type: string;
+    last4: string;
+    brand: string;
+    isDefault: boolean;
 };

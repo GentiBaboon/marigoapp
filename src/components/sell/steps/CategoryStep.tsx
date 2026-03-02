@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -33,10 +34,10 @@ export function CategoryStep() {
   const form = useForm<Step2Values>({
     resolver: zodResolver(sellStep2Schema),
     defaultValues: {
-      gender: formData.gender || '',
-      category: formData.category || '',
-      subCategory: formData.subCategory || '',
-      brand: formData.brand || '',
+      gender: (formData.gender as any) || 'women',
+      categoryId: formData.categoryId || '',
+      subcategoryId: formData.subcategoryId || '',
+      brandId: formData.brandId || '',
     },
   });
 
@@ -62,20 +63,25 @@ export function CategoryStep() {
                     defaultValue={field.value}
                     className="space-y-3"
                   >
-                    {['Womenswear', 'Menswear', 'Girlswear', 'Boyswear'].map(
-                      (gender) => (
-                        <FormItem key={gender} className="flex items-center">
+                    {[
+                      { value: 'women', label: 'Womenswear' },
+                      { value: 'men', label: 'Menswear' },
+                      { value: 'children', label: 'Children' },
+                      { value: 'unisex', label: 'Unisex' }
+                    ].map(
+                      (g) => (
+                        <FormItem key={g.value} className="flex items-center">
                           <FormControl>
                             <Label
                               className={cn(
                                 'flex w-full cursor-pointer items-center gap-4 rounded-md border p-4 transition-colors hover:border-primary',
-                                genderValue === gender.toLowerCase()
+                                genderValue === g.value
                                   ? 'border-primary ring-2 ring-primary'
                                   : 'border-input'
                               )}
                             >
-                              <RadioGroupItem value={gender.toLowerCase()} />
-                              <span className="font-medium">{gender}</span>
+                              <RadioGroupItem value={g.value} />
+                              <span className="font-medium">{g.label}</span>
                             </Label>
                           </FormControl>
                         </FormItem>
@@ -90,7 +96,7 @@ export function CategoryStep() {
 
           <FormField
             control={form.control}
-            name="category"
+            name="subcategoryId"
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel className="font-semibold">Category</FormLabel>
@@ -99,7 +105,13 @@ export function CategoryStep() {
                       value={field.value}
                       onValueChange={(val) => {
                           field.onChange(val);
-                          form.setValue('subCategory', val); // Map subCategory to same val for MVP
+                          // Determine categoryId based on subcategory
+                          for (const cat of productCategories) {
+                              if (cat.subcategories.some(s => s.slug === val)) {
+                                  form.setValue('categoryId', cat.name.toLowerCase());
+                                  break;
+                              }
+                          }
                       }}
                       items={categoryItems}
                       placeholder="Select item type"
@@ -114,7 +126,7 @@ export function CategoryStep() {
           
           <FormField
             control={form.control}
-            name="brand"
+            name="brandId"
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel className="font-semibold">Brand</FormLabel>

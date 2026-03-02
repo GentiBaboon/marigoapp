@@ -10,11 +10,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
 import { AddressForm } from '@/components/profile/address-form';
-import { Plus, MapPin, Loader2, Check } from 'lucide-react';
+import { Plus, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import type { FirestoreAddress } from '@/lib/types';
@@ -52,22 +51,22 @@ export function AddressStep({ onNextStep }: AddressStepProps) {
 
   if (isLoading) {
       return (
-          <Card className="border-none shadow-sm bg-muted/20">
-              <CardHeader>
-                  <Skeleton className="h-8 w-48" />
-                  <Skeleton className="h-4 w-64 mt-2" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                  <Skeleton className="h-24 w-full rounded-xl" />
-                  <Skeleton className="h-24 w-full rounded-xl" />
-              </CardContent>
-          </Card>
+          <div className="space-y-6">
+              <Skeleton className="h-10 w-48" />
+              <div className="space-y-4">
+                  <Skeleton className="h-32 w-full rounded-xl" />
+                  <Skeleton className="h-32 w-full rounded-xl" />
+              </div>
+          </div>
       );
   }
 
   return (
     <div className="space-y-6">
-        <h2 className="text-2xl font-bold font-headline">Shipping Address</h2>
+        <div className="space-y-1">
+            <h2 className="text-2xl font-bold font-headline">Shipping Address</h2>
+            <p className="text-muted-foreground text-sm">Where should we send your items?</p>
+        </div>
         
         {isAddingNew ? (
             <Card className="border-primary/20 shadow-lg">
@@ -89,46 +88,52 @@ export function AddressStep({ onNextStep }: AddressStepProps) {
             </Card>
         ) : (
             <div className="space-y-4">
-                <RadioGroup
-                    value={selectedAddressId}
-                    onValueChange={setSelectedAddressId}
-                    className="grid gap-4"
-                >
-                    {addresses?.map((addr) => (
-                        <Label
-                            key={addr.id}
-                            htmlFor={addr.id}
-                            className={cn(
-                                'relative flex items-start p-5 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:bg-muted/30',
-                                selectedAddressId === addr.id 
-                                    ? 'border-primary bg-primary/5 ring-1 ring-primary' 
-                                    : 'border-muted bg-background'
-                            )}
-                        >
-                            <div className="flex items-center h-5 mr-4">
-                                <RadioGroupItem value={addr.id} id={addr.id} className="text-primary" />
-                            </div>
-                            <div className="flex-1">
-                                <div className="flex items-center justify-between">
-                                    <span className="font-bold text-base">{addr.fullName}</span>
-                                    {addr.isDefault && (
-                                        <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded">Default</span>
-                                    )}
+                {addresses && addresses.length > 0 ? (
+                    <RadioGroup
+                        value={selectedAddressId}
+                        onValueChange={setSelectedAddressId}
+                        className="grid gap-4"
+                    >
+                        {addresses.map((addr) => (
+                            <Label
+                                key={addr.id}
+                                htmlFor={addr.id}
+                                className={cn(
+                                    'relative flex items-start p-5 rounded-xl border-2 cursor-pointer transition-all duration-200',
+                                    selectedAddressId === addr.id 
+                                        ? 'border-primary bg-primary/5 ring-1 ring-primary' 
+                                        : 'border-muted bg-background hover:bg-muted/30'
+                                )}
+                            >
+                                <div className="flex items-center h-5 mr-4">
+                                    <RadioGroupItem value={addr.id} id={addr.id} className="text-primary" />
                                 </div>
-                                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                                    {addr.address}<br />
-                                    {addr.city}, {addr.postal}, {addr.country}
-                                </p>
-                                <p className="text-xs font-medium text-muted-foreground mt-2">{addr.phone}</p>
-                            </div>
-                            {selectedAddressId === addr.id && (
-                                <div className="absolute top-4 right-4 bg-primary text-white rounded-full p-0.5">
-                                    <Check className="h-3 w-3" />
+                                <div className="flex-1">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-bold text-base">{addr.fullName}</span>
+                                        {addr.isDefault && (
+                                            <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded">Default</span>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                                        {addr.address}<br />
+                                        {addr.city}, {addr.postal}, {addr.country}
+                                    </p>
+                                    <p className="text-xs font-medium text-muted-foreground mt-2">{addr.phone}</p>
                                 </div>
-                            )}
-                        </Label>
-                    ))}
-                </RadioGroup>
+                                {selectedAddressId === addr.id && (
+                                    <div className="absolute top-4 right-4 bg-primary text-white rounded-full p-0.5">
+                                        <Check className="h-3 w-3" />
+                                    </div>
+                                )}
+                            </Label>
+                        ))}
+                    </RadioGroup>
+                ) : (
+                    <div className="text-center py-8 border-2 border-dashed rounded-xl bg-muted/20">
+                        <p className="text-muted-foreground text-sm">No saved addresses found.</p>
+                    </div>
+                )}
 
                 <Button 
                     variant="outline" 
@@ -142,7 +147,7 @@ export function AddressStep({ onNextStep }: AddressStepProps) {
                 <div className="pt-6">
                     <Button
                         size="lg"
-                        className="w-full h-14 rounded-full text-base font-bold shadow-xl"
+                        className="w-full h-14 rounded-full text-base font-bold shadow-lg"
                         onClick={handleContinue}
                         disabled={!selectedAddressId}
                     >

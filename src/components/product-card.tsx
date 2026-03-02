@@ -1,17 +1,18 @@
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { Product } from '@/lib/mock-data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useWishlist } from '@/context/WishlistContext';
 import React from 'react';
 import { useCurrency } from '@/context/CurrencyContext';
+import type { FirestoreProduct } from '@/lib/types';
 
 interface ProductCardProps {
-  product: Product;
+  product: Partial<FirestoreProduct> & { id: string; brand?: string; image?: string };
   className?: string;
 }
 
@@ -20,21 +21,8 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const { formatPrice } = useCurrency();
   const favorite = isFavorite(product.id);
 
-  let imageUrl: string | undefined;
-  let imageHint: string | undefined;
-
-  const isUrl =
-    product.image?.startsWith('http') || product.image?.startsWith('data:') || product.image?.startsWith('blob:');
-
-  if (isUrl) {
-    imageUrl = product.image;
-  } else if (product.image) {
-    const productImage = PlaceHolderImages.find((p) => p.id === product.image);
-    if (productImage) {
-      imageUrl = productImage.imageUrl;
-      imageHint = productImage.imageHint;
-    }
-  }
+  // Handle new images structure or fallback to old 'image' field
+  const imageUrl = product.images?.[0]?.url || product.image;
   
   const handleToggleFavorite = (e: React.MouseEvent) => {
       e.preventDefault(); // prevent navigation
@@ -46,7 +34,8 @@ export function ProductCard({ product, className }: ProductCardProps) {
       }
   }
 
-  const displayTitle = product.title;
+  const displayTitle = product.title || 'Untitled Product';
+  const brandName = product.brandId || product.brand || 'Luxury Item';
 
   return (
     <div className={cn('group', className)}>
@@ -55,11 +44,10 @@ export function ProductCard({ product, className }: ProductCardProps) {
           {imageUrl ? (
             <Image
               src={imageUrl}
-              alt={displayTitle || ''}
+              alt={displayTitle}
               fill
               sizes="(max-width: 768px) 50vw, 33vw"
               className="object-cover"
-              data-ai-hint={imageHint}
               unoptimized={imageUrl.startsWith('blob:')}
             />
           ) : (
@@ -68,17 +56,17 @@ export function ProductCard({ product, className }: ProductCardProps) {
             </div>
           )}
           {product.vintage && (
-             <Badge variant="outline" className="absolute top-2 left-2 bg-background/80 font-normal">VINTAGE</Badge>
+             <Badge variant="outline" className="absolute top-2 left-2 bg-background/80 font-normal text-[10px]">VINTAGE</Badge>
           )}
         </div>
       </Link>
       <div className="px-1">
         <div className="flex justify-between items-start">
-          <div className="text-sm">
-            <p className="font-bold uppercase text-[11px] tracking-wider truncate max-w-[120px]">{product.brand}</p>
-            <p className="text-muted-foreground truncate max-w-[140px]">{displayTitle}</p>
+          <div className="text-sm flex-1 min-w-0">
+            <p className="font-bold uppercase text-[11px] tracking-wider truncate">{brandName}</p>
+            <p className="text-muted-foreground text-xs truncate">{displayTitle}</p>
             {product.size && (
-              <p className="text-muted-foreground text-xs">{product.size}</p>
+              <p className="text-muted-foreground text-[10px]">{product.size}</p>
             )}
           </div>
           <Button
@@ -88,17 +76,17 @@ export function ProductCard({ product, className }: ProductCardProps) {
             aria-label="Add to wishlist"
             onClick={handleToggleFavorite}
           >
-            <Heart className={cn("h-5 w-5", favorite && "fill-destructive text-destructive")} />
+            <Heart className={cn("h-4 w-4", favorite && "fill-destructive text-destructive")} />
           </Button>
         </div>
         <div className="mt-1">
           {product.originalPrice && (
-            <p className="text-[11px] text-muted-foreground line-through">
+            <p className="text-[10px] text-muted-foreground line-through">
               {formatPrice(product.originalPrice)}
             </p>
           )}
-          <p className="font-bold">
-            {formatPrice(product.price)}
+          <p className="font-bold text-sm">
+            {product.price ? formatPrice(product.price) : 'Contact for price'}
           </p>
         </div>
       </div>

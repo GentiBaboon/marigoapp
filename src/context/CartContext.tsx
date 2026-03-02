@@ -1,9 +1,10 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, errorEmitter } from '@/firebase';
-import { doc, setDoc, deleteDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot, writeBatch } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 export type ShippingMethod = 'direct' | 'authentication';
@@ -44,17 +45,19 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const firestore = useFirestore();
     const { toast } = useToast();
 
-    // 1. Initial Load from LocalStorage (fast)
+    // 1. Initial Load from LocalStorage (for guests)
     useEffect(() => {
-        const savedCart = localStorage.getItem('marigo_cart');
-        if (savedCart && !user) {
-            try {
-                setItems(JSON.parse(savedCart));
-            } catch (e) {
-                console.error("Failed to parse local cart", e);
+        if (!user) {
+            const savedCart = localStorage.getItem('marigo_cart');
+            if (savedCart) {
+                try {
+                    setItems(JSON.parse(savedCart));
+                } catch (e) {
+                    console.error("Failed to parse local cart", e);
+                }
             }
+            setIsLoading(false);
         }
-        setIsLoading(false);
     }, [user]);
 
     // 2. Sync with Firestore if logged in
@@ -76,7 +79,33 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return () => unsubscribe();
     }, [user, firestore]);
 
-    // 3. Persist LocalStorage
+    // 3. Migrate Guest Cart to Firestore on Login
+    useEffect(() => {
+        if (user && firestore && !isLoading) {
+            const guestCart = localStorage.getItem('marigo_cart');
+            if (guestCart) {
+                try {
+                    const localItems: CartItem[] = JSON.parse(guestCart);
+                    if (localItems.length > 0) {
+                        const batch = writeBatch(firestore);
+                        localItems.forEach(item => {
+                            const itemRef = doc(firestore, 'users', user.uid, 'cart', item.id);
+                            batch.set(itemRef, item, { merge: true });
+                        });
+                        batch.commit().then(() => {
+                            localStorage.removeItem('marigo_cart');
+                        });
+                    } else {
+                        localStorage.removeItem('marigo_cart');
+                    }
+                } catch (e) {
+                    console.error("Migration error:", e);
+                }
+            }
+        }
+    }, [user, firestore, isLoading]);
+
+    // 4. Persist Guest Cart to LocalStorage
     useEffect(() => {
         if (!user) {
             localStorage.setItem('marigo_cart', JSON.stringify(items));
@@ -85,8 +114,6 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const addToCart = useCallback(async (product: any, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => {
         const quantity = options?.quantity || 1;
-        
-        // CRITICAL FIX: Firestore does not allow 'undefined'. Use 'null' instead for optional fields.
         const size = options?.selectedSize || product.size || null;
         const color = options?.selectedColor || product.color || null;
 
@@ -104,6 +131,15 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             directShippingFee: 10.90,
         };
 
+        // Optimistic update for UI feel
+        setItems(prev => {
+            const existing = prev.find(i => i.id === newItem.id);
+            if (existing) {
+                return prev.map(i => i.id === newItem.id ? { ...i, quantity: i.quantity + quantity } : i);
+            }
+            return [...prev, newItem];
+        });
+
         if (user && firestore) {
             const itemRef = doc(firestore, 'users', user.uid, 'cart', product.id);
             setDoc(itemRef, newItem, { merge: true }).catch(err => {
@@ -112,14 +148,6 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     operation: 'write',
                     requestResourceData: newItem
                 }));
-            });
-        } else {
-            setItems(prev => {
-                const existing = prev.find(i => i.id === newItem.id);
-                if (existing) {
-                    return prev.map(i => i.id === newItem.id ? { ...i, quantity: i.quantity + quantity } : i);
-                }
-                return [...prev, newItem];
             });
         }
 
@@ -130,6 +158,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, [user, firestore, toast]);
 
     const removeFromCart = useCallback(async (itemId: string) => {
+        setItems(prev => prev.filter(i => i.id !== itemId));
+
         if (user && firestore) {
             const itemRef = doc(firestore, 'users', user.uid, 'cart', itemId);
             deleteDoc(itemRef).catch(err => {
@@ -138,8 +168,6 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     operation: 'delete'
                 }));
             });
-        } else {
-            setItems(prev => prev.filter(i => i.id !== itemId));
         }
     }, [user, firestore]);
 
@@ -149,23 +177,22 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return;
         }
 
+        setItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity } : i));
+
         if (user && firestore) {
             const itemRef = doc(firestore, 'users', user.uid, 'cart', itemId);
             setDoc(itemRef, { quantity }, { merge: true });
-        } else {
-            setItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity } : i));
         }
     }, [user, firestore, removeFromCart]);
 
     const clearCart = useCallback(async () => {
+        setItems([]);
+        localStorage.removeItem('marigo_cart');
+
         if (user && firestore) {
             const cartRef = collection(firestore, 'users', user.uid, 'cart');
             const snapshot = await getDocs(cartRef);
-            // In a real app we'd use a batch here, but for cart it's small enough
             snapshot.docs.forEach(d => deleteDoc(d.ref));
-        } else {
-            setItems([]);
-            localStorage.removeItem('marigo_cart');
         }
     }, [user, firestore]);
 

@@ -23,7 +23,8 @@ const preferences = [
 
 export function ShoppingPreferenceModal() {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedPreference, setSelectedPreference] = useState<string | null>(null);
+  // Default to womenswear as requested
+  const [selectedPreference, setSelectedPreference] = useState<string | null>('womenswear');
 
   useEffect(() => {
     const preference = localStorage.getItem('marigo_shopping_preference');
@@ -54,12 +55,12 @@ export function ShoppingPreferenceModal() {
         className="h-auto rounded-t-lg"
       >
         <SheetHeader className="text-left mb-4">
-          <SheetTitle className="font-headline text-2xl tracking-tight">Select shopping preference</SheetTitle>
-          <SheetDescription>
+          <SheetTitle className="font-headline text-lg tracking-tight">Select shopping preference</SheetTitle>
+          <SheetDescription className="text-xs">
             Personalize your homepage to get started.
           </SheetDescription>
         </SheetHeader>
-        <div className="space-y-3">
+        <div className="space-y-2">
           {preferences.map((pref) => {
             const imageData = PlaceHolderImages.find((p) => p.id === pref.imageId);
             const isSelected = selectedPreference === pref.id;
@@ -68,31 +69,31 @@ export function ShoppingPreferenceModal() {
                 key={pref.id}
                 onClick={() => setSelectedPreference(pref.id)}
                 className={cn(
-                  "flex w-full items-center justify-between p-3 border rounded-md cursor-pointer transition-all text-left",
-                  isSelected && "border-primary ring-2 ring-primary"
+                  "flex w-full items-center justify-between p-2.5 border rounded-md cursor-pointer transition-all text-left",
+                  isSelected && "border-primary ring-1 ring-primary bg-primary/5"
                 )}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   {imageData && (
                     <Image
                       src={imageData.imageUrl}
                       alt={pref.label}
-                      width={48}
-                      height={64}
-                      className="rounded-md object-cover w-12 h-16"
+                      width={36}
+                      height={48}
+                      className="rounded-md object-cover w-9 h-12"
                     />
                   )}
-                  <span className="font-medium text-base">{pref.label}</span>
+                  <span className="font-medium text-sm">{pref.label}</span>
                 </div>
-                {isSelected && <Check className="h-5 w-5 text-primary" />}
+                {isSelected && <Check className="h-4 w-4 text-primary" />}
               </button>
             );
           })}
         </div>
-        <div className="mt-6">
+        <div className="mt-5">
           <Button
-            size="lg"
-            className="w-full bg-foreground text-background hover:bg-foreground/90"
+            size="default"
+            className="w-full bg-foreground text-background hover:bg-foreground/90 text-sm h-11"
             onClick={handleContinue}
             disabled={!selectedPreference}
           >
