@@ -20,12 +20,12 @@ export default function SellPage() {
     return (
       <div className="container mx-auto max-w-2xl py-12 px-4 space-y-8">
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold font-headline">Sell on Marigo</h1>
-          <p className="text-muted-foreground text-lg">Turn your luxury items into cash in easy steps.</p>
+          <h1 className="text-2xl font-bold font-headline">Sell on Marigo</h1>
+          <p className="text-muted-foreground text-sm">Turn your luxury items into cash in easy steps.</p>
         </div>
 
-        <Button className="w-full h-20 text-xl gap-4 bg-black hover:bg-black/90" onClick={startNewDraft}>
-          <Plus className="h-8 w-8" />
+        <Button className="w-full h-14 text-sm gap-3 bg-black hover:bg-black/90" onClick={startNewDraft}>
+          <Plus className="h-5 w-5" />
           Start New Listing
         </Button>
 
