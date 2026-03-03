@@ -11,6 +11,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
 import type { FirestoreProduct } from '@/lib/types';
+import imageCompression from 'browser-image-compression';
 
 export function ReviewStep() {
   const { formData, goToStep, nextStep, activeDraft } = useSellForm();
@@ -40,23 +41,31 @@ export function ReviewStep() {
       const imageProgress = new Array(images.length).fill(0);
 
       const uploadImage = async (img: typeof images[0], index: number) => {
-        // Skip upload if already a remote URL
-        if (img.url.startsWith('http') && !img.url.includes('blob')) {
-          imageProgress[index] = 100;
-          return img.url;
+        // 1. Fetch the image blob
+        const response = await fetch(img.url);
+        let blob = await response.blob();
+        
+        // 2. Optimized Compression for Production
+        if (img.url.startsWith('blob:')) {
+            const options = {
+                maxSizeMB: 0.8,
+                maxWidthOrHeight: 1200,
+                useWebWorker: true,
+            };
+            try {
+                const compressedFile = await imageCompression(blob as File, options);
+                blob = compressedFile;
+            } catch (error) {
+                console.warn("Compression failed, uploading original", error);
+            }
         }
 
-        const response = await fetch(img.url);
-        const blob = await response.blob();
-        
         const fileExtension = img.type?.split('/')[1] || 'jpg';
         const fileName = `img_${Date.now()}_${index}.${fileExtension}`;
         const storagePath = `products/${user.uid}/${productId}/${fileName}`;
         const storageRef = ref(storage, storagePath);
         
-        const uploadTask = uploadBytesResumable(storageRef, blob, {
-            contentType: img.type
-        });
+        const uploadTask = uploadBytesResumable(storageRef, blob);
 
         return new Promise<string>((resolve, reject) => {
             uploadTask.on('state_changed', 
@@ -81,12 +90,11 @@ export function ReviewStep() {
       uploadedUrls.forEach((url, i) => {
           finalImages.push({
               url,
-              thumbnailUrl: url, // For MVP simplified
+              thumbnailUrl: url,
               position: i
           });
       });
 
-      // Prepare final product data mapping from form fields to new FirestoreProduct schema
       const productData: FirestoreProduct = {
         id: productId,
         sellerId: user.uid,
@@ -115,15 +123,7 @@ export function ReviewStep() {
       };
 
       const productRef = doc(firestore, 'products', productId);
-      
-      await setDoc(productRef, productData).catch(err => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-              path: productRef.path,
-              operation: 'create',
-              requestResourceData: productData
-          }));
-          throw err;
-      });
+      await setDoc(productRef, productData);
       
       setUploadProgress(100);
       toast({ title: "Listing Published!", variant: "success" });
@@ -191,17 +191,6 @@ export function ReviewStep() {
           <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground mb-2">Description</h4>
           <p className="text-sm leading-relaxed text-foreground/80 line-clamp-4">{formData.description}</p>
         </section>
-
-        <div className="space-y-3 pt-2">
-          <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
-            <Check className="h-4 w-4" />
-            <span>High quality photos confirmed</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
-            <Check className="h-4 w-4" />
-            <span>Detailed description verified</span>
-          </div>
-        </div>
       </div>
 
       <div className="flex flex-col gap-3 pt-4">

@@ -3,57 +3,39 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-
-    // By default, allow files to be read by anyone, but not written.
-    allow read: if true;
-    allow write: if false;
-
-    // Helper function to check if a user is signed in.
+    
     function isSignedIn() {
       return request.auth != null;
-    }
-
-    // Helper function to validate image properties.
-    function isAllowedImage(maxSizeMB) {
-      return request.resource.size < maxSizeMB * 1024 * 1024
-          && (
-            request.resource.contentType.matches('image/jpeg') ||
-            request.resource.contentType.matches('image/png') ||
-            request.resource.contentType.matches('image/webp')
-          );
-    }
-
-    // Users can only write to their own profile folder.
-    match /users/{userId}/{fileName} {
-      allow write: if isOwner(userId) && isAllowedImage(5);
-    }
-
-    // Product images: secure path including user ID for atomic uploads
-    match /products/{userId}/{productId}/{fileName} {
-      allow write: if isOwner(userId) && isAllowedImage(10);
-    }
-
-    // Delivery proofs can only be written by the assigned courier.
-    match /deliveries/{deliveryId}/{fileName} {
-      allow write: if isSignedIn() && isAllowedImage(10);
-    }
-    
-    // User data exports: restricted to the user and admins
-    match /user-exports/{userId}/{fileName} {
-        allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-        allow write: if false; // Only written by Cloud Functions
     }
     
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-
+    
     function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.admin == true || 
-        request.auth.uid == '2C81RVoXZWZuSWXEEueehqbHkMu1' || 
-        request.auth.uid == 'v521MWW9rmPYchVBc91DheeRU5j2'
-      );
+      return isSignedIn() && (request.auth.token.admin == true || request.auth.uid == '2C81RVoXZWZuSWXEEueehqbHkMu1');
+    }
+
+    function isValidImage() {
+      return request.resource.size < 10 * 1024 * 1024
+          && (request.resource.contentType.matches('image/jpeg') 
+              || request.resource.contentType.matches('image/png') 
+              || request.resource.contentType.matches('image/webp'));
+    }
+
+    match /users/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isOwner(userId) && isValidImage();
+    }
+
+    match /products/{userId}/{productId}/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(userId) && isValidImage();
+    }
+
+    match /deliveries/{deliveryId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidImage();
     }
   }
 }

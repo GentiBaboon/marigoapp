@@ -68,20 +68,18 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
         const intentResult: any = await createPaymentIntent({
             items: items.map(i => ({ id: i.id, sellerId: i.sellerId, title: i.title })),
             shippingAddress,
-            paymentMethodId: selectedPaymentMethodId // Pass ID if using saved card
+            paymentMethodId: savedMethodId // Corrected variable name from selectedPaymentMethodId
         });
 
         const { clientSecret, orderId, requiresAction } = intentResult.data;
 
         if (requiresAction) {
-            // Handle 3D Secure for saved cards or specific cases
             const actionResult = await stripe.handleCardAction(clientSecret);
             if (actionResult.error) {
                 throw new Error(actionResult.error.message);
             }
         }
 
-        // For new cards, we need the CardElement
         let confirmResult;
         if (paymentMethod === 'card' && elements) {
             confirmResult = await stripe.confirmCardPayment(clientSecret, {
@@ -94,7 +92,6 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
                 },
             });
         } else {
-            // For saved cards where createPaymentIntent already attached the PM
             confirmResult = await stripe.confirmCardPayment(clientSecret);
         }
 
