@@ -20,20 +20,20 @@ export default function SellPage() {
     return (
       <div className="container mx-auto max-w-2xl py-12 px-4 space-y-8">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold font-headline">Vendi su Marigo</h1>
-          <p className="text-muted-foreground text-sm">Dai nuova vita ai tuoi capi di lusso in pochi passaggi.</p>
+          <h1 className="text-3xl font-bold font-headline">Sell on Marigo</h1>
+          <p className="text-muted-foreground text-sm">Give your luxury items a new life in just a few steps.</p>
         </div>
 
         <Button className="w-full h-16 text-lg gap-3 bg-black hover:bg-black/90 shadow-lg" onClick={startNewDraft}>
           <Plus className="h-6 w-6" />
-          Nuovo Annuncio
+          List a New Item
         </Button>
 
         {drafts.length > 0 && (
           <div className="space-y-4 pt-4">
             <h3 className="font-bold flex items-center gap-2 text-muted-foreground uppercase text-xs tracking-widest">
               <History className="h-4 w-4" />
-              Bozze in sospeso
+              Pending Drafts
             </h3>
             <div className="grid gap-3">
               {drafts.map(draft => (
@@ -48,9 +48,9 @@ export default function SellPage() {
                                     <Tag className="h-6 w-6 text-primary" />
                                 </div>
                                 <div>
-                                    <p className="font-bold">{draft.formData.brandId || 'Senza Nome'}</p>
+                                    <p className="font-bold">{draft.formData.brandId || 'Untitled Item'}</p>
                                     <p className="text-[10px] text-muted-foreground uppercase tracking-tighter">
-                                        Ultima modifica {new Date(draft.lastModified).toLocaleDateString()}
+                                        Last modified {new Date(draft.lastModified).toLocaleDateString()}
                                     </p>
                                 </div>
                             </div>

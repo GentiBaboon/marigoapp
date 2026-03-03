@@ -1,7 +1,7 @@
 'use client';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
-import { Edit2, Loader2, Upload, MapPin, CheckCircle2 } from 'lucide-react';
+import { Edit2, Loader2, Upload, MapPin } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +32,7 @@ export function ReviewStep() {
 
   const handlePublish = async () => {
     if (!user || !firestore || !storage) {
-        toast({ variant: "destructive", title: "Autenticazione richiesta" });
+        toast({ variant: "destructive", title: "Authentication required" });
         return;
     }
     
@@ -43,7 +43,7 @@ export function ReviewStep() {
       const productId = activeDraft?.id || `prod_${Date.now()}`;
       const images = formData.images || [];
       
-      if (images.length < 3) throw new Error("Caricare almeno 3 foto");
+      if (images.length < 3) throw new Error("Please upload at least 3 photos");
 
       const finalImages: { url: string; thumbnailUrl: string; position: number }[] = [];
       
@@ -119,7 +119,7 @@ export function ReviewStep() {
         isAuthenticated: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        listingCreated: serverTimestamp(),
+        listingCreated: serverTimestamp(), // Crucial for visibility in feeds
         shippingFromAddressId: formData.shippingFromAddressId,
       };
 
@@ -127,7 +127,7 @@ export function ReviewStep() {
       await setDoc(productRef, productData);
       
       setUploadProgress(100);
-      toast({ title: "Annuncio Pubblicato!", variant: "success" });
+      toast({ title: "Listing Published!", variant: "success" });
       
       // Delay slightly to show 100% progress
       setTimeout(() => nextStep(), 500);
@@ -136,8 +136,8 @@ export function ReviewStep() {
       console.error("Publish error:", e);
       toast({ 
         variant: "destructive", 
-        title: "Errore pubblicazione", 
-        description: e.message || "Impossibile completare l'upload."
+        title: "Publication Error", 
+        description: e.message || "Could not complete the upload process."
       });
       setIsPublishing(false);
       setUploadProgress(0);
@@ -147,22 +147,22 @@ export function ReviewStep() {
   return (
     <div className="space-y-8 pb-20">
       <div className="text-center">
-        <h2 className="text-2xl font-bold font-headline">Riepilogo finale</h2>
-        <p className="text-muted-foreground">Le foto verranno caricate nel database ora.</p>
+        <h2 className="text-2xl font-bold font-headline">Final Review</h2>
+        <p className="text-muted-foreground">Check your listing before publishing.</p>
       </div>
 
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden border bg-muted shadow-sm">
         {formData.images?.[0] && (
             <Image 
                 src={formData.images[0].url} 
-                alt="Main" 
+                alt="Main product view" 
                 fill 
                 className="object-cover" 
                 unoptimized={formData.images[0].url.startsWith('blob:')}
             />
         )}
         <Button variant="secondary" size="sm" className="absolute bottom-4 right-4" onClick={() => goToStep(1)}>
-          <Edit2 className="h-4 w-4 mr-2" /> Cambia Foto
+          <Edit2 className="h-4 w-4 mr-2" /> Change Photos
         </Button>
       </div>
 
@@ -171,12 +171,12 @@ export function ReviewStep() {
               <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-primary">
                   <span className="flex items-center gap-2">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    Upload in corso...
+                    Uploading images...
                   </span>
                   <span>{Math.round(uploadProgress)}%</span>
               </div>
               <Progress value={uploadProgress} className="h-2" />
-              <p className="text-[10px] text-center text-muted-foreground uppercase">Non chiudere questa pagina</p>
+              <p className="text-[10px] text-center text-muted-foreground uppercase">Do not close this page</p>
           </div>
       )}
 
@@ -197,7 +197,7 @@ export function ReviewStep() {
             <section className="p-4 bg-muted/20 rounded-xl border flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
                 <div className="text-sm">
-                    <p className="font-bold uppercase text-[10px] text-muted-foreground tracking-widest mb-1">Spedito da</p>
+                    <p className="font-bold uppercase text-[10px] text-muted-foreground tracking-widest mb-1">Shipping from</p>
                     <p className="font-semibold">{selectedAddress.fullName}</p>
                     <p className="text-xs text-muted-foreground">{selectedAddress.address}, {selectedAddress.city}</p>
                 </div>
@@ -213,13 +213,13 @@ export function ReviewStep() {
             disabled={isPublishing}
         >
           {isPublishing ? (
-              <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Salvataggio...</>
+              <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Publishing...</>
           ) : (
-              <><Upload className="h-5 w-5 mr-2" /> Pubblica Ora</>
+              <><Upload className="h-5 w-5 mr-2" /> Publish Now</>
           )}
         </Button>
-        <Button variant="outline" className="w-full h-14 text-muted-foreground" size="lg" disabled={isPublishing} onClick={() => goToStep(0)}>
-          Annulla e Torna Indietro
+        <Button variant="outline" className="w-full h-14 text-muted-foreground" size="lg" disabled={isPublishing} onClick={() => goToStep(5)}>
+          Go Back
         </Button>
       </div>
     </div>

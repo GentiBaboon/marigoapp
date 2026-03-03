@@ -1,9 +1,9 @@
 'use client';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
-import { Camera, X, Loader2 } from 'lucide-react';
+import { Camera, X } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -17,7 +17,7 @@ export function PhotosStep() {
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const currentCount = localImages.length;
     if (currentCount + acceptedFiles.length > 8) {
-      toast({ variant: "destructive", title: "Massimo 8 foto consentite" });
+      toast({ variant: "destructive", title: "Maximum 8 photos allowed" });
       return;
     }
 
@@ -26,7 +26,7 @@ export function PhotosStep() {
       name: file.name,
       type: file.type,
       position: currentCount + i,
-      isUploading: false, // Not uploading yet, just caching
+      file: file // Keep the actual file object for the final upload
     }));
 
     const updated = [...localImages, ...newItems];
@@ -56,9 +56,9 @@ export function PhotosStep() {
   return (
     <div className="space-y-6">
       <div className="bg-muted/30 p-4 rounded-lg border border-dashed text-center">
-        <h3 className="font-semibold text-lg text-primary">Caricamento in Cache</h3>
+        <h3 className="font-semibold text-lg text-primary">Photo Upload</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Le foto verranno salvate nel database solo alla fine. Caricane almeno 3.
+          Add at least 3 photos. They will be saved to our database in the final step.
         </p>
       </div>
 
@@ -71,8 +71,8 @@ export function PhotosStep() {
       >
         <input {...getInputProps()} />
         <Camera className="h-10 w-10 text-muted-foreground mb-2" />
-        <p className="font-medium">Trascina o clicca per aggiungere foto</p>
-        <p className="text-xs text-muted-foreground mt-1">Le foto caricate qui sono temporanee</p>
+        <p className="font-medium text-center px-4">Drag & drop or click to add photos</p>
+        <p className="text-xs text-muted-foreground mt-1">Temporary local preview</p>
       </div>
 
       {localImages.length > 0 && (
@@ -98,7 +98,7 @@ export function PhotosStep() {
               </div>
               
               {index === 0 && (
-                <div className="absolute bottom-0 left-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold py-0.5 text-center uppercase">Principale</div>
+                <div className="absolute bottom-0 left-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold py-0.5 text-center uppercase">Main</div>
               )}
             </div>
           ))}
@@ -112,11 +112,11 @@ export function PhotosStep() {
           disabled={!canContinue} 
           onClick={nextStep}
         >
-          Continua ({localImages.length}/8)
+          Continue ({localImages.length}/8)
         </Button>
         {!canContinue && (
           <p className="text-center text-xs text-muted-foreground mt-2">
-            Aggiungi altre {3 - localImages.length} foto per continuare
+            Add {3 - localImages.length} more photo(s) to continue
           </p>
         )}
       </div>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -37,7 +36,8 @@ function getCookie(name: string): string | undefined {
 }
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [locale, setLocaleState] = useState<Locale>('sq');
+  // Set default language to English
+  const [locale, setLocaleState] = useState<Locale>('en');
   const { user } = useUser();
   const firestore = useFirestore();
 
@@ -69,7 +69,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     const keys = key.split('.');
     let current: any = translations[locale];
     for (const k of keys) {
-      if (current[k] === undefined) return key;
+      if (!current || current[k] === undefined) return key;
       current = current[k];
     }
     return current;
