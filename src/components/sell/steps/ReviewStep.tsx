@@ -1,3 +1,4 @@
+
 'use client';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
@@ -52,37 +53,57 @@ export function ReviewStep() {
         const img = images[i];
         let finalUrl = img.url;
 
-        // If it's a local blob, we MUST upload it now
-        if (img.url.startsWith('blob:')) {
-          const response = await fetch(img.url);
-          const blob = await response.blob();
+        // If it's a local blob or has a file object, we MUST upload it now
+        if (img.url.startsWith('blob:') || (img as any).file) {
+          let fileToUpload: File | Blob;
           
-          // Compression
-          const options = { maxSizeMB: 0.8, maxWidthOrHeight: 1200 };
-          const compressed = await imageCompression(blob as File, options);
-          
-          const fileExt = img.type?.split('/')[1] || 'jpg';
-          const fileName = `img_${Date.now()}_${i}.${fileExt}`;
-          const storagePath = `products/${user.uid}/${productId}/${fileName}`;
-          const storageRef = ref(storage, storagePath);
-          
-          const uploadTask = uploadBytesResumable(storageRef, compressed, {
-            contentType: img.type || 'image/jpeg'
-          });
+          try {
+            if ((img as any).file) {
+              fileToUpload = (img as any).file;
+            } else {
+              const response = await fetch(img.url);
+              if (!response.ok) throw new Error("Failed to fetch local image data");
+              fileToUpload = await response.blob();
+            }
+            
+            // Compression
+            const options = { maxSizeMB: 0.8, maxWidthOrHeight: 1200, useWebWorker: true };
+            const compressed = await imageCompression(fileToUpload as File, options);
+            
+            const fileExt = img.type?.split('/')[1] || 'jpg';
+            const fileName = `img_${Date.now()}_${i}.${fileExt}`;
+            const storagePath = `products/${user.uid}/${productId}/${fileName}`;
+            const storageRef = ref(storage, storagePath);
+            
+            const uploadTask = uploadBytesResumable(storageRef, compressed, {
+              contentType: img.type || 'image/jpeg'
+            });
 
-          // Wait for upload to complete
-          await new Promise((resolve, reject) => {
-            uploadTask.on('state_changed', 
-              (snapshot) => {
-                const stepProgress = (snapshot.bytesTransferred / snapshot.totalBytes) * (80 / images.length);
-                setUploadProgress(prev => Math.min(85, 5 + (i * (80 / images.length)) + stepProgress));
-              },
-              reject,
-              () => resolve(null)
-            );
-          });
+            // Wait for upload to complete
+            await new Promise((resolve, reject) => {
+              uploadTask.on('state_changed', 
+                (snapshot) => {
+                  const totalBytes = snapshot.totalBytes || 1;
+                  const bytesTransferred = snapshot.bytesTransferred || 0;
+                  const stepProgress = (bytesTransferred / totalBytes) * (80 / images.length);
+                  setUploadProgress(prev => {
+                      const nextVal = 5 + (i * (80 / images.length)) + stepProgress;
+                      return Math.min(85, Math.max(prev, nextVal));
+                  });
+                },
+                (error) => {
+                  console.error("Upload task error:", error);
+                  reject(error);
+                },
+                () => resolve(null)
+              );
+            });
 
-          finalUrl = await getDownloadURL(storageRef);
+            finalUrl = await getDownloadURL(storageRef);
+          } catch (imgError) {
+            console.error(`Error processing image ${i}:`, imgError);
+            throw new Error(`Failed to upload image ${i + 1}. Please try again.`);
+          }
         }
 
         finalImages.push({
@@ -119,7 +140,7 @@ export function ReviewStep() {
         isAuthenticated: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        listingCreated: serverTimestamp(), // Crucial for visibility in feeds
+        listingCreated: serverTimestamp(),
         shippingFromAddressId: formData.shippingFromAddressId,
       };
 
@@ -129,7 +150,6 @@ export function ReviewStep() {
       setUploadProgress(100);
       toast({ title: "Listing Published!", variant: "success" });
       
-      // Delay slightly to show 100% progress
       setTimeout(() => nextStep(), 500);
 
     } catch (e: any) {
