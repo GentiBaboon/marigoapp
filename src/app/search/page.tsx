@@ -1,12 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/product-card';
 import type { Product } from '@/lib/mock-data';
 import { Bookmark, SlidersHorizontal, Search } from 'lucide-react';
-import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -52,16 +51,20 @@ function ProductListPage() {
     const queryConstraints: QueryConstraint[] = [where('status', '==', 'active')];
     
     if (category) {
-      queryConstraints.push(where('category', '==', category));
+      queryConstraints.push(where('subcategoryId', '==', category));
     }
     if (brand) {
-      queryConstraints.push(where('brand', '==', brand));
+      queryConstraints.push(where('brandId', '==', brand));
     }
+    
+    // Always order by listingCreated if it's new arrivals, otherwise by default
     if (section === 'new-arrivals') {
         queryConstraints.push(orderBy('listingCreated', 'desc'));
+    } else {
+        queryConstraints.push(orderBy('listingCreated', 'desc')); // Default order
     }
 
-    queryConstraints.push(limit(50)); // Limit query results for performance
+    queryConstraints.push(limit(50));
 
     return query(baseQuery, ...queryConstraints);
   }, [firestore, category, brand, section]);
@@ -72,10 +75,10 @@ function ProductListPage() {
     if (!products) return [];
     return products.map(p => ({
         id: p.id,
-        brand: p.brand,
+        brand: p.brandId,
         title: p.title,
         price: p.price,
-        image: p.images?.[0] || '',
+        image: p.images?.[0]?.url || '',
         sellerId: p.sellerId,
         size: p.size,
         condition: p.condition as any,

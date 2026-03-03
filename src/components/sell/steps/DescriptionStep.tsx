@@ -79,8 +79,8 @@ export function DescriptionStep() {
     },
   });
 
-  const getCategoryName = (gender: string | undefined, categorySlug: string | undefined): string => {
-    if (!gender || !categorySlug) return formData.category || '';
+  const getCategoryName = React.useCallback((gender: string | undefined, categorySlug: string | undefined): string => {
+    if (!gender || !categorySlug) return '';
     const genderName = `${gender.charAt(0).toUpperCase()}${gender.slice(1)}'s`;
     
     for (const mainCategory of productCategories) {
@@ -90,12 +90,12 @@ export function DescriptionStep() {
         }
     }
     return `${genderName} ${categorySlug}`;
-  }
+  }, []);
 
   const handleGenerateDescription = async () => {
     setIsGenerating(true);
     try {
-      if (!formData.title || !formData.brand || !formData.category || !formData.images || formData.images.length === 0) {
+      if (!formData.title || !formData.brandId || !formData.subcategoryId || !formData.images || formData.images.length === 0) {
            toast({
               variant: 'destructive',
               title: 'Missing Information',
@@ -105,11 +105,11 @@ export function DescriptionStep() {
           return;
       }
       
-      const categoryName = getCategoryName(formData.gender, formData.category);
+      const categoryName = getCategoryName(formData.gender, formData.subcategoryId);
 
       const input: GenerateDescriptionInput = {
         title: formData.title || '',
-        brand: formData.brand || '',
+        brand: formData.brandId || '',
         category: categoryName,
         condition: formData.condition,
         images: formData.images.map(img => img.url),

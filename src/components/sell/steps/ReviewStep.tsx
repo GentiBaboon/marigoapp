@@ -1,8 +1,7 @@
-
 'use client';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
-import { Check, Edit2, Loader2, Upload } from 'lucide-react';
+import { Edit2, Loader2, Upload } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -41,11 +40,10 @@ export function ReviewStep() {
       const imageProgress = new Array(images.length).fill(0);
 
       const uploadImage = async (img: typeof images[0], index: number) => {
-        // 1. Fetch the image blob
         const response = await fetch(img.url);
         let blob = await response.blob();
         
-        // 2. Optimized Compression for Production
+        // Optimized Compression
         if (img.url.startsWith('blob:')) {
             const options = {
                 maxSizeMB: 0.8,
@@ -65,7 +63,9 @@ export function ReviewStep() {
         const storagePath = `products/${user.uid}/${productId}/${fileName}`;
         const storageRef = ref(storage, storagePath);
         
-        const uploadTask = uploadBytesResumable(storageRef, blob);
+        const uploadTask = uploadBytesResumable(storageRef, blob, {
+            contentType: img.type || 'image/jpeg'
+        });
 
         return new Promise<string>((resolve, reject) => {
             uploadTask.on('state_changed', 
@@ -119,15 +119,29 @@ export function ReviewStep() {
         isFeatured: false,
         isAuthenticated: false,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        listingCreated: serverTimestamp(), // CRITICAL for visibility in homepage/search
       };
 
       const productRef = doc(firestore, 'products', productId);
-      await setDoc(productRef, productData);
       
-      setUploadProgress(100);
-      toast({ title: "Listing Published!", variant: "success" });
-      nextStep();
+      // Pattern non-blocking con catch per errori contestuali
+      setDoc(productRef, productData)
+        .then(() => {
+            setUploadProgress(100);
+            toast({ title: "Listing Published!", variant: "success" });
+            nextStep();
+        })
+        .catch(async (error) => {
+            const permissionError = new FirestorePermissionError({
+                path: productRef.path,
+                operation: 'create',
+                requestResourceData: productData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            setIsPublishing(false);
+        });
+
     } catch (e: any) {
       console.error("Publish error:", e);
       toast({ 
@@ -135,7 +149,6 @@ export function ReviewStep() {
         title: "Error publishing listing", 
         description: e.message || "Something went wrong during upload."
       });
-    } finally {
       setIsPublishing(false);
     }
   };

@@ -106,7 +106,7 @@ export function DetailsStep() {
   const selectedSizeStandard = form.watch('sizeStandard');
 
   const { isClothing, isShoes, isSizingApplicable } = React.useMemo(() => {
-    const selectedSubCategorySlug = formData.category;
+    const selectedSubCategorySlug = formData.subcategoryId; // Corrected from category
     if (!selectedSubCategorySlug) {
       return { isClothing: false, isShoes: false, isSizingApplicable: false };
     }
@@ -124,7 +124,7 @@ export function DetailsStep() {
     const isSizingApplicable = isClothing || isShoes;
 
     return { isClothing, isShoes, isSizingApplicable };
-  }, [formData.category]);
+  }, [formData.subcategoryId]);
   
 
   const sizeValues = React.useMemo(() => {
@@ -226,7 +226,7 @@ export function DetailsStep() {
         <FormItem>
           <FormLabel>Category</FormLabel>
           <FormControl>
-            <Input readOnly value={getCategoryPath(formData.category)} />
+            <Input readOnly value={getCategoryPath(formData.subcategoryId)} />
           </FormControl>
         </FormItem>
 

@@ -1,4 +1,3 @@
-
 'use client';
 import { z } from "zod";
 
@@ -158,6 +157,7 @@ export type FirestoreProduct = {
   isAuthenticated: boolean;
   createdAt: any;
   updatedAt: any;
+  listingCreated: any; // Added for ordering in search and admin
   authenticityCheck?: {
     status: 'pending' | 'completed';
     confidence: 'high' | 'medium' | 'low';
