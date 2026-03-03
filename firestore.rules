@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -50,9 +49,15 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.sellerId == request.auth.uid;
       allow update: if isSignedIn() && (resource.data.sellerId == request.auth.uid || isAdmin());
       allow delete: if isAdmin() || (isSignedIn() && resource.data.sellerId == request.auth.uid);
+      
+      match /offers/{offerId} {
+        allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || get(/databases/$(database)/documents/products/$(productId)).data.sellerId == request.auth.uid || isAdmin());
+        allow create: if isSignedIn();
+        allow update: if isSignedIn();
+      }
     }
 
     match /categories/{id} { allow read: if true; allow write: if isAdmin(); }
@@ -64,6 +69,53 @@ service cloud.firestore {
     
     match /settings/global { allow read: if true; allow write: if isAdmin(); }
     match /config/exchangeRates { allow read: if true; }
+    match /admin_logs/{logId} { allow read, write: if isAdmin(); }
+    match /coupons/{couponId} { allow read: if true; allow write: if isAdmin(); }
+    
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || request.auth.uid in resource.data.sellerIds || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || (isSignedIn() && (resource.data.buyerId == request.auth.uid || request.auth.uid in resource.data.sellerIds));
+    }
+
+    match /notifications/{id} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isAdmin();
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /deliveries/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isCourier();
+    }
+
+    match /courier_profiles/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isOwner(id);
+    }
+
+    match /reports/{id} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+    }
+
+    match /support_chats/{chatId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      
+      match /messages/{msgId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+      }
+    }
+
+    match /reviews/{id} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+    }
     
     match /{path=**} {
       allow read, write: if isAdmin();

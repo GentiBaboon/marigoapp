@@ -1,16 +1,16 @@
-
 'use client';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
-import { Edit2, Loader2, Upload, MapPin } from 'lucide-react';
+import { Edit2, Loader2, Upload, MapPin, CheckCircle2 } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useUser, useStorage, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useUser, useStorage } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
 import type { FirestoreProduct, FirestoreAddress } from '@/lib/types';
+import { useCollection, useMemoFirebase } from '@/firebase';
 import imageCompression from 'browser-image-compression';
 
 export function ReviewStep() {
@@ -26,6 +26,7 @@ export function ReviewStep() {
     if (!user || !firestore) return null;
     return collection(firestore, 'users', user.uid, 'addresses');
   }, [user, firestore]);
+  
   const { data: addresses } = useCollection<FirestoreAddress>(addressesCollection);
   const selectedAddress = addresses?.find(a => a.id === formData.shippingFromAddressId);
 
@@ -36,34 +37,51 @@ export function ReviewStep() {
     }
     
     setIsPublishing(true);
-    setUploadProgress(10);
+    setUploadProgress(5);
 
     try {
       const productId = activeDraft?.id || `prod_${Date.now()}`;
       const images = formData.images || [];
       
-      if (images.length === 0) throw new Error("Caricare almeno 3 foto");
+      if (images.length < 3) throw new Error("Caricare almeno 3 foto");
 
-      // Verify all images are uploaded to Storage
-      const finalImages: FirestoreProduct['images'] = [];
+      const finalImages: { url: string; thumbnailUrl: string; position: number }[] = [];
       
+      // PROCESS AND UPLOAD EACH IMAGE
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
         let finalUrl = img.url;
 
-        // If it's still a local blob (should not happen with new PhotosStep, but for safety)
+        // If it's a local blob, we MUST upload it now
         if (img.url.startsWith('blob:')) {
           const response = await fetch(img.url);
           const blob = await response.blob();
+          
+          // Compression
           const options = { maxSizeMB: 0.8, maxWidthOrHeight: 1200 };
           const compressed = await imageCompression(blob as File, options);
           
           const fileExt = img.type?.split('/')[1] || 'jpg';
-          const fileName = `final_img_${Date.now()}_${i}.${fileExt}`;
+          const fileName = `img_${Date.now()}_${i}.${fileExt}`;
           const storagePath = `products/${user.uid}/${productId}/${fileName}`;
           const storageRef = ref(storage, storagePath);
           
-          await uploadBytesResumable(storageRef, compressed);
+          const uploadTask = uploadBytesResumable(storageRef, compressed, {
+            contentType: img.type || 'image/jpeg'
+          });
+
+          // Wait for upload to complete
+          await new Promise((resolve, reject) => {
+            uploadTask.on('state_changed', 
+              (snapshot) => {
+                const stepProgress = (snapshot.bytesTransferred / snapshot.totalBytes) * (80 / images.length);
+                setUploadProgress(prev => Math.min(85, 5 + (i * (80 / images.length)) + stepProgress));
+              },
+              reject,
+              () => resolve(null)
+            );
+          });
+
           finalUrl = await getDownloadURL(storageRef);
         }
 
@@ -72,9 +90,9 @@ export function ReviewStep() {
           thumbnailUrl: finalUrl,
           position: i
         });
-        
-        setUploadProgress(10 + Math.round(((i + 1) / images.length) * 40));
       }
+
+      setUploadProgress(90);
 
       const productData: FirestoreProduct = {
         id: productId,
@@ -106,31 +124,31 @@ export function ReviewStep() {
       };
 
       const productRef = doc(firestore, 'products', productId);
-      
-      setUploadProgress(80);
-      
       await setDoc(productRef, productData);
       
       setUploadProgress(100);
       toast({ title: "Annuncio Pubblicato!", variant: "success" });
-      nextStep();
+      
+      // Delay slightly to show 100% progress
+      setTimeout(() => nextStep(), 500);
 
     } catch (e: any) {
       console.error("Publish error:", e);
       toast({ 
         variant: "destructive", 
         title: "Errore pubblicazione", 
-        description: e.message || "Qualcosa è andato storto."
+        description: e.message || "Impossibile completare l'upload."
       });
       setIsPublishing(false);
+      setUploadProgress(0);
     }
   };
 
   return (
     <div className="space-y-8 pb-20">
       <div className="text-center">
-        <h2 className="text-2xl font-bold">Quasi fatto!</h2>
-        <p className="text-muted-foreground">Controlla i dettagli del tuo annuncio prima di andare online.</p>
+        <h2 className="text-2xl font-bold font-headline">Riepilogo finale</h2>
+        <p className="text-muted-foreground">Le foto verranno caricate nel database ora.</p>
       </div>
 
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden border bg-muted shadow-sm">
@@ -144,17 +162,21 @@ export function ReviewStep() {
             />
         )}
         <Button variant="secondary" size="sm" className="absolute bottom-4 right-4" onClick={() => goToStep(1)}>
-          <Edit2 className="h-4 w-4 mr-2" /> Modifica Foto
+          <Edit2 className="h-4 w-4 mr-2" /> Cambia Foto
         </Button>
       </div>
 
       {isPublishing && (
-          <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="space-y-3 bg-primary/5 p-4 rounded-xl border border-primary/20 animate-in fade-in slide-in-from-bottom-2">
               <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-primary">
-                  <span>Pubblicazione in corso...</span>
-                  <span>{uploadProgress}%</span>
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Upload in corso...
+                  </span>
+                  <span>{Math.round(uploadProgress)}%</span>
               </div>
               <Progress value={uploadProgress} className="h-2" />
+              <p className="text-[10px] text-center text-muted-foreground uppercase">Non chiudere questa pagina</p>
           </div>
       )}
 
@@ -166,37 +188,38 @@ export function ReviewStep() {
           </div>
           <p className="text-muted-foreground text-lg">{formData.title}</p>
           <div className="flex gap-2">
-            {formData.sizeValue && <span className="bg-muted px-2 py-1 rounded text-[10px] uppercase font-bold border">{formData.sizeValue}</span>}
             <span className="bg-muted px-2 py-1 rounded text-[10px] uppercase font-bold border">{formData.condition?.replace('_', ' ')}</span>
+            {formData.sizeValue && <span className="bg-muted px-2 py-1 rounded text-[10px] uppercase font-bold border">{formData.sizeValue}</span>}
           </div>
         </section>
 
         {selectedAddress && (
-            <section className="p-4 bg-primary/5 rounded-xl border border-primary/10">
-                <h4 className="font-bold text-xs uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
-                    <MapPin className="h-3 w-3" /> Spedizione da
-                </h4>
-                <p className="text-sm font-semibold">{selectedAddress.fullName}</p>
-                <p className="text-xs text-muted-foreground">{selectedAddress.address}, {selectedAddress.city}</p>
+            <section className="p-4 bg-muted/20 rounded-xl border flex items-start gap-3">
+                <MapPin className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                <div className="text-sm">
+                    <p className="font-bold uppercase text-[10px] text-muted-foreground tracking-widest mb-1">Spedito da</p>
+                    <p className="font-semibold">{selectedAddress.fullName}</p>
+                    <p className="text-xs text-muted-foreground">{selectedAddress.address}, {selectedAddress.city}</p>
+                </div>
             </section>
         )}
-
-        <section className="p-4 bg-muted/20 rounded-xl border">
-          <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground mb-2">Descrizione</h4>
-          <p className="text-sm leading-relaxed text-foreground/80 line-clamp-4">{formData.description}</p>
-        </section>
       </div>
 
       <div className="flex flex-col gap-3 pt-4">
-        <Button className="w-full h-14 text-lg font-bold bg-black text-white hover:bg-black/90" size="lg" onClick={handlePublish} disabled={isPublishing}>
+        <Button 
+            className="w-full h-16 text-lg font-bold bg-black text-white hover:bg-black/90 shadow-xl" 
+            size="lg" 
+            onClick={handlePublish} 
+            disabled={isPublishing}
+        >
           {isPublishing ? (
-              <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Elaborazione...</>
+              <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Salvataggio...</>
           ) : (
               <><Upload className="h-5 w-5 mr-2" /> Pubblica Ora</>
           )}
         </Button>
-        <Button variant="outline" className="w-full h-14 text-lg font-medium" size="lg" disabled={isPublishing} onClick={() => goToStep(0)}>
-          Salva Bozza
+        <Button variant="outline" className="w-full h-14 text-muted-foreground" size="lg" disabled={isPublishing} onClick={() => goToStep(0)}>
+          Annulla e Torna Indietro
         </Button>
       </div>
     </div>
