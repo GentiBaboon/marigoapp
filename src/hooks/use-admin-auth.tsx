@@ -11,7 +11,8 @@ import type { FirestoreUser } from '@/lib/types';
 const DEV_ADMIN_UIDS = [
   '2C81RVoXZWZuSWXEEueehqbHkMu1', 
   'v521MWW9rmPYchVBc91DheeRU5j2',
-  'GoNLAq0YYdQw70fDS5L1XbBqtow1'
+  'GoNLAq0YYdQw70fDS5L1XbBqtow1',
+  '4qTAOIovwdWYGCnqYPiPCJqNcdP2'
 ];
 
 export function useAdminAuth() {

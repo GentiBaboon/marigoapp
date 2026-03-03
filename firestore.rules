@@ -20,7 +20,8 @@ service cloud.firestore {
         request.auth.token.admin == true || 
         request.auth.uid == '2C81RVoXZWZuSWXEEueehqbHkMu1' || 
         request.auth.uid == 'v521MWW9rmPYchVBc91DheeRU5j2' ||
-        request.auth.uid == 'GoNLAq0YYdQw70fDS5L1XbBqtow1'
+        request.auth.uid == 'GoNLAq0YYdQw70fDS5L1XbBqtow1' ||
+        request.auth.uid == '4qTAOIovwdWYGCnqYPiPCJqNcdP2'
       );
     }
     
