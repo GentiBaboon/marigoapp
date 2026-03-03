@@ -1,3 +1,4 @@
+
 'use client';
 import { z } from "zod";
 
@@ -285,6 +286,8 @@ export type FirestoreSettings = {
     imageMaxSizeMB?: number;
     imageMaxDimension?: number;
     imageCompressionQuality?: number;
+    freeDeliveryThreshold?: number;
+    isFreeDeliveryActive?: boolean;
 };
 
 export type FirestoreCategory = {
@@ -307,6 +310,19 @@ export type FirestoreAttribute = {
     name: string;
     value: string;
     hex?: string;
+};
+
+export type FirestoreCoupon = {
+  id: string;
+  code: string;
+  type: 'percentage' | 'fixed';
+  value: number;
+  minOrderValue: number;
+  startDate: any;
+  endDate: any;
+  isActive: boolean;
+  usageLimit?: number;
+  usedCount: number;
 };
 
 export type ProofFile = {

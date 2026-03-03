@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -171,6 +172,21 @@
         "value": { "type": "string" },
         "hex": { "type": "string", "description": "Optional hex for colors" }
       }
+    },
+    "Coupon": {
+      "title": "Marketing Coupon",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "type": { "type": "string", "enum": ["percentage", "fixed"] },
+        "value": { "type": "number" },
+        "minOrderValue": { "type": "number" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "isActive": { "type": "boolean" },
+        "usageLimit": { "type": "number" },
+        "usedCount": { "type": "number" }
+      }
     }
   },
   "auth": {
@@ -201,6 +217,7 @@
     "/materials/{id}": { "schema": { "$ref": "#/entities/Attribute" }, "description": "Product materials." },
     "/colors/{id}": { "schema": { "$ref": "#/entities/Attribute" }, "description": "Product colors." },
     "/patterns/{id}": { "schema": { "$ref": "#/entities/Attribute" }, "description": "Product patterns." },
+    "/coupons/{couponId}": { "schema": { "$ref": "#/entities/Coupon" }, "description": "Discount coupons." },
     "/settings/global": { "description": "Global marketplace settings." }
   }
 }
