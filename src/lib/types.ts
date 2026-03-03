@@ -182,6 +182,8 @@ export type FirestoreOrder = {
   paymentIntentId?: string;
   shippingAddress: AddressFormValues;
   createdAt: any;
+  couponCode?: string;
+  discountAmount?: number;
 };
 
 export type FirestoreNotification = {
