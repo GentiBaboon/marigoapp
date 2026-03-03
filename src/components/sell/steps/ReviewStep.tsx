@@ -1,15 +1,15 @@
 'use client';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
-import { Edit2, Loader2, Upload } from 'lucide-react';
+import { Edit2, Loader2, Upload, MapPin } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useUser, useStorage, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useFirestore, useUser, useStorage, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
+import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
-import type { FirestoreProduct } from '@/lib/types';
+import type { FirestoreProduct, FirestoreAddress } from '@/lib/types';
 import imageCompression from 'browser-image-compression';
 
 export function ReviewStep() {
@@ -20,6 +20,14 @@ export function ReviewStep() {
   const firestore = useFirestore();
   const storage = useStorage();
   const { user } = useUser();
+
+  // Fetch addresses to show summary
+  const addressesCollection = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, 'users', user.uid, 'addresses');
+  }, [user, firestore]);
+  const { data: addresses } = useCollection<FirestoreAddress>(addressesCollection);
+  const selectedAddress = addresses?.find(a => a.id === formData.shippingFromAddressId);
 
   const handlePublish = async () => {
     if (!user || !firestore || !storage) {
@@ -120,12 +128,12 @@ export function ReviewStep() {
         isAuthenticated: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        listingCreated: serverTimestamp(), // CRITICAL for visibility in homepage/search
+        listingCreated: serverTimestamp(),
+        shippingFromAddressId: formData.shippingFromAddressId,
       };
 
       const productRef = doc(firestore, 'products', productId);
       
-      // Pattern non-blocking con catch per errori contestuali
       setDoc(productRef, productData)
         .then(() => {
             setUploadProgress(100);
@@ -199,6 +207,16 @@ export function ReviewStep() {
             <span className="bg-muted px-2 py-1 rounded text-[10px] uppercase font-bold border">{formData.condition?.replace('_', ' ')}</span>
           </div>
         </section>
+
+        {selectedAddress && (
+            <section className="p-4 bg-primary/5 rounded-xl border border-primary/10">
+                <h4 className="font-bold text-xs uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
+                    <MapPin className="h-3 w-3" /> Shipping From
+                </h4>
+                <p className="text-sm font-semibold">{selectedAddress.fullName}</p>
+                <p className="text-xs text-muted-foreground">{selectedAddress.address}, {selectedAddress.city}</p>
+            </section>
+        )}
 
         <section className="p-4 bg-muted/20 rounded-xl border">
           <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground mb-2">Description</h4>

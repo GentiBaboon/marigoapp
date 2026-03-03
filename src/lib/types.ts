@@ -1,4 +1,3 @@
-
 'use client';
 import { z } from "zod";
 
@@ -34,8 +33,8 @@ export const firestoreUserSchema = z.object({
   stripeAccountId: z.string().optional().nullable(),
   rating: z.number().default(0),
   reviewCount: z.number().default(0),
-  createdAt: z.any().optional(),
-  lastLoginAt: z.any().optional(),
+  createdAt: any().optional(),
+  lastLoginAt: any().optional(),
   status: z.enum(['active', 'banned']).default("active"),
   hasAcceptedChatRules: z.boolean().optional(),
   emailPreferences: z.object({
@@ -91,6 +90,7 @@ export const sellStep5Schema = z.object({
   listingType: z.enum(["fixed_price", "auction"]).default("fixed_price"),
   allowOffers: z.boolean().default(true),
   shippingMethod: z.enum(['baboon', 'other', 'free']).optional(),
+  shippingFromAddressId: z.string().min(1, "Shipping address is required"),
 });
 
 export const sellFormSchema = sellStep1Schema
@@ -166,6 +166,7 @@ export type FirestoreProduct = {
   };
   vintage?: boolean;
   pattern?: string;
+  shippingFromAddressId?: string;
 };
 
 export type FirestoreOrder = {
