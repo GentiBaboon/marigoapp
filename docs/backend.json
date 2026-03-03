@@ -144,6 +144,52 @@
       },
       "required": ["sellerId", "title", "price", "status", "createdAt", "images"]
     },
+    "Order": {
+      "title": "Order",
+      "type": "object",
+      "description": "Represents a purchase transaction.",
+      "properties": {
+        "orderNumber": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "sellerIds": { "type": "array", "items": { "type": "string" } },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "shippingAddress": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderNumber", "buyerId", "sellerIds", "items", "totalAmount", "status"]
+    },
+    "Category": {
+      "title": "Category",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "parentId": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      }
+    },
+    "Brand": {
+      "title": "Brand",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "verified": { "type": "boolean" }
+      }
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "discountType": { "type": "string" },
+        "discountValue": { "type": "number" },
+        "status": { "type": "string" }
+      }
+    },
     "Offer": {
       "title": "Offer",
       "type": "object",
@@ -173,46 +219,6 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["orderId", "reviewerId", "revieweeId", "rating", "content", "createdAt"]
-    },
-    "Report": {
-      "title": "Report",
-      "type": "object",
-      "description": "A user report against content or another user.",
-      "properties": {
-        "reporterId": { "type": "string" },
-        "type": { "type": "string", "enum": ["product", "user", "message", "review"] },
-        "itemId": { "type": "string" },
-        "reason": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "resolved"] }
-      },
-      "required": ["reporterId", "type", "itemId", "reason", "status"]
-    },
-    "Conversation": {
-      "title": "Conversation",
-      "type": "object",
-      "description": "A chat conversation between two users.",
-      "properties": {
-        "participants": { "type": "array", "items": { "type": "string" } },
-        "productId": { "type": "string" },
-        "productTitle": { "type": "string" },
-        "productImage": { "type": "string" },
-        "lastMessage": { "type": "string" },
-        "lastMessageAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["participants", "productId", "lastMessageAt"]
-    },
-    "Delivery": {
-      "title": "Delivery",
-      "type": "object",
-      "description": "Represents a delivery assignment for a courier.",
-      "properties": {
-        "orderId": { "type": "string" },
-        "courierId": { "type": "string" },
-        "status": { "type": "string" },
-        "deliveryFee": { "type": "number" },
-        "packageSize": { "type": "string" }
-      },
-      "required": ["orderId", "status", "deliveryFee", "packageSize"]
     }
   },
   "auth": {
@@ -224,46 +230,44 @@
   },
   "firestore": {
     "/users/{userId}": {
-      "schema": {
-        "$ref": "#/entities/User"
-      },
-      "description": "Stores user profiles and core information."
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles."
     },
     "/products/{productId}": {
-      "schema": {
-        "$ref": "#/entities/Product"
-      },
-      "description": "Main collection for products."
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Product listings."
     },
-    "/products/{productId}/offers/{offerId}": {
-      "schema": {
-        "$ref": "#/entities/Offer"
-      },
-      "description": "Subcollection for offers on a specific product."
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Purchase orders."
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Product categories."
+    },
+    "/brands/{brandId}": {
+      "schema": { "$ref": "#/entities/Brand" },
+      "description": "Designer brands."
+    },
+    "/coupons/{couponId}": {
+      "schema": { "$ref": "#/entities/Coupon" },
+      "description": "Discount coupons."
     },
     "/reviews/{reviewId}": {
-      "schema": {
-        "$ref": "#/entities/Review"
-      },
-      "description": "Stores all user reviews."
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "User reviews."
     },
-    "/reports/{reportId}": {
-      "schema": {
-        "$ref": "#/entities/Report"
-      },
-      "description": "Stores user reports for moderation."
+    "/notifications/{notificationId}": {
+      "description": "User notifications."
     },
     "/conversations/{conversationId}": {
-      "schema": {
-        "$ref": "#/entities/Conversation"
-      },
-      "description": "Main collection for chat conversations."
+      "description": "Chat conversations."
     },
     "/deliveries/{deliveryId}": {
-      "schema": {
-        "$ref": "#/entities/Delivery"
-      },
-      "description": "Stores delivery assignments for couriers."
+      "description": "Courier delivery assignments."
+    },
+    "/courier_profiles/{userId}": {
+      "description": "Courier specific profiles."
     }
   }
 }

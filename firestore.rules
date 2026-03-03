@@ -126,12 +126,12 @@ service cloud.firestore {
     }
 
     match /categories/{categoryId} {
-      allow read: if true;
+      allow get, list: if true; // Public read access for categories
       allow write: if isAdmin();
     }
 
     match /brands/{brandId} {
-      allow read: if true;
+      allow get, list: if true; // Public read access for brands
       allow write: if isAdmin();
     }
 
