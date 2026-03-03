@@ -33,8 +33,8 @@ export const firestoreUserSchema = z.object({
   stripeAccountId: z.string().optional().nullable(),
   rating: z.number().default(0),
   reviewCount: z.number().default(0),
-  createdAt: any().optional(),
-  lastLoginAt: any().optional(),
+  createdAt: z.any().optional(),
+  lastLoginAt: z.any().optional(),
   status: z.enum(['active', 'banned']).default("active"),
   hasAcceptedChatRules: z.boolean().optional(),
   emailPreferences: z.object({
