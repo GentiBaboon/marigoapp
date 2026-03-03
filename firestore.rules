@@ -32,13 +32,6 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'courier';
     }
 
-    // Data Validation
-    function validProduct(p) {
-      return p.title is string && p.title.size() >= 5 && p.title.size() <= 100
-          && p.price is number && p.price > 0
-          && p.status in ['active', 'draft', 'pending_review', 'sold', 'removed', 'expired'];
-    }
-
     // --------------------------------------------------------------------
     // Collections
     // --------------------------------------------------------------------
@@ -57,102 +50,23 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      allow create: if isSignedIn() && validProduct(request.resource.data);
+      allow create: if isSignedIn();
       allow update: if isSignedIn() && (resource.data.sellerId == request.auth.uid || isAdmin());
-      allow delete: if isAdmin() || (isSignedIn() && resource.data.sellerId == request.auth.uid && resource.data.status == 'draft');
-
-      match /offers/{offerId} {
-        allow read: if isSignedIn() && (isOwner(resource.data.buyerId) || isOwner(get(/databases/$(database)/documents/products/$(productId)).data.sellerId) || isAdmin());
-        allow create: if isSignedIn() && request.resource.data.buyerId == request.auth.uid;
-        allow update: if isSignedIn() && (isOwner(resource.data.buyerId) || isOwner(get(/databases/$(database)/documents/products/$(productId)).data.sellerId) || isAdmin());
-      }
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.sellerId == request.auth.uid);
     }
 
-    match /orders/{orderId} {
-      allow get: if isSignedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid in resource.data.sellerIds || isAdmin());
-      allow list: if isSignedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid in resource.data.sellerIds || isAdmin());
-      allow create: if isSignedIn();
-      allow update: if isAdmin();
-    }
-
-    match /deliveries/{deliveryId} {
-      allow read: if isSignedIn() && (resource.data.courierId == request.auth.uid || isAdmin() || request.auth.uid == resource.data.buyerId);
-      allow create: if isAdmin() || isSignedIn();
-      allow update: if isAdmin() || (isSignedIn() && (resource.data.courierId == request.auth.uid || isCourier()));
-    }
-
-    match /notifications/{notificationId} {
-      allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
-    }
-
-    match /reviews/{reviewId} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
-    }
-
-    match /reports/{reportId} {
-      allow read: if isAdmin();
-      allow create: if isSignedIn();
-      allow update: if isAdmin();
-    }
-
-    match /conversations/{conversationId} {
-      allow read: if isSignedIn() && (request.auth.uid in resource.data.participants || isAdmin());
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (request.auth.uid in resource.data.participants || isAdmin());
-
-      match /messages/{messageId} {
-        allow read: if isSignedIn() && (request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants || isAdmin());
-        allow create: if isSignedIn() && (request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants);
-      }
-    }
-
-    match /support_chats/{chatId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-
-      match /messages/{messageId} {
-        allow read: if isSignedIn() && (get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid || isAdmin());
-        allow create: if isSignedIn();
-      }
-    }
-
-    match /coupons/{couponId} {
-      allow read: if isSignedIn();
-      allow list: if isAdmin();
-      allow write: if isAdmin();
-    }
-
-    match /categories/{categoryId} {
-      allow get, list: if true; // Public read access for categories
-      allow write: if isAdmin();
-    }
-
-    match /brands/{brandId} {
-      allow get, list: if true; // Public read access for brands
-      allow write: if isAdmin();
-    }
-
-    match /admin_logs/{logId} {
-      allow read: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-    }
-
-    match /courier_profiles/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isOwner(userId) || isAdmin();
-    }
-
-    match /config/exchangeRates {
-      allow read: if true;
-    }
+    match /categories/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /brands/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /conditions/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /materials/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /colors/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /patterns/{id} { allow read: if true; allow write: if isAdmin(); }
     
-    match /settings/global {
-      allow read: if true;
-      allow write: if isAdmin();
+    match /settings/global { allow read: if true; allow write: if isAdmin(); }
+    match /config/exchangeRates { allow read: if true; }
+    
+    match /{path=**} {
+      allow read, write: if isAdmin();
     }
   }
 }

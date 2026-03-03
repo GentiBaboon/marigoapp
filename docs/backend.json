@@ -114,7 +114,7 @@
         "categoryId": { "type": "string" },
         "subcategoryId": { "type": "string" },
         "brandId": { "type": "string" },
-        "condition": { "type": "string", "enum": ["new", "like_new", "good", "fair"] },
+        "condition": { "type": "string" },
         "listingType": { "type": "string", "enum": ["fixed_price", "auction"] },
         "price": { "type": "number" },
         "originalPrice": { "type": "number" },
@@ -144,23 +144,6 @@
       },
       "required": ["sellerId", "title", "price", "status", "createdAt", "images"]
     },
-    "Order": {
-      "title": "Order",
-      "type": "object",
-      "description": "Represents a purchase transaction.",
-      "properties": {
-        "orderNumber": { "type": "string" },
-        "buyerId": { "type": "string" },
-        "sellerIds": { "type": "array", "items": { "type": "string" } },
-        "items": { "type": "array" },
-        "totalAmount": { "type": "number" },
-        "status": { "type": "string" },
-        "paymentMethod": { "type": "string" },
-        "shippingAddress": { "type": "object" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["orderNumber", "buyerId", "sellerIds", "items", "totalAmount", "status"]
-    },
     "Category": {
       "title": "Category",
       "type": "object",
@@ -180,45 +163,15 @@
         "verified": { "type": "boolean" }
       }
     },
-    "Coupon": {
-      "title": "Coupon",
+    "Attribute": {
+      "title": "Metadata Attribute",
       "type": "object",
+      "description": "Used for Conditions, Materials, Colors, Patterns.",
       "properties": {
-        "code": { "type": "string" },
-        "discountType": { "type": "string" },
-        "discountValue": { "type": "number" },
-        "status": { "type": "string" }
+        "name": { "type": "string" },
+        "value": { "type": "string" },
+        "hex": { "type": "string", "description": "Optional hex for colors" }
       }
-    },
-    "Offer": {
-      "title": "Offer",
-      "type": "object",
-      "description": "Represents an offer made on a product.",
-      "properties": {
-        "buyerId": { "type": "string" },
-        "amount": { "type": "number" },
-        "message": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "accepted", "rejected", "countered", "withdrawn", "expired"] },
-        "counterAmount": { "type": "number" },
-        "expiresAt": { "type": "string", "format": "date-time" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["buyerId", "amount", "status", "createdAt"]
-    },
-    "Review": {
-      "title": "Review",
-      "type": "object",
-      "description": "A user review for a transaction.",
-      "properties": {
-        "orderId": { "type": "string" },
-        "productId": { "type": "string" },
-        "reviewerId": { "type": "string" },
-        "revieweeId": { "type": "string" },
-        "rating": { "type": "number" },
-        "content": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["orderId", "reviewerId", "revieweeId", "rating", "content", "createdAt"]
     }
   },
   "auth": {
@@ -237,10 +190,6 @@
       "schema": { "$ref": "#/entities/Product" },
       "description": "Product listings."
     },
-    "/orders/{orderId}": {
-      "schema": { "$ref": "#/entities/Order" },
-      "description": "Purchase orders."
-    },
     "/categories/{categoryId}": {
       "schema": { "$ref": "#/entities/Category" },
       "description": "Product categories."
@@ -249,25 +198,10 @@
       "schema": { "$ref": "#/entities/Brand" },
       "description": "Designer brands."
     },
-    "/coupons/{couponId}": {
-      "schema": { "$ref": "#/entities/Coupon" },
-      "description": "Discount coupons."
-    },
-    "/reviews/{reviewId}": {
-      "schema": { "$ref": "#/entities/Review" },
-      "description": "User reviews."
-    },
-    "/notifications/{notificationId}": {
-      "description": "User notifications."
-    },
-    "/conversations/{conversationId}": {
-      "description": "Chat conversations."
-    },
-    "/deliveries/{deliveryId}": {
-      "description": "Courier delivery assignments."
-    },
-    "/courier_profiles/{userId}": {
-      "description": "Courier specific profiles."
-    }
+    "/conditions/{id}": { "schema": { "$ref": "#/entities/Attribute" }, "description": "Product conditions." },
+    "/materials/{id}": { "schema": { "$ref": "#/entities/Attribute" }, "description": "Product materials." },
+    "/colors/{id}": { "schema": { "$ref": "#/entities/Attribute" }, "description": "Product colors." },
+    "/patterns/{id}": { "schema": { "$ref": "#/entities/Attribute" }, "description": "Product patterns." },
+    "/settings/global": { "description": "Global marketplace settings." }
   }
 }

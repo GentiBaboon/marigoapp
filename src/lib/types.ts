@@ -1,3 +1,4 @@
+
 'use client';
 import { z } from "zod";
 
@@ -73,7 +74,7 @@ export const sellStep3Schema = z.object({
 });
 
 export const sellStep4Schema = z.object({
-  condition: z.enum(["new", "like_new", "good", "fair"]),
+  condition: z.string().min(1, "Condition is required"),
   material: z.string().min(1, "Material is required"),
   color: z.string().min(1, "Color is required"),
   size: z.string().optional(),
@@ -136,7 +137,7 @@ export type FirestoreProduct = {
   categoryId: string;
   subcategoryId: string;
   brandId: string;
-  condition: "new" | "like_new" | "good" | "fair";
+  condition: string;
   listingType: "fixed_price" | "auction";
   price: number;
   originalPrice?: number;
@@ -157,7 +158,7 @@ export type FirestoreProduct = {
   isAuthenticated: boolean;
   createdAt: any;
   updatedAt: any;
-  listingCreated: any; // Added for ordering in search and admin
+  listingCreated: any;
   authenticityCheck?: {
     status: 'pending' | 'completed';
     confidence: 'high' | 'medium' | 'low';
@@ -300,12 +301,11 @@ export type FirestoreBrand = {
     verified: boolean;
 };
 
-export type FirestoreCoupon = {
+export type FirestoreAttribute = {
     id: string;
-    code: string;
-    discountType: 'percentage' | 'fixed';
-    discountValue: number;
-    status: string;
+    name: string;
+    value: string;
+    hex?: string;
 };
 
 export type ProofFile = {
