@@ -1,3 +1,4 @@
+
 'use client';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
@@ -47,12 +48,20 @@ export function ReviewStep() {
 
       const imageProgress = new Array(images.length).fill(0);
 
-      const uploadImage = async (img: typeof images[0], index: number) => {
+      const ensureUploaded = async (img: typeof images[0], index: number) => {
+        // If it's already a Firebase Storage URL, we just use it
+        if (img.url.includes('firebasestorage.googleapis.com')) {
+            imageProgress[index] = 100;
+            const totalLoaded = imageProgress.reduce((a, b) => a + b, 0);
+            setUploadProgress(5 + Math.round((totalLoaded / images.length) * 0.85));
+            return img.url;
+        }
+
         try {
             const response = await fetch(img.url);
             let blob = await response.blob();
             
-            // Optimized Compression
+            // Optimized Compression for any remaining blob URLs
             if (img.url.startsWith('blob:')) {
                 const options = {
                     maxSizeMB: 0.8,
@@ -98,7 +107,7 @@ export function ReviewStep() {
         }
       };
 
-      const uploadedUrls = await Promise.all(images.map((img, i) => uploadImage(img, i)));
+      const uploadedUrls = await Promise.all(images.map((img, i) => ensureUploaded(img, i)));
       
       uploadedUrls.forEach((url, i) => {
           finalImages.push({
@@ -193,7 +202,7 @@ export function ReviewStep() {
       {isPublishing && (
           <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-primary">
-                  <span>Uploading listing...</span>
+                  <span>Finalizing listing...</span>
                   <span>{uploadProgress}%</span>
               </div>
               <Progress value={uploadProgress} className="h-2" />
