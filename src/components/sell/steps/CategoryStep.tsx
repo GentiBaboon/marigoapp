@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -14,7 +13,7 @@ import {
 } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useSellForm } from '@/components/sell/SellFormContext';
-import { sellStep2Schema, type FirestoreCategory } from '@/lib/types';
+import { sellStep2Schema, type FirestoreCategory, type FirestoreBrand } from '@/lib/types';
 import type { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -29,11 +28,16 @@ export function CategoryStep() {
   const { formData, setFormData, nextStep } = useSellForm();
   const firestore = useFirestore();
 
+  // Fetch Categories
   const categoriesQuery = useMemoFirebase(() => 
     query(collection(firestore, 'categories'), where('isActive', '==', true)),
     [firestore]
   );
   const { data: categories } = useCollection<FirestoreCategory>(categoriesQuery);
+
+  // Fetch Brands
+  const brandsQuery = useMemoFirebase(() => collection(firestore, 'brands'), [firestore]);
+  const { data: brands } = useCollection<FirestoreBrand>(brandsQuery);
 
   const categoryTree = React.useMemo(() => {
     if (!categories) return [];
@@ -127,6 +131,27 @@ export function CategoryStep() {
                       searchPlaceholder="Search categories..."
                       emptyPlaceholder="No category found."
                     />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="brandId"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel className="font-semibold">Brand</FormLabel>
+                <FormControl>
+                  <Combobox
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    items={brands?.map(b => ({ value: b.name, label: b.name })) || []}
+                    placeholder="Select brand"
+                    searchPlaceholder="Search brands..."
+                    emptyPlaceholder="No brands found."
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

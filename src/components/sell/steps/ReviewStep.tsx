@@ -48,49 +48,54 @@ export function ReviewStep() {
       const imageProgress = new Array(images.length).fill(0);
 
       const uploadImage = async (img: typeof images[0], index: number) => {
-        const response = await fetch(img.url);
-        let blob = await response.blob();
-        
-        // Optimized Compression
-        if (img.url.startsWith('blob:')) {
-            const options = {
-                maxSizeMB: 0.8,
-                maxWidthOrHeight: 1200,
-                useWebWorker: true,
-            };
-            try {
-                const compressedFile = await imageCompression(blob as File, options);
-                blob = compressedFile;
-            } catch (error) {
-                console.warn("Compression failed, uploading original", error);
-            }
-        }
-
-        const fileExtension = img.type?.split('/')[1] || 'jpg';
-        const fileName = `img_${Date.now()}_${index}.${fileExtension}`;
-        const storagePath = `products/${user.uid}/${productId}/${fileName}`;
-        const storageRef = ref(storage, storagePath);
-        
-        const uploadTask = uploadBytesResumable(storageRef, blob, {
-            contentType: img.type || 'image/jpeg'
-        });
-
-        return new Promise<string>((resolve, reject) => {
-            uploadTask.on('state_changed', 
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    imageProgress[index] = progress;
-                    const totalLoaded = imageProgress.reduce((a, b) => a + b, 0);
-                    const averageProgress = totalLoaded / images.length;
-                    setUploadProgress(5 + Math.round(averageProgress * 0.85));
-                }, 
-                (error) => reject(error), 
-                async () => {
-                    const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                    resolve(downloadUrl);
+        try {
+            const response = await fetch(img.url);
+            let blob = await response.blob();
+            
+            // Optimized Compression
+            if (img.url.startsWith('blob:')) {
+                const options = {
+                    maxSizeMB: 0.8,
+                    maxWidthOrHeight: 1200,
+                    useWebWorker: true,
+                };
+                try {
+                    const compressedFile = await imageCompression(blob as File, options);
+                    blob = compressedFile;
+                } catch (error) {
+                    console.warn("Compression failed, uploading original", error);
                 }
-            );
-        });
+            }
+
+            const fileExtension = img.type?.split('/')[1] || 'jpg';
+            const fileName = `img_${Date.now()}_${index}.${fileExtension}`;
+            const storagePath = `products/${user.uid}/${productId}/${fileName}`;
+            const storageRef = ref(storage, storagePath);
+            
+            const uploadTask = uploadBytesResumable(storageRef, blob, {
+                contentType: img.type || 'image/jpeg'
+            });
+
+            return new Promise<string>((resolve, reject) => {
+                uploadTask.on('state_changed', 
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        imageProgress[index] = progress;
+                        const totalLoaded = imageProgress.reduce((a, b) => a + b, 0);
+                        const averageProgress = totalLoaded / images.length;
+                        setUploadProgress(5 + Math.round(averageProgress * 0.85));
+                    }, 
+                    (error) => reject(error), 
+                    async () => {
+                        const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                        resolve(downloadUrl);
+                    }
+                );
+            });
+        } catch (error) {
+            console.error("Image upload failed for index", index, error);
+            throw error;
+        }
       };
 
       const uploadedUrls = await Promise.all(images.map((img, i) => uploadImage(img, i)));

@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
@@ -21,7 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useSellForm } from '@/components/sell/SellFormContext';
-import { sellStep4Schema, type FirestoreCategory, type FirestoreBrand, type FirestoreAttribute } from '@/lib/types';
+import { sellStep4Schema, type FirestoreCategory, type FirestoreAttribute } from '@/lib/types';
 import type { z } from 'zod';
 import { StepActions } from '@/components/sell/StepActions';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -35,9 +34,6 @@ export function DetailsStep() {
   const firestore = useFirestore();
 
   // Dynamic Metadata Fetching
-  const brandsQuery = useMemoFirebase(() => collection(firestore, 'brands'), [firestore]);
-  const { data: brands } = useCollection<FirestoreBrand>(brandsQuery);
-
   const categoriesQuery = useMemoFirebase(() => collection(firestore, 'categories'), [firestore]);
   const { data: categories } = useCollection<FirestoreCategory>(categoriesQuery);
 
@@ -84,27 +80,6 @@ export function DetailsStep() {
             <h2 className="text-2xl font-bold font-headline">Item Details</h2>
             <p className="text-sm text-muted-foreground">{categoryPath}</p>
         </div>
-
-        <FormField
-          control={form.control}
-          name="brandId"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel className="font-semibold">Brand</FormLabel>
-              <FormControl>
-                <Combobox
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  items={brands?.map(b => ({ value: b.name, label: b.name })) || []}
-                  placeholder="Select brand"
-                  searchPlaceholder="Search brands..."
-                  emptyPlaceholder="No brands found."
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <FormField
           control={form.control}
