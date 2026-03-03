@@ -158,6 +158,61 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["buyerId", "amount", "status", "createdAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "type": "object",
+      "description": "A user review for a transaction.",
+      "properties": {
+        "orderId": { "type": "string" },
+        "productId": { "type": "string" },
+        "reviewerId": { "type": "string" },
+        "revieweeId": { "type": "string" },
+        "rating": { "type": "number" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderId", "reviewerId", "revieweeId", "rating", "content", "createdAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "type": "object",
+      "description": "A user report against content or another user.",
+      "properties": {
+        "reporterId": { "type": "string" },
+        "type": { "type": "string", "enum": ["product", "user", "message", "review"] },
+        "itemId": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "resolved"] }
+      },
+      "required": ["reporterId", "type", "itemId", "reason", "status"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "type": "object",
+      "description": "A chat conversation between two users.",
+      "properties": {
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "productId": { "type": "string" },
+        "productTitle": { "type": "string" },
+        "productImage": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "lastMessageAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["participants", "productId", "lastMessageAt"]
+    },
+    "Delivery": {
+      "title": "Delivery",
+      "type": "object",
+      "description": "Represents a delivery assignment for a courier.",
+      "properties": {
+        "orderId": { "type": "string" },
+        "courierId": { "type": "string" },
+        "status": { "type": "string" },
+        "deliveryFee": { "type": "number" },
+        "packageSize": { "type": "string" }
+      },
+      "required": ["orderId", "status", "deliveryFee", "packageSize"]
     }
   },
   "auth": {
@@ -185,6 +240,30 @@
         "$ref": "#/entities/Offer"
       },
       "description": "Subcollection for offers on a specific product."
+    },
+    "/reviews/{reviewId}": {
+      "schema": {
+        "$ref": "#/entities/Review"
+      },
+      "description": "Stores all user reviews."
+    },
+    "/reports/{reportId}": {
+      "schema": {
+        "$ref": "#/entities/Report"
+      },
+      "description": "Stores user reports for moderation."
+    },
+    "/conversations/{conversationId}": {
+      "schema": {
+        "$ref": "#/entities/Conversation"
+      },
+      "description": "Main collection for chat conversations."
+    },
+    "/deliveries/{deliveryId}": {
+      "schema": {
+        "$ref": "#/entities/Delivery"
+      },
+      "description": "Stores delivery assignments for couriers."
     }
   }
 }
