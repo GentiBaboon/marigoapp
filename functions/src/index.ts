@@ -1,3 +1,4 @@
+
 import * as admin from "firebase-admin";
 import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
@@ -19,6 +20,34 @@ const getStripe = () => {
     apiVersion: "2024-06-20",
   });
 };
+
+/**
+ * Scheduled job to update exchange rates daily
+ */
+export const updateExchangeRates = onSchedule("every 24 hours", async (event) => {
+    try {
+        // ExchangeRate-API (Free tier)
+        const response = await fetch(`https://open.er-api.com/v6/latest/EUR`);
+        const data = await response.json();
+
+        if (data.result === "success") {
+            const rates = {
+                EUR: 1,
+                ALL: data.rates.ALL,
+                USD: data.rates.USD
+            };
+
+            await db.collection("config").doc("exchangeRates").set({
+                base: "EUR",
+                rates: rates,
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+            });
+            logger.info("Exchange rates updated successfully", rates);
+        }
+    } catch (error) {
+        logger.error("Failed to update exchange rates", error);
+    }
+});
 
 /**
  * Helper to send notifications (In-app, FCM, and Logged Email)
@@ -86,6 +115,7 @@ export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY
       accountId = account.id;
       await db.collection("users").doc(uid).update({
         stripeAccountId: accountId,
+        role: "seller",
         isSeller: true,
       });
     }

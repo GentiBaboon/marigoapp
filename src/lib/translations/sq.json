@@ -1,0 +1,57 @@
+
+{
+  "common": {
+    "save": "Ruaj",
+    "cancel": "Anulo",
+    "delete": "Fshi",
+    "loading": "Duke u ngarkuar...",
+    "error": "Ndodhi një gabim",
+    "back": "Mbrapa",
+    "continue": "Vazhdo",
+    "confirm": "Konfirmo",
+    "all": "Të gjitha"
+  },
+  "nav": {
+    "home": "Kreu",
+    "shop": "Bli",
+    "sell": "Shit",
+    "favorites": "Të preferuarat",
+    "me": "Unë",
+    "womenswear": "Veshje për femra",
+    "menswear": "Veshje për meshkuj",
+    "bags": "Çanta",
+    "shoes": "Këpucë",
+    "accessories": "Aksesorë"
+  },
+  "auth": {
+    "signIn": "Hyni",
+    "signUp": "Regjistrohuni",
+    "signOut": "Dilni",
+    "welcome": "Mirëseerdhët përsëri",
+    "createAccount": "Krijoni një llogari"
+  },
+  "product": {
+    "condition": "Gjendja",
+    "size": "Madhësia",
+    "addToBag": "Shto në çantë",
+    "makeOffer": "Bëj një ofertë",
+    "description": "Përshkrimi dhe detajet",
+    "authenticity": "Autentifikimi i ekspertëve",
+    "seller": "Shitësi"
+  },
+  "sell": {
+    "title": "Shit nje produkt / Sell an item",
+    "step1": "Foto",
+    "step2": "Kategoria & Marka",
+    "step3": "Detajet",
+    "step4": "Gjendja",
+    "step5": "Çmimi",
+    "publish": "Publiko tani"
+  },
+  "categories": {
+    "clothing": "Veshje (Clothing)",
+    "shoes": "Këpucë (Shoes)",
+    "bags": "Çanta (Bags)",
+    "accessories": "Aksesorë (Accessories)"
+  }
+}

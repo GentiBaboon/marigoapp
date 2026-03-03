@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Header } from '@/components/header';
@@ -10,6 +11,7 @@ import { WishlistProvider } from '@/context/WishlistContext';
 import { ShoppingPreferenceModal } from '@/components/home/ShoppingPreferenceModal';
 import { DownloadAppBanner } from '@/components/home/DownloadAppBanner';
 import { CurrencyProvider } from '@/context/CurrencyContext';
+import { LanguageProvider } from '@/context/LanguageContext';
 import dynamic from 'next/dynamic';
 import { CookieBanner } from '@/components/CookieBanner';
 import { Footer } from '@/components/footer';
@@ -58,7 +60,7 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="sq" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -82,23 +84,25 @@ export default function RootLayout({
       </head>
       <body className={cn('font-body antialiased')}>
         <FirebaseClientProvider>
-            <CurrencyProvider>
-              <CartProvider>
-                <WishlistProvider>
-                  <div className="relative flex min-h-screen flex-col">
-                    <Header />
-                    <main className="flex-1 pb-16 md:pb-0">{children}</main>
-                    <ChatbotWidget />
-                    <MobileNav />
-                    <ShoppingPreferenceModal />
-                    <DownloadAppBanner />
-                    <Footer />
-                  </div>
-                  <Toaster />
-                  <CookieBanner />
-                </WishlistProvider>
-              </CartProvider>
-            </CurrencyProvider>
+            <LanguageProvider>
+                <CurrencyProvider>
+                  <CartProvider>
+                    <WishlistProvider>
+                      <div className="relative flex min-h-screen flex-col">
+                        <Header />
+                        <main className="flex-1 pb-16 md:pb-0">{children}</main>
+                        <ChatbotWidget />
+                        <MobileNav />
+                        <ShoppingPreferenceModal />
+                        <DownloadAppBanner />
+                        <Footer />
+                      </div>
+                      <Toaster />
+                      <CookieBanner />
+                    </WishlistProvider>
+                  </CartProvider>
+                </CurrencyProvider>
+            </LanguageProvider>
         </FirebaseClientProvider>
       </body>
     </html>

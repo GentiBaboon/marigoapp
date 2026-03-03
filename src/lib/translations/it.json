@@ -1,0 +1,57 @@
+
+{
+  "common": {
+    "save": "Salva",
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "loading": "Caricamento...",
+    "error": "Si è verificato un errore",
+    "back": "Indietro",
+    "continue": "Continua",
+    "confirm": "Conferma",
+    "all": "Tutto"
+  },
+  "nav": {
+    "home": "Home",
+    "shop": "Negozio",
+    "sell": "Vendi",
+    "favorites": "Preferiti",
+    "me": "Profilo",
+    "womenswear": "Donna",
+    "menswear": "Uomo",
+    "bags": "Borse",
+    "shoes": "Scarpe",
+    "accessories": "Accessori"
+  },
+  "auth": {
+    "signIn": "Accedi",
+    "signUp": "Registrati",
+    "signOut": "Esci",
+    "welcome": "Bentornato",
+    "createAccount": "Crea un account"
+  },
+  "product": {
+    "condition": "Condizioni",
+    "size": "Taglia",
+    "addToBag": "Aggiungi al carrello",
+    "makeOffer": "Fai un'offerta",
+    "description": "Descrizione e dettagli",
+    "authenticity": "Autenticazione esperti",
+    "seller": "Venditore"
+  },
+  "sell": {
+    "title": "Vendi un articolo / Shit nje produkt",
+    "step1": "Foto",
+    "step2": "Categoria e Brand",
+    "step3": "Dettagli",
+    "step4": "Condizioni",
+    "step5": "Prezzo",
+    "publish": "Pubblica ora"
+  },
+  "categories": {
+    "clothing": "Abbigliamento (Veshje)",
+    "shoes": "Scarpe (Këpucë)",
+    "bags": "Borse (Çanta)",
+    "accessories": "Accessori (Aksesorë)"
+  }
+}

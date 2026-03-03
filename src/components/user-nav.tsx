@@ -29,11 +29,15 @@ import {
   Circle,
   CircleDot,
   ShoppingCart,
-  Bell
+  Bell,
+  Globe,
+  Coins
 } from 'lucide-react';
 import { useCurrency, type Currency } from '@/context/CurrencyContext';
+import { useTranslation, type Locale } from '@/context/LanguageContext';
 import { doc } from 'firebase/firestore';
 import type { FirestoreUser } from '@/lib/types';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 
 const getInitials = (name: string | null | undefined) => {
@@ -51,6 +55,7 @@ export function UserNav() {
   const firestore = useFirestore();
   const router = useRouter();
   const { currency, setCurrency } = useCurrency();
+  const { t } = useTranslation();
 
   const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: firestoreUser } = useDoc<FirestoreUser>(userRef);
@@ -66,9 +71,12 @@ export function UserNav() {
 
   if (!user) {
     return (
-      <Button asChild>
-        <Link href="/auth">Sign In</Link>
-      </Button>
+      <div className="flex items-center gap-2">
+        <LanguageSwitcher />
+        <Button asChild variant="outline" size="sm">
+            <Link href="/auth">{t('auth.signIn')}</Link>
+        </Button>
+      </div>
     );
   }
 
@@ -77,6 +85,10 @@ export function UserNav() {
 
   return (
     <div className="flex items-center gap-2">
+      <div className="hidden sm:block">
+        <LanguageSwitcher />
+      </div>
+      
       <Button asChild variant="ghost" size="icon" aria-label="Notifications">
         <Link href="/notifications">
           <Bell className="h-6 w-6" />
@@ -142,6 +154,14 @@ export function UserNav() {
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
 
+          <DropdownMenuGroup className="sm:hidden">
+             <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1.5">
+              Language
+            </DropdownMenuLabel>
+            <LanguageSwitcher />
+            <DropdownMenuSeparator />
+          </DropdownMenuGroup>
+
           <DropdownMenuGroup>
             <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1.5">
               Support
@@ -166,12 +186,13 @@ export function UserNav() {
           <DropdownMenuSeparator />
 
           <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider flex items-center px-2 py-1.5">
+            <Coins className="mr-2 h-3.5 w-3.5" />
             Currency
           </DropdownMenuLabel>
           <DropdownMenuRadioGroup value={currency} onValueChange={(value) => setCurrency(value as Currency)}>
-              <DropdownMenuRadioItem value="EUR">Euro (EUR)</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="USD">US Dollar (USD)</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="ALL">Albanian Lek (ALL)</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="EUR" className="cursor-pointer">Euro (EUR)</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="USD" className="cursor-pointer">US Dollar (USD)</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="ALL" className="cursor-pointer">Albanian Lek (ALL)</DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
           
         </DropdownMenuContent>
