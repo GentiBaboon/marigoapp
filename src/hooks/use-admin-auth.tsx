@@ -8,7 +8,11 @@ import { doc } from 'firebase/firestore';
 import type { FirestoreUser } from '@/lib/types';
 
 // Define a developer admin UIDs for testing purposes
-const DEV_ADMIN_UIDS = ['2C81RVoXZWZuSWXEEueehqbHkMu1', 'v521MWW9rmPYchVBc91DheeRU5j2'];
+const DEV_ADMIN_UIDS = [
+  '2C81RVoXZWZuSWXEEueehqbHkMu1', 
+  'v521MWW9rmPYchVBc91DheeRU5j2',
+  'GoNLAq0YYdQw70fDS5L1XbBqtow1'
+];
 
 export function useAdminAuth() {
   const { user, isUserLoading } = useUser();
