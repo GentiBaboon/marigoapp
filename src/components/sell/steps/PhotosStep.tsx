@@ -1,5 +1,6 @@
+
 'use client';
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
@@ -17,143 +18,123 @@ export function PhotosStep() {
   const storage = useStorage();
   const { user } = useUser();
   
-  // Use local state to manage parallel uploads without stale closures
   const [localImages, setLocalImages] = useState(formData.images || []);
-  const [uploadingIndices, setUploadingIndices] = useState<Set<number>>(new Set());
+  const [uploadingCount, setUploadingCount] = useState(0);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  // Keep global form data in sync with local images
+  // Sync with global context whenever local changes
   useEffect(() => {
     setFormData({ images: localImages });
   }, [localImages, setFormData]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (!user || !storage || !activeDraft) {
-      toast({ variant: "destructive", title: "Authentication required" });
+      toast({ variant: "destructive", title: "Autenticazione richiesta" });
       return;
     }
 
-    if (localImages.length + acceptedFiles.length > 8) {
-      toast({ variant: "destructive", title: "Max 8 photos allowed" });
+    const currentCount = localImages.length;
+    if (currentCount + acceptedFiles.length > 8) {
+      toast({ variant: "destructive", title: "Massimo 8 foto consentite" });
       return;
     }
 
-    const startIndex = localImages.length;
-    
-    // 1. Create temporary items with local blob URLs for immediate preview
+    // Add files to local state with immediate previews
     const newItems = acceptedFiles.map((file, i) => ({
       url: URL.createObjectURL(file),
       name: file.name,
       type: file.type,
-      position: startIndex + i,
-      isUploading: true
+      position: currentCount + i,
+      isUploading: true,
+      file // Keep original file for upload
     }));
 
     setLocalImages(prev => [...prev, ...newItems]);
-    setUploadingIndices(prev => {
-        const next = new Set(prev);
-        newItems.forEach(p => next.add(p.position));
-        return next;
-    });
+    setUploadingCount(prev => prev + newItems.length);
 
-    // 2. Start parallel uploads
-    acceptedFiles.forEach(async (file, index) => {
-        const targetIndex = startIndex + index;
-        try {
-            // Compress before upload
-            const options = {
-                maxSizeMB: 0.8,
-                maxWidthOrHeight: 1200,
-                useWebWorker: true,
-            };
-            const compressedBlob = await imageCompression(file, options);
+    // Process each file
+    for (const item of newItems) {
+      const { file, position, name } = item;
+      
+      try {
+        // 1. Compression
+        const options = {
+          maxSizeMB: 0.8,
+          maxWidthOrHeight: 1200,
+          useWebWorker: true,
+        };
+        const compressedBlob = await imageCompression(file as File, options);
 
-            const fileExtension = file.name.split('.').pop() || 'jpg';
-            const fileName = `img_${Date.now()}_${targetIndex}.${fileExtension}`;
-            const storagePath = `products/${user.uid}/${activeDraft.id}/${fileName}`;
-            const storageRef = ref(storage, storagePath);
-            
-            const uploadTask = uploadBytesResumable(storageRef, compressedBlob, {
-                contentType: file.type || 'image/jpeg'
-            });
+        // 2. Storage Setup
+        const fileExt = name.split('.').pop() || 'jpg';
+        const fileName = `img_${Date.now()}_${position}.${fileExt}`;
+        const storagePath = `products/${user.uid}/${activeDraft.id}/${fileName}`;
+        const storageRef = ref(storage, storagePath);
+        
+        // 3. Upload Task
+        const uploadTask = uploadBytesResumable(storageRef, compressedBlob, {
+          contentType: file.type || 'image/jpeg'
+        });
 
-            uploadTask.on('state_changed', 
-                null, 
-                (error) => {
-                    console.error("Upload error:", error);
-                    toast({ variant: "destructive", title: `Failed to upload ${file.name}` });
-                    setLocalImages(prev => prev.filter(img => img.position !== targetIndex));
-                    setUploadingIndices(prev => {
-                        const next = new Set(prev);
-                        next.delete(targetIndex);
-                        return next;
-                    });
-                }, 
-                async () => {
-                    const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                    
-                    // CRITICAL: Use functional update to avoid overwriting parallel updates
-                    setLocalImages(prev => prev.map(img => 
-                        img.position === targetIndex 
-                        ? { ...img, url: downloadUrl, isUploading: false } 
-                        : img
-                    ));
-
-                    setUploadingIndices(prev => {
-                        const next = new Set(prev);
-                        next.delete(targetIndex);
-                        return next;
-                    });
-                }
-            );
-        } catch (error) {
-            console.error("Image processing error:", error);
-            setLocalImages(prev => prev.filter(img => img.position !== targetIndex));
-            setUploadingIndices(prev => {
-                const next = new Set(prev);
-                next.delete(targetIndex);
-                return next;
-            });
-        }
-    });
-
+        uploadTask.on('state_changed', 
+          null, 
+          (error) => {
+            console.error("Upload error:", error);
+            toast({ variant: "destructive", title: `Errore caricamento: ${name}` });
+            setLocalImages(prev => prev.filter(img => img.position !== position));
+            setUploadingCount(prev => Math.max(0, prev - 1));
+          }, 
+          async () => {
+            try {
+              const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+              
+              setLocalImages(prev => prev.map(img => 
+                img.position === position 
+                ? { ...img, url: downloadUrl, isUploading: false } 
+                : img
+              ));
+            } catch (urlError) {
+              console.error("URL retrieval error:", urlError);
+              setLocalImages(prev => prev.filter(img => img.position !== position));
+            } finally {
+              setUploadingCount(prev => Math.max(0, prev - 1));
+            }
+          }
+        );
+      } catch (err) {
+        console.error("Pre-upload error:", err);
+        setLocalImages(prev => prev.filter(img => img.position !== position));
+        setUploadingCount(prev => Math.max(0, prev - 1));
+      }
+    }
   }, [localImages.length, user, storage, activeDraft, toast]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': ['.jpeg', '.jpg', '.png', '.webp'] },
     maxFiles: 8 - localImages.length,
-    disabled: uploadingIndices.size > 0
+    disabled: uploadingCount > 0
   });
 
   const removePhoto = (index: number) => {
     setLocalImages(prev => {
-        const next = [...prev];
-        next.splice(index, 1);
-        // Re-index positions
-        return next.map((img, i) => ({ ...img, position: i }));
+      const next = [...prev];
+      next.splice(index, 1);
+      return next.map((img, i) => ({ ...img, position: i }));
     });
   };
 
-  const removeBackground = async (index: number) => {
-    setProcessingId(`img-${index}`);
-    // Simulate background removal logic
-    await new Promise(r => setTimeout(r, 2000));
-    toast({ title: "Background removed ✨ (Demo)" });
-    setProcessingId(null);
-  };
-
-  const isAnythingUploading = uploadingIndices.size > 0;
+  const isAnythingUploading = uploadingCount > 0;
   const canContinue = localImages.length >= 3 && !isAnythingUploading;
 
   return (
     <div className="space-y-6">
       <div className="bg-muted/30 p-4 rounded-lg border border-dashed text-center">
-        <h3 className="font-semibold text-lg">Tips for great photos</h3>
+        <h3 className="font-semibold text-lg">Consigli per le foto</h3>
         <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-          <li>• Minimum 3 photos, maximum 8</li>
-          <li>• Use natural daylight</li>
-          <li>• Show any defects clearly</li>
+          <li>• Minimo 3 foto, massimo 8</li>
+          <li>• Usa luce naturale</li>
+          <li>• Mostra chiaramente eventuali difetti</li>
         </ul>
       </div>
 
@@ -167,8 +148,8 @@ export function PhotosStep() {
       >
         <input {...getInputProps()} />
         <Camera className="h-10 w-10 text-muted-foreground mb-2" />
-        <p className="font-medium">Drag & drop or click to upload</p>
-        <p className="text-xs text-muted-foreground mt-1">JPG, PNG or WEBP (Max 10MB)</p>
+        <p className="font-medium">Trascina o clicca per caricare</p>
+        <p className="text-xs text-muted-foreground mt-1">JPG, PNG o WEBP (Max 10MB)</p>
       </div>
 
       {localImages.length > 0 && (
@@ -184,33 +165,25 @@ export function PhotosStep() {
               />
               
               {img.isUploading && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  </div>
+                <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                  <Loader2 className="h-8 w-8 animate-spin text-white" />
+                </div>
               )}
 
               {!img.isUploading && (
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <button 
-                        type="button"
-                        className="bg-destructive text-destructive-foreground p-1.5 rounded-full hover:scale-110 transition-transform" 
-                        onClick={() => removePhoto(index)}
-                    >
-                        <X className="h-4 w-4" />
-                    </button>
-                    <button 
-                        type="button"
-                        className="bg-secondary text-secondary-foreground p-1.5 rounded-full hover:scale-110 transition-transform" 
-                        onClick={() => removeBackground(index)} 
-                        disabled={!!processingId}
-                    >
-                        {processingId === `img-${index}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    </button>
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <button 
+                    type="button"
+                    className="bg-destructive text-white p-2 rounded-full hover:scale-110 transition-transform" 
+                    onClick={() => removePhoto(index)}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
                 </div>
               )}
               
               {index === 0 && (
-                <div className="absolute bottom-0 left-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold py-0.5 text-center uppercase">Main Photo</div>
+                <div className="absolute bottom-0 left-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold py-0.5 text-center uppercase">Foto Principale</div>
               )}
             </div>
           ))}
@@ -224,8 +197,8 @@ export function PhotosStep() {
         onClick={nextStep}
       >
         {isAnythingUploading ? (
-            <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Uploading...</>
-        ) : 'Continue'}
+          <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Caricamento...</>
+        ) : 'Continua'}
       </Button>
     </div>
   );

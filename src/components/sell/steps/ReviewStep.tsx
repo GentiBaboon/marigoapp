@@ -22,7 +22,6 @@ export function ReviewStep() {
   const storage = useStorage();
   const { user } = useUser();
 
-  // Fetch addresses to show summary
   const addressesCollection = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return collection(firestore, 'users', user.uid, 'addresses');
@@ -32,90 +31,50 @@ export function ReviewStep() {
 
   const handlePublish = async () => {
     if (!user || !firestore || !storage) {
-        toast({ variant: "destructive", title: "Authentication required" });
+        toast({ variant: "destructive", title: "Autenticazione richiesta" });
         return;
     }
     
     setIsPublishing(true);
-    setUploadProgress(5);
+    setUploadProgress(10);
 
     try {
       const productId = activeDraft?.id || `prod_${Date.now()}`;
-      const finalImages: FirestoreProduct['images'] = [];
-
       const images = formData.images || [];
-      if (images.length === 0) throw new Error("No images to upload");
-
-      const imageProgress = new Array(images.length).fill(0);
-
-      const ensureUploaded = async (img: typeof images[0], index: number) => {
-        // If it's already a Firebase Storage URL, we just use it
-        if (img.url.includes('firebasestorage.googleapis.com')) {
-            imageProgress[index] = 100;
-            const totalLoaded = imageProgress.reduce((a, b) => a + b, 0);
-            setUploadProgress(5 + Math.round((totalLoaded / images.length) * 0.85));
-            return img.url;
-        }
-
-        try {
-            const response = await fetch(img.url);
-            let blob = await response.blob();
-            
-            // Optimized Compression for any remaining blob URLs
-            if (img.url.startsWith('blob:')) {
-                const options = {
-                    maxSizeMB: 0.8,
-                    maxWidthOrHeight: 1200,
-                    useWebWorker: true,
-                };
-                try {
-                    const compressedFile = await imageCompression(blob as File, options);
-                    blob = compressedFile;
-                } catch (error) {
-                    console.warn("Compression failed, uploading original", error);
-                }
-            }
-
-            const fileExtension = img.type?.split('/')[1] || 'jpg';
-            const fileName = `img_${Date.now()}_${index}.${fileExtension}`;
-            const storagePath = `products/${user.uid}/${productId}/${fileName}`;
-            const storageRef = ref(storage, storagePath);
-            
-            const uploadTask = uploadBytesResumable(storageRef, blob, {
-                contentType: img.type || 'image/jpeg'
-            });
-
-            return new Promise<string>((resolve, reject) => {
-                uploadTask.on('state_changed', 
-                    (snapshot) => {
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        imageProgress[index] = progress;
-                        const totalLoaded = imageProgress.reduce((a, b) => a + b, 0);
-                        const averageProgress = totalLoaded / images.length;
-                        setUploadProgress(5 + Math.round(averageProgress * 0.85));
-                    }, 
-                    (error) => reject(error), 
-                    async () => {
-                        const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                        resolve(downloadUrl);
-                    }
-                );
-            });
-        } catch (error) {
-            console.error("Image upload failed for index", index, error);
-            throw error;
-        }
-      };
-
-      const uploadedUrls = await Promise.all(images.map((img, i) => ensureUploaded(img, i)));
       
-      uploadedUrls.forEach((url, i) => {
-          finalImages.push({
-              url,
-              thumbnailUrl: url,
-              position: i
-          });
-      });
+      if (images.length === 0) throw new Error("Caricare almeno 3 foto");
+
+      // Verify all images are uploaded to Storage
+      const finalImages: FirestoreProduct['images'] = [];
+      
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        let finalUrl = img.url;
+
+        // If it's still a local blob (should not happen with new PhotosStep, but for safety)
+        if (img.url.startsWith('blob:')) {
+          const response = await fetch(img.url);
+          const blob = await response.blob();
+          const options = { maxSizeMB: 0.8, maxWidthOrHeight: 1200 };
+          const compressed = await imageCompression(blob as File, options);
+          
+          const fileExt = img.type?.split('/')[1] || 'jpg';
+          const fileName = `final_img_${Date.now()}_${i}.${fileExt}`;
+          const storagePath = `products/${user.uid}/${productId}/${fileName}`;
+          const storageRef = ref(storage, storagePath);
+          
+          await uploadBytesResumable(storageRef, compressed);
+          finalUrl = await getDownloadURL(storageRef);
+        }
+
+        finalImages.push({
+          url: finalUrl,
+          thumbnailUrl: finalUrl,
+          position: i
+        });
+        
+        setUploadProgress(10 + Math.round(((i + 1) / images.length) * 40));
+      }
 
       const productData: FirestoreProduct = {
         id: productId,
@@ -148,40 +107,30 @@ export function ReviewStep() {
 
       const productRef = doc(firestore, 'products', productId);
       
-      setDoc(productRef, productData)
-        .then(() => {
-            setUploadProgress(100);
-            toast({ title: "Listing Published!", variant: "success" });
-            nextStep();
-        })
-        .catch(async (error) => {
-            const permissionError = new FirestorePermissionError({
-                path: productRef.path,
-                operation: 'create',
-                requestResourceData: productData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-            setIsPublishing(false);
-        });
+      setUploadProgress(80);
+      
+      await setDoc(productRef, productData);
+      
+      setUploadProgress(100);
+      toast({ title: "Annuncio Pubblicato!", variant: "success" });
+      nextStep();
 
     } catch (e: any) {
       console.error("Publish error:", e);
       toast({ 
         variant: "destructive", 
-        title: "Error publishing listing", 
-        description: e.message || "Something went wrong during upload."
+        title: "Errore pubblicazione", 
+        description: e.message || "Qualcosa è andato storto."
       });
       setIsPublishing(false);
     }
   };
 
-  const brandName = formData.brandId || 'Designer Item';
-
   return (
     <div className="space-y-8 pb-20">
       <div className="text-center">
-        <h2 className="text-2xl font-bold">Almost there!</h2>
-        <p className="text-muted-foreground">Review your listing details before going live.</p>
+        <h2 className="text-2xl font-bold">Quasi fatto!</h2>
+        <p className="text-muted-foreground">Controlla i dettagli del tuo annuncio prima di andare online.</p>
       </div>
 
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden border bg-muted shadow-sm">
@@ -195,14 +144,14 @@ export function ReviewStep() {
             />
         )}
         <Button variant="secondary" size="sm" className="absolute bottom-4 right-4" onClick={() => goToStep(1)}>
-          <Edit2 className="h-4 w-4 mr-2" /> Edit Photos
+          <Edit2 className="h-4 w-4 mr-2" /> Modifica Foto
         </Button>
       </div>
 
       {isPublishing && (
           <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-primary">
-                  <span>Finalizing listing...</span>
+                  <span>Pubblicazione in corso...</span>
                   <span>{uploadProgress}%</span>
               </div>
               <Progress value={uploadProgress} className="h-2" />
@@ -212,7 +161,7 @@ export function ReviewStep() {
       <div className="space-y-6">
         <section className="space-y-2">
           <div className="flex justify-between items-center">
-            <h3 className="font-bold text-2xl uppercase tracking-tighter">{brandName}</h3>
+            <h3 className="font-bold text-2xl uppercase tracking-tighter">{formData.brandId || 'Designer'}</h3>
             <span className="text-2xl font-bold">€{formData.price}</span>
           </div>
           <p className="text-muted-foreground text-lg">{formData.title}</p>
@@ -225,7 +174,7 @@ export function ReviewStep() {
         {selectedAddress && (
             <section className="p-4 bg-primary/5 rounded-xl border border-primary/10">
                 <h4 className="font-bold text-xs uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
-                    <MapPin className="h-3 w-3" /> Shipping From
+                    <MapPin className="h-3 w-3" /> Spedizione da
                 </h4>
                 <p className="text-sm font-semibold">{selectedAddress.fullName}</p>
                 <p className="text-xs text-muted-foreground">{selectedAddress.address}, {selectedAddress.city}</p>
@@ -233,7 +182,7 @@ export function ReviewStep() {
         )}
 
         <section className="p-4 bg-muted/20 rounded-xl border">
-          <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground mb-2">Description</h4>
+          <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground mb-2">Descrizione</h4>
           <p className="text-sm leading-relaxed text-foreground/80 line-clamp-4">{formData.description}</p>
         </section>
       </div>
@@ -241,13 +190,13 @@ export function ReviewStep() {
       <div className="flex flex-col gap-3 pt-4">
         <Button className="w-full h-14 text-lg font-bold bg-black text-white hover:bg-black/90" size="lg" onClick={handlePublish} disabled={isPublishing}>
           {isPublishing ? (
-              <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Publishing...</>
+              <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Elaborazione...</>
           ) : (
-              <><Upload className="h-5 w-5 mr-2" /> Publish Now</>
+              <><Upload className="h-5 w-5 mr-2" /> Pubblica Ora</>
           )}
         </Button>
         <Button variant="outline" className="w-full h-14 text-lg font-medium" size="lg" disabled={isPublishing} onClick={() => goToStep(0)}>
-          Save as Draft
+          Salva Bozza
         </Button>
       </div>
     </div>

@@ -13,14 +13,21 @@ service firebase.storage {
     }
     
     function isAdmin() {
-      return isSignedIn() && (request.auth.token.admin == true || request.auth.uid == '2C81RVoXZWZuSWXEEueehqbHkMu1');
+      return isSignedIn() && (
+        request.auth.token.admin == true || 
+        request.auth.uid in [
+          '2C81RVoXZWZuSWXEEueehqbHkMu1', 
+          'v521MWW9rmPYchVBc91DheeRU5j2',
+          'GoNLAq0YYdQw70fDS5L1XbBqtow1',
+          '4qTAOIovwdWYGCnqYPiPCJqNcdP2',
+          'jBbMqpl6zKeZ9skDW3ux0iBMJRB2'
+        ]
+      );
     }
 
     function isValidImage() {
       return request.resource.size < 10 * 1024 * 1024
-          && (request.resource.contentType.matches('image/jpeg') 
-              || request.resource.contentType.matches('image/png') 
-              || request.resource.contentType.matches('image/webp'));
+          && (request.resource.contentType.matches('image/.*'));
     }
 
     match /users/{userId}/{allPaths=**} {
