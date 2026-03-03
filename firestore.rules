@@ -85,6 +85,67 @@ service cloud.firestore {
       allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+    }
+
+    match /conversations/{conversationId} {
+      allow read: if isSignedIn() && (request.auth.uid in resource.data.participants || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (request.auth.uid in resource.data.participants || isAdmin());
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && (request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants || isAdmin());
+        allow create: if isSignedIn() && (request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants);
+      }
+    }
+
+    match /support_chats/{chatId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && (get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid || isAdmin());
+        allow create: if isSignedIn();
+      }
+    }
+
+    match /coupons/{couponId} {
+      allow read: if isSignedIn();
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /brands/{brandId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /admin_logs/{logId} {
+      allow read: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+    }
+
+    match /courier_profiles/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
     match /config/exchangeRates {
       allow read: if true;
     }
