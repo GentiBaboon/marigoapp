@@ -68,17 +68,10 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
         const intentResult: any = await createPaymentIntent({
             items: items.map(i => ({ id: i.id, sellerId: i.sellerId, title: i.title })),
             shippingAddress,
-            paymentMethodId: savedMethodId // Corrected variable name from selectedPaymentMethodId
+            paymentMethodId: savedMethodId
         });
 
-        const { clientSecret, orderId, requiresAction } = intentResult.data;
-
-        if (requiresAction) {
-            const actionResult = await stripe.handleCardAction(clientSecret);
-            if (actionResult.error) {
-                throw new Error(actionResult.error.message);
-            }
-        }
+        const { clientSecret, orderId } = intentResult.data;
 
         let confirmResult;
         if (paymentMethod === 'card' && elements) {
@@ -92,6 +85,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
                 },
             });
         } else {
+            // For saved cards
             confirmResult = await stripe.confirmCardPayment(clientSecret);
         }
 

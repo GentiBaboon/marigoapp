@@ -2,7 +2,6 @@
 import * as admin from "firebase-admin";
 import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
-import {onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
@@ -132,7 +131,7 @@ export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY
 export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minInstances: 1}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
   
-  const {items, shippingAddress} = request.data;
+  const {items, shippingAddress, paymentMethodId} = request.data;
   const stripe = getStripe();
   const buyerId = request.auth.uid;
 
@@ -148,33 +147,76 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
       subtotal += pSnap.data()?.price;
     }
 
-    const totalInCents = Math.round((subtotal + 5.00) * 100);
+    const shippingFee = 10.90; // Align with CartContext
+    const totalInCents = Math.round((subtotal + shippingFee) * 100);
     const commission = Math.round(totalInCents * 0.15);
 
-    const pi = await stripe.paymentIntents.create({
+    const piOptions: Stripe.PaymentIntentCreateParams = {
       amount: totalInCents,
       currency: "eur",
       capture_method: "manual",
-      transfer_data: sellerData?.stripeAccountId ? { 
-          destination: sellerData.stripeAccountId,
-          amount: totalInCents - commission 
-      } : undefined,
       metadata: { buyerId, sellerId }
-    });
+    };
+
+    if (paymentMethodId) {
+        piOptions.payment_method = paymentMethodId;
+    }
+
+    const pi = await stripe.paymentIntents.create(piOptions);
 
     const orderRef = await db.collection("orders").add({
       orderNumber: `MG-${Date.now()}`,
       buyerId,
       sellerIds: [sellerId],
       items,
-      totalAmount: subtotal + 5.00,
+      totalAmount: subtotal + shippingFee,
       status: "pending_payment",
       paymentIntentId: pi.id,
+      paymentMethod: 'card',
       shippingAddress,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     return {clientSecret: pi.client_secret, orderId: orderRef.id};
+  } catch (error: any) {
+    throw new HttpsError("internal", error.message);
+  }
+});
+
+/**
+ * Creates a standard order (e.g. for Cash on Delivery)
+ */
+export const createOrder = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
+  
+  const {items, shippingAddress, paymentMethod} = request.data;
+  const buyerId = request.auth.uid;
+
+  try {
+    let subtotal = 0;
+    const sellerIds = new Set<string>();
+    
+    for (const item of items) {
+      const pSnap = await db.collection("products").doc(item.id).get();
+      if (!pSnap.exists || pSnap.data()?.status !== 'active') throw new HttpsError("failed-precondition", "Item unavailable.");
+      subtotal += pSnap.data()?.price;
+      sellerIds.add(pSnap.data()?.sellerId);
+    }
+
+    const shippingFee = 10.90;
+    const orderRef = await db.collection("orders").add({
+      orderNumber: `MG-${Date.now()}`,
+      buyerId,
+      sellerIds: Array.from(sellerIds),
+      items,
+      totalAmount: subtotal + shippingFee,
+      status: paymentMethod === 'cod' ? 'processing' : 'pending_payment',
+      paymentMethod,
+      shippingAddress,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {orderId: orderRef.id};
   } catch (error: any) {
     throw new HttpsError("internal", error.message);
   }
