@@ -1,6 +1,5 @@
-
 'use client';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { Camera, X, Sparkles, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { useStorage, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useStorage, useUser } from '@/firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import imageCompression from 'browser-image-compression';
 
@@ -17,8 +16,16 @@ export function PhotosStep() {
   const { toast } = useToast();
   const storage = useStorage();
   const { user } = useUser();
+  
+  // Use local state to manage parallel uploads without stale closures
+  const [localImages, setLocalImages] = useState(formData.images || []);
   const [uploadingIndices, setUploadingIndices] = useState<Set<number>>(new Set());
   const [processingId, setProcessingId] = useState<string | null>(null);
+
+  // Keep global form data in sync with local images
+  useEffect(() => {
+    setFormData({ images: localImages });
+  }, [localImages, setFormData]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (!user || !storage || !activeDraft) {
@@ -26,37 +33,34 @@ export function PhotosStep() {
       return;
     }
 
-    const currentImages = formData.images || [];
-    if (currentImages.length + acceptedFiles.length > 8) {
+    if (localImages.length + acceptedFiles.length > 8) {
       toast({ variant: "destructive", title: "Max 8 photos allowed" });
       return;
     }
 
-    // Prepare placeholders
-    const startIndex = currentImages.length;
-    const newPlaceholders = acceptedFiles.map((file, i) => ({
-      url: URL.createObjectURL(file), // Local preview initially
+    const startIndex = localImages.length;
+    
+    // 1. Create temporary items with local blob URLs for immediate preview
+    const newItems = acceptedFiles.map((file, i) => ({
+      url: URL.createObjectURL(file),
       name: file.name,
       type: file.type,
       position: startIndex + i,
       isUploading: true
     }));
 
-    const updatedImages = [...currentImages, ...newPlaceholders];
-    setFormData({ images: updatedImages });
-    
-    // Set indices as uploading
+    setLocalImages(prev => [...prev, ...newItems]);
     setUploadingIndices(prev => {
         const next = new Set(prev);
-        newPlaceholders.forEach(p => next.add(p.position));
+        newItems.forEach(p => next.add(p.position));
         return next;
     });
 
-    // Upload each file
+    // 2. Start parallel uploads
     acceptedFiles.forEach(async (file, index) => {
         const targetIndex = startIndex + index;
         try {
-            // 1. Compress
+            // Compress before upload
             const options = {
                 maxSizeMB: 0.8,
                 maxWidthOrHeight: 1200,
@@ -64,7 +68,6 @@ export function PhotosStep() {
             };
             const compressedBlob = await imageCompression(file, options);
 
-            // 2. Upload to draft folder
             const fileExtension = file.name.split('.').pop() || 'jpg';
             const fileName = `img_${Date.now()}_${targetIndex}.${fileExtension}`;
             const storagePath = `products/${user.uid}/${activeDraft.id}/${fileName}`;
@@ -77,8 +80,9 @@ export function PhotosStep() {
             uploadTask.on('state_changed', 
                 null, 
                 (error) => {
-                    console.error("Upload error", error);
-                    toast({ variant: "destructive", title: "Upload failed" });
+                    console.error("Upload error:", error);
+                    toast({ variant: "destructive", title: `Failed to upload ${file.name}` });
+                    setLocalImages(prev => prev.filter(img => img.position !== targetIndex));
                     setUploadingIndices(prev => {
                         const next = new Set(prev);
                         next.delete(targetIndex);
@@ -88,14 +92,12 @@ export function PhotosStep() {
                 async () => {
                     const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
                     
-                    // Update the image in the form data with the real URL
-                    setFormData({
-                        images: (formData.images || []).map(img => 
-                            img.position === targetIndex 
-                            ? { ...img, url: downloadUrl, isUploading: false } 
-                            : img
-                        )
-                    });
+                    // CRITICAL: Use functional update to avoid overwriting parallel updates
+                    setLocalImages(prev => prev.map(img => 
+                        img.position === targetIndex 
+                        ? { ...img, url: downloadUrl, isUploading: false } 
+                        : img
+                    ));
 
                     setUploadingIndices(prev => {
                         const next = new Set(prev);
@@ -105,34 +107,44 @@ export function PhotosStep() {
                 }
             );
         } catch (error) {
-            console.error("Compression/Upload loop error", error);
+            console.error("Image processing error:", error);
+            setLocalImages(prev => prev.filter(img => img.position !== targetIndex));
+            setUploadingIndices(prev => {
+                const next = new Set(prev);
+                next.delete(targetIndex);
+                return next;
+            });
         }
     });
 
-  }, [formData.images, setFormData, toast, user, storage, activeDraft]);
+  }, [localImages.length, user, storage, activeDraft, toast]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': ['.jpeg', '.jpg', '.png', '.webp'] },
-    maxFiles: 8
+    maxFiles: 8 - localImages.length,
+    disabled: uploadingIndices.size > 0
   });
 
   const removePhoto = (index: number) => {
-    const newImages = [...(formData.images || [])];
-    newImages.splice(index, 1);
-    const indexedImages = newImages.map((img, i) => ({ ...img, position: i }));
-    setFormData({ images: indexedImages });
+    setLocalImages(prev => {
+        const next = [...prev];
+        next.splice(index, 1);
+        // Re-index positions
+        return next.map((img, i) => ({ ...img, position: i }));
+    });
   };
 
   const removeBackground = async (index: number) => {
     setProcessingId(`img-${index}`);
+    // Simulate background removal logic
     await new Promise(r => setTimeout(r, 2000));
     toast({ title: "Background removed ✨ (Demo)" });
     setProcessingId(null);
   };
 
   const isAnythingUploading = uploadingIndices.size > 0;
-  const canContinue = (formData.images?.length || 0) >= 3 && !isAnythingUploading;
+  const canContinue = localImages.length >= 3 && !isAnythingUploading;
 
   return (
     <div className="space-y-6">
@@ -149,7 +161,8 @@ export function PhotosStep() {
         {...getRootProps()}
         className={cn(
           "aspect-video border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors",
-          isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+          isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
+          isAnythingUploading && "opacity-50 cursor-not-allowed"
         )}
       >
         <input {...getInputProps()} />
@@ -158,9 +171,9 @@ export function PhotosStep() {
         <p className="text-xs text-muted-foreground mt-1">JPG, PNG or WEBP (Max 10MB)</p>
       </div>
 
-      {formData.images && formData.images.length > 0 && (
+      {localImages.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
-          {formData.images.map((img, index) => (
+          {localImages.map((img, index) => (
             <div key={index} className="relative aspect-square rounded-lg overflow-hidden border bg-muted group">
               <Image 
                 src={img.url} 
@@ -204,7 +217,12 @@ export function PhotosStep() {
         </div>
       )}
 
-      <Button className="w-full h-14 text-lg" size="lg" disabled={!canContinue} onClick={nextStep}>
+      <Button 
+        className="w-full h-14 text-lg font-bold" 
+        size="lg" 
+        disabled={!canContinue} 
+        onClick={nextStep}
+      >
         {isAnythingUploading ? (
             <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Uploading...</>
         ) : 'Continue'}
