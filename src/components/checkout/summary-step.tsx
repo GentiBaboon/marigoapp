@@ -1,4 +1,3 @@
-
 'use client';
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,7 +23,7 @@ type SummaryStepProps = {
 export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedMethodId }: SummaryStepProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const { items, grandTotal, clearCart } = useCart();
+  const { items, grandTotal, discountAmount, appliedCoupon, clearCart } = useCart();
   const { user } = useUser();
   const firestore = useFirestore();
   const [isLoading, setIsLoading] = useState(false);
@@ -41,15 +40,19 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
     setIsLoading(true);
     setErrorMessage(null);
 
+    const orderPayload = {
+        items: items.map(i => ({ id: i.id, sellerId: i.sellerId, title: i.title, price: i.price })),
+        shippingAddress,
+        paymentMethod: paymentMethod === 'cod' ? 'cod' : 'card',
+        couponCode: appliedCoupon?.code || null,
+        discountAmount: discountAmount || 0,
+    };
+
     // 1. Handle Cash on Delivery
     if (paymentMethod === 'cod') {
         try {
             const createOrder = httpsCallable(functions, 'createOrder');
-            const result: any = await createOrder({
-                items: items.map(i => ({ id: i.id, sellerId: i.sellerId, title: i.title, price: i.price })),
-                shippingAddress,
-                paymentMethod: 'cod'
-            });
+            const result: any = await createOrder(orderPayload);
             clearCart();
             router.push(`/checkout/success/${result.data.orderId}`);
             return;
@@ -66,8 +69,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
     try {
         const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
         const intentResult: any = await createPaymentIntent({
-            items: items.map(i => ({ id: i.id, sellerId: i.sellerId, title: i.title })),
-            shippingAddress,
+            ...orderPayload,
             paymentMethodId: savedMethodId
         });
 

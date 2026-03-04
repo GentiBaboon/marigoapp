@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -8,14 +8,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { useCart } from '@/context/CartContext';
-import { ShoppingBag, Trash2, Heart, ArrowRight, Loader2 } from 'lucide-react';
+import { ShoppingBag, Trash2, Heart, ArrowRight, Loader2, Tag, X } from 'lucide-react';
 import { useCurrency } from '@/context/CurrencyContext';
 import { useWishlist } from '@/context/WishlistContext';
+import { useToast } from '@/hooks/use-toast';
 
 export default function CartPage() {
-    const { items, removeFromCart, updateQuantity, subtotal, totalShipping, grandTotal, isLoading } = useCart();
+    const { items, removeFromCart, updateQuantity, subtotal, totalShipping, grandTotal, appliedCoupon, discountAmount, applyCoupon, removeCoupon, isLoading } = useCart();
     const { formatPrice } = useCurrency();
     const { addToWishlist } = useWishlist();
+    const { toast } = useToast();
+    const [couponCode, setCouponCode] = useState('');
+    const [isApplying, setIsApplying] = useState(false);
 
     if (isLoading) {
         return (
@@ -43,6 +47,19 @@ export default function CartPage() {
     const handleMoveToWishlist = (item: any) => {
         addToWishlist(item.id);
         removeFromCart(item.id);
+    };
+
+    const handleApplyCoupon = async () => {
+        if (!couponCode.trim()) return;
+        setIsApplying(true);
+        const result = await applyCoupon(couponCode);
+        if (result.success) {
+            toast({ title: result.message });
+            setCouponCode('');
+        } else {
+            toast({ variant: 'destructive', title: result.message });
+        }
+        setIsApplying(false);
     };
 
     return (
@@ -132,19 +149,53 @@ export default function CartPage() {
                             <h2 className="text-xl font-bold font-headline">Order Summary</h2>
                             
                             <div className="space-y-4">
-                                <div className="flex items-center gap-2">
-                                    <Input placeholder="Promo code" className="rounded-full" />
-                                    <Button variant="outline" className="rounded-full px-6">Apply</Button>
-                                </div>
+                                {appliedCoupon ? (
+                                    <div className="flex items-center justify-between bg-primary/5 p-3 rounded-xl border border-primary/20">
+                                        <div className="flex items-center gap-2">
+                                            <Tag className="h-4 w-4 text-primary" />
+                                            <span className="font-bold text-sm uppercase">{appliedCoupon.code}</span>
+                                        </div>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" onClick={removeCoupon}>
+                                            <X className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <Input 
+                                            placeholder="Promo code" 
+                                            className="rounded-full" 
+                                            value={couponCode} 
+                                            onChange={(e) => setCouponCode(e.target.value)} 
+                                        />
+                                        <Button 
+                                            variant="outline" 
+                                            className="rounded-full px-6" 
+                                            onClick={handleApplyCoupon}
+                                            disabled={isApplying || !couponCode.trim()}
+                                        >
+                                            {isApplying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                                        </Button>
+                                    </div>
+                                )}
                                 <Separator />
                                 <div className="space-y-2 text-sm">
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Subtotal</span>
                                         <span className="font-medium">{formatPrice(subtotal)}</span>
                                     </div>
+                                    {discountAmount > 0 && (
+                                        <div className="flex justify-between text-green-600 font-medium">
+                                            <span>Discount</span>
+                                            <span>-{formatPrice(discountAmount)}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Shipping (Direct)</span>
-                                        <span className="font-medium">{formatPrice(totalShipping)}</span>
+                                        <span className="font-medium">
+                                            {totalShipping === 0 ? (
+                                                <span className="text-green-600 font-bold uppercase tracking-tight">Free</span>
+                                            ) : formatPrice(totalShipping)}
+                                        </span>
                                     </div>
                                 </div>
                                 <Separator />
