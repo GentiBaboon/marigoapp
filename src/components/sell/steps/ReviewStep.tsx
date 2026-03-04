@@ -2,7 +2,7 @@
 'use client';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
-import { Edit2, Loader2, Upload, MapPin } from 'lucide-react';
+import { Edit2, Loader2, Upload, MapPin, AlertCircle } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -13,11 +13,13 @@ import { Progress } from '@/components/ui/progress';
 import type { FirestoreProduct, FirestoreAddress } from '@/lib/types';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import imageCompression from 'browser-image-compression';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export function ReviewStep() {
   const { formData, goToStep, nextStep, activeDraft } = useSellForm();
   const [isPublishing, setIsPublishing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const firestore = useFirestore();
   const storage = useStorage();
@@ -38,6 +40,7 @@ export function ReviewStep() {
     }
     
     setIsPublishing(true);
+    setError(null);
     setUploadProgress(5);
 
     try {
@@ -48,28 +51,35 @@ export function ReviewStep() {
 
       const finalImages: { url: string; thumbnailUrl: string; position: number }[] = [];
       
-      // PROCESS AND UPLOAD EACH IMAGE
+      // Sequential upload for stability
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
         let finalUrl = img.url;
 
-        // If it's a local blob or has a file object, we MUST upload it now
-        if (img.url.startsWith('blob:') || (img as any).file) {
+        // Determine if we need to upload
+        const isLocal = img.url.startsWith('blob:') || img.url.startsWith('data:');
+        const fileObject = (img as any).file;
+
+        if (isLocal || fileObject) {
           let fileToUpload: File | Blob;
           
           try {
-            if ((img as any).file) {
-              fileToUpload = (img as any).file;
+            // Priority 1: Use the actual File object if available (most stable)
+            if (fileObject instanceof File || fileObject instanceof Blob) {
+              fileToUpload = fileObject;
             } else {
+              // Priority 2: Try to fetch the blob URL
               const response = await fetch(img.url);
-              if (!response.ok) throw new Error("Failed to fetch local image data");
+              if (!response.ok) throw new Error("Local image data has expired. Please re-upload photos.");
               fileToUpload = await response.blob();
             }
             
-            // Compression
-            const options = { maxSizeMB: 0.8, maxWidthOrHeight: 1200, useWebWorker: true };
+            // Step A: Compression
+            setUploadProgress(prev => Math.max(prev, 5 + (i * (90 / images.length))));
+            const options = { maxSizeMB: 0.7, maxWidthOrHeight: 1280, useWebWorker: true };
             const compressed = await imageCompression(fileToUpload as File, options);
             
+            // Step B: Upload to Storage
             const fileExt = img.type?.split('/')[1] || 'jpg';
             const fileName = `img_${Date.now()}_${i}.${fileExt}`;
             const storagePath = `products/${user.uid}/${productId}/${fileName}`;
@@ -79,30 +89,24 @@ export function ReviewStep() {
               contentType: img.type || 'image/jpeg'
             });
 
-            // Wait for upload to complete
             await new Promise((resolve, reject) => {
               uploadTask.on('state_changed', 
                 (snapshot) => {
-                  const totalBytes = snapshot.totalBytes || 1;
-                  const bytesTransferred = snapshot.bytesTransferred || 0;
-                  const stepProgress = (bytesTransferred / totalBytes) * (80 / images.length);
+                  const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * (80 / images.length);
                   setUploadProgress(prev => {
-                      const nextVal = 5 + (i * (80 / images.length)) + stepProgress;
-                      return Math.min(85, Math.max(prev, nextVal));
+                      const base = 5 + (i * (80 / images.length));
+                      return Math.min(90, Math.max(prev, base + progress));
                   });
                 },
-                (error) => {
-                  console.error("Upload task error:", error);
-                  reject(error);
-                },
+                (error) => reject(error),
                 () => resolve(null)
               );
             });
 
             finalUrl = await getDownloadURL(storageRef);
-          } catch (imgError) {
+          } catch (imgError: any) {
             console.error(`Error processing image ${i}:`, imgError);
-            throw new Error(`Failed to upload image ${i + 1}. Please try again.`);
+            throw new Error(imgError.message || `Failed to process image ${i + 1}.`);
           }
         }
 
@@ -113,8 +117,9 @@ export function ReviewStep() {
         });
       }
 
-      setUploadProgress(90);
+      setUploadProgress(95);
 
+      // Final Firestore Document
       const productData: FirestoreProduct = {
         id: productId,
         sellerId: user.uid,
@@ -154,11 +159,7 @@ export function ReviewStep() {
 
     } catch (e: any) {
       console.error("Publish error:", e);
-      toast({ 
-        variant: "destructive", 
-        title: "Publication Error", 
-        description: e.message || "Could not complete the upload process."
-      });
+      setError(e.message || "An unexpected error occurred while publishing.");
       setIsPublishing(false);
       setUploadProgress(0);
     }
@@ -171,6 +172,13 @@ export function ReviewStep() {
         <p className="text-muted-foreground">Check your listing before publishing.</p>
       </div>
 
+      {error && (
+          <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+          </Alert>
+      )}
+
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden border bg-muted shadow-sm">
         {formData.images?.[0] && (
             <Image 
@@ -181,7 +189,7 @@ export function ReviewStep() {
                 unoptimized={formData.images[0].url.startsWith('blob:')}
             />
         )}
-        <Button variant="secondary" size="sm" className="absolute bottom-4 right-4" onClick={() => goToStep(1)}>
+        <Button variant="secondary" size="sm" className="absolute bottom-4 right-4" onClick={() => goToStep(1)} disabled={isPublishing}>
           <Edit2 className="h-4 w-4 mr-2" /> Change Photos
         </Button>
       </div>
@@ -191,12 +199,12 @@ export function ReviewStep() {
               <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-primary">
                   <span className="flex items-center gap-2">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    Uploading images...
+                    Processing & Uploading...
                   </span>
                   <span>{Math.round(uploadProgress)}%</span>
               </div>
               <Progress value={uploadProgress} className="h-2" />
-              <p className="text-[10px] text-center text-muted-foreground uppercase">Do not close this page</p>
+              <p className="text-[10px] text-center text-muted-foreground uppercase">Please wait while we secure your listing</p>
           </div>
       )}
 
