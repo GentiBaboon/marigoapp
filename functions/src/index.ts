@@ -96,7 +96,7 @@ export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
   const stripe = getStripe();
   const uid = request.auth.uid;
-  const appUrl = process.env.APP_URL || "http://localhost:9002";
+  const appUrl = process.env.APP_URL || "https://studio--marigoappcom-v10-6377709-d8775.us-central1.hosted.app";
 
   try {
     const userDoc = await db.collection("users").doc(uid).get();
@@ -271,6 +271,65 @@ export const createOrder = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (reque
   } catch (error: any) {
     logger.error("createOrder error", error);
     if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", error.message);
+  }
+});
+
+/**
+ * Gets the balance of a connected Stripe account
+ */
+export const getSellerBalance = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
+  const stripe = getStripe();
+  const uid = request.auth.uid;
+
+  try {
+    const userDoc = await db.collection("users").doc(uid).get();
+    const accountId = userDoc.data()?.stripeAccountId;
+
+    if (!accountId) return { available: 0, pending: 0 };
+
+    const balance = await stripe.balance.retrieve({
+      stripeAccount: accountId,
+    });
+
+    const available = balance.available.reduce((sum, b) => sum + b.amount, 0) / 100;
+    const pending = balance.pending.reduce((sum, b) => sum + b.amount, 0) / 100;
+
+    return { available, pending };
+  } catch (error: any) {
+    logger.error("getSellerBalance error", error);
+    throw new HttpsError("internal", error.message);
+  }
+});
+
+/**
+ * Initiates a payout for a connected Stripe account
+ */
+export const requestPayout = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
+  const stripe = getStripe();
+  const uid = request.auth.uid;
+
+  try {
+    const userDoc = await db.collection("users").doc(uid).get();
+    const accountId = userDoc.data()?.stripeAccountId;
+
+    if (!accountId) throw new HttpsError("failed-precondition", "No Stripe account found.");
+
+    const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
+    const amount = balance.available.find(b => b.currency === 'eur')?.amount || 0;
+
+    if (amount <= 0) throw new HttpsError("failed-precondition", "Insufficient available balance.");
+
+    const payout = await stripe.payouts.create({
+      amount,
+      currency: 'eur',
+    }, { stripeAccount: accountId });
+
+    return { success: true, payoutId: payout.id };
+  } catch (error: any) {
+    logger.error("requestPayout error", error);
     throw new HttpsError("internal", error.message);
   }
 });

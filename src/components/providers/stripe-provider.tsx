@@ -1,3 +1,4 @@
+
 'use client';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
@@ -8,7 +9,7 @@ import { AlertCircle } from 'lucide-react';
 const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
 // Initialize Stripe outside of the component to avoid re-creation
-const stripePromise = publishableKey ? loadStripe(publishableKey) : null;
+const stripePromise = publishableKey && publishableKey !== 'pk_test_your_key_here' ? loadStripe(publishableKey) : null;
 
 export function StripeProvider({ children }: { children: ReactNode }) {
     const [isMounted, setIsMounted] = useState(false);
@@ -28,7 +29,7 @@ export function StripeProvider({ children }: { children: ReactNode }) {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Stripe Configuration Missing</AlertTitle>
                     <AlertDescription>
-                        The Stripe Publishable Key is not configured. Please add <code>NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code> to your <code>.env</code> file.
+                        The Stripe Publishable Key is not configured correctly in your environment. Please ensure <code>NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code> is set in your project settings.
                     </AlertDescription>
                 </Alert>
                 <div className="mt-4 opacity-50 pointer-events-none">
