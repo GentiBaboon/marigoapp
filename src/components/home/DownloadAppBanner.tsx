@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Star, X } from 'lucide-react';
 import { MarigoVIcon } from '../icons/MarigoVIcon';
@@ -54,6 +54,9 @@ export function DownloadAppBanner() {
         className="h-auto rounded-t-lg border-t-0 bg-background shadow-2xl p-4 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom"
         hideClose // Hide the default close button
       >
+        <SheetHeader className="sr-only">
+          <SheetTitle>Download Marigo App</SheetTitle>
+        </SheetHeader>
         <div className="relative">
           <Button
             variant="ghost"
