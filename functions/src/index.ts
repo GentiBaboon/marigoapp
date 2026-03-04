@@ -126,37 +126,86 @@ export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY
 });
 
 /**
+ * Helper to calculate final order amounts securely on the server
+ */
+async function calculateOrderTotal(items: any[], couponCode?: string) {
+    let subtotal = 0;
+    const sellerIds = new Set<string>();
+    
+    for (const item of items) {
+        const pSnap = await db.collection("products").doc(item.id).get();
+        if (!pSnap.exists || pSnap.data()?.status !== 'active') {
+            throw new HttpsError("failed-precondition", `Item ${item.title} is no longer available.`);
+        }
+        const pData = pSnap.data();
+        subtotal += pData?.price || 0;
+        if (pData?.sellerId) sellerIds.add(pData.sellerId);
+    }
+
+    // Check Promotions
+    const settingsSnap = await db.collection("settings").doc("global").get();
+    const settings = settingsSnap.data();
+    let shippingFee = 10.90;
+    if (settings?.isFreeDeliveryActive && subtotal >= (settings?.freeDeliveryThreshold || 0)) {
+        shippingFee = 0;
+    }
+
+    // Apply Coupon
+    let discount = 0;
+    if (couponCode) {
+        const cSnap = await db.collection("coupons").where("code", "==", couponCode.toUpperCase()).limit(1).get();
+        if (!cSnap.empty) {
+            const coupon = cSnap.docs[0].data();
+            if (coupon.isActive && subtotal >= (coupon.minOrderValue || 0)) {
+                if (coupon.type === 'percentage') {
+                    discount = (subtotal * coupon.value) / 100;
+                } else {
+                    discount = coupon.value;
+                }
+            }
+        }
+    }
+
+    const total = Math.max(0, subtotal + shippingFee - discount);
+    
+    return {
+        subtotal,
+        shippingFee,
+        discount,
+        total,
+        sellerIds: Array.from(sellerIds)
+    };
+}
+
+/**
  * Creates PaymentIntent with manual capture for Escrow
  */
 export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minInstances: 1}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
   
-  const {items, shippingAddress, paymentMethodId} = request.data;
+  const {items, shippingAddress, paymentMethodId, couponCode} = request.data;
   const stripe = getStripe();
   const buyerId = request.auth.uid;
 
   try {
-    const sellerId = items[0].sellerId;
-    const sellerSnap = await db.collection("users").doc(sellerId).get();
-    const sellerData = sellerSnap.data();
+    const { total, sellerIds, discount } = await calculateOrderTotal(items, couponCode);
+    const totalInCents = Math.round(total * 100);
 
-    let subtotal = 0;
-    for (const item of items) {
-      const pSnap = await db.collection("products").doc(item.id).get();
-      if (!pSnap.exists || pSnap.data()?.status !== 'active') throw new HttpsError("failed-precondition", "Item unavailable.");
-      subtotal += pSnap.data()?.price;
-    }
-
-    const shippingFee = 10.90; // Align with CartContext
-    const totalInCents = Math.round((subtotal + shippingFee) * 100);
-    const commission = Math.round(totalInCents * 0.15);
+    // Get Buyer's Stripe Customer ID if they have one
+    const buyerSnap = await db.collection("users").doc(buyerId).get();
+    const customerId = buyerSnap.data()?.stripeCustomerId;
 
     const piOptions: Stripe.PaymentIntentCreateParams = {
       amount: totalInCents,
       currency: "eur",
       capture_method: "manual",
-      metadata: { buyerId, sellerId }
+      metadata: { buyerId, sellerIds: sellerIds.join(',') },
+      description: `Order for ${items.length} items from Marigo Luxe`
     };
+
+    if (customerId) {
+        piOptions.customer = customerId;
+    }
 
     if (paymentMethodId) {
         piOptions.payment_method = paymentMethodId;
@@ -167,9 +216,11 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
     const orderRef = await db.collection("orders").add({
       orderNumber: `MG-${Date.now()}`,
       buyerId,
-      sellerIds: [sellerId],
+      sellerIds,
       items,
-      totalAmount: subtotal + shippingFee,
+      totalAmount: total,
+      discountAmount: discount,
+      couponCode: couponCode || null,
       status: "pending_payment",
       paymentIntentId: pi.id,
       paymentMethod: 'card',
@@ -179,6 +230,8 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
 
     return {clientSecret: pi.client_secret, orderId: orderRef.id};
   } catch (error: any) {
+    logger.error("createPaymentIntent error", error);
+    if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", error.message);
   }
 });
@@ -189,27 +242,20 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
 export const createOrder = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
   
-  const {items, shippingAddress, paymentMethod} = request.data;
+  const {items, shippingAddress, paymentMethod, couponCode} = request.data;
   const buyerId = request.auth.uid;
 
   try {
-    let subtotal = 0;
-    const sellerIds = new Set<string>();
-    
-    for (const item of items) {
-      const pSnap = await db.collection("products").doc(item.id).get();
-      if (!pSnap.exists || pSnap.data()?.status !== 'active') throw new HttpsError("failed-precondition", "Item unavailable.");
-      subtotal += pSnap.data()?.price;
-      sellerIds.add(pSnap.data()?.sellerId);
-    }
+    const { total, sellerIds, discount } = await calculateOrderTotal(items, couponCode);
 
-    const shippingFee = 10.90;
     const orderRef = await db.collection("orders").add({
       orderNumber: `MG-${Date.now()}`,
       buyerId,
-      sellerIds: Array.from(sellerIds),
+      sellerIds,
       items,
-      totalAmount: subtotal + shippingFee,
+      totalAmount: total,
+      discountAmount: discount,
+      couponCode: couponCode || null,
       status: paymentMethod === 'cod' ? 'processing' : 'pending_payment',
       paymentMethod,
       shippingAddress,
@@ -218,6 +264,8 @@ export const createOrder = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (reque
 
     return {orderId: orderRef.id};
   } catch (error: any) {
+    logger.error("createOrder error", error);
+    if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", error.message);
   }
 });

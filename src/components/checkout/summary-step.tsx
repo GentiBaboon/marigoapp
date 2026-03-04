@@ -1,3 +1,4 @@
+
 'use client';
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -48,25 +49,23 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
         discountAmount: discountAmount || 0,
     };
 
-    // 1. Handle Cash on Delivery
-    if (paymentMethod === 'cod') {
-        try {
+    try {
+        // 1. Handle Cash on Delivery
+        if (paymentMethod === 'cod') {
             const createOrder = httpsCallable(functions, 'createOrder');
             const result: any = await createOrder(orderPayload);
             clearCart();
             router.push(`/checkout/success/${result.data.orderId}`);
             return;
-        } catch (e: any) {
-            setErrorMessage(e.message || "Could not process COD order.");
+        }
+
+        // 2. Handle Card Payments (New or Saved)
+        if (!stripe) {
+            setErrorMessage("Payment service not initialized.");
             setIsLoading(false);
             return;
         }
-    }
 
-    // 2. Handle Card Payments (New or Saved)
-    if (!stripe) return;
-
-    try {
         const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
         const intentResult: any = await createPaymentIntent({
             ...orderPayload,
@@ -87,7 +86,7 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
                 },
             });
         } else {
-            // For saved cards
+            // For saved cards (paymentMethodId was already attached on server)
             confirmResult = await stripe.confirmCardPayment(clientSecret);
         }
 
@@ -99,12 +98,12 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
                 toast({ title: "Order Placed!", description: "Funds held in escrow successfully." });
                 router.push(`/checkout/success/${orderId}`);
             } else {
-                setErrorMessage(`Unexpected status: ${confirmResult.paymentIntent.status}`);
+                setErrorMessage(`Unexpected payment status: ${confirmResult.paymentIntent.status}`);
             }
         }
     } catch (error: any) {
-        console.error("Payment error:", error);
-        setErrorMessage(error.message || "An unexpected error occurred during payment.");
+        console.error("Checkout error:", error);
+        setErrorMessage(error.message || "An unexpected error occurred during checkout. Please try again.");
     } finally {
         setIsLoading(false);
     }
@@ -188,12 +187,12 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
             size="lg"
             className="w-full h-16 rounded-full text-lg font-bold shadow-xl shadow-primary/30"
             onClick={handleFinaliseOrder}
-            disabled={isLoading || !stripe}
+            disabled={isLoading}
           >
             {isLoading ? (
                 <div className="flex items-center gap-3">
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>Processing...</span>
+                    <span>Processing Order...</span>
                 </div>
             ) : (
                 `Pay Now — ${formatPrice(grandTotal)}`
