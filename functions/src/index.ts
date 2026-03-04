@@ -12,8 +12,8 @@ const db = admin.firestore();
 
 const getStripe = () => {
   const key = process.env.STRIPE_SECRET_KEY || "";
-  if (!key) {
-    throw new HttpsError("failed-precondition", "STRIPE_SECRET_KEY missing on server.");
+  if (!key || key === "sk_test_your_key_here") {
+    throw new HttpsError("failed-precondition", "STRIPE_SECRET_KEY is not configured on the server. Please use 'firebase functions:secrets:set STRIPE_SECRET_KEY'.");
   }
   return new Stripe(key, {
     apiVersion: "2024-06-20",
@@ -96,6 +96,7 @@ export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
   const stripe = getStripe();
   const uid = request.auth.uid;
+  const appUrl = process.env.APP_URL || "http://localhost:9002";
 
   try {
     const userDoc = await db.collection("users").doc(uid).get();
@@ -105,7 +106,10 @@ export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY
       const account = await stripe.accounts.create({
         type: "express",
         email: request.auth.token.email,
-        capabilities: { card_payments: {requested: true}, transfers: {requested: true} },
+        capabilities: { 
+            card_payments: {requested: true}, 
+            transfers: {requested: true} 
+        },
         metadata: { userId: uid }
       });
       accountId = account.id;
@@ -114,13 +118,14 @@ export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY
 
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: `${process.env.APP_URL}/profile/stripe-onboarding`,
-      return_url: `${process.env.APP_URL}/profile`,
+      refresh_url: `${appUrl}/profile/stripe-onboarding`,
+      return_url: `${appUrl}/profile`,
       type: "account_onboarding",
     });
 
     return {url: accountLink.url};
   } catch (error: any) {
+    logger.error("createStripeConnectedAccount error", error);
     throw new HttpsError("internal", error.message);
   }
 });
@@ -199,7 +204,7 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
       amount: totalInCents,
       currency: "eur",
       capture_method: "manual",
-      metadata: { buyerId, sellerIds: sellerIds.join(',') },
+      metadata: { buyerId, sellerIds: sellerIds.join(','), orderNumber: `MG-${Date.now()}` },
       description: `Order for ${items.length} items from Marigo Luxe`
     };
 
@@ -214,7 +219,7 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
     const pi = await stripe.paymentIntents.create(piOptions);
 
     const orderRef = await db.collection("orders").add({
-      orderNumber: `MG-${Date.now()}`,
+      orderNumber: pi.metadata.orderNumber,
       buyerId,
       sellerIds,
       items,
