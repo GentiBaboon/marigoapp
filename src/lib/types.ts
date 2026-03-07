@@ -1,4 +1,3 @@
-
 'use client';
 import { z } from "zod";
 import { Timestamp, FieldValue } from "firebase/firestore";
@@ -22,6 +21,11 @@ export const signupSchema = z.object({
   }),
 });
 export type SignupValues = z.infer<typeof signupSchema>;
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address." }),
+});
+export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
 export interface FirestoreUser {
   id: string;
@@ -47,6 +51,8 @@ export interface FirestoreUser {
     productUpdates: boolean;
     orderUpdates: boolean;
   };
+  isCourier?: boolean;
+  courierStatus?: 'pending_approval' | 'approved' | 'rejected';
 }
 
 // --- Products ---
@@ -138,6 +144,31 @@ export const editProfileSchema = z.object({
 export type EditProfileValues = z.infer<typeof editProfileSchema>;
 
 // --- Sell Flow State ---
+export const sellStep2Schema = z.object({
+  gender: z.enum(["women", "men", "children", "unisex"]),
+  categoryId: z.string().min(1, "Category is required"),
+  subcategoryId: z.string().min(1, "Subcategory is required"),
+  brandId: z.string().min(1, "Brand is required"),
+});
+
+export const sellStep3Schema = z.object({
+  title: z.string().min(5, "Title must be at least 5 characters"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  origin: z.string().optional(),
+  yearOfPurchase: z.string().min(1, "Year is required"),
+  serialNumber: z.string().optional(),
+  packaging: z.array(z.string()).optional(),
+});
+
+export const sellStep4Schema = z.object({
+  condition: z.string().min(1, "Condition is required"),
+  material: z.string().min(1, "Material is required"),
+  color: z.string().min(1, "Color is required"),
+  sizeValue: z.string().optional(),
+  pattern: z.string().optional(),
+  vintage: z.boolean().default(false),
+});
+
 export interface SellFormValues {
   images: Array<{ url: string; file?: File; position: number; name: string; type: string }>;
   gender: "women" | "men" | "children" | "unisex";
@@ -171,7 +202,57 @@ export interface SellDraft {
   lastModified: number;
 }
 
-// --- Admin ---
+// --- Courier & Logistics ---
+export const courierApplicationSchema = z.object({
+  legalName: z.string().min(2, "Full name is required"),
+  dob: z.date({ required_error: "Date of birth is required" }),
+  phone: z.string().min(6, "Phone is required"),
+  vehicleType: z.enum(["bicycle", "scooter", "car", "van"], { required_error: "Vehicle type is required" }),
+  licensePlate: z.string().min(2, "License plate is required"),
+  serviceAreas: z.string().min(2, "Service areas are required"),
+  availability: z.array(z.string()).min(1, "Select at least one day"),
+});
+export type CourierApplicationValues = z.infer<typeof courierApplicationSchema>;
+
+export interface FirestoreCourierProfile {
+  id: string;
+  userId: string;
+  legalName: string;
+  dob: string;
+  phone: string;
+  vehicleType: "bicycle" | "scooter" | "car" | "van";
+  licensePlate: string;
+  serviceAreas: string;
+  availability: string[];
+  isAvailable: boolean;
+  rating?: number;
+  deliveriesCount?: number;
+}
+
+export interface FirestoreDelivery {
+  id: string;
+  orderId: string;
+  courierId?: string;
+  status: 'pending_assignment' | 'assigned' | 'arrived_for_pickup' | 'picked_up' | 'in_transit' | 'arrived_for_delivery' | 'delivered' | 'cancelled';
+  packageSize: 'small' | 'medium' | 'large';
+  deliveryFee: number;
+  distance?: number;
+  timeEstimate?: number;
+  addresses: {
+    pickup: AddressFormValues;
+    delivery: AddressFormValues;
+  };
+  history?: Array<{
+    status: string;
+    timestamp: FirestoreTimestamp;
+  }>;
+  specialInstructions?: string;
+  proofOfPickup?: string;
+  pickupSignature?: string;
+  pickupNotes?: string;
+}
+
+// --- Admin & Metadata ---
 export interface FirestoreAdminLog {
   id: string;
   adminId: string;
@@ -214,4 +295,67 @@ export interface FirestoreCoupon {
   usedCount: number;
   createdAt: FirestoreTimestamp;
   updatedAt: FirestoreTimestamp;
+}
+
+export interface FirestoreSettings {
+  isFreeDeliveryActive: boolean;
+  freeDeliveryThreshold: number;
+}
+
+// --- Messaging ---
+export interface FirestoreConversation {
+  id: string;
+  participants: string[];
+  participantDetails: Array<{ userId: string; name: string; avatar?: string }>;
+  productId: string;
+  productTitle: string;
+  productImage: string;
+  lastMessage: string;
+  lastMessageAt: FirestoreTimestamp;
+  unreadCount: Record<string, number>;
+}
+
+export interface FirestoreMessage {
+  id: string;
+  senderId: string;
+  content: string;
+  createdAt: FirestoreTimestamp;
+  read: boolean;
+}
+
+// --- Reviews & Notifications ---
+export interface FirestoreReview {
+  id: string;
+  orderId: string;
+  productId: string;
+  reviewerId: string;
+  revieweeId: string;
+  rating: number;
+  content: string;
+  createdAt: FirestoreTimestamp;
+}
+
+export interface FirestoreNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'offer_received' | 'item_sold' | 'new_message' | 'order_update' | 'review_received' | 'welcome' | 'listing_suggestion' | 'default';
+  read: boolean;
+  createdAt: FirestoreTimestamp;
+  data?: {
+    link?: string;
+    imageUrl?: string;
+    [key: string]: any;
+  };
+}
+
+export interface FirestoreReport {
+  id: string;
+  type: 'product' | 'user' | 'message' | 'review';
+  itemId: string;
+  reporterId: string;
+  reason: string;
+  status: 'pending' | 'resolved';
+  createdAt: FirestoreTimestamp;
 }
