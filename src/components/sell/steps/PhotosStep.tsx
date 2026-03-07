@@ -39,6 +39,8 @@ export function PhotosStep() {
     })) || []
   );
 
+  const MAX_PHOTOS = 15;
+
   const onDrop = useCallback(
     (acceptedFiles: File[], rejectedFiles: any[]) => {
       if (rejectedFiles.length > 0) {
@@ -49,7 +51,25 @@ export function PhotosStep() {
         });
       }
 
-      acceptedFiles.forEach(async (file) => {
+      const remainingSlots = MAX_PHOTOS - imageFiles.length;
+      if (remainingSlots <= 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Maximum reached',
+          description: `You can upload a maximum of ${MAX_PHOTOS} photos.`,
+        });
+        return;
+      }
+
+      const filesToProcess = acceptedFiles.slice(0, remainingSlots);
+      if (filesToProcess.length < acceptedFiles.length) {
+        toast({
+          title: 'Limit applied',
+          description: `Only ${filesToProcess.length} of ${acceptedFiles.length} photos were added to stay within the ${MAX_PHOTOS} photo limit.`,
+        });
+      }
+
+      filesToProcess.forEach(async (file) => {
           const fileId = `${file.name}-${Date.now()}`;
           const tempUrl = URL.createObjectURL(file);
 
@@ -69,12 +89,13 @@ export function PhotosStep() {
           }
       });
     },
-    [toast]
+    [toast, imageFiles.length]
   );
-  
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': [] },
+    disabled: imageFiles.length >= MAX_PHOTOS,
   });
 
   const removeFile = (idToRemove: string) => {

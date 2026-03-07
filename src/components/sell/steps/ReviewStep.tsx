@@ -90,7 +90,7 @@ export function ReviewStep() {
         status: 'pending_review' as const,
         images: [],
         listingCreated: serverTimestamp(),
-        // Optional fields that are not required by the strict rule
+        ...(formData.gender && { gender: formData.gender }),
         ...(formData.subCategory && { subCategory: formData.subCategory }),
         ...(formData.sizeValue && { size: `${formData.sizeValue} ${formData.sizeStandard || ''}`.trim() }),
         ...(formData.pattern && { pattern: formData.pattern }),
@@ -99,6 +99,7 @@ export function ReviewStep() {
           ...(formData.title || '').toLowerCase().split(' '),
           ...(formData.brand || '').toLowerCase().split(' '),
           ...(formData.category || '').toLowerCase().split(' '),
+          ...(formData.gender || '').toLowerCase().split(' '),
         ].filter(Boolean))),
       };
 
@@ -152,8 +153,8 @@ export function ReviewStep() {
         let imageUrls: string[] = [];
         if (formData.images && formData.images.length > 0) {
             const storage = getStorage(firebaseApp);
-            const uploadPromises = formData.images.map(imageFile => {
-              const storageRef = ref(storage, `products/${formData.productId}/${Date.now()}-${imageFile.name}`);
+            const uploadPromises = formData.images.map((imageFile, index) => {
+              const storageRef = ref(storage, `products/${formData.productId}/${Date.now()}-${index}-${imageFile.name}`);
               return uploadString(storageRef, imageFile.url, 'data_url').then(snapshot => getDownloadURL(snapshot.ref));
             });
             imageUrls = await Promise.all(uploadPromises);

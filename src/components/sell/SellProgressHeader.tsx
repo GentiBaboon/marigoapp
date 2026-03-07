@@ -2,16 +2,20 @@
 import { useSellForm } from './SellFormContext';
 import { cn } from '@/lib/utils';
 import { Check } from 'lucide-react';
-import { categories } from '@/lib/mock-data';
+import { productCategories } from '@/lib/mock-data';
 
 export function SellProgressHeader() {
   const { formData, currentStep, totalSteps } = useSellForm();
-  
+
   const visualSteps = Array.from({ length: 6 }, (_, i) => i + 1);
 
   const getCategoryName = (slug: string | undefined) => {
     if (!slug) return '';
-    return categories.find(c => c.slug === slug)?.name || '';
+    for (const mainCategory of productCategories) {
+      const sub = mainCategory.subcategories.find(s => s.slug === slug);
+      if (sub) return sub.name;
+    }
+    return slug;
   }
 
   const getGenderName = (gender: string | undefined) => {
@@ -32,7 +36,7 @@ export function SellProgressHeader() {
     <div className="text-center space-y-4">
         <div>
             <h2 className="font-semibold text-lg">{formData.brand}</h2>
-            <p className="text-muted-foreground">{`${getGenderName(formData.gender)}, ${formData.category}`}</p>
+            <p className="text-muted-foreground">{`${getGenderName(formData.gender)}, ${getCategoryName(formData.category)}`}</p>
         </div>
         <div className="flex justify-center items-center gap-4">
             {visualSteps.map(step => {

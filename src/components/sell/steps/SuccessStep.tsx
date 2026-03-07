@@ -1,11 +1,12 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Sprout } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import Image from 'next/image';
 import { Separator } from '@/components/ui/separator';
+import type { SellFormValues } from '@/lib/types';
 
 const GreenCheckIcon = () => (
     <div className="h-12 w-12 rounded-full bg-green-500 flex items-center justify-center">
@@ -16,15 +17,20 @@ const GreenCheckIcon = () => (
 
 export function SuccessStep() {
     const { formData, deleteActiveDraft } = useSellForm();
+    // Snapshot the form data on mount before the draft gets deleted
+    const savedData = useRef<Partial<SellFormValues>>(formData);
 
     useEffect(() => {
-        // This will now delete the completed draft from localStorage
+        // Delete the completed draft from localStorage after data is captured in ref
         deleteActiveDraft();
     }, [deleteActiveDraft]);
 
+    // Use the snapshotted data so the UI doesn't go blank after draft deletion
+    const data = savedData.current;
+
     const currencyFormatter = (value: number | undefined) => {
         if (value === undefined) return '';
-        const currency = formData.currency || 'EUR';
+        const currency = data.currency || 'EUR';
         let locale = 'en-US';
         if (currency === 'EUR') locale = 'de-DE';
         if (currency === 'ALL') locale = 'sq-AL';
@@ -32,14 +38,12 @@ export function SuccessStep() {
         try {
             return new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
         } catch(e) {
-            // Fallback for unsupported currency in some environments
             return `${currency} ${value}`;
         }
     }
-    
-    // In a real app this would be calculated based on the order. Hardcoding based on image for now.
+
     const buyerServiceFee = 6;
-    const title = formData.title;
+    const title = data.title;
 
     return (
         <div className="flex flex-col items-center text-center space-y-6">
@@ -55,9 +59,9 @@ export function SuccessStep() {
 
             <div className="flex items-center gap-4 w-full text-left">
                 <div className="relative h-20 w-20 flex-shrink-0 bg-muted rounded-md">
-                    {formData.images && formData.images.length > 0 ? (
+                    {data.images && data.images.length > 0 ? (
                         <Image
-                            src={formData.images[0].url}
+                            src={data.images[0].url}
                             alt={title || 'Submitted item'}
                             fill
                             sizes="80px"
@@ -68,9 +72,9 @@ export function SuccessStep() {
                     )}
                 </div>
                 <div className="flex-1">
-                    <p className="font-semibold uppercase text-muted-foreground text-sm">{formData.brand || 'NON SIGNÉ / UNSIGNED'}</p>
+                    <p className="font-semibold uppercase text-muted-foreground text-sm">{data.brand || 'NON SIGNÉ / UNSIGNED'}</p>
                     <p className="font-medium">{title || 'Cloth handbag'}</p>
-                    <p className="font-semibold">{currencyFormatter(formData.price)} (You earn {currencyFormatter(formData.sellerEarning)})</p>
+                    <p className="font-semibold">{currencyFormatter(data.price)} (You earn {currencyFormatter(data.sellerEarning)})</p>
                     <p className="text-sm text-muted-foreground">Buyer service fee not included ({currencyFormatter(buyerServiceFee)})</p>
                 </div>
             </div>
@@ -86,7 +90,7 @@ export function SuccessStep() {
                     <p className="text-sm">82% of items sold with us replace a new purchase.</p>
                  </div>
             </div>
-            
+
             <div className="flex w-full gap-4 pt-4">
                 <Button asChild variant="outline" className="w-full" size="lg">
                     <Link href="/profile/listings">View your listings</Link>
@@ -98,5 +102,3 @@ export function SuccessStep() {
         </div>
     );
 }
-
-    

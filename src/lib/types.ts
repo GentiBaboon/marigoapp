@@ -102,7 +102,7 @@ export const imageFileSchema = z.object({
 export type ImageFile = z.infer<typeof imageFileSchema>;
 
 export const proofFileSchema = z.object({
-  url: z.string(),
+  preview: z.string(),
   name: z.string(),
   type: z.string(),
 });
@@ -161,10 +161,11 @@ export const sellFormSchema = sellStep1Schema
   .merge(sellStep5Schema)
   .merge(sellStep6Schema);
 
-export type SellFormValues = z.infer<typeof sellFormSchema> & { 
-    sellerEarning?: number; 
-    currency?: 'EUR';
+export type SellFormValues = z.infer<typeof sellFormSchema> & {
+    sellerEarning?: number;
+    currency?: 'EUR' | 'ALL';
     productId?: string;
+    subCategory?: string;
 };
 
 export interface SellDraft {
