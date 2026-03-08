@@ -11,20 +11,19 @@ import {
   serverTimestamp, 
   Query, 
   DocumentData,
-  CollectionReference,
   updateDoc
 } from 'firebase/firestore';
 import type { FirestoreProduct, ProductStatus } from '@/lib/types';
 
 /**
  * Service Layer for Product Operations
- * This abstracts Firestore details from the components.
+ * Centralizes all Firestore logic for product management.
  */
 export class ProductService {
   private static collectionName = 'products';
 
   /**
-   * Returns a query for active products, ordered by creation date.
+   * Returns a query for active products, ordered by listing date.
    */
   static getActiveProductsQuery(db: Firestore, limitCount = 50): Query<DocumentData> {
     return query(
@@ -69,6 +68,7 @@ export class ProductService {
 
   /**
    * Publishes a new product to Firestore.
+   * Uses serverTimestamp for reliability.
    */
   static async publishProduct(db: Firestore, productData: Partial<FirestoreProduct>): Promise<void> {
     if (!productData.id) throw new Error("Product ID is required for publishing.");
@@ -80,19 +80,25 @@ export class ProductService {
       ...productData,
       createdAt: now,
       updatedAt: now,
-      listingCreated: now,
+      listingCreated: now, // Important for feed ordering
       views: 0,
       wishlistCount: 0,
       isFeatured: false,
       isAuthenticated: false,
+      status: productData.status || 'active',
     };
 
-    // Use setDoc to create the item. If it's a draft ID, it overwrites it.
-    await setDoc(productRef, finalData);
+    // Attempt atomic write
+    try {
+        await setDoc(productRef, finalData);
+    } catch (error: any) {
+        console.error("Firestore Publish Error:", error);
+        throw new Error(error.message || "Failed to create product listing in database.");
+    }
   }
 
   /**
-   * Updates an existing product's status.
+   * Updates an existing product's status (e.g., Sold, Removed).
    */
   static async updateStatus(db: Firestore, productId: string, status: ProductStatus): Promise<void> {
     const productRef = doc(db, this.collectionName, productId);
