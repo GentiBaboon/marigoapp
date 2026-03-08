@@ -1,21 +1,34 @@
 'use client';
+
+import * as React from 'react';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Edit2, Loader2, MapPin, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { 
+    Edit2, 
+    Loader2, 
+    MapPin, 
+    AlertCircle, 
+    CheckCircle2, 
+    Package, 
+    Tag,
+    ChevronRight,
+    Camera
+} from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useStorage, useMemoFirebase } from '@/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Progress } from '@/components/ui/progress';
 import { ProductService } from '@/services/product.service';
 import { validateListingData, notifyNewListing } from '@/app/sell/actions';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { collection } from 'firebase/firestore';
 import { useCollection } from '@/firebase';
 import type { FirestoreAddress, FirestoreProduct } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useCurrency } from '@/context/CurrencyContext';
 
 export function ReviewStep() {
   const { formData, goToStep, nextStep, activeDraft } = useSellForm();
@@ -28,6 +41,7 @@ export function ReviewStep() {
   const firestore = useFirestore();
   const storage = useStorage();
   const { user } = useUser();
+  const { formatPrice } = useCurrency();
 
   const addressesCollection = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -37,19 +51,37 @@ export function ReviewStep() {
   const { data: addresses } = useCollection<FirestoreAddress>(addressesCollection);
   const selectedAddress = addresses?.find(a => a.id === formData.shippingFromAddressId);
 
-  const resolveImageBlob = async (img: any): Promise<Blob> => {
-    // Priority 1: Raw File object from memory
+  /**
+   * Resolves an image URL or File object into a Blob.
+   * Includes retry logic and timeout to handle unstable browser blob URLs.
+   */
+  const resolveImageBlob = async (img: any, retries = 2): Promise<Blob> => {
     if (img.file instanceof Blob) return img.file;
-    
-    // Priority 2: Fetch from local Blob URL if file is missing (backup)
-    try {
-      const response = await fetch(img.url);
-      if (!response.ok) throw new Error("Local blob fetch failed");
-      return await response.blob();
-    } catch (e) {
-      console.error("Failed to resolve image blob:", e);
-      throw new Error(`Photo ${img.position + 1} is no longer available. Please go back and re-upload.`);
+
+    const attemptFetch = async (): Promise<Blob> => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+        try {
+            const response = await fetch(img.url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.blob();
+        } catch (e) {
+            clearTimeout(timeoutId);
+            throw e;
+        }
+    };
+
+    for (let i = 0; i <= retries; i++) {
+        try {
+            return await attemptFetch();
+        } catch (e) {
+            if (i === retries) throw e;
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential-ish backoff
+        }
     }
+    throw new Error("Failed to resolve image data.");
   };
 
   const handlePublish = async () => {
@@ -61,15 +93,15 @@ export function ReviewStep() {
     setIsPublishing(true);
     setError(null);
     setUploadProgress(0);
-    setStatusMessage('Validating listing...');
+    setStatusMessage('Validating details...');
 
     try {
       const productId = activeDraft?.id || `prod_${Date.now()}`;
       const images = formData.images || [];
       
-      if (images.length === 0) throw new Error("At least one photo is required.");
+      if (images.length === 0) throw new Error("At least one photo is required to publish.");
 
-      // 1. Server-Side Validation via Action
+      // 1. Server-Side Validation
       const validation = await validateListingData({
           productId,
           sellerId: user.uid,
@@ -80,42 +112,50 @@ export function ReviewStep() {
 
       if (!validation.success) {
           const firstError = Object.values(validation.errors || {})[0];
-          throw new Error(Array.isArray(firstError) ? firstError[0] : "Listing details are invalid.");
+          throw new Error(Array.isArray(firstError) ? firstError[0] : "One or more fields are invalid.");
       }
 
       const finalImages = [];
       
-      // 2. Sequential Uploads
+      // 2. Sequential reliable uploads
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
-        const stepBase = (i / images.length) * 80;
+        const progressBase = (i / images.length) * 85;
         
-        setStatusMessage(`Preparing photo ${i + 1}...`);
-        setUploadProgress(stepBase + 5);
+        setStatusMessage(`Preparing photo ${i + 1} of ${images.length}...`);
+        setUploadProgress(progressBase + 2);
         
-        const blob = await resolveImageBlob(img);
-        
-        const fileExt = img.type?.split('/')[1] || 'jpg';
-        const fileName = `img_${Date.now()}_${i}.${fileExt}`;
-        const storagePath = `products/${user.uid}/${productId}/${fileName}`;
-        const storageRef = ref(storage, storagePath);
-        
-        const metadata = {
-            contentType: img.type || 'image/jpeg',
-            customMetadata: { originalName: img.name || 'listing_image' }
-        };
+        try {
+            const blob = await resolveImageBlob(img);
+            
+            const fileExt = img.type?.split('/')[1] || 'jpg';
+            const fileName = `img_${Date.now()}_${i}.${fileExt}`;
+            const storagePath = `products/${user.uid}/${productId}/${fileName}`;
+            const storageRef = ref(storage, storagePath);
+            
+            const metadata = {
+                contentType: img.type || 'image/jpeg',
+                customMetadata: { 
+                    originalName: img.name || 'listing_image',
+                    position: i.toString()
+                }
+            };
 
-        setStatusMessage(`Uploading photo ${i + 1} of ${images.length}...`);
-        await uploadBytes(storageRef, blob, metadata);
-        const downloadUrl = await getDownloadURL(storageRef);
+            setStatusMessage(`Uploading photo ${i + 1}...`);
+            await uploadBytes(storageRef, blob, metadata);
+            const downloadUrl = await getDownloadURL(storageRef);
 
-        finalImages.push({ url: downloadUrl, position: i });
-        setUploadProgress(stepBase + (80 / images.length));
+            finalImages.push({ url: downloadUrl, position: i });
+            setUploadProgress(progressBase + (85 / images.length));
+        } catch (imgErr) {
+            console.error(`Failed at image ${i}:`, imgErr);
+            throw new Error(`Photo ${i + 1} could not be uploaded. Please try re-uploading your photos.`);
+        }
       }
 
-      // 3. Firestore Finalization
+      // 3. Final Firestore Creation
       setStatusMessage('Creating your listing...');
-      setUploadProgress(90);
+      setUploadProgress(95);
 
       const productData: Partial<FirestoreProduct> = {
         id: productId,
@@ -142,17 +182,18 @@ export function ReviewStep() {
 
       await ProductService.publishProduct(firestore, productData);
       
-      // Trigger background tasks (non-blocking)
+      // Trigger background notification (Non-blocking)
       notifyNewListing(productData.title!, user.displayName || "A member").catch(console.warn);
 
       setUploadProgress(100);
-      setStatusMessage('Success!');
+      setStatusMessage('Listing live!');
       
-      setTimeout(() => nextStep(), 800);
+      // Short delay for user to see success state
+      setTimeout(() => nextStep(), 1000);
 
     } catch (e: any) {
-      console.error("Publishing Failed:", e);
-      setError(e.message || "An unexpected error occurred during publishing.");
+      console.error("Publishing Error:", e);
+      setError(e.message || "An unexpected error occurred while publishing your item.");
       setIsPublishing(false);
       setUploadProgress(0);
       setStatusMessage('');
@@ -160,54 +201,61 @@ export function ReviewStep() {
   };
 
   return (
-    <div className="space-y-8 pb-24 animate-in fade-in duration-500">
+    <div className="space-y-8 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-bold font-headline tracking-tight">Review Listing</h2>
-        <p className="text-muted-foreground text-sm">Review your details before going live.</p>
+        <p className="text-muted-foreground text-sm">One last look before your item goes live.</p>
       </div>
 
       {error && (
-          <Alert variant="destructive" className="border-destructive/50 bg-destructive/5 shadow-sm">
+          <Alert variant="destructive" className="border-destructive/50 bg-destructive/5">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Upload Interrupted</AlertTitle>
-              <AlertDescription className="mt-2 text-xs leading-relaxed">
+              <AlertTitle>Action Required</AlertTitle>
+              <AlertDescription className="mt-2 text-xs">
                   {error}
               </AlertDescription>
           </Alert>
       )}
 
-      {/* Main Preview */}
-      <div className="relative aspect-[3/4] rounded-2xl overflow-hidden border-2 bg-muted shadow-lg group">
+      {/* Main Preview Card */}
+      <div className="relative aspect-[3/4] rounded-2xl overflow-hidden border shadow-xl bg-muted group">
         {formData.images?.[0] ? (
             <Image 
                 src={formData.images[0].url} 
                 alt="Product preview" 
                 fill 
-                className="object-cover transition-transform duration-500 group-hover:scale-105" 
+                className="object-cover transition-transform duration-700 group-hover:scale-105" 
                 unoptimized={formData.images[0].url.startsWith('blob:')}
             />
         ) : (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                <AlertCircle className="h-8 w-8 mb-2 opacity-20" />
-                <p className="text-xs">No preview available</p>
+                <Camera className="h-12 w-12 mb-2 opacity-20" />
+                <p className="text-xs font-bold uppercase tracking-widest">No preview</p>
             </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        
+        <div className="absolute bottom-0 left-0 right-0 p-6 text-white space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">{formData.brandId || 'Designer'}</p>
+            <h3 className="text-xl font-bold line-clamp-1">{formData.title || 'Untitled Item'}</h3>
+            <p className="text-2xl font-black">{formatPrice(formData.price || 0)}</p>
+        </div>
+
         {!isPublishing && (
             <Button 
                 variant="secondary" 
                 size="sm" 
-                className="absolute bottom-4 right-4 h-10 px-4 rounded-full shadow-lg bg-white text-black hover:bg-gray-100 font-bold text-xs" 
+                className="absolute top-4 right-4 h-10 px-4 rounded-full shadow-lg bg-white/90 backdrop-blur-sm text-black hover:bg-white font-bold text-xs" 
                 onClick={() => goToStep(1)} 
             >
-              <Edit2 className="h-3 w-3 mr-2" /> Edit Photos
+              <Edit2 className="h-3 w-3 mr-2" /> Photos
             </Button>
         )}
       </div>
 
-      {/* Progress Card */}
+      {/* Publishing Progress */}
       {isPublishing && (
-          <Card className="border-primary/20 bg-primary/5 shadow-inner">
+          <Card className="border-primary/20 bg-primary/5">
               <CardContent className="p-6 space-y-4">
                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-primary">
                       <span className="flex items-center gap-2">
@@ -216,51 +264,61 @@ export function ReviewStep() {
                       </span>
                       <span>{Math.round(uploadProgress)}%</span>
                   </div>
-                  <Progress value={uploadProgress} className="h-1.5 bg-primary/10" />
+                  <Progress value={uploadProgress} className="h-1.5" />
               </CardContent>
           </Card>
       )}
 
-      {/* Summary Section */}
+      {/* Item Summary */}
       <div className="space-y-4">
-        <Card className="border-none bg-muted/30 shadow-sm rounded-xl">
+        <Card className="border-none bg-muted/30">
             <CardContent className="p-5 space-y-5">
-                <div className="flex justify-between items-start">
-                    <div className="space-y-0.5 min-w-0">
-                        <h3 className="font-bold text-xl uppercase tracking-tighter text-primary truncate">
-                            {formData.brandId || 'Designer Item'}
-                        </h3>
-                        <p className="text-muted-foreground font-medium text-sm line-clamp-1">{formData.title || 'Product Title'}</p>
+                <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Condition</p>
+                        <p className="font-bold text-sm capitalize">{formData.condition?.replace('_', ' ') || 'N/A'}</p>
                     </div>
-                    <div className="text-right shrink-0">
-                        <p className="text-xl font-black">€{formData.price}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Fixed</p>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Size</p>
+                        <p className="font-bold text-sm">{formData.sizeValue || 'O/S'}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Material</p>
+                        <p className="font-bold text-sm capitalize">{formData.material || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Color</p>
+                        <p className="font-bold text-sm capitalize">{formData.color || 'N/A'}</p>
                     </div>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-muted-foreground/10">
-                    <div className="space-y-0.5">
-                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Condition</p>
-                        <p className="font-bold capitalize text-xs">{formData.condition?.replace('_', ' ') || 'N/A'}</p>
-                    </div>
-                    <div className="space-y-0.5">
-                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Size</p>
-                        <p className="font-bold text-xs">{formData.sizeValue || 'O/S'}</p>
+                <div className="pt-4 border-t border-muted-foreground/10">
+                    <div className="flex justify-between items-center">
+                        <div className="space-y-0.5">
+                            <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Pricing</p>
+                            <p className="text-sm font-medium">15% platform fee applies</p>
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-auto p-0 text-primary font-bold text-xs" onClick={() => goToStep(5)}>Edit</Button>
                     </div>
                 </div>
             </CardContent>
         </Card>
 
         {selectedAddress && (
-            <div className="p-4 bg-background rounded-xl border flex items-center gap-4 shadow-sm">
-                <div className="p-2 bg-primary/5 rounded-full shrink-0">
-                    <MapPin className="h-4 w-4 text-primary" />
+            <div className="p-4 bg-background rounded-xl border flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-4">
+                    <div className="p-2 bg-primary/5 rounded-full">
+                        <MapPin className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="text-xs">
+                        <p className="font-black uppercase text-[8px] text-muted-foreground tracking-widest mb-0.5">Shipping From</p>
+                        <p className="font-bold">{selectedAddress.fullName}</p>
+                        <p className="text-muted-foreground">{selectedAddress.city}, {selectedAddress.country}</p>
+                    </div>
                 </div>
-                <div className="text-xs overflow-hidden">
-                    <p className="font-black uppercase text-[8px] text-muted-foreground tracking-widest mb-0.5">Shipping From</p>
-                    <p className="font-bold text-foreground truncate">{selectedAddress.fullName}</p>
-                    <p className="text-muted-foreground truncate">{selectedAddress.city}, {selectedAddress.country}</p>
-                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => goToStep(5)}>
+                    <ChevronRight className="h-4 w-4" />
+                </Button>
             </div>
         )}
       </div>
@@ -269,7 +327,7 @@ export function ReviewStep() {
       <div className="flex flex-col gap-3 pt-4">
         <Button 
             className={cn(
-                "w-full h-14 text-base font-bold shadow-xl transition-all active:scale-[0.98] rounded-full",
+                "w-full h-16 text-base font-bold shadow-xl transition-all active:scale-[0.98] rounded-full",
                 isPublishing ? "bg-muted text-muted-foreground" : "bg-black text-white hover:bg-black/90"
             )} 
             size="lg" 
@@ -279,9 +337,14 @@ export function ReviewStep() {
           {isPublishing ? (
               <span className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Processing...</span>
+                  <span>Publishing...</span>
               </span>
-          ) : "Confirm & Publish"}
+          ) : (
+              <span className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Confirm & Publish
+              </span>
+          )}
         </Button>
         
         {!isPublishing && (
