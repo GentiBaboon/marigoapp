@@ -1,9 +1,10 @@
 'use client';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Edit2, Loader2, MapPin, AlertCircle, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useStorage, useMemoFirebase } from '@/firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
