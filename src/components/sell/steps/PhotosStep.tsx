@@ -78,19 +78,28 @@ export function PhotosStep() {
     setIsProcessing(`bg-${index}`);
     
     try {
+        // Resolve the image to a File/Blob first
+        let imageFile: Blob | File | undefined = img.file;
+        
+        if (!imageFile) {
+            const response = await fetch(img.url);
+            imageFile = await response.blob();
+        }
+
         // We need a data URI for the AI
         const reader = new FileReader();
-        const dataUri = await new Promise<string>((resolve) => {
+        const dataUri = await new Promise<string>((resolve, reject) => {
             reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(img.file || await (await fetch(img.url)).blob());
+            reader.onerror = (e) => reject(new Error('Failed to read file: ' + e));
+            reader.readAsDataURL(imageFile!);
         });
 
         const result = await removeBackground({ imageDataUri: dataUri });
         
-        // Convert back to file object for consistency
+        // Convert the result back to a File object for consistent storage handling
         const response = await fetch(result.enhancedImageDataUri);
         const blob = await response.blob();
-        const enhancedFile = new File([blob], img.name, { type: 'image/png' });
+        const enhancedFile = new File([blob], `enhanced_${img.name}`, { type: 'image/png' });
         
         const updated = [...localImages];
         updated[index] = {
@@ -103,6 +112,7 @@ export function PhotosStep() {
         setFormData({ images: updated });
         toast({ title: "Background removed!" });
     } catch (e) {
+        console.error("AI background removal failed:", e);
         toast({ variant: 'destructive', title: "AI enhancement failed" });
     } finally {
         setIsProcessing(null);
