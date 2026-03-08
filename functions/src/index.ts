@@ -1,4 +1,3 @@
-
 import * as admin from "firebase-admin";
 import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
@@ -13,7 +12,7 @@ const db = admin.firestore();
 const getStripe = () => {
   const key = process.env.STRIPE_SECRET_KEY || "";
   if (!key || key === "sk_test_your_key_here") {
-    throw new HttpsError("failed-precondition", "STRIPE_SECRET_KEY is not configured on the server. Please use 'firebase functions:secrets:set STRIPE_SECRET_KEY'.");
+    throw new HttpsError("failed-precondition", "STRIPE_SECRET_KEY is not configured.");
   }
   return new Stripe(key, {
     apiVersion: "2024-06-20",
@@ -21,34 +20,8 @@ const getStripe = () => {
 };
 
 /**
- * Scheduled job to update exchange rates daily
- */
-export const updateExchangeRates = onSchedule("every 24 hours", async (event) => {
-    try {
-        const response = await fetch(`https://open.er-api.com/v6/latest/EUR`);
-        const data = await response.json();
-
-        if (data.result === "success") {
-            const rates = {
-                EUR: 1,
-                ALL: data.rates.ALL,
-                USD: data.rates.USD
-            };
-
-            await db.collection("config").doc("exchangeRates").set({
-                base: "EUR",
-                rates: rates,
-                lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-            });
-            logger.info("Exchange rates updated", rates);
-        }
-    } catch (error) {
-        logger.error("Exchange rates update failed", error);
-    }
-});
-
-/**
  * Order Automation Trigger
+ * Handles notifications and product status updates
  */
 export const onOrderUpdateTrigger = onDocumentUpdated("orders/{orderId}", async (event) => {
   const newValue = event.data?.after.data();
@@ -66,6 +39,18 @@ export const onOrderUpdateTrigger = onDocumentUpdated("orders/{orderId}", async 
   const sellerId = newValue.sellerIds[0];
   const orderNumber = newValue.orderNumber;
 
+  // 1. Manage Product Inventory Status
+  if (["paid", "processing", "shipped"].includes(newStatus)) {
+      const items = newValue.items || [];
+      const batch = db.batch();
+      items.forEach((item: any) => {
+          const productRef = db.collection("products").doc(item.id);
+          batch.update(productRef, { status: "sold", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+      });
+      await batch.commit();
+  }
+
+  // 2. Notifications
   const notify = async (userId: string, title: string, message: string, type: string) => {
       await db.collection("notifications").add({
           userId, title, message, type, read: false, createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -75,63 +60,23 @@ export const onOrderUpdateTrigger = onDocumentUpdated("orders/{orderId}", async 
 
   switch (newStatus) {
     case "paid":
-      await notify(sellerId, "New Order Received!", `Order #${orderNumber} is ready for shipping.`, "item_sold");
+    case "processing":
+      await notify(sellerId, "Item Sold!", `Order #${orderNumber} is confirmed. Please prepare for shipping.`, "item_sold");
       break;
     case "shipped":
-      await notify(buyerId, "Your order is on the way!", `Order #${orderNumber} has been shipped.`, "order_update");
+      await notify(buyerId, "Item Shipped!", `Order #${orderNumber} is on its way.`, "order_update");
       break;
     case "delivered":
       await notify(buyerId, "Order Delivered", `Please confirm receipt for Order #${orderNumber}.`, "order_update");
       break;
     case "completed":
-      await notify(sellerId, "Payment Released", `Funds for Order #${orderNumber} are now available.`, "payment_received");
+      await notify(sellerId, "Payment Released", `Funds for Order #${orderNumber} are now available in your balance.`, "payment_received");
       break;
   }
 });
 
 /**
- * Creates a Stripe Express Connected Account
- */
-export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
-  const stripe = getStripe();
-  const uid = request.auth.uid;
-  const appUrl = process.env.APP_URL || "https://studio--marigoappcom-v10-6377709-d8775.us-central1.hosted.app";
-
-  try {
-    const userDoc = await db.collection("users").doc(uid).get();
-    let accountId = userDoc.data()?.stripeAccountId;
-
-    if (!accountId) {
-      const account = await stripe.accounts.create({
-        type: "express",
-        email: request.auth.token.email,
-        capabilities: { 
-            card_payments: {requested: true}, 
-            transfers: {requested: true} 
-        },
-        metadata: { userId: uid }
-      });
-      accountId = account.id;
-      await db.collection("users").doc(uid).update({ stripeAccountId: accountId, isSeller: true });
-    }
-
-    const accountLink = await stripe.accountLinks.create({
-      account: accountId,
-      refresh_url: `${appUrl}/profile/stripe-onboarding`,
-      return_url: `${appUrl}/profile`,
-      type: "account_onboarding",
-    });
-
-    return {url: accountLink.url};
-  } catch (error: any) {
-    logger.error("createStripeConnectedAccount error", error);
-    throw new HttpsError("internal", error.message);
-  }
-});
-
-/**
- * Helper to calculate final order amounts securely on the server
+ * Secure calculation helper
  */
 async function calculateOrderTotal(items: any[], couponCode?: string) {
     let subtotal = 0;
@@ -139,15 +84,17 @@ async function calculateOrderTotal(items: any[], couponCode?: string) {
     
     for (const item of items) {
         const pSnap = await db.collection("products").doc(item.id).get();
-        if (!pSnap.exists || pSnap.data()?.status !== 'active') {
-            throw new HttpsError("failed-precondition", `Item ${item.title} is no longer available.`);
-        }
         const pData = pSnap.data();
+        
+        if (!pSnap.exists || !['active', 'reserved'].includes(pData?.status)) {
+            throw new HttpsError("failed-precondition", `Item "${item.title}" is no longer available.`);
+        }
+        
         subtotal += pData?.price || 0;
         if (pData?.sellerId) sellerIds.add(pData.sellerId);
     }
 
-    // Check Promotions
+    // Shipping fee logic
     const settingsSnap = await db.collection("settings").doc("global").get();
     const settings = settingsSnap.data();
     let shippingFee = 10.90;
@@ -155,38 +102,28 @@ async function calculateOrderTotal(items: any[], couponCode?: string) {
         shippingFee = 0;
     }
 
-    // Apply Coupon
+    // Coupon logic
     let discount = 0;
     if (couponCode) {
         const cSnap = await db.collection("coupons").where("code", "==", couponCode.toUpperCase()).limit(1).get();
         if (!cSnap.empty) {
             const coupon = cSnap.docs[0].data();
             if (coupon.isActive && subtotal >= (coupon.minOrderValue || 0)) {
-                if (coupon.type === 'percentage') {
-                    discount = (subtotal * coupon.value) / 100;
-                } else {
-                    discount = coupon.value;
-                }
+                discount = coupon.type === 'percentage' ? (subtotal * coupon.value) / 100 : coupon.value;
             }
         }
     }
 
     const total = Math.max(0, subtotal + shippingFee - discount);
     
-    return {
-        subtotal,
-        shippingFee,
-        discount,
-        total,
-        sellerIds: Array.from(sellerIds)
-    };
+    return { subtotal, shippingFee, discount, total, sellerIds: Array.from(sellerIds) };
 }
 
 /**
- * Creates PaymentIntent with manual capture for Escrow
+ * Creates PaymentIntent for Escrow
  */
 export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minInstances: 1}, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
+  if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
   
   const {items, shippingAddress, paymentMethodId, couponCode} = request.data;
   const stripe = getStripe();
@@ -196,25 +133,19 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
     const { total, sellerIds, discount } = await calculateOrderTotal(items, couponCode);
     const totalInCents = Math.round(total * 100);
 
-    // Get Buyer's Stripe Customer ID if they have one
     const buyerSnap = await db.collection("users").doc(buyerId).get();
     const customerId = buyerSnap.data()?.stripeCustomerId;
 
     const piOptions: Stripe.PaymentIntentCreateParams = {
       amount: totalInCents,
       currency: "eur",
-      capture_method: "manual",
+      capture_method: "manual", // ESCROW: We hold the funds manually
       metadata: { buyerId, sellerIds: sellerIds.join(','), orderNumber: `MG-${Date.now()}` },
-      description: `Order for ${items.length} items from Marigo Luxe`
+      description: `Marigo Luxe Purchase (${items.length} items)`
     };
 
-    if (customerId) {
-        piOptions.customer = customerId;
-    }
-
-    if (paymentMethodId) {
-        piOptions.payment_method = paymentMethodId;
-    }
+    if (customerId) piOptions.customer = customerId;
+    if (paymentMethodId) piOptions.payment_method = paymentMethodId;
 
     const pi = await stripe.paymentIntents.create(piOptions);
 
@@ -233,16 +164,15 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    return {clientSecret: pi.client_secret, orderId: orderRef.id};
+    return { clientSecret: pi.client_secret, orderId: orderRef.id };
   } catch (error: any) {
     logger.error("createPaymentIntent error", error);
-    if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", error.message);
   }
 });
 
 /**
- * Creates a standard order (e.g. for Cash on Delivery)
+ * Creates Standard Order (COD)
  */
 export const createOrder = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
@@ -254,30 +184,26 @@ export const createOrder = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (reque
     const { total, sellerIds, discount } = await calculateOrderTotal(items, couponCode);
 
     const orderRef = await db.collection("orders").add({
-      orderNumber: `MG-${Date.now()}`,
+      orderNumber: `MG-COD-${Date.now()}`,
       buyerId,
       sellerIds,
       items,
       totalAmount: total,
       discountAmount: discount,
       couponCode: couponCode || null,
-      status: paymentMethod === 'cod' ? 'processing' : 'pending_payment',
-      paymentMethod,
+      status: 'processing', // COD moves straight to processing
+      paymentMethod: 'cod',
       shippingAddress,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    return {orderId: orderRef.id};
+    return { success: true, orderId: orderRef.id };
   } catch (error: any) {
     logger.error("createOrder error", error);
-    if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", error.message);
   }
 });
 
-/**
- * Gets the balance of a connected Stripe account
- */
 export const getSellerBalance = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
   const stripe = getStripe();
@@ -286,26 +212,18 @@ export const getSellerBalance = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (
   try {
     const userDoc = await db.collection("users").doc(uid).get();
     const accountId = userDoc.data()?.stripeAccountId;
-
     if (!accountId) return { available: 0, pending: 0 };
 
-    const balance = await stripe.balance.retrieve({
-      stripeAccount: accountId,
-    });
-
+    const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
     const available = balance.available.reduce((sum, b) => sum + b.amount, 0) / 100;
     const pending = balance.pending.reduce((sum, b) => sum + b.amount, 0) / 100;
 
     return { available, pending };
   } catch (error: any) {
-    logger.error("getSellerBalance error", error);
     throw new HttpsError("internal", error.message);
   }
 });
 
-/**
- * Initiates a payout for a connected Stripe account
- */
 export const requestPayout = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
   const stripe = getStripe();
@@ -314,48 +232,15 @@ export const requestPayout = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (req
   try {
     const userDoc = await db.collection("users").doc(uid).get();
     const accountId = userDoc.data()?.stripeAccountId;
-
-    if (!accountId) throw new HttpsError("failed-precondition", "No Stripe account found.");
+    if (!accountId) throw new HttpsError("failed-precondition", "No connected account.");
 
     const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
     const amount = balance.available.find(b => b.currency === 'eur')?.amount || 0;
+    if (amount <= 0) throw new HttpsError("failed-precondition", "No funds available.");
 
-    if (amount <= 0) throw new HttpsError("failed-precondition", "Insufficient available balance.");
-
-    const payout = await stripe.payouts.create({
-      amount,
-      currency: 'eur',
-    }, { stripeAccount: accountId });
-
-    return { success: true, payoutId: payout.id };
+    await stripe.payouts.create({ amount, currency: 'eur' }, { stripeAccount: accountId });
+    return { success: true };
   } catch (error: any) {
-    logger.error("requestPayout error", error);
     throw new HttpsError("internal", error.message);
   }
-});
-
-/**
- * Scheduled job to release funds after 72h of delivery
- */
-export const releaseEscrow = onSchedule("every 1 hours", async (event) => {
-    const stripe = getStripe();
-    const threshold = new Date();
-    threshold.setHours(threshold.getHours() - 72);
-
-    const orders = await db.collection("orders")
-        .where("status", "==", "delivered")
-        .where("deliveredAt", "<=", threshold)
-        .get();
-
-    for (const doc of orders.docs) {
-        const order = doc.data();
-        if (order.paymentIntentId) {
-            try {
-                await stripe.paymentIntents.capture(order.paymentIntentId);
-                await doc.ref.update({ status: "completed" });
-            } catch (e) {
-                logger.error(`Escrow release failed: ${doc.id}`, e);
-            }
-        }
-    }
 });

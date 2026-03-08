@@ -56,7 +56,7 @@ export interface FirestoreUser {
 }
 
 // --- Products ---
-export type ProductStatus = "draft" | "pending_review" | "active" | "sold" | "removed" | "expired";
+export type ProductStatus = "draft" | "pending_review" | "active" | "sold" | "removed" | "expired" | "reserved";
 
 export interface ProductImage {
   url: string;

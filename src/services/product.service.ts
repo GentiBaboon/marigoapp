@@ -1,4 +1,3 @@
-
 'use client';
 import { 
   Firestore, 
@@ -12,7 +11,8 @@ import {
   serverTimestamp, 
   Query, 
   DocumentData,
-  CollectionReference
+  CollectionReference,
+  updateDoc
 } from 'firebase/firestore';
 import type { FirestoreProduct, ProductStatus } from '@/lib/types';
 
@@ -25,8 +25,6 @@ export class ProductService {
 
   /**
    * Returns a query for active products, ordered by creation date.
-   * NOTE: This requires a composite index in Firestore: 
-   * Field: status (Ascending), Field: listingCreated (Descending)
    */
   static getActiveProductsQuery(db: Firestore, limitCount = 50): Query<DocumentData> {
     return query(
@@ -76,17 +74,20 @@ export class ProductService {
     if (!productData.id) throw new Error("Product ID is required for publishing.");
     
     const productRef = doc(db, this.collectionName, productData.id);
+    const now = serverTimestamp();
+    
     const finalData = {
       ...productData,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      listingCreated: serverTimestamp(),
+      createdAt: now,
+      updatedAt: now,
+      listingCreated: now,
       views: 0,
       wishlistCount: 0,
       isFeatured: false,
       isAuthenticated: false,
     };
 
+    // Use setDoc to create the item. If it's a draft ID, it overwrites it.
     await setDoc(productRef, finalData);
   }
 
@@ -95,6 +96,9 @@ export class ProductService {
    */
   static async updateStatus(db: Firestore, productId: string, status: ProductStatus): Promise<void> {
     const productRef = doc(db, this.collectionName, productId);
-    await setDoc(productRef, { status, updatedAt: serverTimestamp() }, { merge: true });
+    await updateDoc(productRef, { 
+      status, 
+      updatedAt: serverTimestamp() 
+    });
   }
 }
