@@ -22,7 +22,7 @@ interface SellFormContextType {
 
 const SellFormContext = createContext<SellFormContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'marigo_sell_drafts_v5';
+const STORAGE_KEY = 'marigo_sell_drafts_v6';
 
 export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [drafts, setDrafts] = useState<SellDraft[]>([]);
@@ -31,24 +31,34 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   const { toast } = useToast();
   const totalSteps = 6;
 
-  // Load drafts on init
+  // Initial Load from localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) setDrafts(JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Ensure we handle legacy drafts safely
+        setDrafts(parsed);
+      }
     } catch (e) {}
     setIsInitialized(true);
   }, []);
 
   const saveToStorage = useCallback((data: SellDraft[]) => {
     try {
-      // Don't save images to localStorage if they are blobs (too big/invalid)
+      // CRITICAL: We cannot store File objects or huge Base64 strings in localStorage (limit ~5MB)
+      // We strip binary data but keep URLs for persistence
       const sanitizedDrafts = data.map(d => ({
         ...d,
         formData: {
           ...d.formData,
-          // We keep images only if they are remote URLs, otherwise reset them on reload to avoid crashes
-          images: d.formData.images?.filter(img => !img.url.startsWith('blob:')) || []
+          images: d.formData.images?.map(img => ({
+              url: img.url,
+              name: img.name,
+              type: img.type,
+              position: img.position
+              // File object is deliberately excluded here
+          })) || []
         }
       }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizedDrafts.slice(0, 5)));
@@ -92,7 +102,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   const deleteDraft = useCallback((id: string) => {
     setDrafts(prev => prev.filter(d => d.id !== id));
     if (activeDraftId === id) setActiveDraftId(null);
-    toast({ title: "Bozza eliminata" });
+    toast({ title: "Draft deleted" });
   }, [activeDraftId, toast]);
 
   const deleteActiveDraft = useCallback(() => {
