@@ -68,7 +68,7 @@ export class ProductService {
 
   /**
    * Publishes a new product to Firestore.
-   * Uses serverTimestamp for reliability.
+   * Uses serverTimestamp for reliability and ensures data consistency.
    */
   static async publishProduct(db: Firestore, productData: Partial<FirestoreProduct>): Promise<void> {
     if (!productData.id) throw new Error("Product ID is required for publishing.");
@@ -80,7 +80,7 @@ export class ProductService {
       ...productData,
       createdAt: now,
       updatedAt: now,
-      listingCreated: now, // Important for feed ordering
+      listingCreated: now, // Critical for chronological feeds
       views: 0,
       wishlistCount: 0,
       isFeatured: false,
@@ -88,12 +88,11 @@ export class ProductService {
       status: productData.status || 'active',
     };
 
-    // Attempt atomic write
     try {
-        await setDoc(productRef, finalData);
+        await setDoc(productRef, finalData, { merge: true });
     } catch (error: any) {
         console.error("Firestore Publish Error:", error);
-        throw new Error(error.message || "Failed to create product listing in database.");
+        throw new Error(error.message || "Failed to finalize the listing. Please try again.");
     }
   }
 

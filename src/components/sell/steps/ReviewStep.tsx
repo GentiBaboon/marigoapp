@@ -2,12 +2,12 @@
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Edit2, Loader2, MapPin, AlertCircle, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Edit2, Loader2, MapPin, AlertCircle, CheckCircle2 } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useStorage, useMemoFirebase } from '@/firebase';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
 import { ProductService } from '@/services/product.service';
 import { validateListingData, notifyNewListing } from '@/app/sell/actions';
@@ -37,6 +37,19 @@ export function ReviewStep() {
   const { data: addresses } = useCollection<FirestoreAddress>(addressesCollection);
   const selectedAddress = addresses?.find(a => a.id === formData.shippingFromAddressId);
 
+  // Helper to get reliable blob data from various sources
+  const resolveImageBlob = async (img: any): Promise<Blob> => {
+    if (img.file) return img.file;
+    
+    try {
+      const response = await fetch(img.url);
+      return await response.blob();
+    } catch (e) {
+      console.error("Failed to fetch image blob:", e);
+      throw new Error(`Could not access photo ${img.position + 1}. Please try re-uploading it.`);
+    }
+  };
+
   const handlePublish = async () => {
     if (!user || !firestore || !storage) {
         toast({ variant: "destructive", title: "Authentication required" });
@@ -46,13 +59,15 @@ export function ReviewStep() {
     setIsPublishing(true);
     setError(null);
     setUploadProgress(0);
-    setStatusMessage('Validating listing...');
+    setStatusMessage('Validating listing details...');
 
     try {
       const productId = activeDraft?.id || `prod_${Date.now()}`;
       const images = formData.images || [];
       
-      // 1. Server-Side Validation (Price, Title, etc.)
+      if (images.length === 0) throw new Error("At least one photo is required.");
+
+      // 1. Server-Side Validation
       const validation = await validateListingData({
           productId,
           sellerId: user.uid,
@@ -63,56 +78,39 @@ export function ReviewStep() {
 
       if (!validation.success) {
           const firstError = Object.values(validation.errors || {})[0];
-          throw new Error(Array.isArray(firstError) ? firstError[0] : "Please check your title and price.");
+          throw new Error(Array.isArray(firstError) ? firstError[0] : "Please check your listing details.");
       }
 
       const finalImages = [];
       
-      // 2. Sequential Upload
+      // 2. Process and Upload Images
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
-        let finalUrl = img.url;
+        setStatusMessage(`Processing photo ${i + 1} of ${images.length}...`);
+        
+        const blob = await resolveImageBlob(img);
+        
+        const fileExt = img.type?.split('/')[1] || 'jpg';
+        const fileName = `img_${Date.now()}_${i}.${fileExt}`;
+        const storagePath = `products/${user.uid}/${productId}/${fileName}`;
+        const storageRef = ref(storage, storagePath);
+        
+        const metadata = {
+            contentType: img.type || 'image/jpeg',
+            customMetadata: { originalName: img.name || 'product_image' }
+        };
 
-        // If it's a local file (from PhotosStep), upload it
-        if (img.file) {
-          setStatusMessage(`Uploading image ${i + 1} of ${images.length}...`);
-          
-          const fileExt = img.type?.split('/')[1] || 'jpg';
-          const fileName = `img_${Date.now()}_${i}.${fileExt}`;
-          const storagePath = `products/${user.uid}/${productId}/${fileName}`;
-          const storageRef = ref(storage, storagePath);
-          
-          const metadata = {
-              contentType: img.type || 'image/jpeg',
-              customMetadata: {
-                  originalName: img.name || 'product_image'
-              }
-          };
+        setStatusMessage(`Uploading photo ${i + 1}...`);
+        await uploadBytes(storageRef, blob, metadata);
+        const downloadUrl = await getDownloadURL(storageRef);
 
-          const uploadTask = uploadBytesResumable(storageRef, img.file, metadata);
-
-          await new Promise((resolve, reject) => {
-              uploadTask.on('state_changed', 
-                (snap) => {
-                    const chunkWeight = 90 / images.length;
-                    const fileProgress = (snap.bytesTransferred / (snap.totalBytes || 1)) * chunkWeight;
-                    const baseProgress = (i * chunkWeight);
-                    setUploadProgress(Math.min(90, baseProgress + fileProgress));
-                },
-                (err) => reject(new Error(`Storage error: ${err.message}`)),
-                () => resolve(null)
-              );
-          });
-
-          finalUrl = await getDownloadURL(storageRef);
-        }
-
-        finalImages.push({ url: finalUrl, position: i });
+        finalImages.push({ url: downloadUrl, position: i });
+        setUploadProgress(((i + 1) / images.length) * 80);
       }
 
-      // 3. Final Firestore Write via Service Layer
-      setStatusMessage('Making listing live...');
-      setUploadProgress(95);
+      // 3. Final Firestore Write
+      setStatusMessage('Creating your listing...');
+      setUploadProgress(90);
 
       const productData: Partial<FirestoreProduct> = {
         id: productId,
@@ -139,16 +137,17 @@ export function ReviewStep() {
 
       await ProductService.publishProduct(firestore, productData);
       
-      // Async notification (don't block UI)
+      // Async background tasks
       notifyNewListing(productData.title!, user.displayName || "A user").catch(console.warn);
 
       setUploadProgress(100);
-      setStatusMessage('Published!');
+      setStatusMessage('Listing is live!');
       
-      setTimeout(() => nextStep(), 800);
+      setTimeout(() => nextStep(), 1000);
 
     } catch (e: any) {
-      setError(e.message || "An unexpected error occurred during publishing.");
+      console.error("Publishing Error:", e);
+      setError(e.message || "An unexpected error occurred. Please check your connection.");
       setIsPublishing(false);
       setUploadProgress(0);
       setStatusMessage('');
@@ -158,51 +157,52 @@ export function ReviewStep() {
   return (
     <div className="space-y-8 pb-24 max-w-lg mx-auto animate-in fade-in duration-500">
       <div className="text-center space-y-2">
-        <h2 className="text-3xl font-bold font-headline">Review</h2>
-        <p className="text-muted-foreground text-sm">Everything looks perfect. Ready to list?</p>
+        <h2 className="text-3xl font-bold font-headline">Review Listing</h2>
+        <p className="text-muted-foreground text-sm">Everything looks perfect. Ready to list your item?</p>
       </div>
 
       {error && (
           <Alert variant="destructive" className="border-destructive/50 bg-destructive/5">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Publishing Failed</AlertTitle>
-              <AlertDescription className="mt-2">
+              <AlertDescription className="mt-2 text-xs">
                   {error}
               </AlertDescription>
           </Alert>
       )}
 
-      {/* Main Image Preview */}
+      {/* Hero Preview */}
       <div className="relative aspect-[3/4] rounded-3xl overflow-hidden border-2 bg-muted shadow-2xl group">
         {formData.images?.[0] ? (
             <Image 
                 src={formData.images[0].url} 
-                alt="Listing preview" 
+                alt="Main product photo" 
                 fill 
                 className="object-cover transition-transform duration-700 group-hover:scale-105" 
                 unoptimized={formData.images[0].url.startsWith('blob:')}
             />
         ) : (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/50">
                 <AlertCircle className="h-10 w-10 mb-2 opacity-20" />
-                <p>No photos selected</p>
+                <p className="text-sm">No photos found</p>
             </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        <Button 
-            variant="secondary" 
-            size="sm" 
-            className="absolute bottom-6 right-6 h-12 px-6 rounded-full shadow-xl bg-white text-black hover:bg-gray-100 font-bold" 
-            onClick={() => goToStep(1)} 
-            disabled={isPublishing}
-        >
-          <Edit2 className="h-4 w-4 mr-2" /> Edit Photos
-        </Button>
+        {!isPublishing && (
+            <Button 
+                variant="secondary" 
+                size="sm" 
+                className="absolute bottom-6 right-6 h-12 px-6 rounded-full shadow-xl bg-white text-black hover:bg-gray-100 font-bold" 
+                onClick={() => goToStep(1)} 
+            >
+              <Edit2 className="h-4 w-4 mr-2" /> Edit Photos
+            </Button>
+        )}
       </div>
 
-      {/* Upload Status Card */}
+      {/* Dynamic Status / Progress */}
       {isPublishing && (
-          <Card className="border-primary/20 bg-primary/5 shadow-inner">
+          <Card className="border-primary/20 bg-primary/5 shadow-inner animate-in slide-in-from-bottom-2">
               <CardContent className="p-6 space-y-4">
                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-[0.2em] text-primary">
                       <span className="flex items-center gap-2">
@@ -216,16 +216,16 @@ export function ReviewStep() {
           </Card>
       )}
 
-      {/* Details Summary */}
+      {/* Details Summary Card */}
       <div className="space-y-4">
         <Card className="border-none bg-muted/30 shadow-sm rounded-2xl">
             <CardContent className="p-6 space-y-6">
                 <div className="flex justify-between items-start">
                     <div className="space-y-1">
                         <h3 className="font-bold text-2xl uppercase tracking-tighter text-primary">
-                            {formData.brandId || 'Boutique'}
+                            {formData.brandId || 'Boutique Item'}
                         </h3>
-                        <p className="text-muted-foreground font-medium line-clamp-1">{formData.title || 'Product'}</p>
+                        <p className="text-muted-foreground font-medium line-clamp-1">{formData.title || 'Product Title'}</p>
                     </div>
                     <div className="text-right">
                         <p className="text-2xl font-black">€{formData.price}</p>
@@ -240,7 +240,7 @@ export function ReviewStep() {
                     </div>
                     <div className="space-y-1">
                         <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Size</p>
-                        <p className="font-bold text-sm">{formData.sizeValue || 'One Size'}</p>
+                        <p className="font-bold text-sm">{formData.sizeValue || 'Unique Size'}</p>
                     </div>
                 </div>
             </CardContent>
@@ -248,7 +248,7 @@ export function ReviewStep() {
 
         {selectedAddress && (
             <div className="p-5 bg-background rounded-2xl border flex items-start gap-4 shadow-sm">
-                <div className="p-3 bg-muted rounded-full shrink-0">
+                <div className="p-3 bg-primary/5 rounded-full shrink-0">
                     <MapPin className="h-5 w-5 text-primary" />
                 </div>
                 <div className="text-sm overflow-hidden">
@@ -260,7 +260,7 @@ export function ReviewStep() {
         )}
       </div>
 
-      {/* Footer Actions */}
+      {/* Action Footer */}
       <div className="flex flex-col gap-4 pt-4">
         <Button 
             className={cn(
@@ -274,19 +274,20 @@ export function ReviewStep() {
           {isPublishing ? (
               <span className="flex items-center gap-3">
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  Listing Item...
+                  <span>Processing...</span>
               </span>
-          ) : "Confirm & List Item"}
+          ) : "Publish Item Now"}
         </Button>
-        <Button 
-            variant="ghost" 
-            className="w-full h-12 font-bold text-muted-foreground hover:text-foreground uppercase tracking-widest text-[10px]" 
-            size="lg" 
-            disabled={isPublishing} 
-            onClick={() => goToStep(5)}
-        >
-          Back to Pricing
-        </Button>
+        
+        {!isPublishing && (
+            <Button 
+                variant="ghost" 
+                className="w-full h-12 font-bold text-muted-foreground hover:text-foreground uppercase tracking-widest text-[10px]" 
+                onClick={() => goToStep(5)}
+            >
+              Back to Pricing
+            </Button>
+        )}
       </div>
     </div>
   );
