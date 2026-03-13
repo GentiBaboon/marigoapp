@@ -22,7 +22,7 @@ interface SellFormContextType {
 
 const SellFormContext = createContext<SellFormContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'marigo_sell_drafts_v4';
+const STORAGE_KEY = 'marigo_sell_drafts_v6';
 
 export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [drafts, setDrafts] = useState<SellDraft[]>([]);
@@ -31,33 +31,44 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   const { toast } = useToast();
   const totalSteps = 6;
 
-  // Load drafts on init
+  // Initial Load from localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) setDrafts(JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Ensure we handle legacy drafts safely
+        setDrafts(parsed);
+      }
     } catch (e) {}
     setIsInitialized(true);
   }, []);
 
-  // Manual & Auto-save Logic
   const saveToStorage = useCallback((data: SellDraft[]) => {
     try {
-      const recent = [...data].sort((a, b) => b.lastModified - a.lastModified).slice(0, 5);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(recent));
+      // CRITICAL: We cannot store File objects or huge Base64 strings in localStorage (limit ~5MB)
+      // We strip binary data but keep URLs for persistence
+      const sanitizedDrafts = data.map(d => ({
+        ...d,
+        formData: {
+          ...d.formData,
+          images: d.formData.images?.map(img => ({
+              url: img.url,
+              name: img.name,
+              type: img.type,
+              position: img.position
+              // File object is deliberately excluded here
+          })) || []
+        }
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizedDrafts.slice(0, 5)));
     } catch (e) {}
   }, []);
 
   useEffect(() => {
     if (!isInitialized) return;
-    const interval = setInterval(() => {
-      if (activeDraftId) {
-        saveToStorage(drafts);
-        toast({ title: "Draft auto-saved", duration: 2000 });
-      }
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [drafts, isInitialized, activeDraftId, saveToStorage, toast]);
+    saveToStorage(drafts);
+  }, [drafts, isInitialized, saveToStorage]);
 
   const activeDraft = useMemo(() => drafts.find(d => d.id === activeDraftId), [drafts, activeDraftId]);
   
@@ -74,7 +85,11 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
     const newDraftId = `draft_${Date.now()}`;
     const newDraft: SellDraft = {
         id: newDraftId,
-        formData: {},
+        formData: {
+          images: [],
+          allowOffers: true,
+          listingType: 'fixed_price'
+        },
         currentStep: 1,
         lastModified: Date.now(),
     };
@@ -83,10 +98,12 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, []);
 
   const selectDraft = (id: string) => setActiveDraftId(id);
-  const deleteDraft = (id: string) => {
+  
+  const deleteDraft = useCallback((id: string) => {
     setDrafts(prev => prev.filter(d => d.id !== id));
     if (activeDraftId === id) setActiveDraftId(null);
-  };
+    toast({ title: "Draft deleted" });
+  }, [activeDraftId, toast]);
 
   const deleteActiveDraft = useCallback(() => {
     if (!activeDraftId) return;
@@ -97,7 +114,6 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   const goToStep = (step: number) => {
     if (!activeDraftId) return;
     setDrafts(prev => prev.map(d => d.id === activeDraftId ? { ...d, currentStep: step } : d));
-    saveToStorage(drafts);
   };
 
   return (

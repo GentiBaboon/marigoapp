@@ -5,9 +5,10 @@ import { useCart } from '@/context/CartContext';
 import Image from 'next/image';
 import { useCurrency } from '@/context/CurrencyContext';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { Tag } from 'lucide-react';
 
 export function OrderSummary() {
-  const { items, subtotal, totalShipping, grandTotal } = useCart();
+  const { items, subtotal, totalShipping, grandTotal, appliedCoupon, discountAmount } = useCart();
   const { formatPrice } = useCurrency();
 
   const getProductImage = (image: string) => {
@@ -54,15 +55,23 @@ export function OrderSummary() {
             <span className="text-muted-foreground">Subtotal</span>
             <span>{formatPrice(subtotal)}</span>
           </div>
+          {appliedCoupon && (
+              <div className="flex justify-between text-green-600 font-medium">
+                <span className="flex items-center gap-1.5"><Tag className="h-3 w-3" /> {appliedCoupon.code}</span>
+                <span>-{formatPrice(discountAmount)}</span>
+              </div>
+          )}
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Shipping (x{items.length})</span>
-            <span>{formatPrice(totalShipping)}</span>
+            <span className="text-muted-foreground">Shipping</span>
+            <span>
+                {totalShipping === 0 ? <span className="text-green-600 font-bold">FREE</span> : formatPrice(totalShipping)}
+            </span>
           </div>
         </div>
         <Separator />
         <div className="flex justify-between font-bold text-lg">
           <span>Total</span>
-          <span>{formatPrice(grandTotal)}</span>
+          <span className="text-primary">{formatPrice(grandTotal)}</span>
         </div>
       </CardContent>
     </Card>

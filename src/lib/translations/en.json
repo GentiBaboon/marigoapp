@@ -1,0 +1,57 @@
+
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "back": "Back",
+    "continue": "Continue",
+    "confirm": "Confirm",
+    "all": "All"
+  },
+  "nav": {
+    "home": "Home",
+    "shop": "Shop",
+    "sell": "Sell",
+    "favorites": "Favorites",
+    "me": "Me",
+    "womenswear": "Womenswear",
+    "menswear": "Menswear",
+    "bags": "Bags",
+    "shoes": "Shoes",
+    "accessories": "Accessories"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "signOut": "Log Out",
+    "welcome": "Welcome back",
+    "createAccount": "Create an Account"
+  },
+  "product": {
+    "condition": "Condition",
+    "size": "Size",
+    "addToBag": "Add to bag",
+    "makeOffer": "Make an offer",
+    "description": "Description & Details",
+    "authenticity": "Expert authentication",
+    "seller": "Seller"
+  },
+  "sell": {
+    "title": "Sell an item / Shit nje produkt",
+    "step1": "Photos",
+    "step2": "Category & Brand",
+    "step3": "Details",
+    "step4": "Condition",
+    "step5": "Pricing",
+    "publish": "Publish Now"
+  },
+  "categories": {
+    "clothing": "Clothing (Veshje)",
+    "shoes": "Shoes (Këpucë)",
+    "bags": "Bags (Çanta)",
+    "accessories": "Accessories (Aksesorë)"
+  }
+}

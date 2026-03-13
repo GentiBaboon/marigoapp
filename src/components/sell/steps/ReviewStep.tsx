@@ -1,93 +1,163 @@
-
 'use client';
+
+import * as React from 'react';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
-import { Check, Edit2, Loader2, Upload } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { 
+    Edit2, 
+    Loader2, 
+    MapPin, 
+    AlertCircle, 
+    CheckCircle2, 
+    Package, 
+    Tag,
+    ChevronRight,
+    Camera
+} from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useUser, useStorage, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { Progress } from '@/components/ui/progress';
-import type { FirestoreProduct } from '@/lib/types';
+import { useFirestore, useUser, useStorage, useMemoFirebase } from '@/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ProductService } from '@/services/product.service';
+import { validateListingData, notifyNewListing } from '@/app/sell/actions';
+import { collection } from 'firebase/firestore';
+import { useCollection } from '@/firebase';
+import type { FirestoreAddress, FirestoreProduct } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { useCurrency } from '@/context/CurrencyContext';
 
 export function ReviewStep() {
   const { formData, goToStep, nextStep, activeDraft } = useSellForm();
   const [isPublishing, setIsPublishing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  
   const { toast } = useToast();
   const firestore = useFirestore();
   const storage = useStorage();
   const { user } = useUser();
+  const { formatPrice } = useCurrency();
+
+  const addressesCollection = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, 'users', user.uid, 'addresses');
+  }, [user, firestore]);
+  
+  const { data: addresses } = useCollection<FirestoreAddress>(addressesCollection);
+  const selectedAddress = addresses?.find(a => a.id === formData.shippingFromAddressId);
+
+  /**
+   * Resolves an image URL or File object into a Blob.
+   * Includes retry logic and timeout to handle unstable browser blob URLs.
+   */
+  const resolveImageBlob = async (img: any, retries = 2): Promise<Blob> => {
+    if (img.file instanceof Blob) return img.file;
+
+    const attemptFetch = async (): Promise<Blob> => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+        try {
+            const response = await fetch(img.url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.blob();
+        } catch (e) {
+            clearTimeout(timeoutId);
+            throw e;
+        }
+    };
+
+    for (let i = 0; i <= retries; i++) {
+        try {
+            return await attemptFetch();
+        } catch (e) {
+            if (i === retries) throw e;
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential-ish backoff
+        }
+    }
+    throw new Error("Failed to resolve image data.");
+  };
 
   const handlePublish = async () => {
     if (!user || !firestore || !storage) {
-        toast({ variant: "destructive", title: "Authentication required" });
+        toast({ variant: "destructive", title: "Connection Error", description: "Firebase services are not available." });
         return;
     }
-    
+
     setIsPublishing(true);
-    setUploadProgress(5);
+    setError(null);
+    setUploadProgress(0);
+    setStatusMessage('Validating details...');
 
     try {
       const productId = activeDraft?.id || `prod_${Date.now()}`;
-      const finalImages: FirestoreProduct['images'] = [];
-
       const images = formData.images || [];
-      if (images.length === 0) throw new Error("No images to upload");
-
-      const imageProgress = new Array(images.length).fill(0);
-
-      const uploadImage = async (img: typeof images[0], index: number) => {
-        // Skip upload if already a remote URL
-        if (img.url.startsWith('http') && !img.url.includes('blob')) {
-          imageProgress[index] = 100;
-          return img.url;
-        }
-
-        const response = await fetch(img.url);
-        const blob = await response.blob();
-        
-        const fileExtension = img.type?.split('/')[1] || 'jpg';
-        const fileName = `img_${Date.now()}_${index}.${fileExtension}`;
-        const storagePath = `products/${user.uid}/${productId}/${fileName}`;
-        const storageRef = ref(storage, storagePath);
-        
-        const uploadTask = uploadBytesResumable(storageRef, blob, {
-            contentType: img.type
-        });
-
-        return new Promise<string>((resolve, reject) => {
-            uploadTask.on('state_changed', 
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    imageProgress[index] = progress;
-                    const totalLoaded = imageProgress.reduce((a, b) => a + b, 0);
-                    const averageProgress = totalLoaded / images.length;
-                    setUploadProgress(5 + Math.round(averageProgress * 0.85));
-                }, 
-                (error) => reject(error), 
-                async () => {
-                    const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                    resolve(downloadUrl);
-                }
-            );
-        });
-      };
-
-      const uploadedUrls = await Promise.all(images.map((img, i) => uploadImage(img, i)));
       
-      uploadedUrls.forEach((url, i) => {
-          finalImages.push({
-              url,
-              thumbnailUrl: url, // For MVP simplified
-              position: i
-          });
+      if (images.length === 0) throw new Error("At least one photo is required to publish.");
+
+      // 1. Server-Side Validation
+      const validation = await validateListingData({
+          productId,
+          sellerId: user.uid,
+          title: formData.title,
+          price: formData.price,
+          status: 'active'
       });
 
-      // Prepare final product data mapping from form fields to new FirestoreProduct schema
-      const productData: FirestoreProduct = {
+      if (!validation.success) {
+          const firstError = Object.values(validation.errors || {})[0];
+          throw new Error(Array.isArray(firstError) ? firstError[0] : "One or more fields are invalid.");
+      }
+
+      const finalImages = [];
+      
+      // 2. Sequential reliable uploads
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        const progressBase = (i / images.length) * 85;
+        
+        setStatusMessage(`Preparing photo ${i + 1} of ${images.length}...`);
+        setUploadProgress(progressBase + 2);
+        
+        try {
+            const blob = await resolveImageBlob(img);
+            
+            const fileExt = img.type?.split('/')[1] || 'jpg';
+            const fileName = `img_${Date.now()}_${i}.${fileExt}`;
+            const storagePath = `products/${user.uid}/${productId}/${fileName}`;
+            const storageRef = ref(storage, storagePath);
+            
+            const metadata = {
+                contentType: img.type || 'image/jpeg',
+                customMetadata: { 
+                    originalName: img.name || 'listing_image',
+                    position: i.toString()
+                }
+            };
+
+            setStatusMessage(`Uploading photo ${i + 1}...`);
+            await uploadBytes(storageRef, blob, metadata);
+            const downloadUrl = await getDownloadURL(storageRef);
+
+            finalImages.push({ url: downloadUrl, position: i });
+            setUploadProgress(progressBase + (85 / images.length));
+        } catch (imgErr) {
+            console.error(`Failed at image ${i}:`, imgErr);
+            throw new Error(`Photo ${i + 1} could not be uploaded. Please try re-uploading your photos.`);
+        }
+      }
+
+      // 3. Final Firestore Creation
+      setStatusMessage('Creating your listing...');
+      setUploadProgress(95);
+
+      const productData: Partial<FirestoreProduct> = {
         id: productId,
         sellerId: user.uid,
         title: formData.title || 'Untitled',
@@ -95,126 +165,197 @@ export function ReviewStep() {
         categoryId: formData.categoryId || 'uncategorized',
         subcategoryId: formData.subcategoryId || 'uncategorized',
         brandId: formData.brandId || 'other',
-        condition: (formData.condition as any) || 'good',
+        condition: formData.condition || 'good',
         listingType: formData.listingType || 'fixed_price',
         price: formData.price || 0,
-        originalPrice: formData.originalPrice,
         currency: 'EUR',
-        size: formData.sizeValue || formData.size,
+        size: formData.sizeValue || '',
         color: formData.color,
         material: formData.material,
-        gender: (formData.gender as any) || 'unisex',
+        gender: formData.gender || 'unisex',
         images: finalImages,
         status: 'active',
-        views: 0,
-        wishlistCount: 0,
-        isFeatured: false,
-        isAuthenticated: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        vintage: formData.vintage,
+        pattern: formData.pattern,
+        shippingFromAddressId: formData.shippingFromAddressId,
       };
 
-      const productRef = doc(firestore, 'products', productId);
+      await ProductService.publishProduct(firestore, productData);
       
-      await setDoc(productRef, productData).catch(err => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-              path: productRef.path,
-              operation: 'create',
-              requestResourceData: productData
-          }));
-          throw err;
-      });
-      
+      // Trigger background notification (Non-blocking)
+      notifyNewListing(productData.title!, user.displayName || "A member").catch(console.warn);
+
       setUploadProgress(100);
-      toast({ title: "Listing Published!", variant: "success" });
-      nextStep();
+      setStatusMessage('Listing live!');
+      
+      // Short delay for user to see success state
+      setTimeout(() => nextStep(), 1000);
+
     } catch (e: any) {
-      console.error("Publish error:", e);
-      toast({ 
-        variant: "destructive", 
-        title: "Error publishing listing", 
-        description: e.message || "Something went wrong during upload."
-      });
-    } finally {
+      console.error("Publishing Error:", e);
+      setError(e.message || "An unexpected error occurred while publishing your item.");
       setIsPublishing(false);
+      setUploadProgress(0);
+      setStatusMessage('');
     }
   };
 
-  const brandName = formData.brandId || 'Designer Item';
-
   return (
-    <div className="space-y-8 pb-20">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold">Almost there!</h2>
-        <p className="text-muted-foreground">Review your listing details before going live.</p>
+    <div className="space-y-8 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="text-center space-y-2">
+        <h2 className="text-3xl font-bold font-headline tracking-tight">Review Listing</h2>
+        <p className="text-muted-foreground text-sm">One last look before your item goes live.</p>
       </div>
 
-      <div className="relative aspect-[3/4] rounded-xl overflow-hidden border bg-muted shadow-sm">
-        {formData.images?.[0] && (
-            <Image 
-                src={formData.images[0].url} 
-                alt="Main" 
-                fill 
-                className="object-cover" 
-                unoptimized={formData.images[0].url.startsWith('blob:')}
-            />
-        )}
-        <Button variant="secondary" size="sm" className="absolute bottom-4 right-4" onClick={() => goToStep(1)}>
-          <Edit2 className="h-4 w-4 mr-2" /> Edit Photos
-        </Button>
-      </div>
-
-      {isPublishing && (
-          <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-primary">
-                  <span>Uploading listing...</span>
-                  <span>{uploadProgress}%</span>
-              </div>
-              <Progress value={uploadProgress} className="h-2" />
-          </div>
+      {error && (
+          <Alert variant="destructive" className="border-destructive/50 bg-destructive/5">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Action Required</AlertTitle>
+              <AlertDescription className="mt-2 text-xs">
+                  {error}
+              </AlertDescription>
+          </Alert>
       )}
 
-      <div className="space-y-6">
-        <section className="space-y-2">
-          <div className="flex justify-between items-center">
-            <h3 className="font-bold text-2xl uppercase tracking-tighter">{brandName}</h3>
-            <span className="text-2xl font-bold">€{formData.price}</span>
-          </div>
-          <p className="text-muted-foreground text-lg">{formData.title}</p>
-          <div className="flex gap-2">
-            {formData.sizeValue && <span className="bg-muted px-2 py-1 rounded text-[10px] uppercase font-bold border">{formData.sizeValue}</span>}
-            <span className="bg-muted px-2 py-1 rounded text-[10px] uppercase font-bold border">{formData.condition?.replace('_', ' ')}</span>
-          </div>
-        </section>
-
-        <section className="p-4 bg-muted/20 rounded-xl border">
-          <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground mb-2">Description</h4>
-          <p className="text-sm leading-relaxed text-foreground/80 line-clamp-4">{formData.description}</p>
-        </section>
-
-        <div className="space-y-3 pt-2">
-          <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
-            <Check className="h-4 w-4" />
-            <span>High quality photos confirmed</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
-            <Check className="h-4 w-4" />
-            <span>Detailed description verified</span>
-          </div>
+      {/* Main Preview Card */}
+      <div className="relative aspect-[3/4] rounded-2xl overflow-hidden border shadow-xl bg-muted group">
+        {formData.images?.[0] ? (
+            <Image 
+                src={formData.images[0].url} 
+                alt="Product preview" 
+                fill 
+                className="object-cover transition-transform duration-700 group-hover:scale-105" 
+                unoptimized={formData.images[0].url.startsWith('blob:')}
+            />
+        ) : (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                <Camera className="h-12 w-12 mb-2 opacity-20" />
+                <p className="text-xs font-bold uppercase tracking-widest">No preview</p>
+            </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        
+        <div className="absolute bottom-0 left-0 right-0 p-6 text-white space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">{formData.brandId || 'Designer'}</p>
+            <h3 className="text-xl font-bold line-clamp-1">{formData.title || 'Untitled Item'}</h3>
+            <p className="text-2xl font-black">{formatPrice(formData.price || 0)}</p>
         </div>
+
+        {!isPublishing && (
+            <Button 
+                variant="secondary" 
+                size="sm" 
+                className="absolute top-4 right-4 h-10 px-4 rounded-full shadow-lg bg-white/90 backdrop-blur-sm text-black hover:bg-white font-bold text-xs" 
+                onClick={() => goToStep(1)} 
+            >
+              <Edit2 className="h-3 w-3 mr-2" /> Photos
+            </Button>
+        )}
       </div>
 
+      {/* Publishing Progress */}
+      {isPublishing && (
+          <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="p-6 space-y-4">
+                  <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-primary">
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        {statusMessage}
+                      </span>
+                      <span>{Math.round(uploadProgress)}%</span>
+                  </div>
+                  <Progress value={uploadProgress} className="h-1.5" />
+              </CardContent>
+          </Card>
+      )}
+
+      {/* Item Summary */}
+      <div className="space-y-4">
+        <Card className="border-none bg-muted/30">
+            <CardContent className="p-5 space-y-5">
+                <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Condition</p>
+                        <p className="font-bold text-sm capitalize">{formData.condition?.replace('_', ' ') || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Size</p>
+                        <p className="font-bold text-sm">{formData.sizeValue || 'O/S'}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Material</p>
+                        <p className="font-bold text-sm capitalize">{formData.material || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Color</p>
+                        <p className="font-bold text-sm capitalize">{formData.color || 'N/A'}</p>
+                    </div>
+                </div>
+                
+                <div className="pt-4 border-t border-muted-foreground/10">
+                    <div className="flex justify-between items-center">
+                        <div className="space-y-0.5">
+                            <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Pricing</p>
+                            <p className="text-sm font-medium">15% platform fee applies</p>
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-auto p-0 text-primary font-bold text-xs" onClick={() => goToStep(5)}>Edit</Button>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+
+        {selectedAddress && (
+            <div className="p-4 bg-background rounded-xl border flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-4">
+                    <div className="p-2 bg-primary/5 rounded-full">
+                        <MapPin className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="text-xs">
+                        <p className="font-black uppercase text-[8px] text-muted-foreground tracking-widest mb-0.5">Shipping From</p>
+                        <p className="font-bold">{selectedAddress.fullName}</p>
+                        <p className="text-muted-foreground">{selectedAddress.city}, {selectedAddress.country}</p>
+                    </div>
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => goToStep(5)}>
+                    <ChevronRight className="h-4 w-4" />
+                </Button>
+            </div>
+        )}
+      </div>
+
+      {/* Footer Actions */}
       <div className="flex flex-col gap-3 pt-4">
-        <Button className="w-full h-14 text-lg font-bold bg-black text-white hover:bg-black/90" size="lg" onClick={handlePublish} disabled={isPublishing}>
+        <Button 
+            className={cn(
+                "w-full h-16 text-base font-bold shadow-xl transition-all active:scale-[0.98] rounded-full",
+                isPublishing ? "bg-muted text-muted-foreground" : "bg-black text-white hover:bg-black/90"
+            )} 
+            size="lg" 
+            onClick={handlePublish} 
+            disabled={isPublishing}
+        >
           {isPublishing ? (
-              <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Publishing...</>
+              <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Publishing...</span>
+              </span>
           ) : (
-              <><Upload className="h-5 w-5 mr-2" /> Publish Now</>
+              <span className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Confirm & Publish
+              </span>
           )}
         </Button>
-        <Button variant="outline" className="w-full h-14 text-lg font-medium" size="lg" disabled={isPublishing} onClick={() => goToStep(0)}>
-          Save as Draft
-        </Button>
+        
+        {!isPublishing && (
+            <Button 
+                variant="ghost" 
+                className="w-full h-10 font-bold text-muted-foreground hover:text-foreground uppercase tracking-widest text-[10px]" 
+                onClick={() => goToStep(5)}
+            >
+              Back to Pricing
+            </Button>
+        )}
       </div>
     </div>
   );

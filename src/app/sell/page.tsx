@@ -10,49 +10,70 @@ import { ReviewStep } from '@/components/sell/steps/ReviewStep';
 import { SuccessStep } from '@/components/sell/steps/SuccessStep';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Tag, History } from 'lucide-react';
+import { Plus, Tag, History, Trash2, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function SellPage() {
-  const { activeDraft, drafts, startNewDraft, selectDraft, currentStep, totalSteps } = useSellForm();
+  const { activeDraft, drafts, startNewDraft, selectDraft, deleteDraft, currentStep, totalSteps } = useSellForm();
 
   if (!activeDraft) {
     return (
       <div className="container mx-auto max-w-2xl py-12 px-4 space-y-8">
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold font-headline">Sell on Marigo</h1>
-          <p className="text-muted-foreground text-sm">Turn your luxury items into cash in easy steps.</p>
+          <h1 className="text-3xl font-bold font-headline">Sell on Marigo</h1>
+          <p className="text-muted-foreground text-sm">Give your luxury items a new life in just a few steps.</p>
         </div>
 
-        <Button className="w-full h-14 text-sm gap-3 bg-black hover:bg-black/90" onClick={startNewDraft}>
-          <Plus className="h-5 w-5" />
-          Start New Listing
+        <Button className="w-full h-16 text-lg gap-3 bg-black hover:bg-black/90 shadow-lg" onClick={startNewDraft}>
+          <Plus className="h-6 w-6" />
+          List a New Item
         </Button>
 
         {drafts.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="font-bold flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Continue from draft
+          <div className="space-y-4 pt-4">
+            <h3 className="font-bold flex items-center gap-2 text-muted-foreground uppercase text-xs tracking-widest">
+              <History className="h-4 w-4" />
+              Pending Drafts
             </h3>
-            <div className="grid gap-4">
+            <div className="grid gap-3">
               {drafts.map(draft => (
-                <Card key={draft.id} className="cursor-pointer hover:border-primary transition-colors" onClick={() => selectDraft(draft.id)}>
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 bg-muted rounded flex items-center justify-center">
-                        <Tag className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-bold">{draft.formData.brand || 'Untitled Draft'}</p>
-                        <p className="text-xs text-muted-foreground">Last modified {new Date(draft.lastModified).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-primary">Step {draft.currentStep} of {totalSteps}</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div key={draft.id} className="group relative">
+                    <Card 
+                        className="cursor-pointer hover:border-primary transition-all active:scale-[0.98]" 
+                        onClick={() => selectDraft(draft.id)}
+                    >
+                        <CardContent className="p-4 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 bg-primary/5 rounded-lg flex items-center justify-center border border-primary/10">
+                                    <Tag className="h-6 w-6 text-primary" />
+                                </div>
+                                <div>
+                                    <p className="font-bold">{draft.formData.brandId || 'Untitled Item'}</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-tighter">
+                                        Last modified {new Date(draft.lastModified).toLocaleDateString()}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="text-right hidden sm:block">
+                                    <p className="text-xs font-semibold text-primary uppercase">Step {draft.currentStep}/{totalSteps}</p>
+                                </div>
+                                <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute -right-12 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            deleteDraft(draft.id);
+                        }}
+                    >
+                        <Trash2 className="h-5 w-5" />
+                    </Button>
+                </div>
               ))}
             </div>
           </div>

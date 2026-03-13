@@ -1,3 +1,4 @@
+
 'use client';
 import { useMemo } from 'react';
 import Link from 'next/link'; // Import Link
@@ -25,6 +26,7 @@ import {
   Settings,
   Archive,
   Truck,
+  Megaphone,
 } from 'lucide-react';
 import { StatCard } from '@/components/admin/stat-card';
 import { RevenueChart } from '@/components/admin/charts/revenue-chart';
@@ -128,6 +130,12 @@ export default function AdminDashboardPage() {
                 </Button>
                  <Button asChild variant="outline">
                     <Link href="/admin/orders">Orders</Link>
+                </Button>
+                 <Button asChild variant="outline">
+                    <Link href="/admin/marketing">
+                        <Megaphone className="mr-2 h-4 w-4" />
+                        Marketing
+                    </Link>
                 </Button>
                  <Button asChild variant="outline">
                     <Link href="/admin/users">Manage Users</Link>

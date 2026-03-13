@@ -1,6 +1,6 @@
-
 'use client';
 
+import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -13,23 +13,42 @@ import {
 } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useSellForm } from '@/components/sell/SellFormContext';
-import { sellStep2Schema } from '@/lib/types';
+import { sellStep2Schema, type FirestoreCategory, type FirestoreBrand } from '@/lib/types';
 import type { z } from 'zod';
-import { productCategories } from '@/lib/mock-data';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
-import { brands } from '@/lib/mock-data';
 import { StepActions } from '../StepActions';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
 type Step2Values = z.infer<typeof sellStep2Schema>;
 
-const categoryItems = productCategories.flatMap(group => 
-    group.subcategories.map(item => ({ value: item.slug, label: item.name }))
-);
-
 export function CategoryStep() {
   const { formData, setFormData, nextStep } = useSellForm();
+  const firestore = useFirestore();
+
+  // Fetch Categories
+  const categoriesQuery = useMemoFirebase(() => 
+    query(collection(firestore, 'categories'), where('isActive', '==', true)),
+    [firestore]
+  );
+  const { data: categories } = useCollection<FirestoreCategory>(categoriesQuery);
+
+  // Fetch Brands
+  const brandsQuery = useMemoFirebase(() => collection(firestore, 'brands'), [firestore]);
+  const { data: brands } = useCollection<FirestoreBrand>(brandsQuery);
+
+  const categoryTree = React.useMemo(() => {
+    if (!categories) return [];
+    const parents = categories.filter(c => !c.parentId);
+    const subs = categories.filter(c => c.parentId);
+    
+    return parents.map(p => ({
+        heading: p.name,
+        items: subs.filter(s => s.parentId === p.id).map(s => ({ value: s.slug, label: s.name }))
+    })).filter(g => g.items.length > 0);
+  }, [categories]);
 
   const form = useForm<Step2Values>({
     resolver: zodResolver(sellStep2Schema),
@@ -46,8 +65,6 @@ export function CategoryStep() {
     nextStep();
   };
 
-  const genderValue = form.watch('gender');
-
   return (
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -56,7 +73,7 @@ export function CategoryStep() {
             name="gender"
             render={({ field }) => (
               <FormItem className="space-y-4">
-                <FormLabel className="font-semibold">What type of item are you selling?</FormLabel>
+                <FormLabel className="font-semibold text-lg">What type of item are you selling?</FormLabel>
                 <FormControl>
                   <RadioGroup
                     onValueChange={field.onChange}
@@ -74,14 +91,14 @@ export function CategoryStep() {
                           <FormControl>
                             <Label
                               className={cn(
-                                'flex w-full cursor-pointer items-center gap-4 rounded-md border p-4 transition-colors hover:border-primary',
-                                genderValue === g.value
-                                  ? 'border-primary ring-2 ring-primary'
-                                  : 'border-input'
+                                'flex w-full cursor-pointer items-center gap-4 rounded-xl border-2 p-4 transition-all hover:border-primary',
+                                field.value === g.value
+                                  ? 'border-primary bg-primary/5'
+                                  : 'border-muted'
                               )}
                             >
                               <RadioGroupItem value={g.value} />
-                              <span className="font-medium">{g.label}</span>
+                              <span className="font-semibold">{g.label}</span>
                             </Label>
                           </FormControl>
                         </FormItem>
@@ -105,15 +122,11 @@ export function CategoryStep() {
                       value={field.value}
                       onValueChange={(val) => {
                           field.onChange(val);
-                          // Determine categoryId based on subcategory
-                          for (const cat of productCategories) {
-                              if (cat.subcategories.some(s => s.slug === val)) {
-                                  form.setValue('categoryId', cat.name.toLowerCase());
-                                  break;
-                              }
-                          }
+                          const sub = categories?.find(c => c.slug === val);
+                          const parent = categories?.find(c => c.id === sub?.parentId);
+                          if (parent) form.setValue('categoryId', parent.name);
                       }}
-                      items={categoryItems}
+                      items={categoryTree}
                       placeholder="Select item type"
                       searchPlaceholder="Search categories..."
                       emptyPlaceholder="No category found."
@@ -123,7 +136,7 @@ export function CategoryStep() {
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="brandId"
@@ -132,23 +145,20 @@ export function CategoryStep() {
                 <FormLabel className="font-semibold">Brand</FormLabel>
                 <FormControl>
                   <Combobox
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      items={brands.map((brand) => ({
-                        value: brand.name,
-                        label: brand.name,
-                      }))}
-                      placeholder="Select brand"
-                      searchPlaceholder="Search brands..."
-                      emptyPlaceholder="No brand found."
-                    />
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    items={brands?.map(b => ({ value: b.name, label: b.name })) || []}
+                    placeholder="Select brand"
+                    searchPlaceholder="Search brands..."
+                    emptyPlaceholder="No brands found."
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-
-          <StepActions onNext={form.handleSubmit(onSubmit)} backText="Back to drafts" />
+          
+          <StepActions onNext={form.handleSubmit(onSubmit)} />
         </form>
       </Form>
   );

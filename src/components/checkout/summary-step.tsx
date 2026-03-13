@@ -1,4 +1,3 @@
-
 'use client';
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,7 +23,7 @@ type SummaryStepProps = {
 export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedMethodId }: SummaryStepProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const { items, grandTotal, clearCart } = useCart();
+  const { items, grandTotal, discountAmount, appliedCoupon, clearCart } = useCart();
   const { user } = useUser();
   const firestore = useFirestore();
   const [isLoading, setIsLoading] = useState(false);
@@ -41,77 +40,91 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
     setIsLoading(true);
     setErrorMessage(null);
 
-    // 1. Handle Cash on Delivery
-    if (paymentMethod === 'cod') {
-        try {
+    // Prepare standardized payload for the backend
+    const orderPayload = {
+        items: items.map(i => ({ 
+            id: i.id, 
+            sellerId: i.sellerId, 
+            title: i.title, 
+            price: i.price,
+            brand: i.brand,
+            image: i.image
+        })),
+        shippingAddress,
+        paymentMethod: paymentMethod === 'cod' ? 'cod' : 'card',
+        couponCode: appliedCoupon?.code || null,
+        // Backend will re-calculate, but we pass these for audit/comparison
+        clientGrandTotal: grandTotal, 
+    };
+
+    try {
+        // 1. Handle Cash on Delivery (Standard Order)
+        if (paymentMethod === 'cod') {
             const createOrder = httpsCallable(functions, 'createOrder');
-            const result: any = await createOrder({
-                items: items.map(i => ({ id: i.id, sellerId: i.sellerId, title: i.title, price: i.price })),
-                shippingAddress,
-                paymentMethod: 'cod'
-            });
+            const result: any = await createOrder(orderPayload);
+            
+            if (result.data.success === false) {
+                throw new Error(result.data.error || "Order creation failed.");
+            }
+
             clearCart();
             router.push(`/checkout/success/${result.data.orderId}`);
             return;
-        } catch (e: any) {
-            setErrorMessage(e.message || "Could not process COD order.");
-            setIsLoading(false);
-            return;
         }
-    }
 
-    // 2. Handle Card Payments (New or Saved)
-    if (!stripe) return;
+        // 2. Handle Card Payments (New or Saved) via Stripe Escrow
+        if (!stripe) {
+            throw new Error("Stripe is not properly initialized. Please refresh.");
+        }
 
-    try {
         const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
         const intentResult: any = await createPaymentIntent({
-            items: items.map(i => ({ id: i.id, sellerId: i.sellerId, title: i.title })),
-            shippingAddress,
-            paymentMethodId: selectedPaymentMethodId // Pass ID if using saved card
+            ...orderPayload,
+            paymentMethodId: paymentMethod === 'saved_card' ? savedMethodId : undefined
         });
 
-        const { clientSecret, orderId, requiresAction } = intentResult.data;
+        const { clientSecret, orderId, error: backendError } = intentResult.data;
 
-        if (requiresAction) {
-            // Handle 3D Secure for saved cards or specific cases
-            const actionResult = await stripe.handleCardAction(clientSecret);
-            if (actionResult.error) {
-                throw new Error(actionResult.error.message);
-            }
+        if (backendError) {
+            throw new Error(backendError);
         }
 
-        // For new cards, we need the CardElement
         let confirmResult;
         if (paymentMethod === 'card' && elements) {
+            // New card confirmation
             confirmResult = await stripe.confirmCardPayment(clientSecret, {
                 payment_method: {
                     card: elements.getElement(CardElement)!,
                     billing_details: {
                         name: shippingAddress.fullName,
                         email: user.email || undefined,
+                        phone: shippingAddress.phone || undefined,
                     },
                 },
             });
         } else {
-            // For saved cards where createPaymentIntent already attached the PM
+            // Saved card or express checkout (already has paymentMethodId on intent)
             confirmResult = await stripe.confirmCardPayment(clientSecret);
         }
 
         if (confirmResult.error) {
-            setErrorMessage(confirmResult.error.message || "Payment failed");
+            throw new Error(confirmResult.error.message || "Payment failed at Stripe confirmation step.");
+        } 
+        
+        // Successful payment intent (captured manually later)
+        const status = confirmResult.paymentIntent.status;
+        if (status === 'requires_capture' || status === 'succeeded') {
+            clearCart();
+            toast({ title: "Order Confirmed!", description: "Funds are safely held in escrow.", variant: "success" });
+            router.push(`/checkout/success/${orderId}`);
         } else {
-            if (confirmResult.paymentIntent.status === 'requires_capture' || confirmResult.paymentIntent.status === 'succeeded') {
-                clearCart();
-                toast({ title: "Order Placed!", description: "Funds held in escrow successfully." });
-                router.push(`/checkout/success/${orderId}`);
-            } else {
-                setErrorMessage(`Unexpected status: ${confirmResult.paymentIntent.status}`);
-            }
+            throw new Error(`Unexpected payment status: ${status}. Please contact support.`);
         }
+
     } catch (error: any) {
-        console.error("Payment error:", error);
-        setErrorMessage(error.message || "An unexpected error occurred during payment.");
+        console.error("Transaction failed:", error);
+        setErrorMessage(error.message || "An unexpected system error occurred. Your card was not charged.");
+        toast({ variant: 'destructive', title: "Order Error", description: error.message });
     } finally {
         setIsLoading(false);
     }
@@ -119,35 +132,33 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
 
   const paymentLabel = {
       card: 'New Credit or Debit Card',
-      saved_card: 'Saved Credit Card',
+      saved_card: 'Saved Payment Method',
       cod: 'Cash on Delivery',
       apple_pay: 'Apple Pay',
       paypal: 'PayPal',
   }[paymentMethod || 'card'];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold font-headline">Review Your Order</h2>
-        <p className="text-muted-foreground text-sm">Confirm your details below to place your order securely.</p>
+        <h2 className="text-2xl font-bold font-headline">Order Summary</h2>
+        <p className="text-muted-foreground text-sm">One final check before we secure your item.</p>
       </div>
 
-      <div className="grid gap-6">
-          <Card className="border-none bg-muted/20 shadow-sm overflow-hidden">
+      <div className="grid gap-4">
+          <Card className="border-none bg-muted/20 shadow-sm overflow-hidden group">
               <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-2">
-                          <div className="bg-primary/10 p-2 rounded-full">
-                            <MapPin className="h-4 w-4 text-primary" />
-                          </div>
-                          <h3 className="font-bold text-sm uppercase tracking-wider">Shipping To</h3>
+                      <div className="flex items-center gap-2 text-primary">
+                          <MapPin className="h-4 w-4" />
+                          <h3 className="font-bold text-xs uppercase tracking-widest">Delivery Address</h3>
                       </div>
-                      <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onPrevStep(1)}>Change</Button>
+                      <Button variant="ghost" size="sm" className="h-auto p-0 text-xs font-bold text-primary" onClick={() => onPrevStep(1)}>Edit</Button>
                   </div>
                   {shippingAddress && (
                       <div className="text-sm space-y-1">
-                          <p className="font-bold text-base">{shippingAddress.fullName}</p>
-                          <p className="text-muted-foreground">{shippingAddress.address}</p>
+                          <p className="font-bold text-base text-foreground">{shippingAddress.fullName}</p>
+                          <p className="text-muted-foreground leading-tight">{shippingAddress.address}</p>
                           <p className="text-muted-foreground">{shippingAddress.city}, {shippingAddress.postal}, {shippingAddress.country}</p>
                       </div>
                   )}
@@ -157,15 +168,13 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
           <Card className="border-none bg-muted/20 shadow-sm overflow-hidden">
               <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-2">
-                          <div className="bg-primary/10 p-2 rounded-full">
-                            <CreditCard className="h-4 w-4 text-primary" />
-                          </div>
-                          <h3 className="font-bold text-sm uppercase tracking-wider">Payment Method</h3>
+                      <div className="flex items-center gap-2 text-primary">
+                          <CreditCard className="h-4 w-4" />
+                          <h3 className="font-bold text-xs uppercase tracking-widest">Payment Method</h3>
                       </div>
-                      <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onPrevStep(2)}>Change</Button>
+                      <Button variant="ghost" size="sm" className="h-auto p-0 text-xs font-bold text-primary" onClick={() => onPrevStep(2)}>Edit</Button>
                   </div>
-                  <div className="flex items-center gap-3 text-sm font-medium bg-background px-4 py-3 rounded-lg border">
+                  <div className="flex items-center gap-3 text-sm font-bold bg-background/80 px-4 py-3 rounded-xl border border-primary/10">
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
                       {paymentLabel}
                   </div>
@@ -174,38 +183,42 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
       </div>
 
       {errorMessage && (
-          <Alert variant="destructive" className="bg-destructive/5 border-destructive/20 animate-in fade-in slide-in-from-top-2">
+          <Alert variant="destructive" className="bg-destructive/5 border-destructive/20 animate-in shake-in">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="font-medium">{errorMessage}</AlertDescription>
           </Alert>
       )}
 
       <div className="space-y-6 pt-4">
-          <div className="bg-green-50 border border-green-100 rounded-xl p-4 flex gap-3">
+          <div className="bg-green-50 border border-green-100 rounded-2xl p-5 flex gap-4">
               <ShieldCheck className="h-6 w-6 text-green-600 flex-shrink-0" />
               <div className="space-y-1">
-                  <p className="text-sm font-bold text-green-900">Buyer Protection & Escrow</p>
+                  <p className="text-sm font-bold text-green-900">100% Buyer Protection</p>
                   <p className="text-xs text-green-800 leading-relaxed">
-                      Your payment is held securely in escrow. The seller is paid only after you receive the item and confirm it's as described.
+                      We hold your payment in a secure escrow account. The seller only receives funds once you've received and verified your luxury item.
                   </p>
               </div>
           </div>
 
           <Button
             size="lg"
-            className="w-full h-16 rounded-full text-lg font-bold shadow-xl shadow-primary/30"
+            className="w-full h-16 rounded-full text-lg font-bold shadow-xl shadow-primary/30 transition-all active:scale-[0.98]"
             onClick={handleFinaliseOrder}
-            disabled={isLoading || !stripe}
+            disabled={isLoading}
           >
             {isLoading ? (
                 <div className="flex items-center gap-3">
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>Processing...</span>
+                    <span>Processing Transaction...</span>
                 </div>
             ) : (
-                `Pay Now — ${formatPrice(grandTotal)}`
+                `Secure Order — ${formatPrice(grandTotal)}`
             )}
           </Button>
+          
+          <p className="text-[10px] text-center text-muted-foreground px-8 leading-tight">
+              By placing this order, you agree to Marigo's <span className="underline cursor-pointer">Terms of Service</span> and <span className="underline cursor-pointer">Buyer Protection Policy</span>.
+          </p>
       </div>
     </div>
   );

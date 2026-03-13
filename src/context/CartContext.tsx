@@ -1,11 +1,11 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, errorEmitter } from '@/firebase';
-import { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot, writeBatch, query, where, limit } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
+import type { FirestoreCoupon, FirestoreSettings } from '@/lib/types';
 
 export type ShippingMethod = 'direct' | 'authentication';
 
@@ -29,6 +29,10 @@ interface CartContextType {
     removeFromCart: (itemId: string) => void;
     updateQuantity: (itemId: string, quantity: number) => void;
     clearCart: () => void;
+    applyCoupon: (code: string) => Promise<{ success: boolean; message: string }>;
+    removeCoupon: () => void;
+    appliedCoupon: FirestoreCoupon | null;
+    discountAmount: number;
     subtotal: number;
     totalItems: number;
     totalShipping: number;
@@ -41,9 +45,20 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [items, setItems] = useState<CartItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [appliedCoupon, setAppliedCoupon] = useState<FirestoreCoupon | null>(null);
+    const [settings, setSettings] = useState<FirestoreSettings | null>(null);
+    
     const { user } = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
+
+    // Load global settings (for free delivery thresholds)
+    useEffect(() => {
+        if (!firestore) return;
+        return onSnapshot(doc(firestore, 'settings', 'global'), (snap) => {
+            if (snap.exists()) setSettings(snap.data() as FirestoreSettings);
+        });
+    }, [firestore]);
 
     // 1. Initial Load from LocalStorage (for guests)
     useEffect(() => {
@@ -112,6 +127,43 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }, [items, user]);
 
+    const subtotal = useMemo(() => items.reduce((acc, item) => acc + (item.price * item.quantity), 0), [items]);
+
+    const applyCoupon = useCallback(async (code: string) => {
+        if (!firestore) return { success: false, message: "Service unavailable" };
+        
+        try {
+            const q = query(collection(firestore, 'coupons'), where('code', '==', code.toUpperCase()), limit(1));
+            const snap = await getDocs(q);
+            
+            if (snap.empty) return { success: false, message: "Invalid coupon code" };
+            
+            const coupon = { id: snap.docs[0].id, ...snap.docs[0].data() } as FirestoreCoupon;
+            
+            if (!coupon.isActive) return { success: false, message: "This coupon is no longer active" };
+            if (subtotal < (coupon.minOrderValue || 0)) {
+                return { success: false, message: `Minimum spend of €${coupon.minOrderValue} required` };
+            }
+
+            setAppliedCoupon(coupon);
+            return { success: true, message: "Coupon applied!" };
+        } catch (e) {
+            return { success: false, message: "Error validating coupon" };
+        }
+    }, [firestore, subtotal]);
+
+    const removeCoupon = useCallback(() => {
+        setAppliedCoupon(null);
+    }, []);
+
+    const discountAmount = useMemo(() => {
+        if (!appliedCoupon) return 0;
+        if (appliedCoupon.type === 'percentage') {
+            return (subtotal * appliedCoupon.value) / 100;
+        }
+        return appliedCoupon.value;
+    }, [appliedCoupon, subtotal]);
+
     const addToCart = useCallback(async (product: any, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => {
         const quantity = options?.quantity || 1;
         const size = options?.selectedSize || product.size || null;
@@ -122,7 +174,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             brand: product.brand,
             title: product.title,
             price: product.price,
-            image: product.images?.[0] || product.image,
+            image: product.images?.[0]?.url || product.image,
             sellerId: product.sellerId,
             quantity,
             selectedSize: size,
@@ -131,7 +183,6 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             directShippingFee: 10.90,
         };
 
-        // Optimistic update for UI feel
         setItems(prev => {
             const existing = prev.find(i => i.id === newItem.id);
             if (existing) {
@@ -187,6 +238,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const clearCart = useCallback(async () => {
         setItems([]);
+        setAppliedCoupon(null);
         localStorage.removeItem('marigo_cart');
 
         if (user && firestore) {
@@ -196,13 +248,34 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }, [user, firestore]);
 
-    const subtotal = useMemo(() => items.reduce((acc, item) => acc + (item.price * item.quantity), 0), [items]);
     const totalItems = useMemo(() => items.reduce((acc, item) => acc + item.quantity, 0), [items]);
-    const totalShipping = useMemo(() => items.reduce((acc, item) => acc + (item.directShippingFee * item.quantity), 0), [items]);
-    const grandTotal = useMemo(() => subtotal + totalShipping, [subtotal, totalShipping]);
+    
+    const totalShipping = useMemo(() => {
+        if (settings?.isFreeDeliveryActive && subtotal >= (settings?.freeDeliveryThreshold || 0)) {
+            return 0;
+        }
+        return items.reduce((acc, item) => acc + (item.directShippingFee * item.quantity), 0);
+    }, [items, settings, subtotal]);
+
+    const grandTotal = useMemo(() => Math.max(0, subtotal + totalShipping - discountAmount), [subtotal, totalShipping, discountAmount]);
 
     return (
-        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, clearCart, subtotal, totalItems, totalShipping, grandTotal, isLoading }}>
+        <CartContext.Provider value={{ 
+            items, 
+            addToCart, 
+            removeFromCart, 
+            updateQuantity, 
+            clearCart, 
+            applyCoupon,
+            removeCoupon,
+            appliedCoupon,
+            discountAmount,
+            subtotal, 
+            totalItems, 
+            totalShipping, 
+            grandTotal, 
+            isLoading 
+        }}>
             {children}
         </CartContext.Provider>
     );

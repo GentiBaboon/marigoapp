@@ -1,8 +1,9 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useFirestore, useDoc, useMemoFirebase, useUser } from '@/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 export type Currency = 'EUR' | 'ALL' | 'USD';
 
@@ -47,6 +48,7 @@ function setCookie(name: string, value: string, days: number) {
 
 export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [currency, setCurrencyState] = useState<Currency>('EUR');
+    const { user } = useUser();
     const firestore = useFirestore();
 
     const ratesRef = useMemoFirebase(() => firestore ? doc(firestore, 'config', 'exchangeRates') : null, [firestore]);
@@ -59,23 +61,34 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
     }, []);
     
-    const setCurrency = useCallback((newCurrency: Currency) => {
+    const setCurrency = useCallback(async (newCurrency: Currency) => {
         setCurrencyState(newCurrency);
         setCookie('marigo_currency', newCurrency, 365);
-    }, []);
+        if (user && firestore) {
+            try {
+                await updateDoc(doc(firestore, 'users', user.uid), { currency: newCurrency });
+            } catch (e) {
+                console.error("Failed to update user currency preference", e);
+            }
+        }
+    }, [user, firestore]);
 
     const formatPrice = useCallback((priceInEur: number, targetCurrency?: Currency) => {
         const c = targetCurrency || currency;
-        const rate = exchangeRates?.rates[c] || 1;
+        const rates = exchangeRates?.rates || { EUR: 1, ALL: 103.5, USD: 1.08 }; // Fallback rates
+        const rate = rates[c] || 1;
         const convertedPrice = priceInEur * rate;
         
         let locale = 'de-DE'; // For EUR
-        if (c === 'ALL') locale = 'sq-AL';
+        if (c === 'ALL') {
+            return `${Math.round(convertedPrice).toLocaleString('de-DE')} ALL`;
+        }
         else if (c === 'USD') locale = 'en-US';
 
         return new Intl.NumberFormat(locale, {
             style: 'currency',
             currency: c,
+            maximumFractionDigits: c === 'ALL' ? 0 : 2
         }).format(convertedPrice);
 
     }, [currency, exchangeRates]);
