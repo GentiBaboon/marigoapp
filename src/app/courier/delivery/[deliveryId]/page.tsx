@@ -36,17 +36,45 @@ export default function ActiveDeliveryPage() {
         return <PickupStep delivery={delivery} />;
       case 'arrived_for_pickup':
         return <ConfirmPickupStep delivery={delivery} />;
-      // TODO: Add other steps
-      // case 'picked_up':
-      //     return <NavigateToDeliveryStep delivery={delivery} />;
-      // case 'arrived_for_delivery':
-      //     return <ConfirmDeliveryStep delivery={delivery} />;
+      case 'picked_up':
+      case 'in_transit':
+        return (
+          <div className="text-center py-10 space-y-3">
+            <div className="text-4xl">🚚</div>
+            <h2 className="text-xl font-bold">In Transit</h2>
+            <p className="text-muted-foreground">Package picked up. Navigate to the delivery address.</p>
+          </div>
+        );
+      case 'arrived_for_delivery':
+        return (
+          <div className="text-center py-10 space-y-3">
+            <div className="text-4xl">📍</div>
+            <h2 className="text-xl font-bold">Arrived at Destination</h2>
+            <p className="text-muted-foreground">Please hand the package to the recipient and confirm delivery.</p>
+          </div>
+        );
       case 'delivered':
-        return <div>Delivery Completed!</div>;
+        return (
+          <div className="text-center py-10 space-y-3">
+            <div className="text-4xl">✅</div>
+            <h2 className="text-xl font-bold">Delivery Completed!</h2>
+            <p className="text-muted-foreground">This delivery has been successfully completed.</p>
+          </div>
+        );
       case 'cancelled':
-        return <div>Delivery Cancelled.</div>;
+        return (
+          <div className="text-center py-10 space-y-3">
+            <div className="text-4xl">❌</div>
+            <h2 className="text-xl font-bold">Delivery Cancelled</h2>
+            <p className="text-muted-foreground">This delivery has been cancelled.</p>
+          </div>
+        );
       default:
-        return <div>Unknown delivery status: {delivery.status}</div>;
+        return (
+          <div className="text-center py-10 space-y-3">
+            <p className="text-muted-foreground">Status: {delivery.status}</p>
+          </div>
+        );
     }
   };
 

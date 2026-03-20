@@ -90,7 +90,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
           const userDocRef = doc(firestore, 'users', firebaseUser.uid);
           getDoc(userDocRef).then(docSnap => {
             if (!docSnap.exists()) {
-              setDoc(userDocRef, {
+              return setDoc(userDocRef, {
                 name: firebaseUser.displayName,
                 email: firebaseUser.email,
                 profileImage: firebaseUser.photoURL,
@@ -98,11 +98,13 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
                 status: 'active',
                 createdAt: serverTimestamp(),
                 lastLoginAt: serverTimestamp()
-              }, { merge: true }); // use merge to be safe
+              }, { merge: true });
             } else {
               // Update last login
-              setDoc(userDocRef, { lastLoginAt: serverTimestamp() }, { merge: true });
+              return setDoc(userDocRef, { lastLoginAt: serverTimestamp() }, { merge: true });
             }
+          }).catch(error => {
+            console.error("FirebaseProvider: Failed to sync user document:", error);
           });
         }
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });

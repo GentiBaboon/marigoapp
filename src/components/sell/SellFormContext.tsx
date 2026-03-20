@@ -37,10 +37,16 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Ensure we handle legacy drafts safely
-        setDrafts(parsed);
+        if (Array.isArray(parsed)) {
+          setDrafts(parsed);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Failed to load sell drafts from storage:", e);
+      localStorage.removeItem(STORAGE_KEY);
+    }
     setIsInitialized(true);
   }, []);
 
@@ -62,7 +68,9 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
       }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizedDrafts.slice(0, 5)));
-    } catch (e) {}
+    } catch (e) {
+      console.error("Failed to save sell drafts to storage:", e);
+    }
   }, []);
 
   useEffect(() => {

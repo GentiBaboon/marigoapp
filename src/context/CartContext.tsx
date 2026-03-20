@@ -232,7 +232,12 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         if (user && firestore) {
             const itemRef = doc(firestore, 'users', user.uid, 'cart', itemId);
-            setDoc(itemRef, { quantity }, { merge: true });
+            setDoc(itemRef, { quantity }, { merge: true }).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: itemRef.path,
+                    operation: 'write',
+                }));
+            });
         }
     }, [user, firestore, removeFromCart]);
 
@@ -242,9 +247,17 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         localStorage.removeItem('marigo_cart');
 
         if (user && firestore) {
-            const cartRef = collection(firestore, 'users', user.uid, 'cart');
-            const snapshot = await getDocs(cartRef);
-            snapshot.docs.forEach(d => deleteDoc(d.ref));
+            try {
+                const cartRef = collection(firestore, 'users', user.uid, 'cart');
+                const snapshot = await getDocs(cartRef);
+                if (snapshot.docs.length > 0) {
+                    const batch = writeBatch(firestore);
+                    snapshot.docs.forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                }
+            } catch (err) {
+                console.error("Failed to clear cart in Firestore:", err);
+            }
         }
     }, [user, firestore]);
 

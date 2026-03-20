@@ -46,7 +46,7 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
   
   const [selectedMethod, setSelectedMethod] = useState('card');
   const [selectedSavedCardId, setSelectedSavedCardId] = useState<string | null>(null);
-  const [paymentRequest, setPaymentRequest] = useState<any>(null);
+  const [paymentRequest, setPaymentRequest] = useState<ReturnType<typeof stripe.paymentRequest> | null>(null);
 
   const paymentMethodsCol = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -142,7 +142,7 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
                                 </div>
                                 <div>
                                     <p className="font-bold text-sm capitalize">{card.brand} •••• {card.last4}</p>
-                                    <p className="text-[10px] text-muted-foreground uppercase">Expires 12/26</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase">Expires {String(card.expMonth).padStart(2, '0')}/{String(card.expYear).slice(-2)}</p>
                                 </div>
                             </div>
                             {card.isDefault && <span className="text-[10px] font-bold bg-muted px-1.5 py-0.5 rounded">DEFAULT</span>}

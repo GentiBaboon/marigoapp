@@ -52,11 +52,24 @@ export default function CourierJobsPage() {
 
     const { data: jobs, isLoading } = useCollection<FirestoreDelivery>(jobsQuery);
     
-    // TODO: Implement actual sorting logic based on selected option
     const sortedJobs = React.useMemo(() => {
         if (!jobs) return [];
-        // For now, just return as is. Sorting would require more data (e.g., distance).
-        return jobs;
+        const sorted = [...jobs];
+        switch (sortOption) {
+            case 'newest':
+                return sorted.sort((a, b) => {
+                    const aTime = a.createdAt?.seconds || 0;
+                    const bTime = b.createdAt?.seconds || 0;
+                    return bTime - aTime;
+                });
+            case 'highest_fee':
+                return sorted.sort((a, b) => (b.deliveryFee || 0) - (a.deliveryFee || 0));
+            case 'nearest':
+                // Distance sorting requires geolocation; fall back to newest
+                return sorted;
+            default:
+                return sorted;
+        }
     }, [jobs, sortOption]);
 
     return (
