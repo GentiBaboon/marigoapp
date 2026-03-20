@@ -24,7 +24,7 @@ function setCookie(name: string, value: string, days: number) {
   if (typeof document === 'undefined') return;
   const date = new Date();
   date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-  document.cookie = `${name}=${value};expires=${date.toUTCString()};path=/`;
+  document.cookie = `${name}=${value};expires=${date.toUTCString()};path=/;SameSite=Lax`;
 }
 
 function getCookie(name: string): string | undefined {

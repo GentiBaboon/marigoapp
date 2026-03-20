@@ -7,6 +7,6 @@ export const ai = genkit({
       apiVersion: 'v1beta',
     }),
   ],
-  logLevel: 'debug',
-  enableTracingAndMetrics: true,
+  logLevel: process.env.NODE_ENV === 'production' ? 'warn' : 'debug',
+  enableTracingAndMetrics: process.env.NODE_ENV !== 'production',
 });
