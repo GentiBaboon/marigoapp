@@ -96,11 +96,11 @@ function OfferActions({ offer, product, userRole }: { offer: FirestoreOffer, pro
 
         let updateData: any = { status };
         if (status === 'countered' && amount) {
-            updateData.counter_offer_amount = amount;
+            updateData.counterOfferAmount = amount;
         }
 
         const historyAction = status;
-        const historyAmount = amount || (offer.status === 'countered' ? offer.counter_offer_amount : offer.offer_amount);
+        const historyAmount = amount || (offer.status === 'countered' ? offer.counterOfferAmount : offer.offerAmount);
         
         const historyEntry = {
             action: historyAction,
@@ -140,7 +140,7 @@ function OfferActions({ offer, product, userRole }: { offer: FirestoreOffer, pro
             return (
                 <div className="grid grid-cols-2 gap-3">
                     <Button onClick={() => handleUpdateOffer('accepted')} disabled={!!isLoading}>
-                        {isLoading === 'accepted' ? <Loader2 className="animate-spin" /> : `Accept ${formatPrice(offer.counter_offer_amount!)}`}
+                        {isLoading === 'accepted' ? <Loader2 className="animate-spin" /> : `Accept ${formatPrice(offer.counterOfferAmount!)}`}
                     </Button>
                     <Button variant="outline" onClick={() => handleUpdateOffer('declined')} disabled={!!isLoading}>
                         {isLoading === 'declined' ? <Loader2 className="animate-spin" /> : 'Decline'}
@@ -206,16 +206,16 @@ export default function OfferDetailsPage({ params }: { params: { id: string; off
     const offerRef = useMemoFirebase(() => firestore ? doc(firestore, 'products', productId, 'offers', offerId) : null, [firestore, productId, offerId]);
     const { data: offer, isLoading: isOfferLoading } = useDoc<FirestoreOffer>(offerRef);
 
-    const buyerId = offer?.buyer_id;
+    const buyerId = offer?.buyerId;
     const buyerRef = useMemoFirebase(() => (firestore && buyerId) ? doc(firestore, 'users', buyerId) : null, [firestore, buyerId]);
     const { data: buyer } = useDoc<FirestoreUser>(buyerRef);
-    
-    const sellerId = product?.seller_id;
+
+    const sellerId = product?.sellerId;
     const sellerRef = useMemoFirebase(() => (firestore && sellerId) ? doc(firestore, 'users', sellerId) : null, [firestore, sellerId]);
     const { data: seller } = useDoc<FirestoreUser>(sellerRef);
 
     const isLoading = isProductLoading || isOfferLoading;
-    const userRole = user?.uid === product?.seller_id ? 'seller' : user?.uid === offer?.buyer_id ? 'buyer' : null;
+    const userRole = user?.uid === product?.sellerId ? 'seller' : user?.uid === offer?.buyerId ? 'buyer' : null;
     
     if (isLoading) {
         return <OfferPageSkeleton />;

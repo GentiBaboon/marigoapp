@@ -205,7 +205,18 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
     const customerId = buyerSnap.data()?.stripeCustomerId;
     const orderNumber = `MG-${Date.now()}`;
 
-    // 1. Create order FIRST (pending_payment) before charging
+    // 1. Reserve products atomically to prevent double-sell
+    const productBatch = db.batch();
+    for (const item of verifiedItems) {
+      const productRef = db.collection("products").doc(item.id);
+      productBatch.update(productRef, {
+        status: "reserved",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    await productBatch.commit();
+
+    // 2. Create order FIRST (pending_payment) before charging
     const orderRef = await db.collection("orders").add({
       orderNumber,
       buyerId,
@@ -220,14 +231,14 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // 2. Increment coupon usage atomically
+    // 3. Increment coupon usage atomically
     if (couponRef) {
       await couponRef.update({
         usedCount: admin.firestore.FieldValue.increment(1),
       });
     }
 
-    // 3. Create payment intent AFTER order exists
+    // 4. Create payment intent AFTER order exists
     const piOptions: Stripe.PaymentIntentCreateParams = {
       amount: totalInCents,
       currency: "eur",
@@ -241,7 +252,7 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
 
     const pi = await stripe.paymentIntents.create(piOptions);
 
-    // 4. Update order with payment intent ID
+    // 5. Update order with payment intent ID
     await orderRef.update({ paymentIntentId: pi.id });
 
     return { clientSecret: pi.client_secret, orderId: orderRef.id };
@@ -268,6 +279,17 @@ export const createOrder = onCall(async (request) => {
 
   try {
     const { total, sellerIds, discount, verifiedItems, couponRef } = await calculateOrderTotal(items, couponCode, buyerId);
+
+    // Reserve products atomically to prevent double-sell
+    const productBatch = db.batch();
+    for (const item of verifiedItems) {
+      const productRef = db.collection("products").doc(item.id);
+      productBatch.update(productRef, {
+        status: "reserved",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    await productBatch.commit();
 
     const orderRef = await db.collection("orders").add({
       orderNumber: `MG-COD-${Date.now()}`,

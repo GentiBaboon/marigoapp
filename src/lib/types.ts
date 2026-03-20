@@ -359,3 +359,33 @@ export interface FirestoreReport {
   status: 'pending' | 'resolved';
   createdAt: FirestoreTimestamp;
 }
+
+// --- Offers ---
+export interface FirestoreOffer {
+  id: string;
+  buyerId: string;
+  sellerId: string;
+  productId: string;
+  offerAmount: number;
+  counterOfferAmount?: number;
+  originalListingPrice: number;
+  status: 'pending' | 'accepted' | 'declined' | 'countered' | 'withdrawn' | 'expired';
+  offerType?: string;
+  history?: Array<{
+    action: string;
+    amount: number;
+    by_user: string;
+    timestamp: FirestoreTimestamp;
+  }>;
+  createdAt: FirestoreTimestamp;
+}
+
+// --- Payment Methods ---
+export interface FirestorePaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  isDefault: boolean;
+}

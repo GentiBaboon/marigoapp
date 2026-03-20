@@ -30,7 +30,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, doc, updateDoc, deleteDoc, addDoc, serverTimestamp, where, limit } from 'firebase/firestore';
 import type { FirestoreCoupon, FirestoreSettings, FirestoreOrder } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -182,8 +182,11 @@ export default function MarketingPage() {
   const couponsQuery = useMemoFirebase(() => query(collection(firestore, 'coupons'), orderBy('code')), [firestore]);
   const { data: coupons, isLoading: areCouponsLoading } = useCollection<FirestoreCoupon>(couponsQuery);
 
-  // Fetch Orders to calculate ROI
-  const ordersQuery = useMemoFirebase(() => collection(firestore, 'orders'), [firestore]);
+  // Fetch only orders with coupons for ROI calculation (not ALL orders)
+  const ordersQuery = useMemoFirebase(
+    () => query(collection(firestore, 'orders'), where('couponCode', '!=', null), limit(500)),
+    [firestore]
+  );
   const { data: orders, isLoading: areOrdersLoading } = useCollection<FirestoreOrder>(ordersQuery);
 
   const settingsRef = useMemoFirebase(() => doc(firestore, 'settings', 'global'), [firestore]);
