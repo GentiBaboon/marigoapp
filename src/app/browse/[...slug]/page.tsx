@@ -23,7 +23,7 @@ function ListItem({ href, children }: { href: string; children: React.ReactNode 
 export default function CategoryDetailPage() {
   const params = useParams();
   const [gender, categorySlug] = (params.slug as string[]) || [];
-  
+
   const categoryData = React.useMemo(() => {
     return productCategories.find(c => c.name.toLowerCase() === categorySlug?.toLowerCase());
   }, [categorySlug]);
