@@ -21,7 +21,7 @@ export function TopCategoriesChart({ products }: TopCategoriesChartProps) {
     const categoryCounts: { [key: string]: number } = {};
 
     products.forEach(product => {
-      const category = product.category || 'Uncategorized';
+      const category = product.categoryId || 'Uncategorized';
       categoryCounts[category] = (categoryCounts[category] || 0) + 1;
     });
 

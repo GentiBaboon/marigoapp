@@ -61,10 +61,10 @@ export default function ListingsPage() {
     return query(
         collection(firestore, 'products'), 
         where('sellerId', '==', user.uid),
-        orderBy('createdAt', 'desc')
+        orderBy('listingCreated', 'desc')
     );
   }, [user, firestore]);
-  
+
   const { data: listings, isLoading: areListingsLoading } = useCollection<FirestoreProduct>(productsQuery);
 
   // Query for orders where user is a seller
@@ -72,8 +72,7 @@ export default function ListingsPage() {
       if (!user || !firestore) return null;
       return query(
           collection(firestore, 'orders'),
-          where('sellerIds', 'array-contains', user.uid),
-          orderBy('createdAt', 'desc')
+          where('sellerIds', 'array-contains', user.uid)
       );
   }, [user, firestore]);
 

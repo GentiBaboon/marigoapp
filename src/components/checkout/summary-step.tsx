@@ -124,8 +124,12 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
 
     } catch (error: any) {
         console.error("Transaction failed:", error);
-        setErrorMessage(error.message || "An unexpected system error occurred. Your card was not charged.");
-        toast({ variant: 'destructive', title: "Order Error", description: error.message });
+        const msg = error?.details?.message || error?.message || "An unexpected system error occurred. Your card was not charged.";
+        const friendlyMsg = msg === 'internal'
+            ? 'The payment service is temporarily unavailable. Please try again or choose Cash on Delivery.'
+            : msg;
+        setErrorMessage(friendlyMsg);
+        toast({ variant: 'destructive', title: "Order Error", description: friendlyMsg });
     } finally {
         setIsLoading(false);
     }

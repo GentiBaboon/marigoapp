@@ -29,12 +29,9 @@ const statusVariants: { [key: string]: 'default' | 'secondary' | 'destructive' }
 };
 
 const getUserRole = (user: FirestoreUser) => {
-    if (user.email === 'admin@marigoapp.com' || user.id === '2C81RVoXZWZuSWXEEueehqbHkMu1') {
-        return 'Admin';
-    }
-    if (user.isSeller) {
-        return 'Seller';
-    }
+    if (user.role === 'admin') return 'Admin';
+    if (user.role === 'courier') return 'Courier';
+    if (user.isSeller || user.role === 'seller') return 'Seller';
     return 'Customer';
 };
 
@@ -63,7 +60,7 @@ export const columns: ColumnDef<FirestoreUser>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: 'displayName',
+    accessorKey: 'name',
     header: ({ column }) => {
       return (
         <Button
@@ -80,11 +77,11 @@ export const columns: ColumnDef<FirestoreUser>[] = [
       return (
         <div className="flex items-center gap-3">
           <Avatar>
-            <AvatarImage src={user.photoURL ?? undefined} alt={user.displayName ?? 'user'} />
-            <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+            <AvatarImage src={user.profileImage ?? undefined} alt={user.name ?? 'user'} />
+            <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
           </Avatar>
           <div className="grid">
-            <span className="font-medium">{user.displayName}</span>
+            <span className="font-medium">{user.name}</span>
             <span className="text-muted-foreground text-sm">{user.email}</span>
           </div>
         </div>

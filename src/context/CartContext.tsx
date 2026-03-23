@@ -171,14 +171,14 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         const newItem: CartItem = {
             id: product.id,
-            brand: product.brand,
+            brand: product.brand || product.brandId || '',
             title: product.title,
             price: product.price,
-            image: product.images?.[0]?.url || product.image,
+            image: product.images?.[0]?.url || product.image || '',
             sellerId: product.sellerId,
             quantity,
-            selectedSize: size,
-            selectedColor: color,
+            selectedSize: size ?? null,
+            selectedColor: color ?? null,
             shippingMethod: 'direct',
             directShippingFee: 10.90,
         };
@@ -193,7 +193,9 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         if (user && firestore) {
             const itemRef = doc(firestore, 'users', user.uid, 'cart', product.id);
-            setDoc(itemRef, newItem, { merge: true }).catch(err => {
+            // Strip undefined values before writing to Firestore
+            const cleanItem = JSON.parse(JSON.stringify(newItem));
+            setDoc(itemRef, cleanItem, { merge: true }).catch(err => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: itemRef.path,
                     operation: 'write',

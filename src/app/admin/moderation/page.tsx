@@ -76,10 +76,10 @@ const ReportItem = ({ report }: { report: FirestoreReport }) => {
         switch (report.type) {
             case 'product':
                 const product = itemData as FirestoreProduct;
-                const productTitle = (typeof product.title === 'object' && product.title?.en) ? product.title.en : product.title;
+                const productTitle = product.title;
                 return (
                      <div className="flex items-center gap-3">
-                        <Image src={product.images?.[0] || ''} alt={productTitle} width={64} height={64} className="rounded-md bg-background" />
+                        <Image src={product.images?.[0]?.url || ''} alt={productTitle} width={64} height={64} className="rounded-md bg-background" />
                         <div>
                             <p className="font-semibold">{productTitle}</p>
                             <p className="text-sm text-muted-foreground">Item ID: {report.itemId}</p>
@@ -91,11 +91,11 @@ const ReportItem = ({ report }: { report: FirestoreReport }) => {
                  return (
                     <div className="flex items-center gap-3">
                         <Avatar>
-                            <AvatarImage src={user.photoURL || undefined} />
-                            <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
+                            <AvatarImage src={user.profileImage || undefined} />
+                            <AvatarFallback>{user.name?.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <div>
-                            <p className="font-semibold">{user.displayName}</p>
+                            <p className="font-semibold">{user.name}</p>
                             <p className="text-sm text-muted-foreground">User ID: {report.itemId}</p>
                         </div>
                     </div>
@@ -103,7 +103,7 @@ const ReportItem = ({ report }: { report: FirestoreReport }) => {
              case 'message':
              case 'review':
                 const contentItem = itemData as FirestoreMessage | FirestoreReview;
-                const contentText = (typeof contentItem.content === 'object' && contentItem.content?.en) ? contentItem.content.en : contentItem.content;
+                const contentText = contentItem.content;
                 return (
                      <blockquote className="border-l-4 pl-4 italic">
                         "{contentText}"
@@ -134,7 +134,7 @@ const ReportItem = ({ report }: { report: FirestoreReport }) => {
                    {renderContent()}
                 </div>
                  <Separator className="my-4" />
-                 <p className="text-sm text-muted-foreground">Reported by: <span className="font-medium text-foreground">{reporter?.displayName || '...'}</span></p>
+                 <p className="text-sm text-muted-foreground">Reported by: <span className="font-medium text-foreground">{reporter?.name || '...'}</span></p>
 
             </CardContent>
             <CardFooter className="flex justify-end gap-2">

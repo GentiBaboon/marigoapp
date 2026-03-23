@@ -1,7 +1,6 @@
 
 'use client';
 import { useMemo } from 'react';
-import Link from 'next/link'; // Import Link
 import { collection, query, where } from 'firebase/firestore';
 import {
   useFirestore,
@@ -13,6 +12,7 @@ import type {
   FirestoreProduct,
   FirestoreOrder,
   FirestoreReview,
+  FirestoreReport,
 } from '@/lib/types';
 
 import {
@@ -22,11 +22,6 @@ import {
   DollarSign,
   Star,
   FileWarning,
-  ShieldAlert,
-  Settings,
-  Archive,
-  Truck,
-  Megaphone,
 } from 'lucide-react';
 import { StatCard } from '@/components/admin/stat-card';
 import { RevenueChart } from '@/components/admin/charts/revenue-chart';
@@ -36,7 +31,6 @@ import { TopCategoriesChart } from '@/components/admin/charts/top-categories-cha
 import { OrdersByCountryChart } from '@/components/admin/charts/orders-by-country-chart';
 
 import { subDays } from 'date-fns';
-import { Button } from '@/components/ui/button';
 
 const currencyFormatter = new Intl.NumberFormat('de-DE', {
   style: 'currency',
@@ -60,6 +54,12 @@ export default function AdminDashboardPage() {
   
   const reviewsQuery = useMemoFirebase(() => collection(firestore, 'reviews'), [firestore]);
   const { data: reviews, isLoading: reviewsLoading } = useCollection<FirestoreReview>(reviewsQuery);
+
+  const reportsQuery = useMemoFirebase(
+    () => query(collection(firestore, 'reports'), where('status', '==', 'pending')),
+    [firestore]
+  );
+  const { data: reports, isLoading: reportsLoading } = useCollection<FirestoreReport>(reportsQuery);
 
 
   // Memoized Calculations
@@ -87,14 +87,12 @@ export default function AdminDashboardPage() {
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     const commissionEarned = totalRevenue * COMMISSION_RATE;
     
-    // Placeholder for active users - requires more complex logic
-    const activeUsers = 0; 
+    const activeUsers = safeUsers.filter(u => u.lastLoginAt?.toDate && u.lastLoginAt.toDate() > thirtyDaysAgo).length;
 
     // For now, "pending" reviews are just all reviews, since there's no status field
     const pendingReviews = safeReviews.length;
     
-    // Placeholder for reported items - requires data model changes
-    const reportedItems = 0;
+    const reportedItems = reports?.length || 0;
 
     return {
       totalUsers,
@@ -111,63 +109,17 @@ export default function AdminDashboardPage() {
       pendingReviews,
       reportedItems,
     };
-  }, [users, products, orders, reviews]);
+  }, [users, products, orders, reviews, reports]);
 
-  const isLoading = usersLoading || productsLoading || ordersLoading || reviewsLoading;
+  const isLoading = usersLoading || productsLoading || ordersLoading || reviewsLoading || reportsLoading;
 
   return (
     <>
-        <div className="flex justify-between items-start mb-8 gap-4">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-                <p className="text-muted-foreground mt-1">
-                    A real-time overview of your marketplace.
-                </p>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-                <Button asChild>
-                    <Link href="/admin/products">Manage Products</Link>
-                </Button>
-                 <Button asChild variant="outline">
-                    <Link href="/admin/orders">Orders</Link>
-                </Button>
-                 <Button asChild variant="outline">
-                    <Link href="/admin/marketing">
-                        <Megaphone className="mr-2 h-4 w-4" />
-                        Marketing
-                    </Link>
-                </Button>
-                 <Button asChild variant="outline">
-                    <Link href="/admin/users">Manage Users</Link>
-                </Button>
-                 <Button asChild variant="outline">
-                    <Link href="/admin/finance">Financials</Link>
-                </Button>
-                <Button asChild variant="outline">
-                    <Link href="/admin/logistics">
-                        <Truck className="mr-2 h-4 w-4" />
-                        Logistics
-                    </Link>
-                </Button>
-                <Button asChild variant="outline">
-                    <Link href="/admin/moderation">
-                        <ShieldAlert className="mr-2 h-4 w-4" />
-                        Moderation
-                    </Link>
-                </Button>
-                 <Button asChild variant="outline">
-                    <Link href="/admin/logs">
-                        <Archive className="mr-2 h-4 w-4" />
-                        Activity Logs
-                    </Link>
-                </Button>
-                <Button asChild variant="outline">
-                    <Link href="/admin/settings">
-                        <Settings className="mr-2 h-4 w-4" />
-                        Settings
-                    </Link>
-                </Button>
-            </div>
+        <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+            <p className="text-muted-foreground mt-1">
+                A real-time overview of your marketplace.
+            </p>
         </div>
 
 
