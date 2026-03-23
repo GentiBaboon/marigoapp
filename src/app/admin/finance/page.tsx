@@ -75,7 +75,27 @@ export default function AdminFinancePage() {
                     </p>
                 </div>
             </div>
-             <Button variant="outline">
+             <Button
+                variant="outline"
+                onClick={() => {
+                  const csvRows = [
+                    ['Order #', 'Amount', 'Status', 'Date'].join(','),
+                    ...(orders || []).map(o => [
+                      o.orderNumber,
+                      o.totalAmount.toFixed(2),
+                      o.status,
+                      o.createdAt?.toDate ? new Date(o.createdAt.toDate()).toISOString() : '',
+                    ].join(','))
+                  ];
+                  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `marigo-finance-${new Date().toISOString().split('T')[0]}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
                 <Download className="mr-2 h-4 w-4" />
                 Export Data
             </Button>

@@ -293,6 +293,7 @@ export interface FirestoreCoupon {
   minOrderValue: number;
   isActive: boolean;
   usedCount: number;
+  usageLimit?: number;
   createdAt: FirestoreTimestamp;
   updatedAt: FirestoreTimestamp;
 }

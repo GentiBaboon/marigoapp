@@ -174,7 +174,7 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
 /**
  * Creates Standard Order (COD)
  */
-export const createOrder = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
+export const createOrder = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
   
   const {items, shippingAddress, couponCode} = request.data;

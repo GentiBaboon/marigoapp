@@ -23,6 +23,9 @@ import { useToast } from '@/hooks/use-toast';
 import SettingsLoading from './loading';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SizeConfigTab } from '@/components/admin/settings/size-config-tab';
+import { MenuConfigTab } from '@/components/admin/settings/menu-config-tab';
+import { BannerConfigTab } from '@/components/admin/settings/banner-config-tab';
 
 // --- Sub-components for Management ---
 
@@ -348,10 +351,13 @@ export default function AdminSettingsPage() {
       </div>
 
       <Tabs defaultValue="categories" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="flex w-full overflow-x-auto">
             <TabsTrigger value="categories">Categories</TabsTrigger>
             <TabsTrigger value="brands">Brands</TabsTrigger>
             <TabsTrigger value="attributes">Attributes</TabsTrigger>
+            <TabsTrigger value="sizes">Sizes</TabsTrigger>
+            <TabsTrigger value="menu">Menu</TabsTrigger>
+            <TabsTrigger value="banners">Banners</TabsTrigger>
         </TabsList>
         
         <TabsContent value="categories" className="space-y-4">
@@ -442,6 +448,18 @@ export default function AdminSettingsPage() {
                     </CardContent>
                 </Card>
             ))}
+        </TabsContent>
+
+        <TabsContent value="sizes">
+            <SizeConfigTab />
+        </TabsContent>
+
+        <TabsContent value="menu">
+            <MenuConfigTab />
+        </TabsContent>
+
+        <TabsContent value="banners">
+            <BannerConfigTab />
         </TabsContent>
       </Tabs>
 

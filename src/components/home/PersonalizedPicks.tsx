@@ -128,13 +128,13 @@ export function PersonalizedPicks() {
                     {recommendations?.products.map((p) => (
                         <ProductCard key={p.id} product={{
                             id: p.id,
-                            brand: p.brand,
+                            brandId: p.brandId,
                             title: p.title,
                             price: p.price,
-                            image: p.images?.[0] || '',
+                            images: p.images,
                             sellerId: p.sellerId,
                             size: p.size,
-                            condition: p.condition as any,
+                            condition: p.condition,
                             color: p.color,
                             vintage: p.vintage,
                         }} />

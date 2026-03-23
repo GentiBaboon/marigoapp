@@ -59,7 +59,7 @@ export const columns: ColumnDef<FirestoreProduct>[] = [
         <div className="flex items-center gap-3">
           <div className="relative h-10 w-10 flex-shrink-0">
              <Image 
-                src={product.images?.[0] || '/placeholder.png'} 
+                src={product.images?.[0]?.url || '/placeholder.png'}
                 alt={product.title} 
                 fill
                 sizes="40px"
@@ -125,9 +125,9 @@ export const columns: ColumnDef<FirestoreProduct>[] = [
       cell: ({ row }) => row.original.views || 0,
   },
   {
-      accessorKey: 'likes',
+      accessorKey: 'wishlistCount',
       header: 'Likes',
-      cell: ({ row }) => row.original.likes || 0,
+      cell: ({ row }) => row.original.wishlistCount || 0,
   },
   {
     accessorKey: 'listingCreated',

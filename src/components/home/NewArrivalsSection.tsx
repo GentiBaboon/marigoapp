@@ -65,10 +65,10 @@ export function NewArrivalsSection() {
                         {activeProducts.map((p) => {
                             const productForCard: Product = {
                                 id: p.id,
-                                brand: p.brand,
+                                brand: p.brandId || '',
                                 title: p.title,
                                 price: p.price,
-                                image: p.images?.[0]?.url || '', // Use first image URL string
+                                image: p.images?.[0]?.url || '',
                                 sellerId: p.sellerId,
                                 size: p.size,
                                 condition: p.condition as any,

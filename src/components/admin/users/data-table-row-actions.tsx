@@ -52,12 +52,12 @@ export function DataTableRowActions<TData>({
             adminId: adminUser.uid,
             adminName: adminUser.displayName || 'Admin',
             actionType: newStatus === 'banned' ? 'user_banned' : 'user_unbanned',
-            details: `${newStatus === 'banned' ? 'Banned' : 'Unbanned'} user "${targetUser.displayName}" (ID: ${targetUser.id})`,
+            details: `${newStatus === 'banned' ? 'Banned' : 'Unbanned'} user "${targetUser.name}" (ID: ${targetUser.id})`,
             targetId: targetUser.id,
             timestamp: serverTimestamp()
         });
 
-        toast({ title: `User ${newStatus}`, description: `${targetUser.displayName} has been ${newStatus}.` });
+        toast({ title: `User ${newStatus}`, description: `${targetUser.name} has been ${newStatus}.` });
     } catch (error) {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to update user status.' });
     } finally {
@@ -65,6 +65,51 @@ export function DataTableRowActions<TData>({
     }
   };
 
+
+  const handleChangeRole = async (newRole: string) => {
+    if (!firestore || !adminUser) return;
+    setIsLoading(true);
+    try {
+      await updateDoc(doc(firestore, 'users', targetUser.id), {
+        role: newRole,
+        isSeller: newRole === 'seller' || newRole === 'admin',
+      });
+      await addDoc(collection(firestore, 'admin_logs'), {
+        adminId: adminUser.uid,
+        adminName: adminUser.displayName || 'Admin',
+        actionType: 'user_role_changed',
+        details: `Changed role of "${targetUser.name}" to "${newRole}"`,
+        targetId: targetUser.id,
+        timestamp: serverTimestamp(),
+      });
+      toast({ title: 'Role Updated', description: `${targetUser.name} is now "${newRole}".` });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to change role.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!firestore || !adminUser) return;
+    setIsLoading(true);
+    try {
+      await updateDoc(doc(firestore, 'users', targetUser.id), { status: 'banned' });
+      await addDoc(collection(firestore, 'admin_logs'), {
+        adminId: adminUser.uid,
+        adminName: adminUser.displayName || 'Admin',
+        actionType: 'user_deleted',
+        details: `Soft-deleted user "${targetUser.name}" (ID: ${targetUser.id})`,
+        targetId: targetUser.id,
+        timestamp: serverTimestamp(),
+      });
+      toast({ title: 'User Removed' });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete user.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const isBanned = targetUser.status === 'banned';
 
@@ -89,9 +134,14 @@ export function DataTableRowActions<TData>({
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
                 <DropdownMenuSubContent>
-                    <DropdownMenuRadioGroup value="member">
+                    <DropdownMenuRadioGroup
+                      value={targetUser.role}
+                      onValueChange={handleChangeRole}
+                    >
                         <DropdownMenuRadioItem value="admin">Admin</DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="member">Member</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="seller">Seller</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="buyer">Buyer</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="courier">Courier</DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                 </DropdownMenuSubContent>
             </DropdownMenuPortal>
@@ -108,7 +158,7 @@ export function DataTableRowActions<TData>({
                 Ban User
             </DropdownMenuItem>
         )}
-        <DropdownMenuItem className="text-destructive">
+        <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
           <Trash2 className="mr-2 h-4 w-4" />
           Delete
         </DropdownMenuItem>
