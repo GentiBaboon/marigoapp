@@ -143,7 +143,7 @@ async function calculateOrderTotal(items: any[], couponCode?: string) {
 // ═══════════════════════════════════════════════════════
 // CREATE PAYMENT INTENT (Card Payments - Escrow)
 // ═══════════════════════════════════════════════════════
-export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], region: "europe-west1"}, async (request) => {
+export const createPaymentIntent = onCall({region: "europe-west1"}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
 
   const {items, shippingAddress, paymentMethodId, couponCode} = request.data;
@@ -264,7 +264,7 @@ export const createOrder = onCall({region: "europe-west1"}, async (request) => {
 // ═══════════════════════════════════════════════════════
 // STRIPE WEBHOOK HANDLER
 // ═══════════════════════════════════════════════════════
-export const handleStripeWebhook = onRequest({secrets: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"], region: "europe-west1"}, async (req, res) => {
+export const handleStripeWebhook = onRequest({region: "europe-west1"}, async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).send("Method Not Allowed");
     return;
@@ -344,7 +344,7 @@ export const handleStripeWebhook = onRequest({secrets: ["STRIPE_SECRET_KEY", "ST
 // ═══════════════════════════════════════════════════════
 // CAPTURE PAYMENT (Admin/System - Escrow Release)
 // ═══════════════════════════════════════════════════════
-export const capturePayment = onCall({secrets: ["STRIPE_SECRET_KEY"], region: "europe-west1"}, async (request) => {
+export const capturePayment = onCall({region: "europe-west1"}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
 
   const {orderId} = request.data;
@@ -381,7 +381,7 @@ export const capturePayment = onCall({secrets: ["STRIPE_SECRET_KEY"], region: "e
 // ═══════════════════════════════════════════════════════
 // PROCESS REFUND (Admin only)
 // ═══════════════════════════════════════════════════════
-export const processRefund = onCall({secrets: ["STRIPE_SECRET_KEY"], region: "europe-west1"}, async (request) => {
+export const processRefund = onCall({region: "europe-west1"}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
 
   const {orderId, amount, reason} = request.data;
@@ -434,7 +434,6 @@ export const processRefund = onCall({secrets: ["STRIPE_SECRET_KEY"], region: "eu
 // ═══════════════════════════════════════════════════════
 export const releaseEscrow = onSchedule({
   schedule: "every 60 minutes",
-  secrets: ["STRIPE_SECRET_KEY"],
   region: "europe-west1",
 }, async () => {
   const stripe = getStripe();
@@ -483,7 +482,7 @@ export const releaseEscrow = onSchedule({
 // ═══════════════════════════════════════════════════════
 // STRIPE CONNECT - Create Connected Account for Sellers
 // ═══════════════════════════════════════════════════════
-export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY"], region: "europe-west1"}, async (request) => {
+export const createStripeConnectedAccount = onCall({region: "europe-west1"}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
 
   const stripe = getStripe();
@@ -540,7 +539,7 @@ export const createStripeConnectedAccount = onCall({secrets: ["STRIPE_SECRET_KEY
 // ═══════════════════════════════════════════════════════
 // SELLER BALANCE & PAYOUTS
 // ═══════════════════════════════════════════════════════
-export const getSellerBalance = onCall({secrets: ["STRIPE_SECRET_KEY"], region: "europe-west1"}, async (request) => {
+export const getSellerBalance = onCall({region: "europe-west1"}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
   const stripe = getStripe();
   const uid = request.auth.uid;
@@ -560,7 +559,7 @@ export const getSellerBalance = onCall({secrets: ["STRIPE_SECRET_KEY"], region: 
   }
 });
 
-export const requestPayout = onCall({secrets: ["STRIPE_SECRET_KEY"], region: "europe-west1"}, async (request) => {
+export const requestPayout = onCall({region: "europe-west1"}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
   const stripe = getStripe();
   const uid = request.auth.uid;
