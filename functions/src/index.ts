@@ -2,7 +2,6 @@ import * as admin from "firebase-admin";
 import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError, onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
-import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
 import Stripe from "stripe";
 
@@ -10,9 +9,9 @@ initializeApp();
 const db = admin.firestore();
 
 const getStripe = () => {
-  const key = process.env.STRIPE_SECRET_KEY || "";
-  if (!key || key === "sk_test_your_key_here") {
-    throw new HttpsError("failed-precondition", "STRIPE_SECRET_KEY is not configured.");
+  const key = process.env.STRIPE_SK || process.env.STRIPE_SECRET_KEY || "";
+  if (!key) {
+    throw new HttpsError("failed-precondition", "Stripe secret key is not configured.");
   }
   return new Stripe(key, {
     apiVersion: "2024-06-20",
@@ -20,42 +19,43 @@ const getStripe = () => {
 };
 
 // ═══════════════════════════════════════════════════════
-// ORDER AUTOMATION TRIGGER
+// UPDATE ORDER STATUS (Called by admin/system)
 // ═══════════════════════════════════════════════════════
-export const onOrderUpdateTrigger = onDocumentUpdated("orders/{orderId}", async (event) => {
-  const newValue = event.data?.after.data();
-  const previousValue = event.data?.before.data();
+export const updateOrderStatus = onCall({region: "europe-west1"}, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
 
-  if (!newValue || !previousValue) return;
+  const {orderId, newStatus} = request.data;
+  if (!orderId || !newStatus) throw new HttpsError("invalid-argument", "orderId and newStatus required.");
 
-  const orderId = event.params.orderId;
-  const newStatus = newValue.status;
-  const oldStatus = previousValue.status;
+  const orderDoc = await db.collection("orders").doc(orderId).get();
+  const order = orderDoc.data();
+  if (!order) throw new HttpsError("not-found", "Order not found.");
 
-  if (newStatus === oldStatus) return;
+  const oldStatus = order.status;
+  const buyerId = order.buyerId;
+  const sellerId = order.sellerIds?.[0];
+  const orderNumber = order.orderNumber;
 
-  const buyerId = newValue.buyerId;
-  const sellerId = newValue.sellerIds?.[0];
-  const orderNumber = newValue.orderNumber;
+  // Update order status
+  await orderDoc.ref.update({
+    status: newStatus,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
 
-  // 1. Manage Product Inventory Status
+  // 1. Mark products as sold
   if (["paid", "processing", "shipped"].includes(newStatus) && !["paid", "processing", "shipped"].includes(oldStatus)) {
-    const items = newValue.items || [];
     const batch = db.batch();
-    items.forEach((item: any) => {
-      const productRef = db.collection("products").doc(item.id);
-      batch.update(productRef, {status: "sold", updatedAt: admin.firestore.FieldValue.serverTimestamp()});
+    (order.items || []).forEach((item: any) => {
+      batch.update(db.collection("products").doc(item.id), {status: "sold", updatedAt: admin.firestore.FieldValue.serverTimestamp()});
     });
     await batch.commit();
   }
 
   // 2. Release products back if cancelled/refunded
   if (["cancelled", "refunded"].includes(newStatus)) {
-    const items = newValue.items || [];
     const batch = db.batch();
-    items.forEach((item: any) => {
-      const productRef = db.collection("products").doc(item.id);
-      batch.update(productRef, {status: "active", updatedAt: admin.firestore.FieldValue.serverTimestamp()});
+    (order.items || []).forEach((item: any) => {
+      batch.update(db.collection("products").doc(item.id), {status: "active", updatedAt: admin.firestore.FieldValue.serverTimestamp()});
     });
     await batch.commit();
   }
@@ -90,6 +90,8 @@ export const onOrderUpdateTrigger = onDocumentUpdated("orders/{orderId}", async 
     await notify(buyerId, "Refund Processed", `Your refund for Order #${orderNumber} has been processed.`, "order_update");
     break;
   }
+
+  return {success: true, oldStatus, newStatus};
 });
 
 // ═══════════════════════════════════════════════════════
@@ -271,7 +273,7 @@ export const handleStripeWebhook = onRequest({region: "europe-west1"}, async (re
   }
 
   const stripe = getStripe();
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
+  const webhookSecret = process.env.STRIPE_WH_SECRET || process.env.STRIPE_WEBHOOK_SECRET || "";
   const sig = req.headers["stripe-signature"] as string;
 
   let event: Stripe.Event;
