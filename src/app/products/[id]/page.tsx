@@ -126,20 +126,28 @@ export default function ProductDetailPage() {
           <div className="flex flex-col items-center">
              <Carousel setApi={setApi} className="w-full relative">
               <CarouselContent>
-                {product.images.map((img, index) => (
+                {product.images.map((img, index) => {
+                    const imgUrl = typeof img === 'string' ? img : img?.url || '';
+                    const isValidUrl = imgUrl.startsWith('http');
+                    return (
                     <CarouselItem key={index}>
                       <div className="aspect-[3/4] relative bg-muted rounded-lg overflow-hidden">
+                        {isValidUrl ? (
                         <Image
-                          src={img.url}
+                          src={imgUrl}
                           alt={`${product.title} image ${index + 1}`}
                           fill
                           className="object-cover"
                           sizes="(max-width: 768px) 100vw, 50vw"
                           priority={index === 0}
                         />
+                        ) : (
+                        <div className="flex items-center justify-center h-full text-muted-foreground text-xs">Image unavailable</div>
+                        )}
                       </div>
                     </CarouselItem>
-                  ))}
+                    );
+                  })}
               </CarouselContent>
                {count > 1 && (
                 <div className="absolute bottom-4 right-4 bg-black/50 text-white text-xs font-semibold rounded-full px-3 py-1.5">

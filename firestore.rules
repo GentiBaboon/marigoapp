@@ -18,11 +18,12 @@ service cloud.firestore {
       return isSignedIn() && (
         request.auth.token.admin == true || 
         request.auth.uid in [
-          '2C81RVoXZWZuSWXEEueehqbHkMu1', 
+          '2C81RVoXZWZuSWXEEueehqbHkMu1',
           'v521MWW9rmPYchVBc91DheeRU5j2',
           'GoNLAq0YYdQw70fDS5L1XbBqtow1',
           '4qTAOIovwdWYGCnqYPiPCJqNcdP2',
-          'jBbMqpl6zKeZ9skDW3ux0iBMJRB2'
+          'jBbMqpl6zKeZ9skDW3ux0iBMJRB2',
+          'x2QOIY1fw8S6GOgIB2k45eiAAU93'
         ]
       );
     }

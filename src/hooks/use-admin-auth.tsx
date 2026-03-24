@@ -9,11 +9,12 @@ import type { FirestoreUser } from '@/lib/types';
 
 // Define a developer admin UIDs for testing purposes
 const DEV_ADMIN_UIDS = [
-  '2C81RVoXZWZuSWXEEueehqbHkMu1', 
+  '2C81RVoXZWZuSWXEEueehqbHkMu1',
   'v521MWW9rmPYchVBc91DheeRU5j2',
   'GoNLAq0YYdQw70fDS5L1XbBqtow1',
   '4qTAOIovwdWYGCnqYPiPCJqNcdP2',
-  'jBbMqpl6zKeZ9skDW3ux0iBMJRB2'
+  'jBbMqpl6zKeZ9skDW3ux0iBMJRB2',
+  'x2QOIY1fw8S6GOgIB2k45eiAAU93', // genti@eng.al
 ];
 
 export function useAdminAuth() {
