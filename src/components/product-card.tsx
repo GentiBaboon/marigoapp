@@ -21,9 +21,12 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const { formatPrice } = useCurrency();
   const favorite = isFavorite(product.id);
 
-  // Handle new images structure or fallback to old 'image' field
+  // Handle new images structure or fallback to old 'image' field.
+  // Only use URLs that are valid https:// links (Supabase or Firebase Storage).
+  // Discard blob: URLs (dead after reload), data: URIs (too large for <Image>), and empty strings.
   const rawImage = product.images?.[0];
-  const imageUrl = typeof rawImage === 'string' ? rawImage : rawImage?.url || product.image || '';
+  const rawUrl = typeof rawImage === 'string' ? rawImage : rawImage?.url || product.image || '';
+  const imageUrl = typeof rawUrl === 'string' && rawUrl.startsWith('http') ? rawUrl : '';
   
   const handleToggleFavorite = (e: React.MouseEvent) => {
       e.preventDefault(); // prevent navigation
@@ -49,7 +52,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
               fill
               sizes="(max-width: 768px) 50vw, 33vw"
               className="object-cover"
-              unoptimized={typeof imageUrl === 'string' && imageUrl.startsWith('blob:')}
+              unoptimized={false}
             />
           ) : (
             <div className="aspect-square w-full bg-muted flex items-center justify-center text-muted-foreground text-[10px]">

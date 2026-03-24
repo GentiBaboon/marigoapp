@@ -26,7 +26,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const ext = file.type.split('/')[1] || 'jpg';
+    // Normalize content type — accept any image/* format
+    const contentType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
+    const ext = contentType.split('/')[1]?.replace('+xml', '') || 'jpg';
     const fileName = `img_${Date.now()}_${index}.${ext}`;
     const storagePath = `${userId}/${productId}/${fileName}`;
 
@@ -36,7 +38,7 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase.storage
       .from(BUCKET)
       .upload(storagePath, buffer, {
-        contentType: file.type,
+        contentType,
         cacheControl: '31536000',
         upsert: false,
       });

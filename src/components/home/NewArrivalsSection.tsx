@@ -68,7 +68,7 @@ export function NewArrivalsSection() {
                                 brand: p.brand,
                                 title: p.title,
                                 price: p.price,
-                                image: p.images?.[0] || '', // Use first image URL as the string `image`
+                                image: p.images?.[0]?.url || '', // Use first image URL string
                                 sellerId: p.sellerId,
                                 size: p.size,
                                 condition: p.condition as any,
