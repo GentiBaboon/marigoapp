@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
 import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
-import {onSchedule} from "firebase-functions/v2/scheduler";
+// import {onSchedule} from "firebase-functions/v2/scheduler";
 import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
 import Stripe from "stripe";
@@ -177,7 +177,7 @@ export const createPaymentIntent = onCall({secrets: ["STRIPE_SECRET_KEY"], minIn
 export const createOrder = onCall({secrets: ["STRIPE_SECRET_KEY"]}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
   
-  const {items, shippingAddress, paymentMethod, couponCode} = request.data;
+  const {items, shippingAddress, couponCode} = request.data;
   const buyerId = request.auth.uid;
 
   try {
