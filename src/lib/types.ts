@@ -360,3 +360,24 @@ export interface FirestoreReport {
   status: 'pending' | 'resolved';
   createdAt: FirestoreTimestamp;
 }
+
+// --- Payment ---
+export interface FirestorePaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  isDefault: boolean;
+  stripePaymentMethodId: string;
+}
+
+export interface FirestoreOffer {
+  id: string;
+  buyerId: string;
+  buyerName: string;
+  amount: number;
+  message?: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  createdAt: FirestoreTimestamp;
+}
