@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { useUser, useFirestore } from '@/firebase';
 import type { FirestoreAddress } from '@/lib/types';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { useCurrency } from '@/context/CurrencyContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
@@ -28,7 +28,8 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
   const firestore = useFirestore();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const functions = getFunctions();
+  const functionsRegion = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_REGION || 'europe-west1';
+  const functions = getFunctions(undefined, functionsRegion);
   const { formatPrice } = useCurrency();
   
   const stripe = useStripe();

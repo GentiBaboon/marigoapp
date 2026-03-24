@@ -117,8 +117,8 @@ service cloud.firestore {
       allow update: if isAdmin();
     }
     
-    match /{path=**} {
-      allow read, write: if isAdmin();
-    }
+    // REMOVED: Wildcard catch-all rule (match /{path=**}) was a security risk.
+    // Admin access is now explicitly granted per collection above.
+    // If a new collection is needed, add explicit rules for it.
   }
 }

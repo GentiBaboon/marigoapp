@@ -20,9 +20,9 @@ import {
 import Image from 'next/image';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useUser, useStorage, useMemoFirebase } from '@/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { ProductService } from '@/services/product.service';
+import { uploadProductImage } from '@/services/image-upload.service';
 import { validateListingData, notifyNewListing } from '@/app/sell/actions';
 import { collection } from 'firebase/firestore';
 import { useCollection } from '@/firebase';
@@ -39,7 +39,6 @@ export function ReviewStep() {
   
   const { toast } = useToast();
   const firestore = useFirestore();
-  const storage = useStorage();
   const { user } = useUser();
   const { formatPrice } = useCurrency();
 
@@ -52,15 +51,24 @@ export function ReviewStep() {
   const selectedAddress = addresses?.find(a => a.id === formData.shippingFromAddressId);
 
   /**
-   * Resolves an image URL or File object into a Blob.
-   * Includes retry logic and timeout to handle unstable browser blob URLs.
+   * Resolves an image (File, data URI, blob URL, or https URL) into a Blob for upload.
+   * Handles all persistence formats: File objects (live session), data URIs (restored draft),
+   * and https URLs (already-uploaded images).
    */
   const resolveImageBlob = async (img: any, retries = 2): Promise<Blob> => {
+    // 1. If we still have the original File/Blob in memory, use it directly
     if (img.file instanceof Blob) return img.file;
 
+    // 2. If the URL is a data URI (base64), decode it directly — no network needed
+    if (img.url && img.url.startsWith('data:')) {
+      const response = await fetch(img.url);
+      return await response.blob();
+    }
+
+    // 3. For blob: or https: URLs, fetch with retry
     const attemptFetch = async (): Promise<Blob> => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
 
         try {
             const response = await fetch(img.url, { signal: controller.signal });
@@ -78,14 +86,14 @@ export function ReviewStep() {
             return await attemptFetch();
         } catch (e) {
             if (i === retries) throw e;
-            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential-ish backoff
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
         }
     }
     throw new Error("Failed to resolve image data.");
   };
 
   const handlePublish = async () => {
-    if (!user || !firestore || !storage) {
+    if (!user || !firestore) {
         toast({ variant: "destructive", title: "Connection Error", description: "Firebase services are not available." });
         return;
     }
@@ -96,7 +104,7 @@ export function ReviewStep() {
     setStatusMessage('Validating details...');
 
     try {
-      const productId = activeDraft?.id || `prod_${Date.now()}`;
+      const productId = activeDraft?.id || `prod_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const images = formData.images || [];
       
       if (images.length === 0) throw new Error("At least one photo is required to publish.");
@@ -116,36 +124,28 @@ export function ReviewStep() {
       }
 
       const finalImages = [];
-      
-      // 2. Sequential reliable uploads
+
+      // 2. Sequential reliable uploads via Supabase Storage
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
         const progressBase = (i / images.length) * 85;
-        
+
         setStatusMessage(`Preparing photo ${i + 1} of ${images.length}...`);
         setUploadProgress(progressBase + 2);
-        
+
         try {
             const blob = await resolveImageBlob(img);
-            
-            const fileExt = img.type?.split('/')[1] || 'jpg';
-            const fileName = `img_${Date.now()}_${i}.${fileExt}`;
-            const storagePath = `products/${user.uid}/${productId}/${fileName}`;
-            const storageRef = ref(storage, storagePath);
-            
-            const metadata = {
-                contentType: img.type || 'image/jpeg',
-                customMetadata: { 
-                    originalName: img.name || 'listing_image',
-                    position: i.toString()
-                }
-            };
 
             setStatusMessage(`Uploading photo ${i + 1}...`);
-            await uploadBytes(storageRef, blob, metadata);
-            const downloadUrl = await getDownloadURL(storageRef);
+            const uploaded = await uploadProductImage(
+              blob,
+              user.uid,
+              productId,
+              i,
+              img.type || 'image/jpeg'
+            );
 
-            finalImages.push({ url: downloadUrl, position: i });
+            finalImages.push({ url: uploaded.url, position: i });
             setUploadProgress(progressBase + (85 / images.length));
         } catch (imgErr) {
             console.error(`Failed at image ${i}:`, imgErr);

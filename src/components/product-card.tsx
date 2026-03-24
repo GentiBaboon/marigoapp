@@ -22,7 +22,8 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const favorite = isFavorite(product.id);
 
   // Handle new images structure or fallback to old 'image' field
-  const imageUrl = product.images?.[0]?.url || product.image;
+  const rawImage = product.images?.[0];
+  const imageUrl = typeof rawImage === 'string' ? rawImage : rawImage?.url || product.image || '';
   
   const handleToggleFavorite = (e: React.MouseEvent) => {
       e.preventDefault(); // prevent navigation
@@ -48,7 +49,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
               fill
               sizes="(max-width: 768px) 50vw, 33vw"
               className="object-cover"
-              unoptimized={imageUrl.startsWith('blob:')}
+              unoptimized={typeof imageUrl === 'string' && imageUrl.startsWith('blob:')}
             />
           ) : (
             <div className="aspect-square w-full bg-muted flex items-center justify-center text-muted-foreground text-[10px]">
