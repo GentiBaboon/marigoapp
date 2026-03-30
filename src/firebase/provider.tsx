@@ -90,7 +90,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
           const userDocRef = doc(firestore, 'users', firebaseUser.uid);
           getDoc(userDocRef).then(docSnap => {
             if (!docSnap.exists()) {
-              setDoc(userDocRef, {
+              return setDoc(userDocRef, {
                 name: firebaseUser.displayName,
                 email: firebaseUser.email,
                 profileImage: firebaseUser.photoURL,
@@ -101,8 +101,10 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
               }, { merge: true }); // use merge to be safe
             } else {
               // Update last login
-              setDoc(userDocRef, { lastLoginAt: serverTimestamp() }, { merge: true });
+              return setDoc(userDocRef, { lastLoginAt: serverTimestamp() }, { merge: true });
             }
+          }).catch((err) => {
+            console.error("FirebaseProvider: Error creating/updating user document:", err);
           });
         }
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });

@@ -42,18 +42,27 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
     setLoading(provider);
     const action = provider === 'google' ? signInWithGoogle : signInWithApple;
-    const result = await action(auth);
+    try {
+      const result = await action(auth);
 
-    if (result.success) {
-      router.push('/home');
-    } else {
+      if (result.success) {
+        router.push('/home');
+      } else {
+        toast({
+          variant: 'destructive',
+          title: `Sign in with ${
+            provider.charAt(0).toUpperCase() + provider.slice(1)
+          } failed`,
+          description: result.error,
+        });
+      }
+    } catch {
       toast({
         variant: 'destructive',
-        title: `Sign in with ${
-          provider.charAt(0).toUpperCase() + provider.slice(1)
-        } failed`,
-        description: result.error,
+        title: 'Sign in failed',
+        description: 'An unexpected error occurred. Please try again.',
       });
+    } finally {
       setLoading(null);
     }
   };

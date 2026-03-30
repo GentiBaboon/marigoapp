@@ -10,7 +10,7 @@ import Link from 'next/link';
 
 export default function ForgotPasswordPage() {
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md mx-auto mt-20">
       <CardHeader className="text-center">
         <CardTitle className="font-headline text-3xl">
           Forgot Password
