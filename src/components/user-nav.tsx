@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useUser, useAuth, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { signOutUser } from '@/firebase/auth/actions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -35,8 +35,8 @@ import {
 } from 'lucide-react';
 import { useCurrency, type Currency } from '@/context/CurrencyContext';
 import { useTranslation, type Locale } from '@/context/LanguageContext';
-import { doc } from 'firebase/firestore';
-import type { FirestoreUser } from '@/lib/types';
+import { doc, collection, query, where } from 'firebase/firestore';
+import type { FirestoreUser, FirestoreConversation } from '@/lib/types';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
 
@@ -59,6 +59,13 @@ export function UserNav() {
 
   const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: firestoreUser } = useDoc<FirestoreUser>(userRef);
+
+  const conversationsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(collection(firestore, 'conversations'), where('participants', 'array-contains', user.uid));
+  }, [user, firestore]);
+  const { data: conversations } = useCollection<FirestoreConversation>(conversationsQuery);
+  const totalUnread = conversations?.reduce((sum, c) => sum + (c.unreadCount?.[user?.uid ?? ''] ?? 0), 0) ?? 0;
 
   const handleSignOut = async () => {
     await signOutUser(auth);
@@ -94,7 +101,18 @@ export function UserNav() {
           <Bell className="h-6 w-6" />
         </Link>
       </Button>
-      
+
+      <Button asChild variant="ghost" size="icon" aria-label="Messages" className="relative">
+        <Link href="/messages">
+          <MessageSquare className="h-6 w-6" />
+          {totalUnread > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+              {totalUnread > 9 ? '9+' : totalUnread}
+            </span>
+          )}
+        </Link>
+      </Button>
+
       <Button asChild variant="ghost" size="icon" aria-label="Shopping Cart" className="relative">
         <Link href="/cart">
           <ShoppingCart className="h-6 w-6" />
