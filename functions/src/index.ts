@@ -11,10 +11,11 @@ const db = admin.firestore();
 const getStripe = () => {
   const key = process.env.STRIPE_SK || process.env.STRIPE_SECRET_KEY || "";
   if (!key) {
-    throw new HttpsError("failed-precondition", "Stripe secret key is not configured.");
+    logger.error("Stripe secret key is missing. Check functions/.env file and redeploy.");
+    throw new HttpsError("failed-precondition", "Payment service is not configured. Please contact support.");
   }
   return new Stripe(key, {
-    apiVersion: "2024-06-20",
+    apiVersion: "2024-06-20" as Stripe.LatestApiVersion,
   });
 };
 
@@ -223,8 +224,21 @@ export const createPaymentIntent = onCall({region: "europe-west1"}, async (reque
 
     return {clientSecret: pi.client_secret, orderId: orderRef.id};
   } catch (error: any) {
-    logger.error("createPaymentIntent error", error);
+    logger.error("createPaymentIntent error", {message: error.message, code: error.code, type: error.type, statusCode: error.statusCode});
     if (error instanceof HttpsError) throw error;
+    // Stripe errors have a `type` property - surface them with a helpful message
+    if (error.type === "StripeCardError") {
+      throw new HttpsError("failed-precondition", error.message || "Your card was declined. Please try another payment method.");
+    }
+    if (error.type === "StripeInvalidRequestError") {
+      throw new HttpsError("invalid-argument", "Payment configuration error. Please contact support.");
+    }
+    if (error.type === "StripeAuthenticationError") {
+      throw new HttpsError("failed-precondition", "Payment service configuration issue. Please contact support.");
+    }
+    if (error.type === "StripeConnectionError" || error.type === "StripeAPIError") {
+      throw new HttpsError("unavailable", "Payment service is temporarily unavailable. Please try again in a moment.");
+    }
     throw new HttpsError("internal", error.message || "Payment processing failed. Please try again.");
   }
 });
@@ -257,9 +271,9 @@ export const createOrder = onCall({region: "europe-west1"}, async (request) => {
 
     return {success: true, orderId: orderRef.id};
   } catch (error: any) {
-    logger.error("createOrder error", error);
+    logger.error("createOrder error", {message: error.message, code: error.code});
     if (error instanceof HttpsError) throw error;
-    throw new HttpsError("internal", error.message || "Order creation failed.");
+    throw new HttpsError("internal", error.message || "Order creation failed. Please try again.");
   }
 });
 
