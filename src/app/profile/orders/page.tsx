@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreOrder } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -71,12 +71,24 @@ export default function OrdersPage() {
     if (!user || !firestore) return null;
     return query(
         collection(firestore, 'orders'),
-        where('buyerId', '==', user.uid),
-        orderBy('createdAt', 'desc')
+        where('buyerId', '==', user.uid)
     );
   }, [user, firestore]);
 
-  const { data: orders, isLoading: areOrdersLoading } = useCollection<FirestoreOrder>(ordersQuery);
+  const { data: rawOrders, isLoading: areOrdersLoading } = useCollection<FirestoreOrder>(ordersQuery);
+  const orders = React.useMemo(() => {
+    if (!rawOrders) return rawOrders;
+    return [...rawOrders].sort((a, b) => {
+      const getMs = (ts: any) => {
+        if (!ts) return 0;
+        if (typeof ts === 'string') return new Date(ts).getTime();
+        if (typeof ts === 'object' && 'seconds' in ts) return ts.seconds * 1000;
+        if (ts?.toMillis) return ts.toMillis();
+        return 0;
+      };
+      return getMs(b.createdAt) - getMs(a.createdAt);
+    });
+  }, [rawOrders]);
 
   if (!user && !isUserLoading) {
      return (
