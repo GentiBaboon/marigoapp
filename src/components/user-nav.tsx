@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { useCurrency, type Currency } from '@/context/CurrencyContext';
 import { useTranslation, type Locale } from '@/context/LanguageContext';
-import { doc } from 'firebase/firestore';
+import { doc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { FirestoreUser } from '@/lib/types';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
@@ -59,6 +59,25 @@ export function UserNav() {
 
   const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: firestoreUser } = useDoc<FirestoreUser>(userRef);
+
+  const [totalUnread, setTotalUnread] = React.useState(0);
+  React.useEffect(() => {
+    if (!user || !firestore) return;
+    const q = query(
+      collection(firestore, 'conversations'),
+      where('participants', 'array-contains', user.uid)
+    );
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const count = snap.docs.reduce((sum, d) => {
+        const data = d.data();
+        return sum + ((data.unreadCount?.[user.uid] as number) ?? 0);
+      }, 0);
+      setTotalUnread(count);
+    }, () => {
+      // Silently ignore permission errors — badge shows 0
+    });
+    return () => unsubscribe();
+  }, [user, firestore]);
 
   const handleSignOut = async () => {
     await signOutUser(auth);
@@ -94,7 +113,18 @@ export function UserNav() {
           <Bell className="h-6 w-6" />
         </Link>
       </Button>
-      
+
+      <Button asChild variant="ghost" size="icon" aria-label="Messages" className="relative">
+        <Link href="/messages">
+          <MessageSquare className="h-6 w-6" />
+          {totalUnread > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+              {totalUnread > 9 ? '9+' : totalUnread}
+            </span>
+          )}
+        </Link>
+      </Button>
+
       <Button asChild variant="ghost" size="icon" aria-label="Shopping Cart" className="relative">
         <Link href="/cart">
           <ShoppingCart className="h-6 w-6" />

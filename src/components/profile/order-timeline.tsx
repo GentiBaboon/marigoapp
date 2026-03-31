@@ -21,10 +21,18 @@ const TimelineDot = ({ state }: { state: 'completed' | 'current' | 'upcoming' })
     )
 }
 
+function toDate(ts: any): Date {
+    if (!ts) return new Date();
+    if (typeof ts === 'string') return new Date(ts);
+    if (typeof ts === 'object' && 'seconds' in ts) return new Date(ts.seconds * 1000);
+    if (ts?.toDate) return ts.toDate();
+    return new Date();
+}
+
 export function OrderTimeline({ order }: { order: FirestoreOrder }) {
     const { status } = order;
 
-    const shipByDate = addDays(new Date(order.createdAt.seconds * 1000), 7);
+    const shipByDate = addDays(toDate(order.createdAt), 7);
     const cancelDate = addDays(shipByDate, 1);
     
     // Statuses: processing, shipped, delivered, completed
@@ -45,7 +53,7 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
             <div className="relative pl-8 pb-10">
                 <TimelineDot state="completed" />
                 <h4 className="font-semibold">Order received</h4>
-                <p className="text-sm text-muted-foreground">On {format(new Date(order.createdAt.seconds * 1000), 'MMMM d, yyyy')}</p>
+                <p className="text-sm text-muted-foreground">On {format(toDate(order.createdAt), 'MMMM d, yyyy')}</p>
             </div>
 
             {/* Step 2: Waiting for Seller to Ship */}

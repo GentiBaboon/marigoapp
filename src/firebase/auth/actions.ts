@@ -26,14 +26,22 @@ const getErrorMessage = (error: any): string => {
                 return 'No user found with this email.';
             case 'auth/wrong-password':
                 return 'Incorrect password. Please try again.';
+            case 'auth/invalid-credential':
+                return 'Invalid email or password. Please check your credentials and try again.';
             case 'auth/email-already-in-use':
                 return 'This email is already in use by another account.';
             case 'auth/invalid-email':
                 return 'Please enter a valid email address.';
             case 'auth/weak-password':
                 return 'Password should be at least 6 characters.';
-             case 'auth/popup-closed-by-user':
+            case 'auth/popup-closed-by-user':
                 return 'Sign-in process was cancelled.';
+            case 'auth/account-exists-with-different-credential':
+                return 'An account already exists with the same email but a different sign-in method.';
+            case 'auth/too-many-requests':
+                return 'Too many failed attempts. Please try again later.';
+            case 'auth/network-request-failed':
+                return 'Network error. Please check your connection and try again.';
             default:
                 return 'An unexpected error occurred. Please try again.';
         }

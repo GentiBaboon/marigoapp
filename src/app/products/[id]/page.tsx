@@ -19,6 +19,7 @@ import {
   Check,
   ShieldCheck,
   Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -119,6 +120,31 @@ export default function ProductDetailPage() {
         isFavorite(product.id) ? removeFromWishlist(product.id) : addToWishlist(product.id);
     }
 
+    const handleContactSeller = async () => {
+        if (!user) { router.push('/auth'); return; }
+        setIsChatLoading(true);
+        try {
+            const idToken = await user.getIdToken();
+            const res = await fetch('/api/start-conversation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({
+                    productId: product.id,
+                    sellerId: product.sellerId,
+                    productTitle: product.title,
+                    productImage: product.images?.[0] || '',
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            router.push(`/messages/${data.conversationId}`);
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: 'Error', description: err.message || 'Could not start conversation.' });
+        } finally {
+            setIsChatLoading(false);
+        }
+    };
+
     return (
       <div className="container mx-auto max-w-4xl px-0 md:px-4 py-6 md:py-10 pb-32 md:pb-10">
         <ProductJsonLd product={product} seller={seller} />
@@ -182,6 +208,10 @@ export default function ProductDetailPage() {
                     <>
                         <Button size="lg" className="w-full bg-foreground text-background" onClick={handleAddToCart} disabled={isSoldOrReserved}>Add to bag</Button>
                         <Button size="lg" variant="outline" className="w-full" onClick={() => setIsOfferSheetOpen(true)} disabled={isSoldOrReserved}>Make an offer</Button>
+                        <Button size="lg" variant="ghost" className="w-full border" onClick={handleContactSeller} disabled={isChatLoading}>
+                            {isChatLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                            Contact Seller
+                        </Button>
                     </>
                 )}
             </div>
