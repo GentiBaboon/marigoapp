@@ -7,6 +7,7 @@ import {
   firestoreUpdate,
   firestoreCreate,
 } from '@/lib/firebase-admin';
+import { sendOrderConfirmation, sendSellerOrderNotification } from '@/lib/mailtrap';
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY || '';
@@ -164,6 +165,33 @@ export async function POST(req: NextRequest) {
       },
       idToken
     );
+
+    // Send emails (non-blocking)
+    if (buyerData?.email) {
+      sendOrderConfirmation({
+        buyerEmail: buyerData.email,
+        buyerName: buyerData.name || 'Customer',
+        orderNumber,
+        orderId,
+        items: validatedItems,
+        totalAmount: total,
+        paymentMethod: 'card',
+        shippingAddress,
+      }).catch(console.error);
+    }
+
+    for (const sellerId of sellerIds) {
+      const sellerData = await firestoreGet('users', sellerId, idToken).catch(() => null);
+      if (sellerData?.email) {
+        sendSellerOrderNotification({
+          sellerEmail: sellerData.email,
+          sellerName: sellerData.name || 'Seller',
+          orderNumber,
+          items: validatedItems.filter((i: any) => i.sellerId === sellerId),
+          totalAmount: total,
+        }).catch(console.error);
+      }
+    }
 
     return NextResponse.json({ clientSecret: pi.client_secret, orderId });
   } catch (err: any) {
