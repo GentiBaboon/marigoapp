@@ -57,7 +57,12 @@ export function OrderItem({ order }: { order: FirestoreOrder }) {
                     {status.label.toUpperCase()}
                 </Badge>
                 <p className="text-xs text-muted-foreground">
-                    Order #{order.orderNumber} • {format(new Date(order.createdAt.seconds * 1000), 'd MMM yyyy')}
+                    Order #{order.orderNumber} • {format(
+                      typeof order.createdAt === 'string'
+                        ? new Date(order.createdAt)
+                        : new Date((order.createdAt as any)?.seconds * 1000 || Date.now()),
+                      'd MMM yyyy'
+                    )}
                 </p>
             </div>
              <DropdownMenu>
