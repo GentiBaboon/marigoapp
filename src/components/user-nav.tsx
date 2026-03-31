@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useUser, useAuth, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
+import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOutUser } from '@/firebase/auth/actions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -35,8 +35,8 @@ import {
 } from 'lucide-react';
 import { useCurrency, type Currency } from '@/context/CurrencyContext';
 import { useTranslation, type Locale } from '@/context/LanguageContext';
-import { doc, collection, query, where } from 'firebase/firestore';
-import type { FirestoreUser, FirestoreConversation } from '@/lib/types';
+import { doc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import type { FirestoreUser } from '@/lib/types';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
 
@@ -60,12 +60,24 @@ export function UserNav() {
   const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: firestoreUser } = useDoc<FirestoreUser>(userRef);
 
-  const conversationsQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(collection(firestore, 'conversations'), where('participants', 'array-contains', user.uid));
+  const [totalUnread, setTotalUnread] = React.useState(0);
+  React.useEffect(() => {
+    if (!user || !firestore) return;
+    const q = query(
+      collection(firestore, 'conversations'),
+      where('participants', 'array-contains', user.uid)
+    );
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const count = snap.docs.reduce((sum, d) => {
+        const data = d.data();
+        return sum + ((data.unreadCount?.[user.uid] as number) ?? 0);
+      }, 0);
+      setTotalUnread(count);
+    }, () => {
+      // Silently ignore permission errors — badge shows 0
+    });
+    return () => unsubscribe();
   }, [user, firestore]);
-  const { data: conversations } = useCollection<FirestoreConversation>(conversationsQuery);
-  const totalUnread = conversations?.reduce((sum, c) => sum + (c.unreadCount?.[user?.uid ?? ''] ?? 0), 0) ?? 0;
 
   const handleSignOut = async () => {
     await signOutUser(auth);
