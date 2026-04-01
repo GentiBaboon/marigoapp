@@ -225,6 +225,82 @@ export async function sendSellerOrderNotification({
   });
 }
 
+// ─── Password Reset ───────────────────────────────────────────────────────────
+
+export async function sendPasswordResetMail({
+  email,
+  resetLink,
+}: {
+  email: string;
+  resetLink: string;
+}) {
+  if (!TOKEN) return;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f7f7f7;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f7;padding:40px 0;">
+    <tr><td align="center">
+      <table width="580" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.07);">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:#000;padding:32px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:28px;font-weight:300;letter-spacing:4px;">MARIGO</h1>
+            <p style="margin:6px 0 0;color:#aaa;font-size:12px;letter-spacing:2px;text-transform:uppercase;">Luxury Fashion Marketplace</p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:40px;">
+            <h2 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#111;">Reset Your Password</h2>
+            <p style="margin:0 0 28px;color:#666;font-size:15px;line-height:1.6;">
+              We received a request to reset your password. Click the button below to choose a new one.
+              This link expires in <strong>1 hour</strong>.
+            </p>
+
+            <div style="text-align:center;margin-bottom:32px;">
+              <a href="${resetLink}"
+                style="display:inline-block;background:#000;color:#fff;text-decoration:none;padding:16px 40px;border-radius:50px;font-size:15px;font-weight:600;letter-spacing:0.5px;">
+                Reset Password
+              </a>
+            </div>
+
+            <p style="margin:0 0 8px;font-size:13px;color:#999;text-align:center;">
+              If you didn't request this, you can safely ignore this email — your password won't change.
+            </p>
+            <p style="margin:0;font-size:12px;color:#bbb;text-align:center;word-break:break-all;">
+              ${resetLink}
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f9f9f9;padding:24px 40px;text-align:center;border-top:1px solid #eee;">
+            <p style="margin:0;font-size:12px;color:#aaa;">© 2026 Marigo Luxe. All rights reserved.</p>
+            <p style="margin:4px 0 0;font-size:12px;color:#aaa;">Albania & EU Luxury Fashion Marketplace</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  await client.send({
+    from: SENDER,
+    to: [{ email }],
+    subject: 'Reset your Marigo password',
+    html,
+    category: 'Password Reset',
+  });
+}
+
 // ─── New Message Notification ─────────────────────────────────────────────────
 
 export async function sendMessageNotification({
