@@ -6,8 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 
 import { forgotPasswordSchema, type ForgotPasswordValues } from '@/lib/types';
-import { useAuth } from '@/firebase';
-import { sendPasswordReset } from '@/firebase/auth/actions';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,7 +21,6 @@ import { Input } from '@/components/ui/input';
 export function ForgotPasswordForm() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const auth = useAuth();
   const { toast } = useToast();
 
   const form = useForm<ForgotPasswordValues>({
@@ -35,19 +32,31 @@ export function ForgotPasswordForm() {
 
   async function onSubmit(data: ForgotPasswordValues) {
     setLoading(true);
-    const result = await sendPasswordReset(auth, data.email);
-    if (result.success) {
-      setSubmitted(true);
-    } else {
+    try {
+      const res = await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: data.email }),
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        setSubmitted(true);
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'An error occurred',
+          description: result.error || 'There was a problem sending the password reset email.',
+        });
+      }
+    } catch {
       toast({
         variant: 'destructive',
-        title: 'An error occurred',
-        description:
-          result.error ||
-          'There was a problem sending the password reset email.',
+        title: 'Network error',
+        description: 'Could not reach the server. Please try again.',
       });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   if (submitted) {

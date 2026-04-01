@@ -553,6 +553,58 @@ export const createStripeConnectedAccount = onCall({region: "europe-west1"}, asy
 });
 
 // ═══════════════════════════════════════════════════════
+// PASSWORD RESET LINK GENERATOR
+// Called by Next.js API — generates OOB link using Admin SDK
+// Requires RESET_SERVICE_SECRET env var on both sides
+// ═══════════════════════════════════════════════════════
+export const sendPasswordResetLink = onRequest({region: "europe-west1"}, async (req, res) => {
+  const appUrl = process.env.APP_URL || "https://marigoapp.com";
+  res.set("Access-Control-Allow-Origin", appUrl);
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+
+  if (req.method !== "POST") {
+    res.status(405).json({error: "Method Not Allowed"});
+    return;
+  }
+
+  const {email, serviceSecret} = req.body;
+  const expectedSecret = process.env.RESET_SERVICE_SECRET;
+
+  if (!expectedSecret || serviceSecret !== expectedSecret) {
+    res.status(401).json({error: "Unauthorized"});
+    return;
+  }
+
+  if (!email || typeof email !== "string") {
+    res.status(400).json({error: "Email required"});
+    return;
+  }
+
+  try {
+    const actionCodeSettings = {
+      url: `${appUrl}/auth/reset-password`,
+      handleCodeInApp: true,
+    };
+    const link = await admin.auth().generatePasswordResetLink(email.toLowerCase().trim(), actionCodeSettings);
+    res.status(200).json({success: true, link});
+  } catch (err: any) {
+    if (err.code === "auth/user-not-found") {
+      // Don't reveal if email exists (prevent enumeration)
+      res.status(200).json({success: true});
+    } else {
+      logger.error("sendPasswordResetLink error", err);
+      res.status(500).json({error: "Internal error"});
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════
 // SELLER BALANCE & PAYOUTS
 // ═══════════════════════════════════════════════════════
 export const getSellerBalance = onCall({region: "europe-west1"}, async (request) => {
