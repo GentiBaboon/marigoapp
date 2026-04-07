@@ -14,20 +14,23 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Admin check relies solely on the Firebase custom claim `admin: true`.
+    // Set this server-side via Firebase Admin SDK or Cloud Functions.
+    // Alternatively falls back to checking the Firestore user document role.
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.admin == true || 
-        request.auth.uid in [
-          '2C81RVoXZWZuSWXEEueehqbHkMu1',
-          'v521MWW9rmPYchVBc91DheeRU5j2',
-          'GoNLAq0YYdQw70fDS5L1XbBqtow1',
-          '4qTAOIovwdWYGCnqYPiPCJqNcdP2',
-          'jBbMqpl6zKeZ9skDW3ux0iBMJRB2',
-          'x2QOIY1fw8S6GOgIB2k45eiAAU93'
-        ]
+        request.auth.token.admin == true ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin','super_admin','moderator','analyst']
       );
     }
-    
+
+    function isFullAdmin() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin','super_admin']
+      );
+    }
+
     function isCourier() {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'courier';
     }
@@ -35,13 +38,13 @@ service cloud.firestore {
     // --------------------------------------------------------------------
     // Collections
     // --------------------------------------------------------------------
-    
+
     match /users/{userId} {
       allow get: if true;
       allow list: if isAdmin();
       allow create: if isOwner(userId) || isAdmin();
       allow update: if isOwner(userId) || isAdmin();
-      
+
       match /wishlist/{productId} { allow read, write: if isOwner(userId); }
       match /cart/{productId} { allow read, write: if isOwner(userId); }
       match /addresses/{addressId} { allow read, write: if isOwner(userId); }
@@ -53,7 +56,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.sellerId == request.auth.uid;
       allow update: if isSignedIn() && (resource.data.sellerId == request.auth.uid || isAdmin());
       allow delete: if isAdmin() || (isSignedIn() && resource.data.sellerId == request.auth.uid);
-      
+
       match /offers/{offerId} {
         allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || get(/databases/$(database)/documents/products/$(productId)).data.sellerId == request.auth.uid || isAdmin());
         allow create: if isSignedIn();
@@ -61,18 +64,26 @@ service cloud.firestore {
       }
     }
 
+    // Catalog metadata — public read is fine
     match /categories/{id} { allow read: if true; allow write: if isAdmin(); }
     match /brands/{id} { allow read: if true; allow write: if isAdmin(); }
     match /conditions/{id} { allow read: if true; allow write: if isAdmin(); }
     match /materials/{id} { allow read: if true; allow write: if isAdmin(); }
     match /colors/{id} { allow read: if true; allow write: if isAdmin(); }
     match /patterns/{id} { allow read: if true; allow write: if isAdmin(); }
-    
-    match /settings/global { allow read: if true; allow write: if isAdmin(); }
+
+    match /settings/global { allow read: if true; allow write: if isFullAdmin(); }
     match /config/exchangeRates { allow read: if true; }
     match /admin_logs/{logId} { allow read, write: if isAdmin(); }
-    match /coupons/{couponId} { allow read: if true; allow write: if isAdmin(); }
-    
+
+    // Coupons: signed-in users can query by code during checkout (they need
+    // the exact code). Only admins can create/update/delete coupons.
+    // This prevents unauthenticated enumeration while allowing checkout validation.
+    match /coupons/{couponId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /orders/{orderId} {
       allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || request.auth.uid in resource.data.sellerIds || isAdmin());
       allow create: if isSignedIn();
@@ -85,13 +96,16 @@ service cloud.firestore {
       allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
+    // Deliveries: restricted to the assigned courier or admin.
+    // Couriers need read access to browse unassigned jobs (courierId may be null).
     match /deliveries/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || isCourier();
+      allow read: if isSignedIn() && (isCourier() || isAdmin());
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (isSignedIn() && resource.data.courierId == request.auth.uid);
     }
 
     match /courier_profiles/{id} {
-      allow read: if isSignedIn();
+      allow read: if isOwner(id) || isAdmin();
       allow write: if isAdmin() || isOwner(id);
     }
 
@@ -105,10 +119,17 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isSignedIn();
       allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      
+
+      // Support messages: only the chat owner and admins can read/write
       match /messages/{msgId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid ||
+          isAdmin()
+        );
+        allow create: if isSignedIn() && (
+          get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid ||
+          isAdmin()
+        );
       }
     }
 
@@ -131,9 +152,25 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update: if isAdmin();
     }
-    
-    // REMOVED: Wildcard catch-all rule (match /{path=**}) was a security risk.
-    // Admin access is now explicitly granted per collection above.
-    // If a new collection is needed, add explicit rules for it.
+
+    match /refunds/{refundId} {
+      allow read: if isSignedIn() && (resource.data.requestedBy == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+    }
+
+    match /disputes/{disputeId} {
+      allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+    }
+
+    match /returns/{returnId} {
+      allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+    }
+
+    // No wildcard catch-all rule. Every collection must have explicit rules.
   }
 }

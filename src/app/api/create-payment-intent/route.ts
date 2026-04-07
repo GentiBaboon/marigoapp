@@ -8,6 +8,7 @@ import {
   firestoreCreate,
 } from '@/lib/firebase-admin';
 import { sendOrderConfirmation, sendSellerOrderNotification } from '@/lib/mailtrap';
+import { paymentIntentLimiter, applyRateLimit } from '@/lib/rate-limit';
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY || '';
@@ -70,6 +71,10 @@ async function calculateOrderTotal(
 }
 
 export async function POST(req: NextRequest) {
+  // Rate limit: 10 requests per minute per IP
+  const rateLimitResponse = applyRateLimit(req, paymentIntentLimiter);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const authHeader = req.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {

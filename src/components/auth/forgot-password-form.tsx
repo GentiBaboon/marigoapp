@@ -33,9 +33,18 @@ export function ForgotPasswordForm() {
   async function onSubmit(data: ForgotPasswordValues) {
     setLoading(true);
     try {
+      // Read the CSRF cookie set by middleware and send it as a header
+      const csrfToken = document.cookie
+        .split('; ')
+        .find((c) => c.startsWith('__csrf='))
+        ?.split('=')[1] || '';
+
       const res = await fetch('/api/forgot-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
         body: JSON.stringify({ email: data.email }),
       });
       const result = await res.json();

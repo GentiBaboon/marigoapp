@@ -5,6 +5,78 @@ import { Timestamp, FieldValue } from "firebase/firestore";
 // --- Base Types ---
 export type FirestoreTimestamp = Timestamp | FieldValue | { seconds: number; nanoseconds: number };
 
+/**
+ * Safely convert a FirestoreTimestamp to a JS Date.
+ * Handles Timestamp objects, raw {seconds, nanoseconds}, and ISO strings.
+ */
+export function toDate(ts: FirestoreTimestamp | string | null | undefined): Date | null {
+  if (!ts) return null;
+  if (typeof ts === 'string') return new Date(ts);
+  if (typeof (ts as any).toDate === 'function') return (ts as any).toDate();
+  if (typeof (ts as any).seconds === 'number') return new Date((ts as any).seconds * 1000);
+  return null;
+}
+
+// --- Status Enums (single source of truth for all status values) ---
+
+export const ProductStatusEnum = {
+  DRAFT: 'draft',
+  PENDING_REVIEW: 'pending_review',
+  ACTIVE: 'active',
+  SOLD: 'sold',
+  REMOVED: 'removed',
+  EXPIRED: 'expired',
+  RESERVED: 'reserved',
+} as const;
+
+export const OrderStatusEnum = {
+  PENDING_PAYMENT: 'pending_payment',
+  PROCESSING: 'processing',
+  SHIPPED: 'shipped',
+  DELIVERED: 'delivered',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+  REFUNDED: 'refunded',
+} as const;
+
+export const UserStatusEnum = {
+  ACTIVE: 'active',
+  BANNED: 'banned',
+} as const;
+
+export const UserRoleEnum = {
+  BUYER: 'buyer',
+  SELLER: 'seller',
+  COURIER: 'courier',
+  ADMIN: 'admin',
+  SUPER_ADMIN: 'super_admin',
+  MODERATOR: 'moderator',
+  ANALYST: 'analyst',
+} as const;
+
+export const DeliveryStatusEnum = {
+  PENDING_ASSIGNMENT: 'pending_assignment',
+  ASSIGNED: 'assigned',
+  ARRIVED_FOR_PICKUP: 'arrived_for_pickup',
+  PICKED_UP: 'picked_up',
+  IN_TRANSIT: 'in_transit',
+  ARRIVED_FOR_DELIVERY: 'arrived_for_delivery',
+  DELIVERED: 'delivered',
+  CANCELLED: 'cancelled',
+} as const;
+
+export const ReportStatusEnum = {
+  PENDING: 'pending',
+  RESOLVED: 'resolved',
+} as const;
+
+export const OfferStatusEnum = {
+  PENDING: 'pending',
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected',
+  EXPIRED: 'expired',
+} as const;
+
 // --- Auth & User ---
 export const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -32,7 +104,7 @@ export interface FirestoreUser {
   name: string | null;
   email: string | null;
   phone: string | null;
-  role: "buyer" | "seller" | "courier" | "admin";
+  role: "buyer" | "seller" | "courier" | "admin" | "super_admin" | "moderator" | "analyst";
   profileImage: string | null;
   bio?: string | null;
   language: "sq" | "en" | "it";
@@ -53,6 +125,10 @@ export interface FirestoreUser {
   };
   isCourier?: boolean;
   courierStatus?: 'pending_approval' | 'approved' | 'rejected';
+  kycStatus?: 'not_started' | 'pending' | 'approved' | 'rejected';
+  kycDocuments?: Array<{ url: string; type: string; uploadedAt: string }>;
+  isVerifiedSeller?: boolean;
+  kycRejectionReason?: string;
 }
 
 // --- Products ---
@@ -122,6 +198,8 @@ export interface FirestoreOrder {
   createdAt: FirestoreTimestamp;
   couponCode?: string | null;
   discountAmount?: number;
+  taxAmount?: number;
+  taxRate?: number;
 }
 
 // --- Shared Components ---
@@ -301,6 +379,10 @@ export interface FirestoreCoupon {
 export interface FirestoreSettings {
   isFreeDeliveryActive: boolean;
   freeDeliveryThreshold: number;
+  commissionRate?: number;
+  taxEnabled?: boolean;
+  taxRate?: number;
+  taxLabel?: string;
 }
 
 // --- Messaging ---
@@ -380,4 +462,81 @@ export interface FirestoreOffer {
   message?: string;
   status: 'pending' | 'accepted' | 'rejected' | 'expired';
   createdAt: FirestoreTimestamp;
+}
+
+// --- Refunds ---
+export const RefundStatusEnum = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  PROCESSED: 'processed',
+} as const;
+
+export interface FirestoreRefund {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  requestedBy: string;
+  requestedByName: string;
+  reason: string;
+  amount: number;
+  status: 'pending' | 'approved' | 'rejected' | 'processed';
+  adminNotes?: string;
+  processedBy?: string;
+  createdAt: FirestoreTimestamp;
+  updatedAt?: FirestoreTimestamp;
+}
+
+// --- Disputes ---
+export interface DisputeMessage {
+  senderId: string;
+  senderName: string;
+  senderRole: 'buyer' | 'seller' | 'admin';
+  content: string;
+  createdAt: string;
+}
+
+export interface FirestoreDispute {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  buyerId: string;
+  buyerName: string;
+  sellerId: string;
+  sellerName: string;
+  reason: string;
+  status: 'open' | 'investigating' | 'resolved' | 'closed';
+  messages: DisputeMessage[];
+  resolution?: string;
+  createdAt: FirestoreTimestamp;
+  resolvedAt?: FirestoreTimestamp;
+  resolvedBy?: string;
+}
+
+// --- Returns ---
+export const ReturnStatusEnum = {
+  REQUESTED: 'requested',
+  APPROVED: 'approved',
+  SHIPPING: 'shipping',
+  RECEIVED: 'received',
+  REFUNDED: 'refunded',
+  EXCHANGED: 'exchanged',
+  REJECTED: 'rejected',
+} as const;
+
+export interface FirestoreReturn {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  buyerId: string;
+  buyerName: string;
+  sellerId: string;
+  items: Array<{ id: string; title: string; price: number; image: string }>;
+  type: 'return' | 'exchange';
+  reason: string;
+  status: 'requested' | 'approved' | 'shipping' | 'received' | 'refunded' | 'exchanged' | 'rejected';
+  adminNotes?: string;
+  processedBy?: string;
+  createdAt: FirestoreTimestamp;
+  updatedAt?: FirestoreTimestamp;
 }

@@ -50,7 +50,7 @@ export function PersonalizedPicks() {
                 // 1. Build user taste profile from wishlist
                 const wishlistedProductIds = wishlistItems.map(item => item.id).slice(0, 10);
                 const productsRef = collection(firestore, 'products');
-                
+
                 const wishlistProductsSnapshot = await getDocs(query(productsRef, where(documentId(), 'in', wishlistedProductIds)));
                 const wishlistProducts = wishlistProductsSnapshot.docs.map(doc => doc.data() as FirestoreProduct);
 
@@ -58,18 +58,19 @@ export function PersonalizedPicks() {
                     wishlistedBrands: [...new Set(wishlistProducts.map(p => p.brand))],
                     wishlistedCategories: [...new Set(wishlistProducts.map(p => p.category))],
                 };
-                
+
                 if (tasteProfile.wishlistedBrands.length === 0 && tasteProfile.wishlistedCategories.length === 0) {
                     setIsLoading(false);
                     return;
                 }
 
-                // 2. Get recommendation query from AI (Latency optimized)
+                // 2. Get AI recommendations — this is the slowest call, so fire it now
+                //    and fetch products in parallel once we have the query back.
                 const recommendationQuery = await getRecommendations(tasteProfile);
-                
-                // 3. Fetch products based on AI query
+
+                // 3. Build and fetch recommended products
                 const queryConstraints: QueryConstraint[] = [where('status', '==', 'active')];
-                
+
                 if (recommendationQuery.query.brands && recommendationQuery.query.brands.length > 0) {
                     queryConstraints.push(where('brand', 'in', recommendationQuery.query.brands.slice(0, 10)));
                 } else if (recommendationQuery.query.categories && recommendationQuery.query.categories.length > 0) {
@@ -80,13 +81,13 @@ export function PersonalizedPicks() {
                     setIsLoading(false);
                     return;
                 }
-                
+
                 queryConstraints.push(limit(12));
 
                 const recommendedProductsSnapshot = await getDocs(query(productsRef, ...queryConstraints));
                 const fetchedProducts = recommendedProductsSnapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() } as FirestoreProduct))
-                    .filter(p => !wishlistedProductIds.includes(p.id)); // Exclude already wishlisted
+                    .map(d => ({ id: d.id, ...d.data() } as FirestoreProduct))
+                    .filter(p => !wishlistedProductIds.includes(p.id));
 
                 setRecommendations({
                     products: fetchedProducts.slice(0, 8),

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyIdToken } from '@/lib/firebase-admin';
+import { conversationLimiter, applyRateLimit } from '@/lib/rate-limit';
 
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!;
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
@@ -143,6 +144,10 @@ async function createConversation(
 }
 
 export async function POST(req: NextRequest) {
+  // Rate limit: 20 requests per minute per IP
+  const rateLimitResponse = applyRateLimit(req, conversationLimiter);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const authHeader = req.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {

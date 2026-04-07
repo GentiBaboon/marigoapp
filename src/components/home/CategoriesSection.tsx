@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { collection } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreProduct, FirestoreCategory } from '@/lib/types';
 import { ProductCard } from '@/components/product-card';
@@ -29,19 +29,17 @@ export function CategoriesSection() {
   );
   const { data: categories, isLoading: categoriesLoading } = useCollection<FirestoreCategory>(categoriesQuery);
 
+  // Only fetch active products, limited to top 100 by views (avoids downloading entire collection)
   const productsQuery = useMemoFirebase(
-    () => collection(firestore, 'products'),
+    () => query(
+      collection(firestore, 'products'),
+      where('status', '==', 'active'),
+      orderBy('views', 'desc'),
+      limit(100)
+    ),
     [firestore]
   );
-  const { data: rawProducts, isLoading: productsLoading } = useCollection<FirestoreProduct>(productsQuery);
-
-  // Filter active, sort by views
-  const products = React.useMemo(() => {
-    if (!rawProducts) return null;
-    return rawProducts
-      .filter(p => p.status === 'active')
-      .sort((a, b) => (b.views || 0) - (a.views || 0));
-  }, [rawProducts]);
+  const { data: products, isLoading: productsLoading } = useCollection<FirestoreProduct>(productsQuery);
 
   // Build category lookup
   const categoryMap = React.useMemo(() => {

@@ -21,6 +21,7 @@ import { useFirestore, useUser } from '@/firebase';
 import { doc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestoreUser } from '@/lib/types';
+import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 
 interface DataTableRowActionsProps<TData> {
   row: Row<TData>;
@@ -33,6 +34,8 @@ export function DataTableRowActions<TData>({
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
+  const [confirmBanOpen, setConfirmBanOpen] = React.useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
   const targetUser = row.original as FirestoreUser;
 
   const handleUpdateStatus = async (newStatus: 'active' | 'banned') => {
@@ -114,6 +117,7 @@ export function DataTableRowActions<TData>({
   const isBanned = targetUser.status === 'banned';
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -153,16 +157,37 @@ export function DataTableRowActions<TData>({
                 Unban User
             </DropdownMenuItem>
         ) : (
-            <DropdownMenuItem onClick={() => handleUpdateStatus('banned')}>
+            <DropdownMenuItem onClick={() => setConfirmBanOpen(true)}>
                 <Ban className="mr-2 h-4 w-4" />
                 Ban User
             </DropdownMenuItem>
         )}
-        <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
+        <DropdownMenuItem className="text-destructive" onClick={() => setConfirmDeleteOpen(true)}>
           <Trash2 className="mr-2 h-4 w-4" />
           Delete
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <ConfirmActionDialog
+      open={confirmBanOpen}
+      onOpenChange={setConfirmBanOpen}
+      title="Ban User"
+      description={`Are you sure you want to ban "${targetUser.name}"? They will lose access to their account.`}
+      actionLabel="Ban User"
+      variant="destructive"
+      onConfirm={() => handleUpdateStatus('banned')}
+      isLoading={isLoading}
+    />
+    <ConfirmActionDialog
+      open={confirmDeleteOpen}
+      onOpenChange={setConfirmDeleteOpen}
+      title="Delete User"
+      description={`Are you sure you want to remove "${targetUser.name}"? This will ban their account.`}
+      actionLabel="Delete"
+      variant="destructive"
+      onConfirm={handleDelete}
+      isLoading={isLoading}
+    />
+    </>
   );
 }

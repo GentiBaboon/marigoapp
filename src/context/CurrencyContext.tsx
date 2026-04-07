@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useFirestore, useDoc, useMemoFirebase, useUser } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { getCookie, setCookie } from '@/lib/cookies';
 
 export type Currency = 'EUR' | 'ALL' | 'USD';
 
@@ -26,25 +27,6 @@ interface CurrencyContextType {
 }
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
-
-function getCookie(name: string): string | undefined {
-  if (typeof document === 'undefined') return undefined;
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop()?.split(';').shift();
-  return undefined;
-}
-
-function setCookie(name: string, value: string, days: number) {
-  if (typeof document === 'undefined') return;
-  let expires = "";
-  if (days) {
-    const date = new Date();
-    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-    expires = "; expires=" + date.toUTCString();
-  }
-  document.cookie = name + "=" + (value || "") + expires + "; path=/";
-}
 
 export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [currency, setCurrencyState] = useState<Currency>('EUR');

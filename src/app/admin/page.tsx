@@ -1,10 +1,11 @@
 
 'use client';
-import { useMemo } from 'react';
-import { collection, query, where } from 'firebase/firestore';
+import { useMemo, useState } from 'react';
+import { collection, query, where, doc } from 'firebase/firestore';
 import {
   useFirestore,
   useCollection,
+  useDoc,
   useMemoFirebase,
 } from '@/firebase';
 import type {
@@ -13,6 +14,7 @@ import type {
   FirestoreOrder,
   FirestoreReview,
   FirestoreReport,
+  FirestoreSettings,
 } from '@/lib/types';
 
 import {
@@ -22,13 +24,21 @@ import {
   DollarSign,
   Star,
   FileWarning,
+  Repeat,
+  TrendingUp,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { StatCard } from '@/components/admin/stat-card';
-import { RevenueChart } from '@/components/admin/charts/revenue-chart';
-import { UsersChart } from '@/components/admin/charts/users-chart';
-import { OrdersStatusChart } from '@/components/admin/charts/orders-status-chart';
-import { TopCategoriesChart } from '@/components/admin/charts/top-categories-chart';
-import { OrdersByCountryChart } from '@/components/admin/charts/orders-by-country-chart';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PeriodSelector, type Period } from '@/components/admin/charts/period-selector';
+
+// Lazy load chart components (recharts is ~200KB) — only loaded when admin visits dashboard
+const ChartSkeleton = () => <Skeleton className="h-[300px] w-full rounded-lg" />;
+const RevenueChart = dynamic(() => import('@/components/admin/charts/revenue-chart').then(m => m.RevenueChart), { loading: ChartSkeleton });
+const UsersChart = dynamic(() => import('@/components/admin/charts/users-chart').then(m => m.UsersChart), { loading: ChartSkeleton });
+const OrdersStatusChart = dynamic(() => import('@/components/admin/charts/orders-status-chart').then(m => m.OrdersStatusChart), { loading: ChartSkeleton });
+const TopCategoriesChart = dynamic(() => import('@/components/admin/charts/top-categories-chart').then(m => m.TopCategoriesChart), { loading: ChartSkeleton });
+const OrdersByCountryChart = dynamic(() => import('@/components/admin/charts/orders-by-country-chart').then(m => m.OrdersByCountryChart), { loading: ChartSkeleton });
 
 import { subDays } from 'date-fns';
 
@@ -37,10 +47,16 @@ const currencyFormatter = new Intl.NumberFormat('de-DE', {
   currency: 'EUR',
 });
 
-const COMMISSION_RATE = 0.15;
-
 export default function AdminDashboardPage() {
   const firestore = useFirestore();
+  const [period, setPeriod] = useState<Period>('30d');
+
+  // Configurable commission rate from Firestore
+  const settingsRef = useMemoFirebase(() => doc(firestore, 'settings', 'global'), [firestore]);
+  const { data: settings } = useDoc<FirestoreSettings>(settingsRef);
+  const commissionRate = settings?.commissionRate ?? 0.15;
+
+  const periodDays = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : 365;
 
   // Data Fetching
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
@@ -65,7 +81,7 @@ export default function AdminDashboardPage() {
   // Memoized Calculations
   const stats = useMemo(() => {
     const now = new Date();
-    const thirtyDaysAgo = subDays(now, 30);
+    const periodAgo = subDays(now, periodDays);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const safeUsers = users || [];
@@ -74,25 +90,37 @@ export default function AdminDashboardPage() {
     const safeReviews = reviews || [];
 
     const totalUsers = safeUsers.length;
-    const newUsers = safeUsers.filter(u => u.createdAt?.toDate && u.createdAt.toDate() > thirtyDaysAgo).length;
+    const newUsers = safeUsers.filter(u => u.createdAt?.toDate && u.createdAt.toDate() > periodAgo).length;
 
     const totalProducts = safeProducts.length;
     const activeListings = safeProducts.filter(p => p.status === 'active').length;
     const soldItems = safeOrders.reduce((sum, order) => sum + order.items.length, 0);
 
     const totalOrders = safeOrders.length;
-    const ordersThisMonth = safeOrders.filter(o => o.createdAt?.toDate && o.createdAt.toDate() > startOfMonth).length;
+    const ordersInPeriod = safeOrders.filter(o => o.createdAt?.toDate && o.createdAt.toDate() > periodAgo).length;
 
     const totalRevenue = safeOrders.reduce((sum, order) => sum + order.totalAmount, 0);
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    const commissionEarned = totalRevenue * COMMISSION_RATE;
-    
-    const activeUsers = safeUsers.filter(u => u.lastLoginAt?.toDate && u.lastLoginAt.toDate() > thirtyDaysAgo).length;
+    const commissionEarned = totalRevenue * commissionRate;
+
+    const activeUsers = safeUsers.filter(u => u.lastLoginAt?.toDate && u.lastLoginAt.toDate() > periodAgo).length;
 
     // For now, "pending" reviews are just all reviews, since there's no status field
     const pendingReviews = safeReviews.length;
-    
+
     const reportedItems = reports?.length || 0;
+
+    // Repeat Buyers: buyers who placed more than 1 order
+    const buyerOrderCounts = safeOrders.reduce<Record<string, number>>((acc, o) => {
+      acc[o.buyerId] = (acc[o.buyerId] || 0) + 1;
+      return acc;
+    }, {});
+    const uniqueBuyers = Object.keys(buyerOrderCounts).length;
+    const repeatBuyers = Object.values(buyerOrderCounts).filter(c => c > 1).length;
+    const repeatBuyerRate = uniqueBuyers > 0 ? Math.round((repeatBuyers / uniqueBuyers) * 100) : 0;
+
+    // Conversion Rate placeholder: orders / total users as a simple proxy
+    const conversionRate = totalUsers > 0 ? Math.round((uniqueBuyers / totalUsers) * 100) : 0;
 
     return {
       totalUsers,
@@ -102,24 +130,29 @@ export default function AdminDashboardPage() {
       activeListings,
       soldItems,
       totalOrders,
-      ordersThisMonth,
+      ordersInPeriod,
       avgOrderValue,
       totalRevenue,
       commissionEarned,
       pendingReviews,
       reportedItems,
+      repeatBuyerRate,
+      conversionRate,
     };
-  }, [users, products, orders, reviews, reports]);
+  }, [users, products, orders, reviews, reports, periodDays, commissionRate]);
 
   const isLoading = usersLoading || productsLoading || ordersLoading || reviewsLoading || reportsLoading;
 
   return (
     <>
-        <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-            <p className="text-muted-foreground mt-1">
-                A real-time overview of your marketplace.
-            </p>
+        <div className="mb-8 flex items-center justify-between">
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+                <p className="text-muted-foreground mt-1">
+                    A real-time overview of your marketplace.
+                </p>
+            </div>
+            <PeriodSelector value={period} onChange={setPeriod} />
         </div>
 
 
@@ -128,7 +161,7 @@ export default function AdminDashboardPage() {
         <StatCard
           title="Total Revenue"
           value={currencyFormatter.format(stats.totalRevenue)}
-          description={`${stats.ordersThisMonth} orders this month`}
+          description={`${stats.ordersInPeriod} orders in period`}
           icon={<DollarSign className="text-muted-foreground h-4 w-4" />}
           isLoading={isLoading}
         />
@@ -142,7 +175,7 @@ export default function AdminDashboardPage() {
         <StatCard
           title="Total Users"
           value={`${stats.totalUsers}`}
-          description={`+${stats.newUsers} in last 30 days`}
+          description={`+${stats.newUsers} in last ${periodDays} days`}
           icon={<Users className="text-muted-foreground h-4 w-4" />}
           isLoading={isLoading}
         />
@@ -156,7 +189,7 @@ export default function AdminDashboardPage() {
       </div>
 
        {/* Secondary Stats Row */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 my-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 my-8">
          <StatCard
           title="Avg. Order Value"
           value={currencyFormatter.format(stats.avgOrderValue)}
@@ -166,7 +199,7 @@ export default function AdminDashboardPage() {
          <StatCard
           title="Commission Earned"
           value={currencyFormatter.format(stats.commissionEarned)}
-          description={`at ${COMMISSION_RATE * 100}% rate`}
+          description={`at ${commissionRate * 100}% rate`}
           icon={<DollarSign className="text-muted-foreground h-4 w-4" />}
           isLoading={isLoading}
         />
@@ -180,6 +213,20 @@ export default function AdminDashboardPage() {
           title="Reported Items"
           value={`${stats.reportedItems}`}
           icon={<FileWarning className="text-muted-foreground h-4 w-4" />}
+          isLoading={isLoading}
+        />
+        <StatCard
+          title="Repeat Buyers"
+          value={`${stats.repeatBuyerRate}%`}
+          description="Buyers with more than 1 order"
+          icon={<Repeat className="text-muted-foreground h-4 w-4" />}
+          isLoading={isLoading}
+        />
+        <StatCard
+          title="Conversion Rate"
+          value={`${stats.conversionRate}%`}
+          description="Buyers / total users"
+          icon={<TrendingUp className="text-muted-foreground h-4 w-4" />}
           isLoading={isLoading}
         />
       </div>

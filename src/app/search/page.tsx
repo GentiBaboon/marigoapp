@@ -4,13 +4,12 @@ import * as React from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/product-card';
-import type { Product } from '@/lib/mock-data';
-import { Bookmark, SlidersHorizontal, Search } from 'lucide-react';
+import { Bookmark, SlidersHorizontal, Search, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, type QueryConstraint, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, type QueryConstraint, limit, startAfter, getDocs, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import type { FirestoreProduct } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 
@@ -26,14 +25,22 @@ function ProductCardSkeleton() {
 }
 
 
+const PAGE_SIZE = 20;
+
 function ProductListPage() {
   const searchParams = useSearchParams();
   const firestore = useFirestore();
-  
+
   const category = searchParams.get('category');
   const brand = searchParams.get('brand');
   const section = searchParams.get('section');
-  
+
+  const [allProducts, setAllProducts] = React.useState<FirestoreProduct[]>([]);
+  const [lastDoc, setLastDoc] = React.useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(true);
+
   let title = 'Products';
   if (category) title = category.replace(/-/g, ' ');
   if (brand) title = brand.replace(/-/g, ' ');
@@ -43,59 +50,60 @@ function ProductListPage() {
     title = section.replace(/-/g, ' ');
   }
 
+  // Build base query constraints (shared by initial and "load more")
+  const buildConstraints = React.useCallback(() => {
+    const constraints: QueryConstraint[] = [where('status', '==', 'active')];
+    if (category) constraints.push(where('subcategoryId', '==', category));
+    if (brand) constraints.push(where('brandId', '==', brand));
+    constraints.push(orderBy('listingCreated', 'desc'));
+    return constraints;
+  }, [category, brand]);
 
-  const productsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+  // Initial load
+  React.useEffect(() => {
+    if (!firestore) return;
+    setIsLoading(true);
+    setAllProducts([]);
+    setLastDoc(null);
+    setHasMore(true);
 
-    const baseQuery = collection(firestore, 'products');
-    const queryConstraints: QueryConstraint[] = [where('status', '==', 'active')];
-    
-    if (category) {
-      queryConstraints.push(where('subcategoryId', '==', category));
-    }
-    if (brand) {
-      queryConstraints.push(where('brandId', '==', brand));
-    }
-    
-    // Always order by listingCreated if it's new arrivals, otherwise by default
-    if (section === 'new-arrivals') {
-        queryConstraints.push(orderBy('listingCreated', 'desc'));
-    } else {
-        queryConstraints.push(orderBy('listingCreated', 'desc')); // Default order
-    }
+    const constraints = buildConstraints();
+    const q = query(collection(firestore, 'products'), ...constraints, limit(PAGE_SIZE));
 
-    queryConstraints.push(limit(50));
+    getDocs(q).then((snap) => {
+      const products = snap.docs.map(d => ({ id: d.id, ...d.data() } as FirestoreProduct));
+      setAllProducts(products);
+      setLastDoc(snap.docs[snap.docs.length - 1] || null);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+      setIsLoading(false);
+    });
+  }, [firestore, buildConstraints]);
 
-    return query(baseQuery, ...queryConstraints);
-  }, [firestore, category, brand, section]);
+  const loadMore = React.useCallback(async () => {
+    if (!firestore || !lastDoc || isLoadingMore) return;
+    setIsLoadingMore(true);
 
-  const { data: products, isLoading } = useCollection<FirestoreProduct>(productsQuery);
+    const constraints = buildConstraints();
+    const q = query(collection(firestore, 'products'), ...constraints, startAfter(lastDoc), limit(PAGE_SIZE));
 
-  const productsToShow: Product[] = React.useMemo(() => {
-    if (!products) return [];
-    return products.map(p => ({
-        id: p.id,
-        brand: p.brandId,
-        title: p.title,
-        price: p.price,
-        image: p.images?.[0]?.url || '',
-        sellerId: p.sellerId,
-        size: p.size,
-        condition: p.condition as any,
-        color: p.color,
-        vintage: p.vintage,
-    }));
-  }, [products]);
+    const snap = await getDocs(q);
+    const newProducts = snap.docs.map(d => ({ id: d.id, ...d.data() } as FirestoreProduct));
+
+    setAllProducts(prev => [...prev, ...newProducts]);
+    setLastDoc(snap.docs[snap.docs.length - 1] || null);
+    setHasMore(snap.docs.length === PAGE_SIZE);
+    setIsLoadingMore(false);
+  }, [firestore, lastDoc, isLoadingMore, buildConstraints]);
 
   return (
     <div className="flex flex-col bg-background">
         <main className="flex-1">
             <div className="container px-4 py-4">
-                
+
                 <div className="flex justify-between items-center mb-4">
                     <div>
                         <h1 className="text-xl font-bold uppercase">{ isLoading ? 'Loading...' : title }</h1>
-                        { !isLoading && <p className="text-sm text-muted-foreground">{productsToShow.length}+ items</p> }
+                        { !isLoading && <p className="text-sm text-muted-foreground">{allProducts.length}{hasMore ? '+' : ''} items</p> }
                     </div>
                      <Button variant="outline" className="shrink-0">
                         <SlidersHorizontal className="mr-2 h-4 w-4" />
@@ -107,12 +115,38 @@ function ProductListPage() {
                      <div className="grid grid-cols-2 gap-x-4 gap-y-8 mt-6">
                         {[...Array(4)].map((_, i) => <ProductCardSkeleton key={i} />)}
                     </div>
-                ) : productsToShow.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-8 mt-6">
-                        {productsToShow.map((product) => (
-                            <ProductCard key={product.id} product={product} />
-                        ))}
-                    </div>
+                ) : allProducts.length > 0 ? (
+                    <>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-8 mt-6">
+                            {allProducts.map((p) => (
+                                <ProductCard key={p.id} product={{
+                                    id: p.id,
+                                    brandId: p.brandId,
+                                    title: p.title,
+                                    price: p.price,
+                                    images: p.images,
+                                    sellerId: p.sellerId,
+                                    size: p.size,
+                                    condition: p.condition,
+                                    color: p.color,
+                                    vintage: p.vintage,
+                                }} />
+                            ))}
+                        </div>
+                        {hasMore && (
+                            <div className="text-center mt-8">
+                                <Button
+                                    variant="outline"
+                                    className="rounded-full px-12"
+                                    onClick={loadMore}
+                                    disabled={isLoadingMore}
+                                >
+                                    {isLoadingMore && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Load more
+                                </Button>
+                            </div>
+                        )}
+                    </>
                 ) : (
                      <div className="text-center py-20">
                         <h2 className="text-xl font-semibold">No products found</h2>

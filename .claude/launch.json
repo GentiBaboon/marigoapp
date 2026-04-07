@@ -5,8 +5,7 @@
       "name": "Next.js Dev Server",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 9002,
-      "autoPort": true
+      "port": 3001
     },
     {
       "name": "Firebase Functions Emulator",
