@@ -211,7 +211,7 @@ export function ChatbotWidget() {
           <SheetHeader className="p-4 border-b text-left">
             <SheetTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5" />
-              AI Support Chat
+              MarigoAI
             </SheetTitle>
             <Button
               variant="ghost"
