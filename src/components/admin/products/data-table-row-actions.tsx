@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { Row } from '@tanstack/react-table';
-import { MoreHorizontal, Eye, Star, Trash2, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { MoreHorizontal, Eye, Star, Trash2, Loader2, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -114,6 +115,12 @@ export function DataTableRowActions<TData>({
             <Eye className="mr-2 h-4 w-4" />
             View on Site
           </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/admin/products/${product.id}`}>
+            <ClipboardList className="mr-2 h-4 w-4" />
+            Review Product
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSub>
             <DropdownMenuSubTrigger>

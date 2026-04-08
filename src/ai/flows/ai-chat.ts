@@ -19,12 +19,79 @@ export type ChatInput = z.infer<typeof ChatInputSchema>;
 
 export const ChatOutputSchema = z.object({
   response: z.string(),
+  products: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    price: z.number(),
+    image: z.string(),
+    brandId: z.string(),
+    sellerId: z.string(),
+  })).optional(),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 export async function chatWithAI(input: ChatInput): Promise<ChatOutput> {
   return aiChatFlow(input);
+}
+
+const SEARCH_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!;
+const SEARCH_BASE = `https://firestore.googleapis.com/v1/projects/${SEARCH_PROJECT_ID}/databases/(default)/documents`;
+
+async function searchProducts(searchTerms: string): Promise<Array<{id: string; title: string; price: number; image: string; brandId: string; sellerId: string}>> {
+  try {
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    const body = {
+      structuredQuery: {
+        from: [{ collectionId: 'products' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'status' },
+            op: 'EQUAL',
+            value: { stringValue: 'active' },
+          },
+        },
+        orderBy: [{ field: { fieldPath: 'views' }, direction: 'DESCENDING' }],
+        limit: { value: 50 },
+      },
+    };
+
+    const res = await fetch(`${SEARCH_BASE}:runQuery?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) return [];
+    const results = await res.json();
+
+    const terms = searchTerms.toLowerCase().split(/\s+/).filter(t => t.length > 1);
+
+    return (results as any[])
+      .filter((r: any) => r.document)
+      .map((r: any) => {
+        const fields = r.document.fields || {};
+        const id = r.document.name.split('/').pop();
+        const title = fields.title?.stringValue || '';
+        const brandId = fields.brandId?.stringValue || '';
+        const description = fields.description?.stringValue || '';
+        const price = Number(fields.price?.doubleValue || fields.price?.integerValue || 0);
+        const images = fields.images?.arrayValue?.values || [];
+        const image = images[0]?.mapValue?.fields?.url?.stringValue || '';
+        const sellerId = fields.sellerId?.stringValue || '';
+        return { id, title, brandId, description, price, image, sellerId };
+      })
+      .filter(p => terms.some(t =>
+        p.title.toLowerCase().includes(t) ||
+        p.brandId.toLowerCase().includes(t) ||
+        p.description.toLowerCase().includes(t)
+      ))
+      .slice(0, 4)
+      .map(({ description, ...rest }) => rest);
+  } catch (error) {
+    console.error('Product search error:', error);
+    return [];
+  }
 }
 
 const knowledgeBase = `
@@ -35,6 +102,11 @@ MarigoApp Knowledge Base:
 - Shipping: Sellers ship items directly to buyers. For high-value items, we offer an optional authentication service where items are shipped to us first. Shipping costs are calculated at checkout.
 - Returns: Returns are accepted within 7 days of delivery for items that are not as described. The buyer is responsible for return shipping.
 - Safety Tips: Never share personal information like your phone number or bank details in the chat. All transactions must happen on the MarigoApp platform.
+
+## Shopping Assistant
+You can help users find and buy products. When a user asks to find, search for, browse, or shop for products (e.g., "show me bags", "I want a Chanel purse", "what do you have under 500€"), include [SEARCH: relevant keywords] at the END of your response.
+When you include a search, keep your text response brief and helpful, like "Here are some options I found for you:".
+Users can click "Add to Cart" on product cards and proceed to checkout.
 `;
 
 const aiChatFlow = ai.defineFlow(
@@ -68,6 +140,19 @@ ${message}
       },
     });
 
-    return { response: llmResponse.text };
+    const responseText = llmResponse.text;
+    const searchMatch = responseText.match(/\[SEARCH:\s*(.+?)\]/);
+    let products: Array<{id: string; title: string; price: number; image: string; brandId: string; sellerId: string}> | undefined;
+    let cleanedResponse = responseText;
+
+    if (searchMatch) {
+      cleanedResponse = responseText.replace(/\[SEARCH:\s*.+?\]/g, '').trim();
+      products = await searchProducts(searchMatch[1]);
+      if (products.length === 0) {
+        cleanedResponse += "\n\nI couldn't find any matching products right now. Try different keywords or browse our catalog.";
+      }
+    }
+
+    return { response: cleanedResponse, products };
   }
 );

@@ -464,6 +464,18 @@ export interface FirestoreOffer {
   createdAt: FirestoreTimestamp;
 }
 
+// --- Chat Commerce ---
+export interface ChatProductCard {
+  id: string;
+  title: string;
+  price: number;
+  image: string;
+  brandId: string;
+  sellerId: string;
+}
+
+export type SupportMessageType = 'text' | 'product_card';
+
 // --- Refunds ---
 export const RefundStatusEnum = {
   PENDING: 'pending',

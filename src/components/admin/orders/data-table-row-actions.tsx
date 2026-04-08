@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { Row } from '@tanstack/react-table';
+import Link from 'next/link';
 import { MoreHorizontal, View, Truck, Undo, MessageSquare, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,6 +10,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuTrigger,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -73,9 +75,11 @@ export function DataTableRowActions<TData>({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-        <DropdownMenuItem>
-          <View className="mr-2 h-4 w-4" />
-          View Details
+        <DropdownMenuItem asChild>
+          <Link href={`/admin/orders/${order.id}`}>
+            <View className="mr-2 h-4 w-4" />
+            View Details
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem>
             <Truck className="mr-2 h-4 w-4" />
