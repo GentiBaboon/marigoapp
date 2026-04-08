@@ -18,8 +18,10 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to an error reporting service
-    console.error(error);
+    // Report to monitoring service (Sentry, etc.)
+    import('@/lib/error-reporter').then(({ reportError }) => {
+      reportError(error, { source: 'error-boundary', extra: { digest: error.digest } });
+    });
   }, [error]);
 
   return (

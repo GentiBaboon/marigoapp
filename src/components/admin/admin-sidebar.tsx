@@ -16,6 +16,9 @@ import {
   Settings,
   Megaphone,
   MessageSquare,
+  Scale,
+  Undo2,
+  PackageOpen,
   Moon,
   Sun,
   ChevronLeft,
@@ -24,25 +27,33 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAdminAuth } from '@/hooks/use-admin-auth';
+import type { AdminPermission } from '@/lib/admin-permissions';
 
 const navItems = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/products', label: 'Products', icon: Package },
-  { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
-  { href: '/admin/users', label: 'Users', icon: Users },
-  { href: '/admin/finance', label: 'Finance', icon: DollarSign },
-  { href: '/admin/marketing', label: 'Marketing', icon: Megaphone },
-  { href: '/admin/logistics', label: 'Logistics', icon: Truck },
-  { href: '/admin/moderation', label: 'Moderation', icon: ShieldAlert },
-  { href: '/admin/support', label: 'Support Chat', icon: MessageSquare },
-  { href: '/admin/logs', label: 'Activity Logs', icon: Archive },
-  { href: '/admin/settings', label: 'Settings', icon: Settings },
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard.view' as AdminPermission },
+  { href: '/admin/products', label: 'Products', icon: Package, permission: 'products.manage' as AdminPermission },
+  { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, permission: 'orders.manage' as AdminPermission },
+  { href: '/admin/users', label: 'Users', icon: Users, permission: 'users.view' as AdminPermission },
+  { href: '/admin/finance', label: 'Finance', icon: DollarSign, permission: 'finance.view' as AdminPermission },
+  { href: '/admin/marketing', label: 'Marketing', icon: Megaphone, permission: 'marketing.manage' as AdminPermission },
+  { href: '/admin/logistics', label: 'Logistics', icon: Truck, permission: 'logistics.manage' as AdminPermission },
+  { href: '/admin/moderation', label: 'Moderation', icon: ShieldAlert, permission: 'moderation.manage' as AdminPermission },
+  { href: '/admin/disputes', label: 'Disputes', icon: Scale, permission: 'disputes.manage' as AdminPermission },
+  { href: '/admin/refunds', label: 'Refunds', icon: Undo2, permission: 'refunds.manage' as AdminPermission },
+  { href: '/admin/returns', label: 'Returns', icon: PackageOpen, permission: 'returns.manage' as AdminPermission },
+  { href: '/admin/support', label: 'Support Chat', icon: MessageSquare, permission: 'support.manage' as AdminPermission },
+  { href: '/admin/logs', label: 'Activity Logs', icon: Archive, permission: 'logs.view' as AdminPermission },
+  { href: '/admin/settings', label: 'Settings', icon: Settings, permission: 'settings.manage' as AdminPermission },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const { can } = useAdminAuth();
   const [collapsed, setCollapsed] = React.useState(false);
   const [darkMode, setDarkMode] = React.useState(false);
+
+  const visibleItems = navItems.filter(item => can(item.permission));
 
   React.useEffect(() => {
     const stored = localStorage.getItem('admin-dark-mode');
@@ -95,7 +106,7 @@ export function AdminSidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             const active = isActive(item.href);
             const linkContent = (
               <Link

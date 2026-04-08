@@ -2,30 +2,18 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import type { FirestoreProduct, FirestoreUser } from '@/lib/types';
+import type { FirestoreProduct } from '@/lib/types';
 import { format } from 'date-fns';
 import { DataTableRowActions } from './data-table-row-actions';
 import { ArrowUpDown, CheckCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 
 const currencyFormatter = new Intl.NumberFormat('de-DE', {
   style: 'currency',
   currency: 'EUR',
 });
-
-// Helper component to fetch and display seller name
-const SellerName = ({ sellerId }: { sellerId: string }) => {
-    const firestore = useFirestore();
-    const sellerRef = useMemoFirebase(() => doc(firestore, 'users', sellerId), [firestore, sellerId]);
-    const { data: seller, isLoading } = useDoc<FirestoreUser>(sellerRef);
-
-    if (isLoading) return <span className="text-muted-foreground">Loading...</span>;
-    return <span>{seller?.displayName || 'Unknown Seller'}</span>;
-}
 
 export const columns: ColumnDef<FirestoreProduct>[] = [
   {
@@ -78,7 +66,13 @@ export const columns: ColumnDef<FirestoreProduct>[] = [
    {
     accessorKey: 'sellerId',
     header: 'Seller',
-    cell: ({ row }) => <SellerName sellerId={row.original.sellerId} />,
+    cell: ({ row, table }) => {
+      // Seller names are batch-fetched and passed via table meta to avoid N+1 queries
+      const sellerMap = (table.options.meta as any)?.sellerNames as Record<string, string> | undefined;
+      const name = sellerMap?.[row.original.sellerId];
+      if (name === undefined) return <span className="text-muted-foreground">Loading...</span>;
+      return <span>{name || 'Unknown Seller'}</span>;
+    },
   },
   {
     accessorKey: 'price',

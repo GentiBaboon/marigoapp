@@ -107,6 +107,15 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
             console.error("FirebaseProvider: Error creating/updating user document:", err);
           });
         }
+        // Set/clear a lightweight auth cookie so Next.js middleware can gate
+        // protected routes server-side (before JS loads). The cookie holds
+        // no secrets — it's just a presence flag.
+        if (firebaseUser) {
+          document.cookie = `marigo_auth=1; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict${location.protocol === 'https:' ? '; Secure' : ''}`;
+        } else {
+          document.cookie = 'marigo_auth=; path=/; max-age=0';
+        }
+
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
       },
       (error) => { // Auth listener error

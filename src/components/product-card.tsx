@@ -16,7 +16,7 @@ interface ProductCardProps {
   className?: string;
 }
 
-export function ProductCard({ product, className }: ProductCardProps) {
+export const ProductCard = React.memo(function ProductCard({ product, className }: ProductCardProps) {
   const { isFavorite, addToWishlist, removeFromWishlist } = useWishlist();
   const { formatPrice } = useCurrency();
   const favorite = isFavorite(product.id);
@@ -27,16 +27,16 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const rawImage = product.images?.[0];
   const rawUrl = typeof rawImage === 'string' ? rawImage : rawImage?.url || product.image || '';
   const imageUrl = typeof rawUrl === 'string' && rawUrl.startsWith('http') ? rawUrl : '';
-  
-  const handleToggleFavorite = (e: React.MouseEvent) => {
-      e.preventDefault(); // prevent navigation
+
+  const handleToggleFavorite = React.useCallback((e: React.MouseEvent) => {
+      e.preventDefault();
       e.stopPropagation();
       if (favorite) {
           removeFromWishlist(product.id);
       } else {
           addToWishlist(product.id);
       }
-  }
+  }, [favorite, product.id, addToWishlist, removeFromWishlist]);
 
   const displayTitle = product.title || 'Untitled Product';
   const brandName = product.brandId || product.brand || 'Luxury Item';
@@ -96,4 +96,4 @@ export function ProductCard({ product, className }: ProductCardProps) {
       </div>
     </div>
   );
-}
+});

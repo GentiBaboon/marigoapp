@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendPasswordResetMail } from '@/lib/mailtrap';
+import { forgotPasswordLimiter, applyRateLimit } from '@/lib/rate-limit';
 
 const FUNCTIONS_BASE = `https://europe-west1-${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net`;
 
 export async function POST(req: NextRequest) {
+  // Rate limit: 5 requests per 15 minutes per IP
+  const rateLimitResponse = applyRateLimit(req, forgotPasswordLimiter);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const { email } = await req.json();
 

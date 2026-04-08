@@ -1,27 +1,18 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { doc } from 'firebase/firestore';
 import type { FirestoreUser } from '@/lib/types';
-
-// Define a developer admin UIDs for testing purposes
-const DEV_ADMIN_UIDS = [
-  '2C81RVoXZWZuSWXEEueehqbHkMu1',
-  'v521MWW9rmPYchVBc91DheeRU5j2',
-  'GoNLAq0YYdQw70fDS5L1XbBqtow1',
-  '4qTAOIovwdWYGCnqYPiPCJqNcdP2',
-  'jBbMqpl6zKeZ9skDW3ux0iBMJRB2',
-  'x2QOIY1fw8S6GOgIB2k45eiAAU93', // genti@eng.al
-];
+import { isAdminRole, hasPermission, type AdminPermission } from '@/lib/admin-permissions';
 
 export function useAdminAuth() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [role, setRole] = useState<string | undefined>(undefined);
   const router = useRouter();
 
   const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
@@ -29,25 +20,42 @@ export function useAdminAuth() {
 
   useEffect(() => {
     if (isUserLoading || isDocLoading) {
-      return; // Wait for user state to be determined
+      return; // Still loading — wait
     }
 
     if (!user) {
       router.replace('/auth/login');
       return;
     }
-    
-    // Grant access based on 'role' field in Firestore or dev UIDs
-    if (firestoreUser?.role === 'admin' || DEV_ADMIN_UIDS.includes(user.uid)) {
-        setIsAdmin(true);
-        setIsLoading(false);
-    } else {
-        setIsAdmin(false);
-        setIsLoading(false);
-        router.replace('/home');
+
+    // The Firestore document may not exist yet (first login creates it async).
+    // Wait for it — don't redirect prematurely.
+    if (!firestoreUser) {
+      return;
     }
-      
+
+    const userRole = firestoreUser.role;
+    if (isAdminRole(userRole)) {
+      setIsAdmin(true);
+      setRole(userRole);
+      setIsLoading(false);
+    } else {
+      setIsAdmin(false);
+      setRole(undefined);
+      setIsLoading(false);
+      router.replace('/home');
+    }
   }, [user, isUserLoading, firestoreUser, isDocLoading, router]);
 
-  return { isAdmin, isLoading: isUserLoading || isDocLoading || isLoading };
+  const can = useCallback(
+    (perm: AdminPermission) => hasPermission(role, perm),
+    [role]
+  );
+
+  return {
+    isAdmin,
+    isLoading: isUserLoading || isDocLoading || isLoading,
+    role,
+    can,
+  };
 }

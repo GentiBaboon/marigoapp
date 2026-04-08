@@ -21,6 +21,7 @@ import { useFirestore, useUser } from '@/firebase';
 import { doc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestoreUser } from '@/lib/types';
+import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 
 interface DataTableRowActionsProps<TData> {
   row: Row<TData>;
@@ -33,6 +34,8 @@ export function DataTableRowActions<TData>({
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
+  const [confirmBanOpen, setConfirmBanOpen] = React.useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
   const targetUser = row.original as FirestoreUser;
 
   const handleUpdateStatus = async (newStatus: 'active' | 'banned') => {
@@ -52,12 +55,12 @@ export function DataTableRowActions<TData>({
             adminId: adminUser.uid,
             adminName: adminUser.displayName || 'Admin',
             actionType: newStatus === 'banned' ? 'user_banned' : 'user_unbanned',
-            details: `${newStatus === 'banned' ? 'Banned' : 'Unbanned'} user "${targetUser.name}" (ID: ${targetUser.id})`,
+            details: `${newStatus === 'banned' ? 'Banned' : 'Unbanned'} user "${displayName}" (ID: ${targetUser.id})`,
             targetId: targetUser.id,
             timestamp: serverTimestamp()
         });
 
-        toast({ title: `User ${newStatus}`, description: `${targetUser.name} has been ${newStatus}.` });
+        toast({ title: `User ${newStatus}`, description: `${displayName} has been ${newStatus}.` });
     } catch (error) {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to update user status.' });
     } finally {
@@ -78,11 +81,11 @@ export function DataTableRowActions<TData>({
         adminId: adminUser.uid,
         adminName: adminUser.displayName || 'Admin',
         actionType: 'user_role_changed',
-        details: `Changed role of "${targetUser.name}" to "${newRole}"`,
+        details: `Changed role of "${displayName}" to "${newRole}"`,
         targetId: targetUser.id,
         timestamp: serverTimestamp(),
       });
-      toast({ title: 'Role Updated', description: `${targetUser.name} is now "${newRole}".` });
+      toast({ title: 'Role Updated', description: `${displayName} is now "${newRole}".` });
     } catch {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to change role.' });
     } finally {
@@ -99,7 +102,7 @@ export function DataTableRowActions<TData>({
         adminId: adminUser.uid,
         adminName: adminUser.displayName || 'Admin',
         actionType: 'user_deleted',
-        details: `Soft-deleted user "${targetUser.name}" (ID: ${targetUser.id})`,
+        details: `Soft-deleted user "${displayName}" (ID: ${targetUser.id})`,
         targetId: targetUser.id,
         timestamp: serverTimestamp(),
       });
@@ -112,8 +115,10 @@ export function DataTableRowActions<TData>({
   };
 
   const isBanned = targetUser.status === 'banned';
+  const displayName = targetUser.name || targetUser.email || 'this user';
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -153,16 +158,37 @@ export function DataTableRowActions<TData>({
                 Unban User
             </DropdownMenuItem>
         ) : (
-            <DropdownMenuItem onClick={() => handleUpdateStatus('banned')}>
+            <DropdownMenuItem onClick={() => setConfirmBanOpen(true)}>
                 <Ban className="mr-2 h-4 w-4" />
                 Ban User
             </DropdownMenuItem>
         )}
-        <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
+        <DropdownMenuItem className="text-destructive" onClick={() => setConfirmDeleteOpen(true)}>
           <Trash2 className="mr-2 h-4 w-4" />
           Delete
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <ConfirmActionDialog
+      open={confirmBanOpen}
+      onOpenChange={setConfirmBanOpen}
+      title="Ban User"
+      description={`Are you sure you want to ban "${displayName}"? They will lose access to their account.`}
+      actionLabel="Ban User"
+      variant="destructive"
+      onConfirm={() => handleUpdateStatus('banned')}
+      isLoading={isLoading}
+    />
+    <ConfirmActionDialog
+      open={confirmDeleteOpen}
+      onOpenChange={setConfirmDeleteOpen}
+      title="Delete User"
+      description={`Are you sure you want to remove "${displayName}"? This will ban their account.`}
+      actionLabel="Delete"
+      variant="destructive"
+      onConfirm={handleDelete}
+      isLoading={isLoading}
+    />
+    </>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
@@ -7,6 +8,25 @@ import { NewArrivalsSection } from '@/components/home/NewArrivalsSection';
 import { RecentlyViewedSection } from '@/components/home/RecentlyViewedSection';
 import { PersonalizedPicks } from '@/components/home/PersonalizedPicks';
 import { CategoriesSection } from '@/components/home/CategoriesSection';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function SectionSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-7 w-48" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="aspect-[3/4] w-full" />
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-5 w-1/3" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function HomePage() {
   return (
@@ -23,10 +43,18 @@ export default function HomePage() {
       </div>
 
       <div className="container mx-auto px-4 py-8 md:py-12 space-y-12">
-        <PersonalizedPicks />
-        <CategoriesSection />
-        <RecentlyViewedSection />
-        <NewArrivalsSection />
+        <Suspense fallback={<SectionSkeleton />}>
+          <PersonalizedPicks />
+        </Suspense>
+        <Suspense fallback={<SectionSkeleton />}>
+          <CategoriesSection />
+        </Suspense>
+        <Suspense fallback={<SectionSkeleton />}>
+          <RecentlyViewedSection />
+        </Suspense>
+        <Suspense fallback={<SectionSkeleton />}>
+          <NewArrivalsSection />
+        </Suspense>
       </div>
     </div>
   );

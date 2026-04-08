@@ -1,12 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import { Table } from '@tanstack/react-table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { X, Trash2, Download } from 'lucide-react';
 import { DataTableViewOptions } from '@/components/admin/users/data-table-view-options';
 import { DataTableFacetedFilter } from '@/components/admin/users/data-table-faceted-filter';
 import { brands } from '@/lib/mock-data';
+import { writeBatch, doc } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
+import { exportToCSV } from '@/lib/csv-export';
+import { useToast } from '@/hooks/use-toast';
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>;
@@ -30,6 +36,44 @@ export function DataTableToolbar<TData>({
   table,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0;
+  const selectedRows = table.getFilteredSelectedRowModel().rows;
+  const hasSelection = selectedRows.length > 0;
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleBulkDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const batch = writeBatch(firestore);
+      selectedRows.forEach((row) => {
+        const product = row.original as any;
+        if (product.id) {
+          batch.delete(doc(firestore, 'products', product.id));
+        }
+      });
+      await batch.commit();
+      table.toggleAllRowsSelected(false);
+      toast({ title: `${selectedRows.length} product(s) deleted.` });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error deleting products.' });
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    const rows = (hasSelection ? selectedRows : table.getFilteredRowModel().rows).map(r => r.original as any);
+    exportToCSV(rows, [
+      { key: 'title', header: 'Title' },
+      { key: 'status', header: 'Status' },
+      { key: 'price', header: 'Price' },
+      { key: 'condition', header: 'Condition' },
+      { key: 'views', header: 'Views' },
+    ], `products-export-${new Date().toISOString().split('T')[0]}`);
+  };
 
   return (
     <div className="flex items-center justify-between">
@@ -67,7 +111,34 @@ export function DataTableToolbar<TData>({
           </Button>
         )}
       </div>
-      <DataTableViewOptions table={table} />
+      <div className="flex items-center space-x-2">
+        {hasSelection && (
+          <>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-8"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete ({selectedRows.length})
+            </Button>
+            <ConfirmActionDialog
+              open={deleteDialogOpen}
+              onOpenChange={setDeleteDialogOpen}
+              title="Delete Products"
+              description={`Are you sure you want to delete ${selectedRows.length} product(s)? This action cannot be undone.`}
+              onConfirm={handleBulkDelete}
+              isLoading={isDeleting}
+            />
+          </>
+        )}
+        <Button variant="outline" size="sm" className="h-8" onClick={handleExportCSV}>
+          <Download className="mr-2 h-4 w-4" />
+          Export CSV
+        </Button>
+        <DataTableViewOptions table={table} />
+      </div>
     </div>
   );
 }

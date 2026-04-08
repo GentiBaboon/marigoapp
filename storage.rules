@@ -3,26 +3,19 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    
+
     function isSignedIn() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-    
+
+    // Admin check relies solely on the Firebase custom claim `admin: true`.
+    // Set this server-side via Firebase Admin SDK or Cloud Functions.
     function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.admin == true || 
-        request.auth.uid in [
-          '2C81RVoXZWZuSWXEEueehqbHkMu1', 
-          'v521MWW9rmPYchVBc91DheeRU5j2',
-          'GoNLAq0YYdQw70fDS5L1XbBqtow1',
-          '4qTAOIovwdWYGCnqYPiPCJqNcdP2',
-          'jBbMqpl6zKeZ9skDW3ux0iBMJRB2'
-        ]
-      );
+      return isSignedIn() && request.auth.token.admin == true;
     }
 
     function isValidImage() {

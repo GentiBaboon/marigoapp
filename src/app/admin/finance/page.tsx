@@ -1,15 +1,15 @@
 'use client';
 
 import { useMemo } from 'react';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import type { FirestoreOrder } from '@/lib/types';
+import { collection, query, orderBy, limit, doc } from 'firebase/firestore';
+import { useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import type { FirestoreOrder, FirestoreSettings } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Download } from 'lucide-react';
 import Link from 'next/link';
 
 import { StatCard } from '@/components/admin/stat-card';
-import { DollarSign, Percent, Banknote, Undo } from 'lucide-react';
+import { DollarSign, Percent, Banknote, Undo, Receipt } from 'lucide-react';
 import { DataTable } from '@/components/admin/finance/data-table';
 import { columns } from '@/components/admin/finance/columns';
 import FinanceLoading from './loading';
@@ -19,10 +19,13 @@ const currencyFormatter = new Intl.NumberFormat('de-DE', {
   currency: 'EUR',
 });
 
-const COMMISSION_RATE = 0.15;
-
 export default function AdminFinancePage() {
   const firestore = useFirestore();
+
+  // Configurable commission rate from Firestore
+  const settingsRef = useMemoFirebase(() => doc(firestore, 'settings', 'global'), [firestore]);
+  const { data: settings } = useDoc<FirestoreSettings>(settingsRef);
+  const commissionRate = settings?.commissionRate ?? 0.15;
 
   const ordersQuery = useMemoFirebase(
     () => query(collection(firestore, 'orders'), orderBy('createdAt', 'desc'), limit(100)),
@@ -38,19 +41,23 @@ export default function AdminFinancePage() {
     const refundedOrders = safeOrders.filter(o => o.status === 'refunded');
 
     const totalRevenue = completedOrders.reduce((sum, order) => sum + order.totalAmount, 0);
-    const commissionEarned = totalRevenue * COMMISSION_RATE;
+    const commissionEarned = totalRevenue * commissionRate;
     const totalRefunds = refundedOrders.reduce((sum, order) => sum + order.totalAmount, 0);
 
     // Placeholder for pending payouts, would need more complex logic
     const pendingPayouts = totalRevenue - commissionEarned - totalRefunds;
+
+    // Tax collected
+    const taxCollected = safeOrders.reduce((sum, o) => sum + ((o as any).taxAmount || 0), 0);
 
     return {
         totalRevenue,
         commissionEarned,
         pendingPayouts,
         totalRefunds,
+        taxCollected,
     };
-  }, [orders]);
+  }, [orders, commissionRate]);
 
   if (isLoading) {
     return <FinanceLoading />;
@@ -101,7 +108,7 @@ export default function AdminFinancePage() {
             </Button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <StatCard
             title="Total Revenue"
             value={currencyFormatter.format(financialStats.totalRevenue)}
@@ -111,7 +118,7 @@ export default function AdminFinancePage() {
              <StatCard
             title="Commission Earned"
             value={currencyFormatter.format(financialStats.commissionEarned)}
-            description={`at ${COMMISSION_RATE * 100}% rate`}
+            description={`at ${commissionRate * 100}% rate`}
             icon={<Percent className="text-muted-foreground h-4 w-4" />}
             isLoading={isLoading}
             />
@@ -125,6 +132,12 @@ export default function AdminFinancePage() {
             title="Total Refunds"
             value={currencyFormatter.format(financialStats.totalRefunds)}
             icon={<Undo className="text-muted-foreground h-4 w-4" />}
+            isLoading={isLoading}
+            />
+             <StatCard
+            title="Tax Collected"
+            value={currencyFormatter.format(financialStats.taxCollected)}
+            icon={<Receipt className="text-muted-foreground h-4 w-4" />}
             isLoading={isLoading}
             />
         </div>

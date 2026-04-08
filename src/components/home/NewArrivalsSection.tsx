@@ -1,10 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreProduct } from '@/lib/types';
-import type { Product } from '@/lib/mock-data';
 import { ProductCard } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -25,22 +24,20 @@ function ProductCardSkeleton() {
 export function NewArrivalsSection() {
   const firestore = useFirestore();
 
+  // Filter active products server-side instead of fetching all and filtering on client
   const productsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(
       collection(firestore, 'products'),
+      where('status', '==', 'active'),
       orderBy('listingCreated', 'desc'),
-      limit(20) // Fetch more to filter on the client
+      limit(10)
     );
   }, [firestore]);
 
-  const { data: products, isLoading } = useCollection<FirestoreProduct>(productsQuery);
-  
-  const activeProducts = React.useMemo(() => {
-    return products?.filter(p => p.status === 'active').slice(0, 10) || [];
-  }, [products]);
+  const { data: activeProducts, isLoading } = useCollection<FirestoreProduct>(productsQuery);
 
-  if (!isLoading && activeProducts.length === 0) {
+  if (!isLoading && (!activeProducts || activeProducts.length === 0)) {
     return null; // Hide the block if no active new products exist
   }
 
@@ -62,25 +59,22 @@ export function NewArrivalsSection() {
              <>
                 <ScrollArea>
                     <div className="flex space-x-4 pb-4">
-                        {activeProducts.map((p) => {
-                            const productForCard: Product = {
-                                id: p.id,
-                                brand: p.brandId || '',
-                                title: p.title,
-                                price: p.price,
-                                image: p.images?.[0]?.url || '',
-                                sellerId: p.sellerId,
-                                size: p.size,
-                                condition: p.condition as any,
-                                color: p.color,
-                                vintage: p.vintage,
-                            };
-                            return (
+                        {activeProducts?.map((p) => (
                                 <div key={p.id} className="w-48 flex-shrink-0">
-                                    <ProductCard product={productForCard} />
+                                    <ProductCard product={{
+                                        id: p.id,
+                                        brandId: p.brandId,
+                                        title: p.title,
+                                        price: p.price,
+                                        images: p.images,
+                                        sellerId: p.sellerId,
+                                        size: p.size,
+                                        condition: p.condition,
+                                        color: p.color,
+                                        vintage: p.vintage,
+                                    }} />
                                 </div>
-                            );
-                        })}
+                        ))}
                     </div>
                     <ScrollBar orientation="horizontal" />
                 </ScrollArea>

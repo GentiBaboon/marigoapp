@@ -11,6 +11,8 @@ import {
   onSnapshot,
   doc,
   updateDoc,
+  getDocs,
+  where,
 } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -19,9 +21,12 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, MessageSquare, ArrowLeft, CheckCheck } from 'lucide-react';
+import { Send, MessageSquare, ArrowLeft, CheckCheck, ShoppingBag, Search, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import Image from 'next/image';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import type { FirestoreProduct, ChatProductCard } from '@/lib/types';
 
 interface SupportChat {
   id: string;
@@ -41,6 +46,8 @@ interface SupportMessage {
   content: string;
   createdAt: any;
   isAdmin: boolean;
+  type?: 'text' | 'product_card';
+  productData?: ChatProductCard;
 }
 
 export default function AdminSupportPage() {
@@ -51,6 +58,10 @@ export default function AdminSupportPage() {
   const [newMessage, setNewMessage] = React.useState('');
   const [isSending, setIsSending] = React.useState(false);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const [productSearchOpen, setProductSearchOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState<FirestoreProduct[]>([]);
+  const [isSearching, setIsSearching] = React.useState(false);
 
   // Fetch all support chats
   const chatsQuery = useMemoFirebase(
@@ -118,6 +129,54 @@ export default function AdminSupportPage() {
   const handleReopenChat = async () => {
     if (!selectedChat || !firestore) return;
     await updateDoc(doc(firestore, 'support_chats', selectedChat.id), { status: 'open' });
+  };
+
+  const handleProductSearch = async () => {
+    if (!searchQuery.trim() || !firestore) return;
+    setIsSearching(true);
+    try {
+      const q = query(collection(firestore, 'products'), where('status', '==', 'active'), limit(20));
+      const snap = await getDocs(q);
+      const results = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as FirestoreProduct))
+        .filter(p =>
+          p.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.brandId?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      setSearchResults(results);
+    } catch (err) {
+      console.error('Product search error:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSendProduct = async (product: FirestoreProduct) => {
+    if (!selectedChat || !firestore || !adminUser) return;
+    const messagesRef = collection(firestore, 'support_chats', selectedChat.id, 'messages');
+    await addDoc(messagesRef, {
+      senderId: adminUser.uid,
+      senderName: adminUser.displayName || 'Support',
+      content: `Check out this product: ${product.title}`,
+      createdAt: serverTimestamp(),
+      isAdmin: true,
+      type: 'product_card',
+      productData: {
+        id: product.id,
+        title: product.title,
+        price: product.price,
+        image: product.images?.[0]?.url || '',
+        brandId: product.brandId,
+        sellerId: product.sellerId,
+      },
+    });
+    await updateDoc(doc(firestore, 'support_chats', selectedChat.id), {
+      lastMessage: `Shared product: ${product.title}`,
+      lastMessageAt: serverTimestamp(),
+    });
+    setProductSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
   };
 
   const openChats = chats?.filter(c => c.status === 'open') || [];
@@ -234,6 +293,23 @@ export default function AdminSupportPage() {
                         )}
                       >
                         <p className="text-sm">{msg.content}</p>
+                        {msg.type === 'product_card' && msg.productData && (
+                          <div className="max-w-[280px] border rounded-lg p-3 space-y-2 bg-background shadow-sm mt-2">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Product Recommendation</p>
+                            <div className="flex gap-3 items-center">
+                              {msg.productData.image && (
+                                <div className="relative h-14 w-14 rounded bg-muted overflow-hidden flex-shrink-0">
+                                  <Image src={msg.productData.image} alt="" fill className="object-cover" sizes="56px" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-bold text-xs uppercase text-foreground">{msg.productData.brandId}</p>
+                                <p className="text-xs truncate text-foreground">{msg.productData.title}</p>
+                                <p className="text-sm font-semibold text-foreground">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(msg.productData.price)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <p
                           className={cn(
                             'text-[10px] mt-1',
@@ -269,6 +345,9 @@ export default function AdminSupportPage() {
                 <Button type="submit" disabled={isSending || !newMessage.trim()}>
                   <Send className="h-4 w-4" />
                 </Button>
+                <Button variant="outline" size="icon" onClick={() => setProductSearchOpen(true)} title="Share Product" type="button">
+                  <ShoppingBag className="h-4 w-4" />
+                </Button>
               </form>
             </div>
           </>
@@ -282,6 +361,45 @@ export default function AdminSupportPage() {
           </div>
         )}
       </Card>
+
+      <Dialog open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share a Product</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search by name or brand..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleProductSearch()}
+              />
+              <Button onClick={handleProductSearch} disabled={isSearching} size="icon">
+                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              </Button>
+            </div>
+            <div className="max-h-[300px] overflow-y-auto space-y-2">
+              {searchResults.map((p) => (
+                <div key={p.id} className="flex items-center gap-3 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer" onClick={() => handleSendProduct(p)}>
+                  <div className="relative h-12 w-12 rounded bg-muted overflow-hidden flex-shrink-0">
+                    {p.images?.[0]?.url && <Image src={p.images[0].url} alt="" fill className="object-cover" sizes="48px" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-xs uppercase">{p.brandId}</p>
+                    <p className="text-sm truncate">{p.title}</p>
+                    <p className="text-sm font-semibold">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(p.price)}</p>
+                  </div>
+                  <Button size="sm" variant="outline">Send</Button>
+                </div>
+              ))}
+              {searchResults.length === 0 && searchQuery && !isSearching && (
+                <p className="text-center text-sm text-muted-foreground py-4">No products found. Try different keywords.</p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

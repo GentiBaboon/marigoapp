@@ -279,6 +279,125 @@ const AttributeDialog = ({
     );
 };
 
+// --- General Settings Tab ---
+
+const GeneralSettingsTab = ({
+    settings,
+    firestore,
+    toast
+}: {
+    settings: FirestoreSettings | null | undefined;
+    firestore: any;
+    toast: any;
+}) => {
+    const [isLoading, setIsLoading] = React.useState(false);
+    const [formData, setFormData] = React.useState({
+        commissionRate: 15,
+        taxEnabled: false,
+        taxRate: 0,
+        taxLabel: 'VAT',
+    });
+
+    React.useEffect(() => {
+        if (settings) {
+            setFormData({
+                commissionRate: (settings.commissionRate ?? 0.15) * 100,
+                taxEnabled: settings.taxEnabled ?? false,
+                taxRate: (settings.taxRate ?? 0) * 100,
+                taxLabel: settings.taxLabel ?? 'VAT',
+            });
+        }
+    }, [settings]);
+
+    const handleSave = async () => {
+        setIsLoading(true);
+        try {
+            await setDoc(doc(firestore, 'settings', 'global'), {
+                commissionRate: formData.commissionRate / 100,
+                taxEnabled: formData.taxEnabled,
+                taxRate: formData.taxRate / 100,
+                taxLabel: formData.taxLabel,
+            }, { merge: true });
+            toast({ title: 'Settings saved successfully.' });
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'Error saving settings.' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>General Settings</CardTitle>
+                <CardDescription>Configure commission rates and tax settings for your marketplace.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="space-y-2">
+                    <Label>Commission Rate (%)</Label>
+                    <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        value={formData.commissionRate}
+                        onChange={e => setFormData({ ...formData, commissionRate: parseFloat(e.target.value) || 0 })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        The percentage of each sale kept as platform commission.
+                    </p>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <Label>Enable Tax</Label>
+                            <p className="text-xs text-muted-foreground">Apply tax to all orders.</p>
+                        </div>
+                        <Switch
+                            checked={formData.taxEnabled}
+                            onCheckedChange={val => setFormData({ ...formData, taxEnabled: val })}
+                        />
+                    </div>
+
+                    {formData.taxEnabled && (
+                        <>
+                            <div className="space-y-2">
+                                <Label>Tax Rate (%)</Label>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    step={0.1}
+                                    value={formData.taxRate}
+                                    onChange={e => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Tax Label</Label>
+                                <Input
+                                    value={formData.taxLabel}
+                                    onChange={e => setFormData({ ...formData, taxLabel: e.target.value })}
+                                    placeholder="e.g. VAT, GST, Sales Tax"
+                                />
+                            </div>
+                        </>
+                    )}
+                </div>
+            </CardContent>
+            <CardFooter>
+                <Button onClick={handleSave} disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Settings
+                </Button>
+            </CardFooter>
+        </Card>
+    );
+};
+
 // --- Main Page ---
 
 export default function AdminSettingsPage() {
@@ -350,8 +469,9 @@ export default function AdminSettingsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="categories" className="w-full">
+      <Tabs defaultValue="general" className="w-full">
         <TabsList className="flex w-full overflow-x-auto">
+            <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="categories">Categories</TabsTrigger>
             <TabsTrigger value="brands">Brands</TabsTrigger>
             <TabsTrigger value="attributes">Attributes</TabsTrigger>
@@ -359,7 +479,11 @@ export default function AdminSettingsPage() {
             <TabsTrigger value="menu">Menu</TabsTrigger>
             <TabsTrigger value="banners">Banners</TabsTrigger>
         </TabsList>
-        
+
+        <TabsContent value="general" className="space-y-4">
+            <GeneralSettingsTab settings={settings} firestore={firestore} toast={toast} />
+        </TabsContent>
+
         <TabsContent value="categories" className="space-y-4">
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">

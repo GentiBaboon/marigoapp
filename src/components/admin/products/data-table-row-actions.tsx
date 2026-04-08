@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { Row } from '@tanstack/react-table';
-import { MoreHorizontal, Eye, Star, Trash2, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { MoreHorizontal, Eye, Star, Trash2, Loader2, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -20,6 +21,7 @@ import { useFirestore, useUser } from '@/firebase';
 import { doc, updateDoc, deleteDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestoreProduct } from '@/lib/types';
+import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 
 interface DataTableRowActionsProps<TData> {
   row: Row<TData>;
@@ -39,6 +41,7 @@ export function DataTableRowActions<TData>({
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
   const product = row.original as FirestoreProduct;
 
   const logAction = async (actionType: string, details: string) => {
@@ -97,6 +100,7 @@ export function DataTableRowActions<TData>({
   };
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -111,6 +115,12 @@ export function DataTableRowActions<TData>({
             <Eye className="mr-2 h-4 w-4" />
             View on Site
           </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/admin/products/${product.id}`}>
+            <ClipboardList className="mr-2 h-4 w-4" />
+            Review Product
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSub>
             <DropdownMenuSubTrigger>
@@ -135,11 +145,22 @@ export function DataTableRowActions<TData>({
             {product.isFeatured ? 'Unfeature' : 'Feature'}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
+        <DropdownMenuItem className="text-destructive" onClick={() => setConfirmDeleteOpen(true)}>
           <Trash2 className="mr-2 h-4 w-4" />
           Delete Product
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <ConfirmActionDialog
+      open={confirmDeleteOpen}
+      onOpenChange={setConfirmDeleteOpen}
+      title="Delete Product"
+      description={`Are you sure you want to permanently delete "${product.title}"? This action cannot be undone.`}
+      actionLabel="Delete"
+      variant="destructive"
+      onConfirm={handleDelete}
+      isLoading={isLoading}
+    />
+    </>
   );
 }
