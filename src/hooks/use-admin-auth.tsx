@@ -20,7 +20,7 @@ export function useAdminAuth() {
 
   useEffect(() => {
     if (isUserLoading || isDocLoading) {
-      return;
+      return; // Still loading — wait
     }
 
     if (!user) {
@@ -28,7 +28,13 @@ export function useAdminAuth() {
       return;
     }
 
-    const userRole = firestoreUser?.role;
+    // The Firestore document may not exist yet (first login creates it async).
+    // Wait for it — don't redirect prematurely.
+    if (!firestoreUser) {
+      return;
+    }
+
+    const userRole = firestoreUser.role;
     if (isAdminRole(userRole)) {
       setIsAdmin(true);
       setRole(userRole);

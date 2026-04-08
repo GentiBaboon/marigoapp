@@ -55,12 +55,12 @@ export function DataTableRowActions<TData>({
             adminId: adminUser.uid,
             adminName: adminUser.displayName || 'Admin',
             actionType: newStatus === 'banned' ? 'user_banned' : 'user_unbanned',
-            details: `${newStatus === 'banned' ? 'Banned' : 'Unbanned'} user "${targetUser.name}" (ID: ${targetUser.id})`,
+            details: `${newStatus === 'banned' ? 'Banned' : 'Unbanned'} user "${displayName}" (ID: ${targetUser.id})`,
             targetId: targetUser.id,
             timestamp: serverTimestamp()
         });
 
-        toast({ title: `User ${newStatus}`, description: `${targetUser.name} has been ${newStatus}.` });
+        toast({ title: `User ${newStatus}`, description: `${displayName} has been ${newStatus}.` });
     } catch (error) {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to update user status.' });
     } finally {
@@ -81,11 +81,11 @@ export function DataTableRowActions<TData>({
         adminId: adminUser.uid,
         adminName: adminUser.displayName || 'Admin',
         actionType: 'user_role_changed',
-        details: `Changed role of "${targetUser.name}" to "${newRole}"`,
+        details: `Changed role of "${displayName}" to "${newRole}"`,
         targetId: targetUser.id,
         timestamp: serverTimestamp(),
       });
-      toast({ title: 'Role Updated', description: `${targetUser.name} is now "${newRole}".` });
+      toast({ title: 'Role Updated', description: `${displayName} is now "${newRole}".` });
     } catch {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to change role.' });
     } finally {
@@ -102,7 +102,7 @@ export function DataTableRowActions<TData>({
         adminId: adminUser.uid,
         adminName: adminUser.displayName || 'Admin',
         actionType: 'user_deleted',
-        details: `Soft-deleted user "${targetUser.name}" (ID: ${targetUser.id})`,
+        details: `Soft-deleted user "${displayName}" (ID: ${targetUser.id})`,
         targetId: targetUser.id,
         timestamp: serverTimestamp(),
       });
@@ -115,6 +115,7 @@ export function DataTableRowActions<TData>({
   };
 
   const isBanned = targetUser.status === 'banned';
+  const displayName = targetUser.name || targetUser.email || 'this user';
 
   return (
     <>
@@ -172,7 +173,7 @@ export function DataTableRowActions<TData>({
       open={confirmBanOpen}
       onOpenChange={setConfirmBanOpen}
       title="Ban User"
-      description={`Are you sure you want to ban "${targetUser.name}"? They will lose access to their account.`}
+      description={`Are you sure you want to ban "${displayName}"? They will lose access to their account.`}
       actionLabel="Ban User"
       variant="destructive"
       onConfirm={() => handleUpdateStatus('banned')}
@@ -182,7 +183,7 @@ export function DataTableRowActions<TData>({
       open={confirmDeleteOpen}
       onOpenChange={setConfirmDeleteOpen}
       title="Delete User"
-      description={`Are you sure you want to remove "${targetUser.name}"? This will ban their account.`}
+      description={`Are you sure you want to remove "${displayName}"? This will ban their account.`}
       actionLabel="Delete"
       variant="destructive"
       onConfirm={handleDelete}
