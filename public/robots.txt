@@ -1,0 +1,45 @@
+# *
+User-agent: *
+Allow: /
+
+# *
+User-agent: *
+Disallow: /admin
+
+# *
+User-agent: *
+Disallow: /profile
+
+# *
+User-agent: *
+Disallow: /cart
+
+# *
+User-agent: *
+Disallow: /checkout
+
+# *
+User-agent: *
+Disallow: /messages
+
+# *
+User-agent: *
+Disallow: /sell
+
+# *
+User-agent: *
+Disallow: /auth
+
+# *
+User-agent: *
+Disallow: /courier
+
+# *
+User-agent: *
+Disallow: /delivery-partner
+
+# Host
+Host: https://www.marigo.app
+
+# Sitemaps
+Sitemap: https://www.marigo.app/sitemap.xml
