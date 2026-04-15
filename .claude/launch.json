@@ -3,14 +3,15 @@
   "configurations": [
     {
       "name": "Next.js Dev Server",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3001
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export PATH=/Users/xhenimaloku/.nvm/versions/node/v20.20.2/bin:$PATH && cd '/Users/xhenimaloku/Desktop/Marigo App 10' && npm run dev"],
+      "port": 3001,
+      "autoPort": true
     },
     {
       "name": "Firebase Functions Emulator",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "functions", "run", "serve"],
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export PATH=/Users/xhenimaloku/.nvm/versions/node/v20.20.2/bin:$PATH && cd '/Users/xhenimaloku/Desktop/Marigo App 10/functions' && npm run serve"],
       "port": 5001
     }
   ]
