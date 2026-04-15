@@ -85,7 +85,10 @@ export function middleware(request: NextRequest) {
     // This covers our main API routes (create-order, upload, start-conversation).
     const hasBearer = request.headers.get('authorization')?.startsWith('Bearer ');
 
-    if (!hasBearer) {
+    // Exempt AI routes — they are stateless read-only queries, not user data mutations.
+    const isAIRoute = pathname.startsWith('/api/chat') || pathname.startsWith('/api/ai/');
+
+    if (!hasBearer && !isAIRoute) {
       // For cookie-authenticated or unauthenticated POST requests (e.g. forgot-password),
       // require the CSRF token to match.
       if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
