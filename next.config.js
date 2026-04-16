@@ -1,4 +1,12 @@
 
+// Derive the Supabase hostname from the env var so next.config.js stays in sync
+// with whatever Supabase project is configured in .env.local.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+let supabaseHostname = null;
+try {
+  if (supabaseUrl) supabaseHostname = new URL(supabaseUrl).hostname;
+} catch {}
+
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
@@ -55,6 +63,13 @@ const nextConfig = {
         port: '',
         pathname: '/storage/v1/object/public/**',
       },
+      // Dynamic: picks up whatever Supabase project is in NEXT_PUBLIC_SUPABASE_URL
+      ...(supabaseHostname ? [{
+        protocol: 'https',
+        hostname: supabaseHostname,
+        port: '',
+        pathname: '/storage/v1/object/public/**',
+      }] : []),
     ],
   },
   async headers() {

@@ -36,7 +36,8 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
   const itemData = isSale ? order.items[0] : product!;
   const imageUrl = isSale ? order.items[0].image : (product?.images?.[0]?.url || '/placeholder.png');
   const displayTitle = itemData.title ?? 'Untitled';
-  
+  const displayBrand = isSale ? (order.items[0].brand || 'Luxury Item') : (product?.brandId || 'Luxury Item');
+
   const link = isSale ? `/profile/listings/sales/${order.id}` : `/products/${product!.id}`;
   const status = isSale ? order.status : product!.status;
   
@@ -69,7 +70,7 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                  <h3 className="font-bold text-sm uppercase tracking-tight truncate">{itemData.brand || 'Luxury Item'}</h3>
+                  <h3 className="font-bold text-sm uppercase tracking-tight truncate">{displayBrand}</h3>
                   <p className="text-sm text-muted-foreground truncate">{displayTitle}</p>
               </div>
               <Badge className={cn("border-none shrink-0", statusStyles[status] || 'bg-gray-100 text-gray-800')}>
@@ -105,7 +106,9 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
                           </DropdownMenuItem>
                           {!isSale && (
                               <>
-                                <DropdownMenuItem>Edit Listing</DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/products/${product!.id}/edit`}>Edit Listing</Link>
+                                </DropdownMenuItem>
                                 <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
                               </>
                           )}

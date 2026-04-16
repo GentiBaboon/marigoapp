@@ -89,6 +89,7 @@ export default function ProductDetailPage() {
     const [current, setCurrent] = React.useState(0);
     const [count, setCount] = React.useState(0);
     const [isOfferSheetOpen, setIsOfferSheetOpen] = React.useState(false);
+    const [failedImages, setFailedImages] = React.useState<Set<number>>(new Set());
     const [isChatLoading, setIsChatLoading] = React.useState(false);
     const { isFavorite, addToWishlist, removeFromWishlist } = useWishlist();
 
@@ -152,13 +153,13 @@ export default function ProductDetailPage() {
           <div className="flex flex-col items-center">
              <Carousel setApi={setApi} className="w-full relative">
               <CarouselContent>
-                {product.images.map((img, index) => {
+                {(product.images ?? []).map((img, index) => {
                     const imgUrl = typeof img === 'string' ? img : img?.url || '';
-                    const isValidUrl = imgUrl.startsWith('http');
+                    const isValidUrl = imgUrl.startsWith('http') || imgUrl.startsWith('data:');
                     return (
                     <CarouselItem key={index}>
                       <div className="aspect-[3/4] relative bg-muted rounded-lg overflow-hidden">
-                        {isValidUrl ? (
+                        {isValidUrl && !failedImages.has(index) ? (
                         <Image
                           src={imgUrl}
                           alt={`${product.title} image ${index + 1}`}
@@ -166,6 +167,8 @@ export default function ProductDetailPage() {
                           className="object-cover"
                           sizes="(max-width: 768px) 100vw, 50vw"
                           priority={index === 0}
+                          unoptimized={imgUrl.startsWith('data:')}
+                          onError={() => setFailedImages(prev => new Set(prev).add(index))}
                         />
                         ) : (
                         <div className="flex items-center justify-center h-full text-muted-foreground text-xs">Image unavailable</div>
@@ -203,7 +206,9 @@ export default function ProductDetailPage() {
 
             <div className="flex flex-col gap-3">
                 {isSeller ? (
-                    <Button size="lg" className="w-full">Manage Listing</Button>
+                    <Button size="lg" className="w-full" asChild>
+                        <Link href={`/products/${productId}/edit`}>Manage Listing</Link>
+                    </Button>
                 ) : (
                     <>
                         <Button size="lg" className="w-full bg-foreground text-background" onClick={handleAddToCart} disabled={isSoldOrReserved}>Add to bag</Button>
@@ -229,6 +234,14 @@ export default function ProductDetailPage() {
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm pt-2">
                     {product.color && <DetailRow label="Color" value={product.color} />}
                     {product.material && <DetailRow label="Material" value={product.material} />}
+                    {product.gender && <DetailRow label="Gender" value={product.gender.charAt(0).toUpperCase() + product.gender.slice(1)} />}
+                    {product.pattern && <DetailRow label="Pattern" value={product.pattern} />}
+                    {product.size && <DetailRow label="Size" value={product.size} />}
+                    {product.categoryId && <DetailRow label="Category" value={product.categoryId} />}
+                    {product.subcategoryId && <DetailRow label="Subcategory" value={product.subcategoryId} />}
+                    {product.listingType && <DetailRow label="Listing Type" value={product.listingType === 'fixed_price' ? 'Fixed Price' : 'Auction'} />}
+                    {product.vintage && <DetailRow label="Vintage" value="Yes (15+ years)" />}
+                    {product.originalPrice && <DetailRow label="Original Price" value={formatPrice(product.originalPrice)} />}
                   </div>
                 </AccordionContent>
               </AccordionItem>

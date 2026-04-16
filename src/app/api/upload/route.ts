@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyIdToken } from '@/lib/firebase-admin';
 import { uploadLimiter, applyRateLimit } from '@/lib/rate-limit';
 
-const BUCKET = 'product-images';
+const BUCKET = 'MARIGO_BUCKED';
 
 /**
  * Server-side upload endpoint.
