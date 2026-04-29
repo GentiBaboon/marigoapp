@@ -26,6 +26,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SizeConfigTab } from '@/components/admin/settings/size-config-tab';
 import { MenuConfigTab } from '@/components/admin/settings/menu-config-tab';
 import { BannerConfigTab } from '@/components/admin/settings/banner-config-tab';
+import { MacroFiltersTab } from '@/components/admin/settings/macro-filters-tab';
+import { HomepageBlocksTab } from '@/components/admin/settings/homepage-blocks-tab';
 
 // --- Sub-components for Management ---
 
@@ -478,6 +480,8 @@ export default function AdminSettingsPage() {
             <TabsTrigger value="sizes">Sizes</TabsTrigger>
             <TabsTrigger value="menu">Menu</TabsTrigger>
             <TabsTrigger value="banners">Banners</TabsTrigger>
+            <TabsTrigger value="macrofilters">MacroFilters</TabsTrigger>
+            <TabsTrigger value="homepageblocks">Homepage Blocks</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
@@ -584,6 +588,14 @@ export default function AdminSettingsPage() {
 
         <TabsContent value="banners">
             <BannerConfigTab />
+        </TabsContent>
+
+        <TabsContent value="macrofilters">
+            <MacroFiltersTab />
+        </TabsContent>
+
+        <TabsContent value="homepageblocks">
+            <HomepageBlocksTab />
         </TabsContent>
       </Tabs>
 

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Star, X } from 'lucide-react';
-import { MarigoVIcon } from '../icons/MarigoVIcon';
 import { usePathname } from 'next/navigation';
 
 const SESSION_STORAGE_KEY = 'marigo_app_banner_shown';
@@ -69,7 +69,7 @@ export function DownloadAppBanner() {
           </Button>
 
           <div className="flex items-center gap-4">
-            <MarigoVIcon className="h-12 w-12 flex-shrink-0" />
+            <Image src="/app-icon.png" alt="Marigo" width={48} height={48} className="h-12 w-12 flex-shrink-0 rounded-xl" />
             <div>
               <h3 className="font-semibold">Shop Exclusive Deals on our App</h3>
               <div className="flex items-center gap-1">

@@ -3,11 +3,13 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { productCategories, brands } from '@/lib/mock-data';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import type { FirestoreCategory, FirestoreBrand } from '@/lib/types';
 
 function ListItem({ href, children }: { href: string; children: React.ReactNode }) {
   return (
@@ -23,21 +25,41 @@ function ListItem({ href, children }: { href: string; children: React.ReactNode 
 export default function CategoryDetailPage() {
   const params = useParams();
   const [gender, categorySlug] = (params.slug as string[]) || [];
-  
-  const categoryData = React.useMemo(() => {
-    return productCategories.find(c => c.name.toLowerCase() === categorySlug?.toLowerCase());
-  }, [categorySlug]);
+  const firestore = useFirestore();
 
-  const topBrands = React.useMemo(() => {
-    // Just show a few top brands for demonstration
-    return brands.filter(b => ['Chanel', 'Hermès', 'Louis Vuitton', 'Gucci'].includes(b.name));
-  }, []);
+  const categoriesQ = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'categories') : null),
+    [firestore],
+  );
+  const { data: allCategories, isLoading: catsLoading } = useCollection<FirestoreCategory>(categoriesQ);
+
+  const brandsQ = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'brands') : null),
+    [firestore],
+  );
+  const { data: brands } = useCollection<FirestoreBrand>(brandsQ);
+
+  const parentCategory = React.useMemo(
+    () => allCategories?.find((c) => !c.parentId && c.slug === categorySlug),
+    [allCategories, categorySlug],
+  );
+
+  const subcategories = React.useMemo(
+    () => allCategories?.filter((c) => c.parentId === parentCategory?.id && c.isActive) ?? [],
+    [allCategories, parentCategory],
+  );
 
   const genderName = gender ? gender.charAt(0).toUpperCase() + gender.slice(1) : '';
 
-  if (!categoryData) {
-    // This could also be a different page if the slug doesn't match the pattern.
-    // For now, simple not found.
+  if (catsLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!parentCategory) {
     return (
       <div className="container mx-auto py-8 text-center">
         <p>Category not found.</p>
@@ -48,44 +70,48 @@ export default function CategoryDetailPage() {
     );
   }
 
-  const categoryName = categoryData.name;
-  
   return (
     <div className="flex flex-col h-full">
-       <div className="container px-4 py-6 border-b">
-        <h1 className="text-2xl font-bold">{categoryName}</h1>
+      <div className="container px-4 py-6 border-b">
+        <h1 className="text-2xl font-bold">{parentCategory.name}</h1>
       </div>
 
       <ScrollArea className="flex-1">
-         <ul className="bg-background">
-          <ListItem href={`/search?gender=${gender}&category=${categorySlug}`}>
-            All {genderName}'s {categoryName}
+        <ul className="bg-background">
+          {/* All in this category */}
+          <ListItem href={`/search?gender=${gender}&categoryId=${parentCategory.slug}`}>
+            All {genderName}'s {parentCategory.name}
           </ListItem>
           <Separator />
-          {categoryData.subcategories.map((sub, index) => (
-            <React.Fragment key={sub.slug}>
+
+          {/* Subcategories from Firestore */}
+          {subcategories.map((sub, index) => (
+            <React.Fragment key={sub.id}>
               <ListItem href={`/search?gender=${gender}&category=${sub.slug}`}>
                 {sub.name}
               </ListItem>
-              {index < categoryData.subcategories.length -1 && <Separator className="ml-4" />}
+              {index < subcategories.length - 1 && <Separator className="ml-4" />}
             </React.Fragment>
           ))}
         </ul>
 
-        <div className="p-4 bg-muted/50 mt-4">
-            <h2 className="text-sm font-semibold uppercase text-muted-foreground tracking-wider">Top Brands</h2>
-        </div>
-        
-        <ul className="bg-background">
-             {topBrands.map((brand, index) => (
-                <React.Fragment key={brand.slug}>
-                    <ListItem href={`/search?brand=${brand.slug}`}>
-                        {brand.name}
-                    </ListItem>
-                    {index < topBrands.length - 1 && <Separator className="ml-4" />}
+        {brands && brands.length > 0 && (
+          <>
+            <div className="p-4 bg-muted/50 mt-4">
+              <h2 className="text-sm font-semibold uppercase text-muted-foreground tracking-wider">Top Brands</h2>
+            </div>
+            <ul className="bg-background">
+              {brands.slice(0, 6).map((brand, index) => (
+                <React.Fragment key={brand.id}>
+                  <ListItem href={`/search?brand=${brand.slug}`}>
+                    {brand.name}
+                  </ListItem>
+                  {index < Math.min(brands.length, 6) - 1 && <Separator className="ml-4" />}
                 </React.Fragment>
-             ))}
-        </ul>
+              ))}
+            </ul>
+          </>
+        )}
       </ScrollArea>
     </div>
   );

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
+import Image from 'next/image';
 import { Button } from './ui/button';
 import { Bell, Search, ShoppingCart, ArrowLeft } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
@@ -52,8 +53,8 @@ function HeaderContent() {
               </Link>
             </Button>
           )}
-          <Link href="/home" className="font-logo text-3xl font-bold tracking-tight">
-            marigo
+          <Link href="/home">
+            <Image src="/logo.png" alt="Marigo" width={100} height={28} className="h-7 w-auto brightness-0" priority />
           </Link>
           <nav className="hidden md:flex items-center gap-6 ml-6">
             {navLinks.map(link => (
@@ -85,8 +86,8 @@ function HeaderSkeleton() {
                     <Skeleton className="h-10 w-10" />
                 </div>
                 <div className="flex justify-center">
-                    <Link href="/home" className="font-logo text-3xl font-bold tracking-tight">
-                        marigo
+                    <Link href="/home">
+                        <Image src="/logo.png" alt="Marigo" width={100} height={28} className="h-7 w-auto brightness-0" />
                     </Link>
                 </div>
                 <div className="flex items-center justify-end gap-2">

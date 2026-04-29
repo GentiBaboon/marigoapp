@@ -73,6 +73,9 @@ service cloud.firestore {
     match /patterns/{id} { allow read: if true; allow write: if isAdmin(); }
 
     match /settings/global { allow read: if true; allow write: if isFullAdmin(); }
+    match /settings/banners { allow read: if true; allow write: if isAdmin(); }
+    match /settings/macro_filters { allow read: if true; allow write: if isAdmin(); }
+    match /settings/homepage_blocks { allow read: if true; allow write: if isAdmin(); }
     match /config/exchangeRates { allow read: if true; }
     match /admin_logs/{logId} { allow read, write: if isAdmin(); }
 

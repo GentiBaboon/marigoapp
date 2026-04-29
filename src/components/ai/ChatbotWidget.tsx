@@ -197,10 +197,16 @@ export function ChatbotWidget() {
     setIsLoading(false);
   };
 
+  useEffect(() => {
+    const handler = () => setIsOpen(true);
+    window.addEventListener('open-chatbot', handler);
+    return () => window.removeEventListener('open-chatbot', handler);
+  }, []);
+
   return (
     <>
       <Button
-        className="fixed bottom-4 right-4 h-16 w-16 rounded-full shadow-lg"
+        className="fixed bottom-4 right-4 h-16 w-16 rounded-full shadow-lg hidden md:inline-flex"
         size="icon"
         onClick={() => setIsOpen(true)}
       >

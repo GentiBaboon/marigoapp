@@ -63,6 +63,8 @@ export default function RootLayout({
     <html lang="sq" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/app-icon.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/app-icon.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link

@@ -24,6 +24,11 @@ export function FirebaseErrorListener() {
         console.warn('[Firestore] Permission error on admin page (non-fatal):', err.message);
         return;
       }
+      // Settings docs are public reads — suppress until rules are deployed
+      if (err.message?.includes('/settings/')) {
+        console.warn('[Firestore] Settings read permission error (non-fatal):', err.message);
+        return;
+      }
       setError(err);
     };
 

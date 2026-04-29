@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -9,7 +10,7 @@ export function Footer() {
       <div className="container mx-auto py-12 px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <h3 className="font-bold text-lg mb-4 font-logo">marigo</h3>
+            <Image src="/logo.png" alt="Marigo" width={100} height={28} className="h-7 w-auto brightness-0 mb-4" />
             <p className="text-muted-foreground">The luxury fashion marketplace.</p>
           </div>
           <div>

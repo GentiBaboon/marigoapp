@@ -74,15 +74,6 @@ export function ShoppingPreferenceModal() {
                 )}
               >
                 <div className="flex items-center gap-3">
-                  {imageData && (
-                    <Image
-                      src={imageData.imageUrl}
-                      alt={pref.label}
-                      width={36}
-                      height={48}
-                      className="rounded-md object-cover w-9 h-12"
-                    />
-                  )}
                   <span className="font-medium text-sm">{pref.label}</span>
                 </div>
                 {isSelected && <Check className="h-4 w-4 text-primary" />}

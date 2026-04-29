@@ -8,6 +8,8 @@ import { NewArrivalsSection } from '@/components/home/NewArrivalsSection';
 import { RecentlyViewedSection } from '@/components/home/RecentlyViewedSection';
 import { PersonalizedPicks } from '@/components/home/PersonalizedPicks';
 import { CategoriesSection } from '@/components/home/CategoriesSection';
+import { MacroFilters } from '@/components/home/MacroFilters';
+import { HomepageBlocks } from '@/components/home/HomepageBlocks';
 import { Skeleton } from '@/components/ui/skeleton';
 
 function SectionSkeleton() {
@@ -31,7 +33,13 @@ function SectionSkeleton() {
 export default function HomePage() {
   return (
     <div className="flex flex-col bg-background">
-      <div className="bg-background border-b">
+      <div className="container mx-auto px-4 pt-4">
+        <Suspense fallback={null}>
+          <MacroFilters />
+        </Suspense>
+      </div>
+
+      <div className="bg-background border-b mt-4">
         <div className="container mx-auto px-4 py-6">
           <h2 className="text-2xl font-serif mb-2">First Time?</h2>
           <p className="text-muted-foreground">Shop: 15% off with code <span className="font-semibold text-foreground">WELCOME15</span>. Sell: No fees to start.*...</p>
@@ -42,7 +50,12 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 md:py-12 space-y-12">
+      <div className="container mx-auto px-4 pt-4 pb-8 md:py-12 space-y-6 md:space-y-12">
+
+        <Suspense fallback={null}>
+          <HomepageBlocks />
+        </Suspense>
+
         <Suspense fallback={<SectionSkeleton />}>
           <PersonalizedPicks />
         </Suspense>
