@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Plus, Edit, Trash2, Loader2, Save } from 'lucide-react';
 import { useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, updateDoc, addDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { doc, collection, query, orderBy, updateDoc, addDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import type { FirestoreSettings, FirestoreCategory, FirestoreBrand, FirestoreAttribute } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import SettingsLoading from './loading';
@@ -28,6 +28,7 @@ import { MenuConfigTab } from '@/components/admin/settings/menu-config-tab';
 import { BannerConfigTab } from '@/components/admin/settings/banner-config-tab';
 import { MacroFiltersTab } from '@/components/admin/settings/macro-filters-tab';
 import { HomepageBlocksTab } from '@/components/admin/settings/homepage-blocks-tab';
+import { CategoryConfigTab } from '@/components/admin/settings/category-config-tab';
 
 // --- Sub-components for Management ---
 
@@ -410,10 +411,10 @@ export default function AdminSettingsPage() {
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'global') : null, [firestore]);
   const { data: settings, isLoading: settingsLoading } = useDoc<FirestoreSettings>(settingsRef);
   
-  const categoriesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'categories') : null, [firestore]);
+  const categoriesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'categories'), orderBy('order')) : null, [firestore]);
   const { data: categories } = useCollection<FirestoreCategory>(categoriesQuery);
 
-  const brandsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'brands') : null, [firestore]);
+  const brandsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'brands'), orderBy('name')) : null, [firestore]);
   const { data: brands } = useCollection<FirestoreBrand>(brandsQuery);
 
   // Metadata collections
@@ -489,41 +490,7 @@ export default function AdminSettingsPage() {
         </TabsContent>
 
         <TabsContent value="categories" className="space-y-4">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle>Product Categories</CardTitle>
-                        <CardDescription>Hierarchy for your marketplace.</CardDescription>
-                    </div>
-                    <Button size="sm" onClick={() => { setEditingCategory(null); setCatDialogOpen(true); }}>
-                        <Plus className="mr-2 h-4 w-4" /> Add Category
-                    </Button>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    {categoryTree.map(cat => (
-                        <div key={cat.id} className="space-y-2">
-                            <div className="flex justify-between items-center bg-muted/30 p-2 rounded-md">
-                                <h4 className="font-bold">{cat.name}</h4>
-                                <div className="flex gap-1">
-                                    <Button variant="ghost" size="icon" onClick={() => { setEditingCategory(cat); setCatDialogOpen(true); }}><Edit className="h-4 w-4" /></Button>
-                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteItem('categories', cat.id)}><Trash2 className="h-4 w-4" /></Button>
-                                </div>
-                            </div>
-                            <div className="ml-6 space-y-1">
-                                {cat.subcategories.map(sub => (
-                                    <div key={sub.id} className="flex justify-between items-center p-2 hover:bg-muted/50 rounded-md">
-                                        <span>{sub.name}</span>
-                                        <div className="flex gap-1">
-                                            <Button variant="ghost" size="icon" onClick={() => { setEditingCategory(sub); setCatDialogOpen(true); }}><Edit className="h-4 w-4" /></Button>
-                                            <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteItem('categories', sub.id)}><Trash2 className="h-4 w-4" /></Button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-                </CardContent>
-            </Card>
+            <CategoryConfigTab categories={categories ?? []} firestore={firestore} toast={toast} />
         </TabsContent>
 
         <TabsContent value="brands" className="space-y-4">

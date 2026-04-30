@@ -347,6 +347,7 @@ export interface FirestoreCategory {
   slug: string;
   parentId?: string | null;
   isActive: boolean;
+  order?: number;
 }
 
 export interface FirestoreBrand {

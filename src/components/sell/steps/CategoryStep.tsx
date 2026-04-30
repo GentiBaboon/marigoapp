@@ -41,9 +41,9 @@ export function CategoryStep() {
 
   const categoryTree = React.useMemo(() => {
     if (!categories) return [];
-    const parents = categories.filter(c => !c.parentId);
-    const subs = categories.filter(c => c.parentId);
-    
+    const parents = [...categories.filter(c => !c.parentId)].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    const subs = [...categories.filter(c => c.parentId)].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+
     return parents.map(p => ({
         heading: p.name,
         items: subs.filter(s => s.parentId === p.id).map(s => ({ value: s.slug, label: s.name }))

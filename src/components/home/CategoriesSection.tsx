@@ -87,10 +87,14 @@ export function CategoriesSection() {
       }
     });
 
-    // Sort tabs by product count, limit to 8
+    // Sort tabs by category order, limit to 8
     const sortedTabs = Object.entries(productGroups)
       .filter(([, prods]) => prods.length > 0)
-      .sort((a, b) => b[1].length - a[1].length)
+      .sort((a, b) => {
+        const orderA = categoryMap[a[0]]?.order ?? 999;
+        const orderB = categoryMap[b[0]]?.order ?? 999;
+        return orderA - orderB;
+      })
       .slice(0, 8)
       .map(([id]) => ({ id, name: tabNames[id] || id }));
 
