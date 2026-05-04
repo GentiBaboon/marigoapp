@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { useCurrency, type Currency } from '@/context/CurrencyContext';
 import { useTranslation, type Locale } from '@/context/LanguageContext';
+import { useCart } from '@/context/CartContext';
 import { doc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { FirestoreUser } from '@/lib/types';
 import { LanguageSwitcher } from './LanguageSwitcher';
@@ -56,6 +57,12 @@ export function UserNav() {
   const router = useRouter();
   const { currency, setCurrency } = useCurrency();
   const { t } = useTranslation();
+  const { items: cartItems } = useCart();
+  // Sum of quantities — a single line with quantity 3 should show "3", not "1".
+  const cartCount = React.useMemo(
+    () => cartItems.reduce((sum, item) => sum + (item.quantity ?? 1), 0),
+    [cartItems],
+  );
 
   const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: firestoreUser } = useDoc<FirestoreUser>(userRef);
@@ -76,6 +83,19 @@ export function UserNav() {
     }, () => {
       // Silently ignore permission errors — badge shows 0
     });
+    return () => unsubscribe();
+  }, [user, firestore]);
+
+  // Unread notifications (order updates, etc.) for the bell badge.
+  const [unreadNotifications, setUnreadNotifications] = React.useState(0);
+  React.useEffect(() => {
+    if (!user || !firestore) return;
+    const q = query(
+      collection(firestore, 'notifications'),
+      where('userId', '==', user.uid),
+      where('read', '==', false),
+    );
+    const unsubscribe = onSnapshot(q, (snap) => setUnreadNotifications(snap.size), () => {});
     return () => unsubscribe();
   }, [user, firestore]);
 
@@ -108,9 +128,14 @@ export function UserNav() {
         <LanguageSwitcher />
       </div>
       
-      <Button asChild variant="ghost" size="icon" aria-label="Notifications">
+      <Button asChild variant="ghost" size="icon" aria-label="Notifications" className="relative">
         <Link href="/notifications">
           <Bell className="h-6 w-6" />
+          {unreadNotifications > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+              {unreadNotifications > 9 ? '9+' : unreadNotifications}
+            </span>
+          )}
         </Link>
       </Button>
 
@@ -128,6 +153,11 @@ export function UserNav() {
       <Button asChild variant="ghost" size="icon" aria-label="Shopping Cart" className="relative">
         <Link href="/cart">
           <ShoppingCart className="h-6 w-6" />
+          {cartCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+              {cartCount > 9 ? '9+' : cartCount}
+            </span>
+          )}
         </Link>
       </Button>
 

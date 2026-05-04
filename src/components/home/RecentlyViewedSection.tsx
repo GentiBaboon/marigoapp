@@ -91,7 +91,7 @@ export function RecentlyViewedSection() {
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-8">
             {products.map((p) => {
-                const productForCard: Product = {
+                const productForCard = {
                     id: p.id,
                     brand: p.brand,
                     title: p.title,
@@ -102,8 +102,9 @@ export function RecentlyViewedSection() {
                     condition: p.condition as any,
                     color: p.color,
                     vintage: p.vintage,
+                    status: p.status,
                 };
-                return <ProductCard key={p.id} product={productForCard} />;
+                return <ProductCard key={p.id} product={productForCard as any} />;
             })}
         </div>
     </section>

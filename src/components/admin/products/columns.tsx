@@ -90,6 +90,24 @@ export const columns: ColumnDef<FirestoreProduct>[] = [
     cell: ({ row }) => currencyFormatter.format(row.original.price),
   },
   {
+    accessorKey: 'quantity',
+    header: 'Stock',
+    cell: ({ row }) => {
+      // Treat missing field as 1 — older listings predate the quantity feature.
+      const q = (row.original as any).quantity ?? 1;
+      return (
+        <Badge variant="outline" className={cn(
+          'font-mono',
+          q === 0 ? 'bg-red-100 text-red-800 border-transparent' :
+          q === 1 ? 'bg-gray-100 text-gray-800 border-transparent' :
+                    'bg-blue-100 text-blue-800 border-transparent',
+        )}>
+          {q}
+        </Badge>
+      );
+    },
+  },
+  {
     accessorKey: 'status',
     header: 'Status',
     cell: ({ row }) => {

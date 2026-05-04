@@ -4,12 +4,15 @@ import * as React from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/product-card';
-import { SlidersHorizontal, Loader2, X, ChevronDown } from 'lucide-react';
+import { SlidersHorizontal, Loader2, X, ChevronDown, Search as SearchIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { Slider } from '@/components/ui/slider';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import {
   collection, query, where, orderBy,
@@ -80,10 +83,31 @@ function useFilteredProducts(
     () => brands.find((b) => b.slug === brand)?.name ?? brand,
     [brands, brand],
   );
-  const resolvedCategoryName = React.useMemo(
-    () => categories.find((c) => c.slug === categoryId && !c.parentId)?.name ?? categoryId,
+  const parentCategory = React.useMemo(
+    () => categories.find((c) => c.slug === categoryId && !c.parentId),
     [categories, categoryId],
   );
+  // Build a set of values a product's categoryId/subcategoryId might match this
+  // parent under: doc id, slug, name, plus all child slugs/names. Handles
+  // legacy/inconsistent product data.
+  const parentMatchSet = React.useMemo(() => {
+    const set = new Set<string>();
+    if (!parentCategory) {
+      if (categoryId) set.add(categoryId.toLowerCase());
+      return set;
+    }
+    set.add(parentCategory.id.toLowerCase());
+    set.add(parentCategory.slug.toLowerCase());
+    set.add(parentCategory.name.toLowerCase());
+    categories.forEach((c) => {
+      if (c.parentId === parentCategory.id) {
+        set.add(c.id.toLowerCase());
+        if (c.slug) set.add(c.slug.toLowerCase());
+        if (c.name) set.add(c.name.toLowerCase());
+      }
+    });
+    return set;
+  }, [categories, categoryId, parentCategory]);
 
   const [raw, setRaw] = React.useState<FirestoreProduct[]>([]);
   const [lastDoc, setLastDoc] = React.useState<QueryDocumentSnapshot<DocumentData> | null>(null);
@@ -95,7 +119,9 @@ function useFilteredProducts(
   // subcategoryId stores slugs → can filter in Firestore.
   // brandId stores brand NAMES (not slugs) → must filter client-side.
   const buildConstraints = React.useCallback((): QueryConstraint[] => {
-    const c: QueryConstraint[] = [where('status', '==', 'active')];
+    // Include reserved items too — they stay browsable so shoppers see them
+    // marked "Reserved" instead of disappearing entirely.
+    const c: QueryConstraint[] = [where('status', 'in', ['active', 'reserved'])];
     if (category) c.push(where('subcategoryId', '==', category));
     c.push(orderBy('listingCreated', 'desc'));
     return c;
@@ -146,8 +172,15 @@ function useFilteredProducts(
     if (gender) list = list.filter((p) => p.gender === gender);
     // brand: resolve slug → name, then compare to stored name
     if (brand) list = list.filter((p) => p.brandId === resolvedBrandName);
-    // parent category: resolve slug → name
-    if (categoryId) list = list.filter((p) => p.categoryId === resolvedCategoryName);
+    // parent category: match against the parent's id/slug/name AND all of its
+    // children's id/slug/name — products may store the value as the parent
+    // name, the parent slug, or any subcategory id/slug.
+    if (categoryId)
+      list = list.filter((p) => {
+        const c = (p.categoryId ?? '').toLowerCase();
+        const s = (p.subcategoryId ?? '').toLowerCase();
+        return parentMatchSet.has(c) || parentMatchSet.has(s);
+      });
     if (size) list = list.filter((p) => p.size === size);
     if (color) list = list.filter((p) => p.color === color);
     if (condition) list = list.filter((p) => p.condition === condition);
@@ -172,7 +205,7 @@ function useFilteredProducts(
       );
     }
     return list;
-  }, [raw, gender, brand, resolvedBrandName, category, categoryId, resolvedCategoryName, size, color, condition, material, pattern, minPrice, maxPrice, section, q]);
+  }, [raw, gender, brand, resolvedBrandName, category, categoryId, parentMatchSet, size, color, condition, material, pattern, minPrice, maxPrice, section, q]);
 
   const activeFilterCount = [gender, category, categoryId, brand, size, color, condition, material, pattern,
     minPrice !== null ? '1' : '', maxPrice !== null ? '1' : '']
@@ -186,9 +219,11 @@ function useFilteredProducts(
 function FilterSheet({
   open,
   onOpenChange,
+  priceRange,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  priceRange?: { min: number; max: number };
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -210,40 +245,38 @@ function FilterSheet({
   const { data: patterns } = useCollection<FirestoreAttribute>(patternsQ);
 
   // Local draft state
-  const [draft, setDraft] = React.useState(() => ({
-    gender: searchParams.get('gender') ?? '',
-    category: searchParams.get('category') ?? '',
-    brand: searchParams.get('brand') ?? '',
-    condition: searchParams.get('condition') ?? '',
-    color: searchParams.get('color') ?? '',
-    material: searchParams.get('material') ?? '',
-    pattern: searchParams.get('pattern') ?? '',
-    minPrice: searchParams.get('minPrice') ?? '',
-    maxPrice: searchParams.get('maxPrice') ?? '',
-  }));
+  const buildDraftFromParams = React.useCallback(
+    () => ({
+      gender: searchParams.get('gender') ?? '',
+      categoryId: searchParams.get('categoryId') ?? '',
+      category: searchParams.get('category') ?? '',
+      brand: searchParams.get('brand') ?? '',
+      condition: searchParams.get('condition') ?? '',
+      color: searchParams.get('color') ?? '',
+      material: searchParams.get('material') ?? '',
+      pattern: searchParams.get('pattern') ?? '',
+      minPrice: searchParams.get('minPrice') ?? '',
+      maxPrice: searchParams.get('maxPrice') ?? '',
+    }),
+    [searchParams],
+  );
+  const [draft, setDraft] = React.useState(buildDraftFromParams);
 
   React.useEffect(() => {
-    if (open) {
-      setDraft({
-        gender: searchParams.get('gender') ?? '',
-        category: searchParams.get('category') ?? '',
-        brand: searchParams.get('brand') ?? '',
-        condition: searchParams.get('condition') ?? '',
-        color: searchParams.get('color') ?? '',
-        material: searchParams.get('material') ?? '',
-        pattern: searchParams.get('pattern') ?? '',
-        minPrice: searchParams.get('minPrice') ?? '',
-        maxPrice: searchParams.get('maxPrice') ?? '',
-      });
-    }
-  }, [open, searchParams]);
+    if (open) setDraft(buildDraftFromParams());
+  }, [open, buildDraftFromParams]);
 
   const set = (key: string, value: string) =>
-    setDraft((d) => ({ ...d, [key]: d[key as keyof typeof d] === value ? '' : value }));
+    setDraft((d) => {
+      const next = { ...d, [key]: d[key as keyof typeof d] === value ? '' : value };
+      // Clearing or changing the parent category invalidates the active subcategory.
+      if (key === 'categoryId' && next.categoryId !== d.categoryId) next.category = '';
+      return next;
+    });
 
   const applyFilters = () => {
     const params = new URLSearchParams(searchParams.toString());
-    const keys = ['gender', 'category', 'brand', 'condition', 'color', 'material', 'pattern', 'minPrice', 'maxPrice'];
+    const keys = ['gender', 'categoryId', 'category', 'brand', 'condition', 'color', 'material', 'pattern', 'minPrice', 'maxPrice'];
     keys.forEach((k) => {
       const v = draft[k as keyof typeof draft];
       if (v) params.set(k, v);
@@ -254,42 +287,135 @@ function FilterSheet({
   };
 
   const clearAll = () => {
-    setDraft({ gender: '', category: '', brand: '', condition: '', color: '', material: '', pattern: '', minPrice: '', maxPrice: '' });
+    setDraft({ gender: '', categoryId: '', category: '', brand: '', condition: '', color: '', material: '', pattern: '', minPrice: '', maxPrice: '' });
   };
 
-  // Subcategories: only from the selected category parent (or all leaf categories)
-  const subcategories = React.useMemo(() => {
-    if (!allCategories) return [];
-    return allCategories.filter((c) => c.parentId);
-  }, [allCategories]);
-
+  // Parent categories registered in admin, sorted by admin order then name.
   const parentCategories = React.useMemo(() => {
     if (!allCategories) return [];
-    return allCategories.filter((c) => !c.parentId);
+    return allCategories
+      .filter((c) => !c.parentId && c.isActive !== false)
+      .slice()
+      .sort((a, b) => {
+        const oa = a.order ?? 999;
+        const ob = b.order ?? 999;
+        if (oa !== ob) return oa - ob;
+        return a.name.localeCompare(b.name);
+      });
   }, [allCategories]);
 
-  const PillGroup = ({
-    label, options, field,
-  }: { label: string; options: { value: string; label: string }[]; field: string }) => (
-    <div className="space-y-2">
-      <Label className="text-sm font-semibold">{label}</Label>
-      <div className="flex flex-wrap gap-2">
-        {options.map((o) => (
-          <button
-            key={o.value}
-            onClick={() => set(field, o.value)}
-            className={cn(
-              'px-3 py-1.5 rounded-full border text-sm transition-colors',
-              draft[field as keyof typeof draft] === o.value
-                ? 'bg-foreground text-background border-foreground'
-                : 'bg-background text-foreground border-border hover:border-foreground',
-            )}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
+  // Subcategory groups, mirroring the sell-flow CategoryStep: each parent is a
+  // heading, its subcategories listed underneath, sorted alphabetically. We
+  // dedupe by slug so the same physical sub doesn't appear twice.
+  const categoryGroups = React.useMemo(() => {
+    if (!allCategories) return [] as { parent: FirestoreCategory; subs: FirestoreCategory[] }[];
+    const seen = new Set<string>();
+    return parentCategories
+      .map((p) => ({
+        parent: p,
+        subs: allCategories
+          .filter((c) => c.parentId === p.id && c.isActive !== false)
+          .filter((c) => {
+            if (!c.slug || seen.has(c.slug)) return false;
+            seen.add(c.slug);
+            return true;
+          })
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .filter((g) => g.subs.length > 0);
+  }, [allCategories, parentCategories]);
+
+  // Currently-picked subcategory record (for the accordion header summary).
+  const pickedSubcategory = React.useMemo(() => {
+    if (!draft.category) return undefined;
+    for (const g of categoryGroups) {
+      const found = g.subs.find((s) => s.slug === draft.category);
+      if (found) return { sub: found, parent: g.parent };
+    }
+    return undefined;
+  }, [categoryGroups, draft.category]);
+
+  const sortedBrands = React.useMemo(
+    () => (brands ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [brands],
+  );
+  const sortedConditions = React.useMemo(
+    () => (conditions ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [conditions],
+  );
+  const sortedColors = React.useMemo(
+    () => (colors ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [colors],
+  );
+  const sortedMaterials = React.useMemo(
+    () => (materials ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [materials],
+  );
+  const sortedPatterns = React.useMemo(
+    () => (patterns ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [patterns],
+  );
+
+  // Per-section search inputs (only relevant for sections with many options).
+  const [searchTerms, setSearchTerms] = React.useState<Record<string, string>>({});
+  const sectionSearch = (section: string) => searchTerms[section] ?? '';
+  const setSectionSearch = (section: string, value: string) =>
+    setSearchTerms((prev) => ({ ...prev, [section]: value }));
+  const matchesSearch = (label: string, term: string) =>
+    !term || label.toLowerCase().includes(term.toLowerCase());
+
+  // Default-open Gender; the rest collapsed so the sheet starts compact.
+  const [openSections, setOpenSections] = React.useState<string[]>(['gender']);
+
+  // Render helpers — defined as plain functions (not React components) so
+  // they're inlined into the parent's element tree on each render. Defining
+  // them as components inside FilterSheet would give them a new identity per
+  // render, causing React to unmount and remount the inputs and lose focus
+  // mid-typing.
+  const renderPills = (
+    options: { value: string; label: string }[],
+    field: string,
+  ) => (
+    <div className="flex flex-wrap gap-2">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => set(field, o.value)}
+          className={cn(
+            'px-3 py-1.5 rounded-full border text-sm transition-colors',
+            draft[field as keyof typeof draft] === o.value
+              ? 'bg-foreground text-background border-foreground'
+              : 'bg-background text-foreground border-border hover:border-foreground',
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
+  );
+
+  const renderSearchInput = (section: string, placeholder: string) => (
+    <div className="relative mb-3">
+      <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      <Input
+        type="text"
+        placeholder={placeholder}
+        value={sectionSearch(section)}
+        onChange={(e) => setSectionSearch(section, e.target.value)}
+        className="h-8 pl-8 text-xs"
+      />
+    </div>
+  );
+
+  const renderSectionTrigger = (label: string, summary?: string) => (
+    <span className="flex w-full items-center justify-between pr-2">
+      <span className="font-semibold text-sm">{label}</span>
+      {summary && (
+        <span className="text-xs font-normal text-muted-foreground truncate ml-2 max-w-[60%]">
+          {summary}
+        </span>
+      )}
+    </span>
   );
 
   return (
@@ -304,162 +430,287 @@ function FilterSheet({
           </div>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-          {/* Gender */}
-          <PillGroup
-            label="Gender"
-            field="gender"
-            options={GENDERS}
-          />
-          <Separator />
+        <div className="flex-1 overflow-y-auto px-4 py-2">
+          <Accordion
+            type="multiple"
+            value={openSections}
+            onValueChange={setOpenSections}
+            className="w-full"
+          >
+            {/* Gender */}
+            <AccordionItem value="gender">
+              <AccordionTrigger className="py-3">
+                {renderSectionTrigger('Gender', GENDERS.find((g) => g.value === draft.gender)?.label)}
+              </AccordionTrigger>
+              <AccordionContent>
+                {renderPills(GENDERS, 'gender')}
+              </AccordionContent>
+            </AccordionItem>
 
-          {/* Category */}
-          {parentCategories.length > 0 && (
-            <>
-              <PillGroup
-                label="Category"
-                field="categoryId"
-                options={parentCategories.filter((c) => c.isActive).map((c) => ({ value: c.slug, label: c.name }))}
-              />
-              <Separator />
-            </>
-          )}
+            {/* Category — grouped by parent, same shape as the sell flow */}
+            {categoryGroups.length > 0 && (
+              <AccordionItem value="category">
+                <AccordionTrigger className="py-3">
+                  {renderSectionTrigger(
+                    'Category',
+                    pickedSubcategory
+                      ? `${pickedSubcategory.parent.name} · ${pickedSubcategory.sub.name}`
+                      : undefined,
+                  )}
+                </AccordionTrigger>
+                <AccordionContent>
+                  {renderSearchInput('category', 'Search categories…')}
+                  <div className="max-h-72 overflow-y-auto space-y-3 pr-1">
+                    {categoryGroups
+                      .map((g) => ({
+                        ...g,
+                        matched: g.subs.filter(
+                          (s) =>
+                            matchesSearch(s.name, sectionSearch('category'))
+                            || matchesSearch(g.parent.name, sectionSearch('category')),
+                        ),
+                      }))
+                      .filter((g) => g.matched.length > 0)
+                      .map((g) => (
+                        <div key={g.parent.id} className="space-y-1.5">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            {g.parent.name}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {g.matched.map((s) => (
+                              <button
+                                key={s.id}
+                                onClick={() => {
+                                  // Picking a sub also locks the parent — mirrors the sell flow,
+                                  // where the parent is implied by the chosen subcategory.
+                                  set('category', s.slug);
+                                  setDraft((d) => ({
+                                    ...d,
+                                    categoryId: d.category === s.slug ? '' : g.parent.slug,
+                                  }));
+                                }}
+                                className={cn(
+                                  'px-3 py-1.5 rounded-full border text-sm transition-colors',
+                                  draft.category === s.slug
+                                    ? 'bg-foreground text-background border-foreground'
+                                    : 'bg-background text-foreground border-border hover:border-foreground',
+                                )}
+                              >
+                                {s.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
 
-          {/* Subcategory */}
-          {subcategories.length > 0 && (
-            <>
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold">Subcategory</Label>
-                <div className="flex flex-wrap gap-2">
-                  {subcategories.filter((c) => c.isActive).map((c) => (
-                    <button
-                      key={c.slug}
-                      onClick={() => set('category', c.slug)}
-                      className={cn(
-                        'px-3 py-1.5 rounded-full border text-sm transition-colors',
-                        draft.category === c.slug
-                          ? 'bg-foreground text-background border-foreground'
-                          : 'bg-background text-foreground border-border hover:border-foreground',
-                      )}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
+            {/* Brand */}
+            {sortedBrands.length > 0 && (
+              <AccordionItem value="brand">
+                <AccordionTrigger className="py-3">
+                  {renderSectionTrigger(
+                    'Brand',
+                    sortedBrands.find((b) => b.slug === draft.brand)?.name,
+                  )}
+                </AccordionTrigger>
+                <AccordionContent>
+                  {renderSearchInput('brand', 'Search brands…')}
+                  <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto">
+                    {sortedBrands
+                      .filter((b) => matchesSearch(b.name, sectionSearch('brand')))
+                      .map((b) => (
+                        <button
+                          key={b.id}
+                          onClick={() => set('brand', b.slug)}
+                          className={cn(
+                            'px-3 py-1.5 rounded-full border text-sm transition-colors',
+                            draft.brand === b.slug
+                              ? 'bg-foreground text-background border-foreground'
+                              : 'bg-background text-foreground border-border hover:border-foreground',
+                          )}
+                        >
+                          {b.name}
+                        </button>
+                      ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+
+            {/* Condition */}
+            {sortedConditions.length > 0 && (
+              <AccordionItem value="condition">
+                <AccordionTrigger className="py-3">
+                  {renderSectionTrigger(
+                    'Condition',
+                    sortedConditions.find((c) => c.value === draft.condition)?.name,
+                  )}
+                </AccordionTrigger>
+                <AccordionContent>
+                  {renderPills(
+                    sortedConditions.map((c) => ({ value: c.value, label: c.name })),
+                    'condition',
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+            )}
+
+            {/* Color */}
+            {sortedColors.length > 0 && (
+              <AccordionItem value="color">
+                <AccordionTrigger className="py-3">
+                  {renderSectionTrigger(
+                    'Color',
+                    sortedColors.find((c) => c.value === draft.color)?.name,
+                  )}
+                </AccordionTrigger>
+                <AccordionContent>
+                  {renderSearchInput('color', 'Search colors…')}
+                  <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto">
+                    {sortedColors
+                      .filter((c) => matchesSearch(c.name, sectionSearch('color')))
+                      .map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => set('color', c.value)}
+                          title={c.name}
+                          className={cn(
+                            'w-8 h-8 rounded-full border-2 transition-all',
+                            draft.color === c.value
+                              ? 'border-foreground scale-110 shadow-md'
+                              : 'border-border',
+                          )}
+                          style={{ backgroundColor: c.hex ?? c.value }}
+                        />
+                      ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+
+            {/* Material */}
+            {sortedMaterials.length > 0 && (
+              <AccordionItem value="material">
+                <AccordionTrigger className="py-3">
+                  {renderSectionTrigger(
+                    'Material',
+                    sortedMaterials.find((m) => m.value === draft.material)?.name,
+                  )}
+                </AccordionTrigger>
+                <AccordionContent>
+                  {renderSearchInput('material', 'Search materials…')}
+                  <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto">
+                    {sortedMaterials
+                      .filter((m) => matchesSearch(m.name, sectionSearch('material')))
+                      .map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() => set('material', m.value)}
+                          className={cn(
+                            'px-3 py-1.5 rounded-full border text-sm transition-colors',
+                            draft.material === m.value
+                              ? 'bg-foreground text-background border-foreground'
+                              : 'bg-background text-foreground border-border hover:border-foreground',
+                          )}
+                        >
+                          {m.name}
+                        </button>
+                      ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+
+            {/* Pattern */}
+            {sortedPatterns.length > 0 && (
+              <AccordionItem value="pattern">
+                <AccordionTrigger className="py-3">
+                  {renderSectionTrigger(
+                    'Pattern',
+                    sortedPatterns.find((p) => p.value === draft.pattern)?.name,
+                  )}
+                </AccordionTrigger>
+                <AccordionContent>
+                  {renderSearchInput('pattern', 'Search patterns…')}
+                  <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto">
+                    {sortedPatterns
+                      .filter((p) => matchesSearch(p.name, sectionSearch('pattern')))
+                      .map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => set('pattern', p.value)}
+                          className={cn(
+                            'px-3 py-1.5 rounded-full border text-sm transition-colors',
+                            draft.pattern === p.value
+                              ? 'bg-foreground text-background border-foreground'
+                              : 'bg-background text-foreground border-border hover:border-foreground',
+                          )}
+                        >
+                          {p.name}
+                        </button>
+                      ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+
+            {/* Price */}
+            <AccordionItem value="price">
+              <AccordionTrigger className="py-3">
+                {renderSectionTrigger(
+                  'Price (EUR)',
+                  draft.minPrice || draft.maxPrice
+                    ? `${draft.minPrice || '0'} – ${draft.maxPrice || '∞'}`
+                    : undefined,
+                )}
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="number"
+                    placeholder="€0"
+                    value={draft.minPrice}
+                    onChange={(e) => setDraft((d) => ({ ...d, minPrice: e.target.value }))}
+                    className="flex-1 h-10 rounded-md border border-border px-3 text-sm bg-background"
+                    min={0}
+                    max={priceRange?.max}
+                  />
+                  <span className="text-muted-foreground">–</span>
+                  <input
+                    type="number"
+                    placeholder={priceRange ? `€${priceRange.max}` : 'Max'}
+                    value={draft.maxPrice}
+                    onChange={(e) => setDraft((d) => ({ ...d, maxPrice: e.target.value }))}
+                    className="flex-1 h-10 rounded-md border border-border px-3 text-sm bg-background"
+                    min={0}
+                    max={priceRange?.max}
+                  />
                 </div>
-              </div>
-              <Separator />
-            </>
-          )}
-
-          {/* Brand */}
-          {brands && brands.length > 0 && (
-            <>
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold">Brand</Label>
-                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                  {brands.map((b) => (
-                    <button
-                      key={b.slug}
-                      onClick={() => set('brand', b.slug)}
-                      className={cn(
-                        'px-3 py-1.5 rounded-full border text-sm transition-colors',
-                        draft.brand === b.slug
-                          ? 'bg-foreground text-background border-foreground'
-                          : 'bg-background text-foreground border-border hover:border-foreground',
-                      )}
-                    >
-                      {b.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <Separator />
-            </>
-          )}
-
-          {/* Condition */}
-          {conditions && conditions.length > 0 && (
-            <>
-              <PillGroup
-                label="Condition"
-                field="condition"
-                options={conditions.map((c) => ({ value: c.value, label: c.name }))}
-              />
-              <Separator />
-            </>
-          )}
-
-          {/* Color */}
-          {colors && colors.length > 0 && (
-            <>
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold">Color</Label>
-                <div className="flex flex-wrap gap-2">
-                  {colors.map((c) => (
-                    <button
-                      key={c.value}
-                      onClick={() => set('color', c.value)}
-                      title={c.name}
-                      className={cn(
-                        'w-8 h-8 rounded-full border-2 transition-all',
-                        draft.color === c.value ? 'border-foreground scale-110 shadow-md' : 'border-border',
-                      )}
-                      style={{ backgroundColor: c.hex ?? c.value }}
-                    />
-                  ))}
-                </div>
-              </div>
-              <Separator />
-            </>
-          )}
-
-          {/* Material */}
-          {materials && materials.length > 0 && (
-            <>
-              <PillGroup
-                label="Material"
-                field="material"
-                options={materials.map((m) => ({ value: m.value, label: m.name }))}
-              />
-              <Separator />
-            </>
-          )}
-
-          {/* Pattern */}
-          {patterns && patterns.length > 0 && (
-            <>
-              <PillGroup
-                label="Pattern"
-                field="pattern"
-                options={patterns.map((p) => ({ value: p.value, label: p.name }))}
-              />
-              <Separator />
-            </>
-          )}
-
-          {/* Price range */}
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold">Price (EUR)</Label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                placeholder="Min"
-                value={draft.minPrice}
-                onChange={(e) => setDraft((d) => ({ ...d, minPrice: e.target.value }))}
-                className="flex-1 h-10 rounded-md border border-border px-3 text-sm bg-background"
-                min={0}
-              />
-              <span className="text-muted-foreground">–</span>
-              <input
-                type="number"
-                placeholder="Max"
-                value={draft.maxPrice}
-                onChange={(e) => setDraft((d) => ({ ...d, maxPrice: e.target.value }))}
-                className="flex-1 h-10 rounded-md border border-border px-3 text-sm bg-background"
-                min={0}
-              />
-            </div>
-          </div>
+                {priceRange && priceRange.max > 0 && (
+                  <Slider
+                    className="mt-4"
+                    min={0}
+                    max={priceRange.max}
+                    step={1}
+                    value={[
+                      Math.max(0, Number(draft.minPrice) || 0),
+                      Math.min(priceRange.max, Number(draft.maxPrice) || priceRange.max),
+                    ]}
+                    onValueChange={([lo, hi]) =>
+                      setDraft((d) => ({
+                        ...d,
+                        minPrice: lo === 0 ? '' : String(lo),
+                        maxPrice: hi === priceRange.max ? '' : String(hi),
+                      }))
+                    }
+                  />
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
 
         <SheetFooter className="px-4 pb-6 pt-2 border-t">
@@ -519,6 +770,22 @@ function ProductListPage() {
   const { products, isLoading, isLoadingMore, hasMore, loadMore, activeFilterCount } =
     useFilteredProducts(firestore, searchParams, brands, categories);
 
+  // Actual price range across the currently-loaded products. Drives the
+  // Price filter placeholders so users see real bounds instead of "Min/Max".
+  const priceRange = React.useMemo(() => {
+    if (products.length === 0) return undefined;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const p of products) {
+      const v = typeof p.price === 'number' ? p.price : Number(p.price);
+      if (!Number.isFinite(v)) continue;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return undefined;
+    return { min: Math.floor(min), max: Math.ceil(max) };
+  }, [products]);
+
   const gender = searchParams.get('gender') ?? '';
   const category = searchParams.get('category') ?? '';
   const section = searchParams.get('section') ?? '';
@@ -572,6 +839,7 @@ function ProductListPage() {
                     condition: p.condition,
                     color: p.color,
                     vintage: p.vintage,
+                    status: p.status,
                   }}
                 />
               ))}
@@ -601,7 +869,7 @@ function ProductListPage() {
         )}
       </div>
 
-      <FilterSheet open={filterOpen} onOpenChange={setFilterOpen} />
+      <FilterSheet open={filterOpen} onOpenChange={setFilterOpen} priceRange={priceRange} />
     </div>
   );
 }

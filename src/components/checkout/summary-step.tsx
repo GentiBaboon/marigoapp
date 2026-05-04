@@ -69,8 +69,11 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Order creation failed.');
 
-        clearCart();
+        // Navigate to success FIRST. Calling clearCart() before navigation
+        // would empty the cart, which makes /checkout's "empty cart" effect
+        // fire and replace() us back to /cart — racing against the push.
         router.push(`/checkout/success/${data.orderId}`);
+        clearCart();
         return;
       }
 
@@ -117,9 +120,10 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
 
       const status = confirmResult.paymentIntent.status;
       if (status === 'requires_capture' || status === 'succeeded') {
-        clearCart();
         toast({ title: 'Order Confirmed!', description: 'Funds are safely held in escrow.', variant: 'success' });
+        // Navigate before clearing — see comment above for the race rationale.
         router.push(`/checkout/success/${orderId}`);
+        clearCart();
       } else {
         throw new Error(`Unexpected payment status: ${status}. Please contact support.`);
       }

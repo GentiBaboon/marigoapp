@@ -49,6 +49,17 @@ export function DataTableRowActions<TData>({
     setIsLoading(true);
     try {
       await updateDoc(doc(firestore, 'orders', order.id), { status: newStatus });
+
+      // Cancelling/refunding releases each product back to active so it can
+      // be ordered again.
+      if (newStatus === 'cancelled' || newStatus === 'refunded') {
+        await Promise.all(
+          (order.items || []).map((it: any) =>
+            updateDoc(doc(firestore, 'products', it.id), { status: 'active' }).catch(() => null),
+          ),
+        );
+      }
+
       await addDoc(collection(firestore, 'admin_logs'), {
         adminId: adminUser.uid,
         adminName: adminUser.displayName || 'Admin',

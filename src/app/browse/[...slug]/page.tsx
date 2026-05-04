@@ -24,7 +24,26 @@ function ListItem({ href, children }: { href: string; children: React.ReactNode 
 
 export default function CategoryDetailPage() {
   const params = useParams();
-  const [gender, categorySlug] = (params.slug as string[]) || [];
+  const segments = (params.slug as string[]) || [];
+  // Routes can be /browse/{gender}/{slug} (e.g. /browse/womenswear/clothing)
+  // or /browse/{slug} for gender-neutral categories (e.g. /browse/beauty-and-skincare).
+  const genderSlug = segments.length >= 2 ? segments[0] : '';
+  const categorySlug = segments.length >= 2 ? segments[1] : segments[0];
+
+  // Browse URLs use display-friendly slugs (womenswear/menswear) but products
+  // store the schema gender values (women/men/children/unisex). Map both ways.
+  // For children we leave display empty — parent category names like
+  // "Clothing for Girls" or "Children's Shoes" already imply the gender, so
+  // prefixing "Children's" reads redundantly ("All Children's Baby").
+  const GENDER_MAP: Record<string, { value: string; display: string }> = {
+    womenswear: { value: 'women', display: "Women's" },
+    menswear: { value: 'men', display: "Men's" },
+    children: { value: 'children', display: '' },
+  };
+  const genderInfo = GENDER_MAP[genderSlug];
+  const gender = genderInfo?.value ?? '';
+  const genderDisplay = genderInfo?.display ?? '';
+
   const firestore = useFirestore();
 
   const categoriesQ = useMemoFirebase(
@@ -45,11 +64,14 @@ export default function CategoryDetailPage() {
   );
 
   const subcategories = React.useMemo(
-    () => allCategories?.filter((c) => c.parentId === parentCategory?.id && c.isActive) ?? [],
+    () =>
+      (allCategories?.filter(
+        (c) => c.parentId === parentCategory?.id && c.isActive !== false,
+      ) ?? [])
+        .slice()
+        .sort((a, b) => (a.order ?? 999) - (b.order ?? 999)),
     [allCategories, parentCategory],
   );
-
-  const genderName = gender ? gender.charAt(0).toUpperCase() + gender.slice(1) : '';
 
   if (catsLoading) {
     return (
@@ -79,15 +101,29 @@ export default function CategoryDetailPage() {
       <ScrollArea className="flex-1">
         <ul className="bg-background">
           {/* All in this category */}
-          <ListItem href={`/search?gender=${gender}&categoryId=${parentCategory.slug}`}>
-            All {genderName}'s {parentCategory.name}
+          <ListItem
+            href={
+              gender
+                ? `/search?gender=${gender}&categoryId=${parentCategory.slug}`
+                : `/search?categoryId=${parentCategory.slug}`
+            }
+          >
+            {genderDisplay
+              ? `All ${genderDisplay} ${parentCategory.name}`
+              : `All ${parentCategory.name}`}
           </ListItem>
           <Separator />
 
           {/* Subcategories from Firestore */}
           {subcategories.map((sub, index) => (
             <React.Fragment key={sub.id}>
-              <ListItem href={`/search?gender=${gender}&category=${sub.slug}`}>
+              <ListItem
+                href={
+                  gender
+                    ? `/search?gender=${gender}&category=${sub.slug}`
+                    : `/search?category=${sub.slug}`
+                }
+              >
                 {sub.name}
               </ListItem>
               {index < subcategories.length - 1 && <Separator className="ml-4" />}

@@ -64,10 +64,17 @@ export default function CartPage() {
 
     return (
         <div className="container mx-auto max-w-6xl px-4 py-8 md:py-12">
-            <h1 className="text-3xl font-bold font-headline mb-8 flex items-center gap-3">
-                Shopping Bag
-                <span className="text-lg font-sans font-normal text-muted-foreground">({items.length} items)</span>
-            </h1>
+            {(() => {
+              const totalItems = items.reduce((sum, item) => sum + (item.quantity ?? 1), 0);
+              return (
+                <h1 className="text-3xl font-bold font-headline mb-8 flex items-center gap-3">
+                    Shopping Bag
+                    <span className="text-lg font-sans font-normal text-muted-foreground">
+                        ({totalItems} {totalItems === 1 ? 'item' : 'items'})
+                    </span>
+                </h1>
+              );
+            })()}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
                 <div className="lg:col-span-2 space-y-6">
@@ -100,21 +107,34 @@ export default function CartPage() {
                                         </div>
 
                                         <div className="flex items-center justify-between mt-4">
-                                            <div className="flex items-center border rounded-full bg-background px-2">
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-8 w-8 rounded-full"
-                                                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                                >-</Button>
-                                                <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-8 w-8 rounded-full"
-                                                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                                >+</Button>
-                                            </div>
+                                            {(() => {
+                                              const atMax = typeof item.stock === 'number' && item.quantity >= item.stock;
+                                              return (
+                                                <div className="flex items-center gap-3">
+                                                  <div className="flex items-center border rounded-full bg-background px-2">
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="icon"
+                                                      className="h-8 w-8 rounded-full"
+                                                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                                    >-</Button>
+                                                    <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="icon"
+                                                      className="h-8 w-8 rounded-full"
+                                                      disabled={atMax}
+                                                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                                    >+</Button>
+                                                  </div>
+                                                  {atMax && (
+                                                    <span className="text-xs text-muted-foreground">
+                                                      Max stock: {item.stock}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              );
+                                            })()}
                                             <div className="flex gap-4">
                                                 <Button 
                                                     variant="ghost" 

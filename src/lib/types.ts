@@ -153,6 +153,9 @@ export interface FirestoreProduct {
   price: number;
   originalPrice?: number;
   currency: "EUR";
+  // Available inventory for this listing. Defaults to 1 (unique item) when
+  // older records are missing the field.
+  quantity?: number;
   size?: string;
   color?: string;
   material?: string;
@@ -191,8 +194,24 @@ export interface FirestoreOrder {
     sellerId: string;
   }>;
   totalAmount: number;
-  status: "pending_payment" | "processing" | "shipped" | "delivered" | "completed" | "cancelled" | "refunded";
+  status:
+    | "pending_payment"
+    | "processing"
+    | "in_preparation"
+    | "prepared"
+    | "shipped"
+    | "delivered"
+    | "completed"
+    | "cancel_requested"
+    | "refund_requested"
+    | "cancelled"
+    | "refunded";
   paymentMethod: "card" | "cod";
+  // Customer-supplied reasons that admin reviews before approving.
+  cancellationReason?: string;
+  refundReason?: string;
+  cancelRequestedBy?: string; // uid
+  refundRequestedBy?: string; // uid
   paymentIntentId?: string;
   shippingAddress: AddressFormValues;
   createdAt: FirestoreTimestamp;
@@ -267,6 +286,7 @@ export interface SellFormValues {
   vintage: boolean;
   price: number;
   originalPrice?: number;
+  quantity: number;
   listingType: "fixed_price" | "auction";
   allowOffers: boolean;
   shippingMethod: 'baboon' | 'other' | 'free';
@@ -348,6 +368,9 @@ export interface FirestoreCategory {
   parentId?: string | null;
   isActive: boolean;
   order?: number;
+  // Whether this top-level category is shown in the homepage "Shop by Category"
+  // tabs. Undefined or true → visible; false → hidden. Only meaningful on parents.
+  homepageVisible?: boolean;
 }
 
 export interface FirestoreBrand {

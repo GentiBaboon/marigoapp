@@ -9,18 +9,18 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, Loader2, X, Ruler } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import type { FirestoreCategory } from '@/lib/types';
 
 interface SizeChart {
   id: string;
-  categoryType: string; // e.g., "Shoes", "Tops", "Bottoms", "Dresses"
+  categoryType: string;
   sizeSystem: string;   // "EU", "US", "UK", "IT", "FR", "International"
   sizes: string[];      // ["36", "37", "38", ...]
   isActive: boolean;
 }
 
-const CATEGORY_TYPES = ['Shoes', 'Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Bags', 'Accessories', 'Jewelry', 'Hats'];
 const SIZE_SYSTEMS = ['EU', 'US', 'UK', 'IT', 'FR', 'International'];
 
 const DEFAULT_SIZES: Record<string, Record<string, string[]>> = {
@@ -29,25 +29,21 @@ const DEFAULT_SIZES: Record<string, Record<string, string[]>> = {
     US: ['5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '12', '13'],
     UK: ['3', '3.5', '4', '4.5', '5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '10', '11'],
   },
-  Tops: {
+  Clothing: {
     EU: ['34', '36', '38', '40', '42', '44', '46', '48', '50'],
     US: ['0', '2', '4', '6', '8', '10', '12', '14', '16'],
-    International: ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
-  },
-  Bottoms: {
-    EU: ['34', '36', '38', '40', '42', '44', '46', '48'],
-    US: ['24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '36'],
-    International: ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL'],
-  },
-  Dresses: {
-    EU: ['34', '36', '38', '40', '42', '44', '46'],
-    US: ['0', '2', '4', '6', '8', '10', '12', '14'],
     IT: ['38', '40', '42', '44', '46', '48'],
     FR: ['34', '36', '38', '40', '42', '44'],
-    International: ['XXS', 'XS', 'S', 'M', 'L', 'XL'],
+    International: ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
   },
   Bags: {
     International: ['Mini', 'Small', 'Medium', 'Large', 'Oversized', 'One Size'],
+  },
+  Accessories: {
+    International: ['One Size', 'XS', 'S', 'M', 'L', 'XL'],
+  },
+  Watches: {
+    International: ['One Size'],
   },
 };
 
@@ -69,9 +65,17 @@ export function SizeConfigTab() {
   const chartsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'size_charts') : null, [firestore]);
   const { data: charts } = useCollection<SizeChart>(chartsQuery);
 
+  const categoriesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'categories'), orderBy('order')) : null, [firestore]);
+  const { data: allCategories } = useCollection<FirestoreCategory>(categoriesQuery);
+  const topLevelCategories = React.useMemo(
+    () => (allCategories ?? []).filter(c => !c.parentId).map(c => c.name),
+    [allCategories]
+  );
+
   const openCreate = () => {
     setEditing(null);
-    setFormData({ categoryType: 'Shoes', sizeSystem: 'EU', sizes: [], isActive: true });
+    const first = topLevelCategories[0] ?? 'Shoes';
+    setFormData({ categoryType: first, sizeSystem: 'EU', sizes: [], isActive: true });
     setDialogOpen(true);
   };
 
@@ -126,7 +130,8 @@ export function SizeConfigTab() {
         toast({ title: 'Size chart created.' });
       }
       setDialogOpen(false);
-    } catch {
+    } catch (err) {
+      console.error('[SizeChart] save error:', err);
       toast({ variant: 'destructive', title: 'Error saving size chart.' });
     } finally {
       setIsLoading(false);
@@ -208,7 +213,7 @@ export function SizeConfigTab() {
                   value={formData.categoryType}
                   onChange={e => setFormData(prev => ({ ...prev, categoryType: e.target.value }))}
                 >
-                  {CATEGORY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  {topLevelCategories.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div className="space-y-2">

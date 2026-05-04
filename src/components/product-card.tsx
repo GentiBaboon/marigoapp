@@ -40,6 +40,7 @@ export const ProductCard = React.memo(function ProductCard({ product, className 
 
   const displayTitle = product.title || 'Untitled Product';
   const brandName = product.brandId || product.brand || 'Luxury Item';
+  const isReserved = product.status === 'reserved' || product.status === 'sold';
 
   return (
     <div className={cn('group', className)}>
@@ -51,7 +52,7 @@ export const ProductCard = React.memo(function ProductCard({ product, className 
               alt={displayTitle}
               fill
               sizes="(max-width: 768px) 50vw, 33vw"
-              className="object-cover"
+              className={cn('object-cover', isReserved && 'opacity-60')}
               unoptimized={false}
             />
           ) : (
@@ -61,6 +62,13 @@ export const ProductCard = React.memo(function ProductCard({ product, className 
           )}
           {product.vintage && (
              <Badge variant="outline" className="absolute top-2 left-2 bg-background/80 font-normal text-[10px]">VINTAGE</Badge>
+          )}
+          {isReserved && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="bg-foreground text-background text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow">
+                Reserved
+              </span>
+            </div>
           )}
         </div>
       </Link>

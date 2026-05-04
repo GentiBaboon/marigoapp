@@ -32,7 +32,16 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
     const { status } = order;
     const { toast } = useToast();
 
-    const saleDate = new Date(order.createdAt.seconds * 1000);
+    // createdAt may be a Firestore Timestamp, an ISO string, or a Date. Normalize.
+    const createdMs = (() => {
+        const c = order.createdAt as any;
+        if (!c) return Date.now();
+        if (typeof c.toDate === 'function') return c.toDate().getTime();
+        if (typeof c.seconds === 'number') return c.seconds * 1000;
+        if (typeof c === 'string') return new Date(c).getTime() || Date.now();
+        return Date.now();
+    })();
+    const saleDate = new Date(createdMs);
     const shipByDate = addDays(saleDate, 7);
     
     const isProcessing = status === 'processing';

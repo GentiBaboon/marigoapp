@@ -13,6 +13,7 @@ import { useParams } from 'next/navigation';
 import { format, addDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { DeliveryTracking } from '@/components/tracking/DeliveryTracking';
+import { SellerOrderActions } from '@/components/profile/seller-order-actions';
 
 function SaleDetailsSkeleton() {
     return (
@@ -94,7 +95,16 @@ export default function SaleDetailsPage() {
     }
 
     const item = order.items[0];
-    const estimatedPaymentDate = addDays(new Date(order.createdAt.seconds * 1000), 10); // Placeholder logic
+    // createdAt may be a Firestore Timestamp ({ seconds }), an ISO string, or a Date.
+    const createdMs = (() => {
+        const c = order.createdAt as any;
+        if (!c) return Date.now();
+        if (typeof c.toDate === 'function') return c.toDate().getTime();
+        if (typeof c.seconds === 'number') return c.seconds * 1000;
+        if (typeof c === 'string') return new Date(c).getTime() || Date.now();
+        return Date.now();
+    })();
+    const estimatedPaymentDate = addDays(new Date(createdMs), 10);
     const shippingFromAddress = addresses?.find(a => a.isDefault) || addresses?.[0];
 
     const copyToClipboard = (text: string) => {
@@ -115,8 +125,8 @@ export default function SaleDetailsPage() {
                             <p className="font-bold text-lg uppercase">{item.brand}</p>
                             <p>{item.title}</p>
                              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                                Ref. {item.productId.slice(0, 8)}
-                                <Copy className="h-3 w-3 cursor-pointer" onClick={() => copyToClipboard(item.productId)} />
+                                Ref. {(item.id || (item as any).productId || '').slice(0, 8)}
+                                <Copy className="h-3 w-3 cursor-pointer" onClick={() => copyToClipboard(item.id || (item as any).productId || '')} />
                             </p>
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
                                 <PackageCheck className="h-4 w-4" />
@@ -140,6 +150,8 @@ export default function SaleDetailsPage() {
                         <p className="text-center text-muted-foreground">Waiting for shipping details...</p>
                     )}
                 </div>
+
+                <SellerOrderActions order={order} />
             </main>
         </div>
     );

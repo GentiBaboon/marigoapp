@@ -25,14 +25,30 @@ const statusVariants: { [key: string]: 'default' | 'secondary' | 'destructive' }
   refunded: 'destructive',
 };
 
-// Helper component to fetch and display user name
-const UserName = ({ userId }: { userId: string }) => {
+// Fetch + display a user's name and email. Email is what admins actually need
+// to reach a buyer/seller; the name is kept above it as a soft label.
+const UserCell = ({ userId }: { userId: string }) => {
     const firestore = useFirestore();
     const userRef = useMemoFirebase(() => doc(firestore, 'users', userId), [firestore, userId]);
     const { data: user, isLoading } = useDoc<FirestoreUser>(userRef);
 
-    if (isLoading) return <span className="text-muted-foreground">Loading...</span>;
-    return <span>{user?.displayName || userId}</span>;
+    if (isLoading) return <span className="text-muted-foreground text-xs">Loading…</span>;
+    if (!user) return <span className="text-muted-foreground text-xs font-mono">{userId.slice(0, 8)}…</span>;
+
+    return (
+        <div className="flex flex-col leading-tight">
+            <span className="text-sm">{user.name || '—'}</span>
+            {user.email && (
+                <a
+                    href={`mailto:${user.email}`}
+                    className="text-xs text-muted-foreground hover:text-foreground truncate max-w-[200px]"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {user.email}
+                </a>
+            )}
+        </div>
+    );
 }
 
 export const columns: ColumnDef<FirestoreOrder>[] = [
@@ -65,15 +81,19 @@ export const columns: ColumnDef<FirestoreOrder>[] = [
    {
     accessorKey: 'buyerId',
     header: 'Buyer',
-    cell: ({ row }) => <UserName userId={row.original.buyerId} />,
+    cell: ({ row }) => <UserCell userId={row.original.buyerId} />,
   },
   {
     accessorKey: 'sellerIds',
     header: 'Seller(s)',
     cell: ({ row }) => {
-        // For now, just display the first seller.
-        const sellerId = row.original.sellerIds[0];
-        return <UserName userId={sellerId} />;
+        const ids = Array.from(new Set(row.original.sellerIds || []));
+        if (ids.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
+        return (
+            <div className="space-y-1.5">
+                {ids.map((id) => <UserCell key={id} userId={id} />)}
+            </div>
+        );
     }
   },
   {
@@ -106,8 +126,22 @@ export const columns: ColumnDef<FirestoreOrder>[] = [
     accessorKey: 'createdAt',
     header: 'Date',
     cell: ({ row }) => {
-      const { createdAt } = row.original;
-      return createdAt?.toDate ? format(createdAt.toDate(), 'd MMM, yyyy') : 'N/A';
+      // Handle every shape the API has historically saved:
+      //  - Firestore Timestamp ({ toDate() })
+      //  - ISO string ("2026-05-04T...")
+      //  - { seconds, nanoseconds } client-side Timestamp
+      //  - epoch number
+      const raw = row.original.createdAt as any;
+      let date: Date | null = null;
+      if (!raw) date = null;
+      else if (typeof raw.toDate === 'function') date = raw.toDate();
+      else if (typeof raw === 'string') {
+          const parsed = new Date(raw);
+          date = isNaN(parsed.getTime()) ? null : parsed;
+      } else if (typeof raw.seconds === 'number') date = new Date(raw.seconds * 1000);
+      else if (typeof raw === 'number') date = new Date(raw);
+
+      return date ? format(date, 'd MMM, yyyy') : 'N/A';
     },
   },
   {

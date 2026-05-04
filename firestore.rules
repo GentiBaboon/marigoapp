@@ -71,6 +71,7 @@ service cloud.firestore {
     match /materials/{id} { allow read: if true; allow write: if isAdmin(); }
     match /colors/{id} { allow read: if true; allow write: if isAdmin(); }
     match /patterns/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /size_charts/{id} { allow read: if true; allow write: if isAdmin(); }
 
     match /settings/global { allow read: if true; allow write: if isFullAdmin(); }
     match /settings/banners { allow read: if true; allow write: if isAdmin(); }

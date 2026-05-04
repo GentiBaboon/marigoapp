@@ -29,7 +29,7 @@ export function NewArrivalsSection() {
     if (!firestore) return null;
     return query(
       collection(firestore, 'products'),
-      where('status', '==', 'active'),
+      where('status', 'in', ['active', 'reserved']),
       orderBy('listingCreated', 'desc'),
       limit(10)
     );
@@ -72,6 +72,7 @@ export function NewArrivalsSection() {
                                         condition: p.condition,
                                         color: p.color,
                                         vintage: p.vintage,
+                                        status: p.status,
                                     }} />
                                 </div>
                         ))}

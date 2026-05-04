@@ -20,7 +20,9 @@ import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 import { StepActions } from '../StepActions';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
+import { Info } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 type Step2Values = z.infer<typeof sellStep2Schema>;
 
@@ -28,10 +30,12 @@ export function CategoryStep() {
   const { formData, setFormData, nextStep } = useSellForm();
   const firestore = useFirestore();
 
-  // Fetch Categories
-  const categoriesQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'categories'), where('isActive', '==', true)),
-    [firestore]
+  // Fetch all categories. We filter active client-side because seeded records
+  // may be missing the `isActive` field — a strict Firestore-level
+  // `where('isActive','==',true)` would silently drop them.
+  const categoriesQuery = useMemoFirebase(
+    () => collection(firestore, 'categories'),
+    [firestore],
   );
   const { data: categories } = useCollection<FirestoreCategory>(categoriesQuery);
 
@@ -41,13 +45,20 @@ export function CategoryStep() {
 
   const categoryTree = React.useMemo(() => {
     if (!categories) return [];
-    const parents = [...categories.filter(c => !c.parentId)].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-    const subs = [...categories.filter(c => c.parentId)].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    const active = categories.filter(c => c.isActive !== false);
+    const parents = active.filter(c => !c.parentId).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    const subs = active.filter(c => c.parentId).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 
-    return parents.map(p => ({
+    return parents
+      .map(p => ({
         heading: p.name,
-        items: subs.filter(s => s.parentId === p.id).map(s => ({ value: s.slug, label: s.name }))
-    })).filter(g => g.items.length > 0);
+        items: subs
+          .filter(s => s.parentId === p.id)
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(s => ({ value: s.slug, label: s.name })),
+      }))
+      .filter(g => g.items.length > 0);
   }, [categories]);
 
   const form = useForm<Step2Values>({
@@ -142,12 +153,31 @@ export function CategoryStep() {
             name="brandId"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel className="font-semibold">Brand</FormLabel>
+                <div className="flex items-center gap-1.5">
+                  <FormLabel className="font-semibold">Brand</FormLabel>
+                  <Popover>
+                    <PopoverTrigger
+                      type="button"
+                      aria-label="Brand help"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="start" className="w-72 text-xs leading-relaxed">
+                      If you can not find the brand of your item, put it on item description on the next step and we will edit it before publishing.
+                    </PopoverContent>
+                  </Popover>
+                </div>
                 <FormControl>
                   <Combobox
                     value={field.value}
                     onValueChange={field.onChange}
-                    items={brands?.map(b => ({ value: b.name, label: b.name })) || []}
+                    items={
+                      brands
+                        ?.slice()
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map(b => ({ value: b.name, label: b.name })) || []
+                    }
                     placeholder="Select brand"
                     searchPlaceholder="Search brands..."
                     emptyPlaceholder="No brands found."

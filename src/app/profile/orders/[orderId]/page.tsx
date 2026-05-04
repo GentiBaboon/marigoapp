@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { OrderTimeline } from '@/components/profile/order-timeline';
 import { useParams } from 'next/navigation';
 import { DeliveryTracking } from '@/components/tracking/DeliveryTracking';
+import { OrderCustomerActions } from '@/components/profile/order-actions';
 
 function OrderDetailsSkeleton() {
     return (
@@ -115,7 +116,9 @@ export default function OrderDetailsPage() {
                         <OrderTimeline order={order} />
                     )}
                 </div>
-                
+
+                <OrderCustomerActions order={order} />
+
                 <div className="pt-8">
                      <Button variant="outline" className="w-full bg-background">
                         <HelpCircle className="mr-2 h-4 w-4"/>

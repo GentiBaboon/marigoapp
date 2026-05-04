@@ -92,6 +92,14 @@ export async function POST(req: NextRequest) {
 
     const orderNumber = `MG-COD-${Date.now()}`;
 
+    // Reserve every product so it can't be ordered again. The card flow does
+    // the same thing in /api/create-payment-intent.
+    await Promise.all(
+      validatedItems.map((item: any) =>
+        firestoreUpdate('products', item.id, { status: 'reserved' }, idToken),
+      ),
+    );
+
     const orderId = await firestoreCreate(
       'orders',
       {

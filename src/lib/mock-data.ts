@@ -320,7 +320,7 @@ export const browseCategories = {
 };
 
 export const browseBanners = [
-    { id: 'new-arrivals', title: 'New Arrivals for You', description: 'A daily drop, personalized for you', image: 'banner-new-arrivals', href: '/browse/new-arrivals' },
-    { id: 'designers', title: 'Designers', description: 'A-Z of brands and official partners', image: 'banner-designers', href: '/browse/designers' },
-    { id: 'we-love', title: 'We Love', description: '', image: 'banner-we-love', href: '/browse/we-love' }
+    { id: 'beauty-and-skincare', title: 'Beauty & Skincare', description: 'Shop beauty and skincare', image: 'banner-beauty', href: '/browse/beauty-and-skincare' },
+    { id: 'art', title: 'ART', description: 'New art pieces added daily', image: 'banner-art', href: '/browse/art' },
+    { id: 'home', title: 'HOME', description: 'Shop home accessories', image: 'banner-home', href: '/browse/home' },
 ];

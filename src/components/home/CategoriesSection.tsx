@@ -29,11 +29,12 @@ export function CategoriesSection() {
   );
   const { data: categories, isLoading: categoriesLoading } = useCollection<FirestoreCategory>(categoriesQuery);
 
-  // Only fetch active products, limited to top 100 by views (avoids downloading entire collection)
+  // Top 100 by views. Include reserved alongside active so shoppers see them
+  // labelled "Reserved" instead of vanishing from category tabs.
   const productsQuery = useMemoFirebase(
     () => query(
       collection(firestore, 'products'),
-      where('status', '==', 'active'),
+      where('status', 'in', ['active', 'reserved']),
       orderBy('views', 'desc'),
       limit(100)
     ),
@@ -48,58 +49,70 @@ export function CategoriesSection() {
     return map;
   }, [categories]);
 
-  // Group products into displayable tabs
+  // Resolve a product → its display parent category id+name.
+  // Subcategories roll up to their parent. Returns null for products whose
+  // categoryId/subcategoryId can't be matched to a registered Firestore
+  // category — those are excluded from the homepage tabs entirely.
+  const resolveDisplayCategory = React.useCallback(
+    (product: FirestoreProduct): { id: string; name: string } | null => {
+      const rawIds = [product.categoryId, product.subcategoryId].filter(Boolean) as string[];
+      if (rawIds.length === 0) return null;
+
+      const allCats = Object.values(categoryMap);
+
+      for (const raw of rawIds) {
+        const lower = raw.toLowerCase();
+        const cat =
+          categoryMap[raw]
+          ?? allCats.find(c => c.slug?.toLowerCase() === lower)
+          ?? allCats.find(c => c.name?.toLowerCase() === lower);
+        if (cat) {
+          const parent = cat.parentId ? categoryMap[cat.parentId] : cat;
+          return parent
+            ? { id: parent.id, name: parent.name }
+            : { id: cat.id, name: cat.name };
+        }
+      }
+      return null;
+    },
+    [categoryMap],
+  );
+
+  // Build tabs from ALL admin-enabled parent categories.
+  // Sort: most-used first (sum of product views), then the rest in admin
+  // `order`, then alphabetic. Each tab still surfaces its products on click.
   const { tabs, grouped } = React.useMemo(() => {
-    if (!products || products.length === 0) return { tabs: [], grouped: {} };
-
-    // Resolve each product to a display category
     const productGroups: Record<string, FirestoreProduct[]> = {};
-    const tabNames: Record<string, string> = {};
+    const totalViews: Record<string, number> = {};
 
-    products.forEach(product => {
-      // Try categoryId, subcategoryId, or fallback
-      const catId = product.categoryId || product.subcategoryId || '';
-
-      if (!catId) {
-        // No category assigned — group under "All"
-        if (!productGroups['all']) productGroups['all'] = [];
-        productGroups['all'].push(product);
-        tabNames['all'] = 'All';
-        return;
-      }
-
-      const cat = categoryMap[catId];
-      if (cat) {
-        // If it's a subcategory, group under parent
-        const displayId = cat.parentId ? cat.parentId : cat.id;
-        const displayName = cat.parentId && categoryMap[cat.parentId]
-          ? categoryMap[cat.parentId].name
-          : cat.name;
-
-        if (!productGroups[displayId]) productGroups[displayId] = [];
-        productGroups[displayId].push(product);
-        tabNames[displayId] = displayName;
-      } else {
-        // Category ID exists but not in categories collection
-        if (!productGroups[catId]) productGroups[catId] = [];
-        productGroups[catId].push(product);
-        tabNames[catId] = catId;
-      }
+    (products ?? []).forEach(product => {
+      const resolved = resolveDisplayCategory(product);
+      if (!resolved) return;
+      const { id } = resolved;
+      if (!productGroups[id]) productGroups[id] = [];
+      productGroups[id].push(product);
+      totalViews[id] = (totalViews[id] ?? 0) + (product.views ?? 0);
     });
 
-    // Sort tabs by category order, limit to 8
-    const sortedTabs = Object.entries(productGroups)
-      .filter(([, prods]) => prods.length > 0)
+    const visibleParents = (categories ?? []).filter(
+      c => !c.parentId && c.isActive !== false && c.homepageVisible !== false,
+    );
+
+    const sortedTabs = visibleParents
+      .slice()
       .sort((a, b) => {
-        const orderA = categoryMap[a[0]]?.order ?? 999;
-        const orderB = categoryMap[b[0]]?.order ?? 999;
-        return orderA - orderB;
+        const va = totalViews[a.id] ?? 0;
+        const vb = totalViews[b.id] ?? 0;
+        if (vb !== va) return vb - va;
+        const oa = a.order ?? 999;
+        const ob = b.order ?? 999;
+        if (oa !== ob) return oa - ob;
+        return a.name.localeCompare(b.name);
       })
-      .slice(0, 8)
-      .map(([id]) => ({ id, name: tabNames[id] || id }));
+      .map(c => ({ id: c.id, name: c.name }));
 
     return { tabs: sortedTabs, grouped: productGroups };
-  }, [products, categoryMap]);
+  }, [products, categories, resolveDisplayCategory]);
 
   const isLoading = categoriesLoading || productsLoading;
 
@@ -123,12 +136,12 @@ export function CategoriesSection() {
       ) : (
         <Tabs defaultValue={tabs[0]?.id}>
           <ScrollArea>
-            <TabsList className="mb-6 bg-transparent gap-1 h-auto flex-wrap">
+            <TabsList className="mb-6 bg-transparent gap-1 h-auto w-max flex-nowrap">
               {tabs.map(tab => (
                 <TabsTrigger
                   key={tab.id}
                   value={tab.id}
-                  className="rounded-full border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-4"
+                  className="shrink-0 rounded-full border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-4"
                 >
                   {tab.name}
                 </TabsTrigger>
@@ -137,29 +150,39 @@ export function CategoriesSection() {
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
 
-          {tabs.map(tab => (
-            <TabsContent key={tab.id} value={tab.id}>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
-                {grouped[tab.id]?.slice(0, 8).map(p => (
-                  <ProductCard
-                    key={p.id}
-                    product={{
-                      id: p.id,
-                      brandId: p.brandId,
-                      title: p.title,
-                      price: p.price,
-                      images: p.images,
-                      sellerId: p.sellerId,
-                      size: p.size,
-                      condition: p.condition,
-                      color: p.color,
-                      vintage: p.vintage,
-                    }}
-                  />
-                ))}
-              </div>
-            </TabsContent>
-          ))}
+          {tabs.map(tab => {
+            const items = grouped[tab.id]?.slice(0, 8) ?? [];
+            return (
+              <TabsContent key={tab.id} value={tab.id}>
+                {items.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-8 text-center">
+                    No items in {tab.name} yet.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
+                    {items.map(p => (
+                      <ProductCard
+                        key={p.id}
+                        product={{
+                          id: p.id,
+                          brandId: p.brandId,
+                          title: p.title,
+                          price: p.price,
+                          images: p.images,
+                          sellerId: p.sellerId,
+                          size: p.size,
+                          condition: p.condition,
+                          color: p.color,
+                          vintage: p.vintage,
+                          status: p.status,
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            );
+          })}
         </Tabs>
       )}
     </section>

@@ -247,6 +247,24 @@
       "imageHint": "shoe handbag"
     },
     {
+      "id": "banner-beauty",
+      "description": "Skincare and cosmetic bottles flat-lay",
+      "imageUrl": "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?auto=format&fit=crop&q=80&w=400",
+      "imageHint": "skincare cosmetics"
+    },
+    {
+      "id": "banner-art",
+      "description": "Art canvases and paint brushes in a studio",
+      "imageUrl": "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&q=80&w=400",
+      "imageHint": "art canvas"
+    },
+    {
+      "id": "banner-home",
+      "description": "Stylish modern home decor accessories",
+      "imageUrl": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&q=80&w=400",
+      "imageHint": "home decor"
+    },
+    {
       "id": "product-polo",
       "description": "A black lacoste polo shirt",
       "imageUrl": "https://images.unsplash.com/photo-1744551358258-5a5b9b268eca?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxibGFjayUyMHBvbG98ZW58MHx8fHwxNzcxMDI1MzY0fDA&ixlib=rb-4.1.0&q=80&w=1080",

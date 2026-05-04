@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import type { FirestoreCategory } from '@/lib/types';
 
 interface CategoryNode extends FirestoreCategory {
@@ -114,6 +115,14 @@ export function CategoryConfigTab({ categories, firestore, toast }: Props) {
     }
   }
 
+  async function toggleHomepageVisible(cat: FirestoreCategory, visible: boolean) {
+    try {
+      await updateDoc(doc(firestore, 'categories', cat.id), { homepageVisible: visible });
+    } catch {
+      toast({ title: 'Error updating homepage visibility.', variant: 'destructive' });
+    }
+  }
+
   async function handleDelete(cat: FirestoreCategory) {
     if (!confirm('Delete this category?')) return;
     try {
@@ -130,7 +139,10 @@ export function CategoryConfigTab({ categories, firestore, toast }: Props) {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Product Categories</CardTitle>
-            <CardDescription>Drag to reorder parent categories and subcategories.</CardDescription>
+            <CardDescription>
+              Reorder parent categories and subcategories. Use the homepage toggle to hide a parent
+              from the homepage "Shop by Category" tabs.
+            </CardDescription>
           </div>
           <Button size="sm" onClick={() => openAdd(null)}>
             <Plus className="mr-2 h-4 w-4" /> Add Category
@@ -150,6 +162,13 @@ export function CategoryConfigTab({ categories, firestore, toast }: Props) {
                   </Button>
                 </div>
                 <h4 className="font-bold flex-1 text-sm">{cat.name}</h4>
+                <div className="flex items-center gap-1.5 mr-1" title="Show in homepage Shop by Category">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Homepage</span>
+                  <Switch
+                    checked={cat.homepageVisible !== false}
+                    onCheckedChange={(checked) => toggleHomepageVisible(cat, checked)}
+                  />
+                </div>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openAdd(cat.id)}>
                   <Plus className="h-3.5 w-3.5" />
                 </Button>

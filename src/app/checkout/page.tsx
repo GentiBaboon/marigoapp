@@ -24,15 +24,15 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { user, isUserLoading } = useUser();
 
+  // Auth-only guard. The empty-cart → /cart redirect was removed: it raced
+  // with router.push('/checkout/success/...') after a successful order
+  // (clearCart fires synchronously, the empty state triggers redirect, the
+  // replace beats the push). For cold-load empty-cart visits we just render
+  // the loading state below — users can navigate away manually.
   React.useEffect(() => {
     if (isUserLoading || isCartLoading) return;
-    
-    if (!user) {
-      router.replace('/auth');
-    } else if (items.length === 0) {
-      router.replace('/cart');
-    }
-  }, [items, router, user, isUserLoading, isCartLoading]);
+    if (!user) router.replace('/auth');
+  }, [router, user, isUserLoading, isCartLoading]);
 
   const handleAddressNext = (address: FirestoreAddress) => {
     setSelectedAddress(address);

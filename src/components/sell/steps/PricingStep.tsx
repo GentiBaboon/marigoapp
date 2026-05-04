@@ -21,6 +21,8 @@ export function PricingStep() {
   const firestore = useFirestore();
   
   const [price, setPrice] = useState(formData.price?.toString() || '');
+  // Default to 1 — most listings on a resale marketplace are unique pieces.
+  const [quantity, setQuantity] = useState((formData.quantity ?? 1).toString());
   const [selectedAddressId, setSelectedAddressId] = useState<string | undefined>(formData.shippingFromAddressId);
   const [isAddrDialogOpen, setIsAddrDialogOpen] = useState(false);
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -46,16 +48,20 @@ export function PricingStep() {
     }
   }, [addresses, selectedAddressId]);
 
+  // Parse quantity → positive integer, default 1.
+  const parsedQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
+
   useEffect(() => {
-    setFormData({ 
+    setFormData({
         price: currentPrice,
+        quantity: parsedQuantity,
         shippingFromAddressId: selectedAddressId
     });
-  }, [price, selectedAddressId, setFormData, currentPrice]);
+  }, [price, selectedAddressId, setFormData, currentPrice, parsedQuantity]);
 
   const selectedAddress = addresses?.find(a => a.id === selectedAddressId);
 
-  const canContinue = currentPrice > 0 && !!selectedAddressId;
+  const canContinue = currentPrice > 0 && parsedQuantity >= 1 && !!selectedAddressId;
 
   return (
     <div className="space-y-8 pb-20">
@@ -71,6 +77,47 @@ export function PricingStep() {
             placeholder="0"
           />
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground">€</span>
+        </div>
+      </div>
+
+      {/* Quantity Section */}
+      <div className="space-y-2">
+        <Label className="text-base font-bold">Quantity</Label>
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-12 w-12 rounded-full"
+            onClick={() => setQuantity((prev) => String(Math.max(1, Math.floor(Number(prev) || 1) - 1)))}
+            disabled={parsedQuantity <= 1}
+            aria-label="Decrease quantity"
+          >
+            –
+          </Button>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={1}
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            onBlur={() => setQuantity(String(parsedQuantity))}
+            className="h-12 w-24 text-center text-lg font-semibold"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-12 w-12 rounded-full"
+            onClick={() => setQuantity((prev) => String(Math.max(1, Math.floor(Number(prev) || 1) + 1)))}
+            aria-label="Increase quantity"
+          >
+            +
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            {parsedQuantity === 1 ? 'Unique item' : `${parsedQuantity} pieces available`}
+          </p>
         </div>
       </div>
 

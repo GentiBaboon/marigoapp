@@ -9,7 +9,8 @@ import type { FirestoreOrder } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { X, Check, Package } from 'lucide-react';
+import { X, Check, Package, MapPin, CreditCard, ShoppingBag, ArrowRight } from 'lucide-react';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import Confetti from 'react-confetti';
 import { useWindowSize } from '@/hooks/use-window-size';
@@ -93,43 +94,127 @@ export default function OrderSuccessPage() {
             
             <Separator className="max-w-sm" />
 
-            <div className="w-full bg-muted/30 p-6 rounded-2xl border space-y-4 text-left">
+            {/* Order details preview */}
+            <div className="w-full bg-muted/30 p-6 rounded-2xl border space-y-5 text-left">
                 <div className="flex items-center gap-3">
                     <div className="bg-primary/10 p-2 rounded-full">
                         <Package className="h-5 w-5 text-primary" />
                     </div>
-                    <h3 className="font-bold">Summary</h3>
+                    <div>
+                        <h3 className="font-bold">Order Summary</h3>
+                        <p className="text-xs text-muted-foreground">
+                            {order.items.length} {order.items.length === 1 ? 'item' : 'items'}
+                        </p>
+                    </div>
                 </div>
-                <div className="space-y-2">
+
+                {/* Item rows with thumbnails */}
+                <ul className="space-y-3">
                     {order.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-sm">
-                            <span className="text-muted-foreground truncate max-w-[70%]">{item.brand} {item.title}</span>
-                            <span className="font-medium">{formatPrice(item.price)}</span>
-                        </div>
+                        <li key={idx} className="flex items-center gap-3">
+                            <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-md bg-muted">
+                                {item.image && (
+                                    <Image
+                                        src={item.image}
+                                        alt={item.title}
+                                        fill
+                                        sizes="56px"
+                                        className="object-cover"
+                                    />
+                                )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[10px] uppercase tracking-widest text-primary font-bold truncate">
+                                    {item.brand}
+                                </p>
+                                <p className="text-sm font-medium truncate">{item.title}</p>
+                            </div>
+                            <span className="text-sm font-semibold">{formatPrice(item.price)}</span>
+                        </li>
                     ))}
-                    <Separator className="my-2" />
-                    <div className="flex justify-between font-bold text-lg pt-1">
+                </ul>
+
+                <Separator />
+
+                {/* Money breakdown */}
+                <div className="space-y-1.5 text-sm">
+                    {typeof order.discountAmount === 'number' && order.discountAmount > 0 && (
+                        <div className="flex justify-between text-muted-foreground">
+                            <span>Discount{order.couponCode ? ` (${order.couponCode})` : ''}</span>
+                            <span>− {formatPrice(order.discountAmount)}</span>
+                        </div>
+                    )}
+                    {typeof order.taxAmount === 'number' && order.taxAmount > 0 && (
+                        <div className="flex justify-between text-muted-foreground">
+                            <span>Tax</span>
+                            <span>{formatPrice(order.taxAmount)}</span>
+                        </div>
+                    )}
+                    <div className="flex justify-between font-bold text-lg pt-2 border-t">
                         <span>Total Paid</span>
                         <span>{formatPrice(order.totalAmount)}</span>
                     </div>
                 </div>
-                <div className="pt-2 text-xs text-muted-foreground flex items-center gap-2">
-                    <Check className="h-3 w-3 text-green-600" />
-                    <span>Payment via {order.paymentMethod === 'cod' ? 'Cash on Delivery' : 'Card'} confirmed</span>
+
+                {/* Shipping + payment chips */}
+                <div className="space-y-3 pt-1">
+                    {order.shippingAddress && (
+                        <div className="flex items-start gap-2 text-xs">
+                            <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                            <div className="text-muted-foreground leading-tight">
+                                <p className="font-semibold text-foreground">
+                                    {order.shippingAddress.fullName}
+                                </p>
+                                <p>
+                                    {order.shippingAddress.address}, {order.shippingAddress.city}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <CreditCard className="h-4 w-4 shrink-0" />
+                        <span>
+                            Paid by {order.paymentMethod === 'cod' ? 'Cash on Delivery' : 'Card'}
+                        </span>
+                        <Check className="h-3 w-3 text-green-600" />
+                    </div>
                 </div>
             </div>
 
-            <div className="w-full max-w-sm space-y-4 pt-4">
-                <Button size="lg" asChild className="w-full h-14 text-base font-bold bg-black hover:bg-black/90">
-                    <Link href={`/profile/orders/${order.id}`}>
-                        Track your order
+            {/* Action buttons */}
+            <div className="w-full max-w-sm space-y-3 pt-2">
+                <Button
+                    size="lg"
+                    asChild
+                    className="w-full h-14 text-base font-bold bg-black hover:bg-black/90"
+                >
+                    <Link href="/home">
+                        Continue Shopping
+                        <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                 </Button>
-                 <Button size="lg" variant="outline" asChild className="w-full h-14 text-base font-medium">
-                    <Link href="/home">Keep shopping</Link>
+                <Button
+                    size="lg"
+                    variant="outline"
+                    asChild
+                    className="w-full h-14 text-base font-medium"
+                >
+                    <Link href="/profile/orders">
+                        <ShoppingBag className="mr-2 h-4 w-4" />
+                        View My Orders
+                    </Link>
+                </Button>
+                <Button
+                    variant="ghost"
+                    asChild
+                    className="w-full text-sm font-medium text-muted-foreground hover:text-foreground"
+                >
+                    <Link href={`/profile/orders/${order.id}`}>
+                        Track this order →
+                    </Link>
                 </Button>
             </div>
-            
+
             <p className="text-sm text-muted-foreground">
                 We've sent a confirmation email to your registered address.
             </p>

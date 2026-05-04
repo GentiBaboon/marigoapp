@@ -169,6 +169,8 @@ export function ReviewStep() {
         listingType: formData.listingType || 'fixed_price',
         price: formData.price || 0,
         currency: 'EUR',
+        // Available stock — defaults to 1 when the seller didn't change it.
+        quantity: Math.max(1, Math.floor(formData.quantity ?? 1)),
         size: formData.sizeValue || '',
         color: formData.color,
         material: formData.material,
@@ -289,6 +291,10 @@ export function ReviewStep() {
                     <div className="space-y-1">
                         <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Color</p>
                         <p className="font-bold text-sm capitalize">{formData.color || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Quantity</p>
+                        <p className="font-bold text-sm">{Math.max(1, Math.floor(formData.quantity ?? 1))}</p>
                     </div>
                 </div>
                 

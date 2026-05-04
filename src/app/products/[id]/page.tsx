@@ -211,8 +211,24 @@ export default function ProductDetailPage() {
                     </Button>
                 ) : (
                     <>
-                        <Button size="lg" className="w-full bg-foreground text-background" onClick={handleAddToCart} disabled={isSoldOrReserved}>Add to bag</Button>
-                        <Button size="lg" variant="outline" className="w-full" onClick={() => setIsOfferSheetOpen(true)} disabled={isSoldOrReserved}>Make an offer</Button>
+                        <Button
+                            size="lg"
+                            className="w-full bg-foreground text-background"
+                            onClick={handleAddToCart}
+                            disabled={isSoldOrReserved}
+                        >
+                            {isSoldOrReserved ? 'Reserved' : 'Add to bag'}
+                        </Button>
+                        {!isSoldOrReserved && (
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => setIsOfferSheetOpen(true)}
+                            >
+                                Make an offer
+                            </Button>
+                        )}
                         <Button size="lg" variant="ghost" className="w-full border" onClick={handleContactSeller} disabled={isChatLoading}>
                             {isChatLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
                             Contact Seller

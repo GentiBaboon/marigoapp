@@ -68,6 +68,26 @@ export function DetailsStep() {
     return parent ? `${parent.name} / ${sub?.name}` : sub?.name || '';
   }, [formData.subcategoryId, categories]);
 
+  // Build combobox items from a Firestore attribute collection. Some seeded
+  // records lack the `value` field — fall back to a slugified name so the
+  // option still renders and remains selectable.
+  const slugify = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const toAttributeItems = React.useCallback((rows?: FirestoreAttribute[] | null) => {
+    if (!rows) return [];
+    return rows
+      .filter((r) => typeof r?.name === 'string' && r.name.trim().length > 0)
+      .map((r) => ({
+        value: (r.value && r.value.trim()) || slugify(r.name),
+        label: r.name,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, []);
+
+  const materialItems = React.useMemo(() => toAttributeItems(materials), [materials, toAttributeItems]);
+  const colorItems = React.useMemo(() => toAttributeItems(colors), [colors, toAttributeItems]);
+  const patternItems = React.useMemo(() => toAttributeItems(patterns), [patterns, toAttributeItems]);
+
   const onSubmit = (data: Step4Values) => {
     setFormData(data);
     nextStep();
@@ -94,9 +114,12 @@ export function DetailsStep() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {conditions?.map(c => (
-                    <SelectItem key={c.id} value={c.value}>{c.name}</SelectItem>
-                  ))}
+                  {conditions?.map(c => {
+                    const val = (c.value && c.value.trim()) || slugify(c.name);
+                    return (
+                      <SelectItem key={c.id} value={val}>{c.name}</SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -115,7 +138,7 @@ export function DetailsStep() {
                         <Combobox
                         value={field.value}
                         onValueChange={field.onChange}
-                        items={materials?.map(m => ({ value: m.value, label: m.name })) || []}
+                        items={materialItems}
                         placeholder="Material"
                         searchPlaceholder="Search..."
                         emptyPlaceholder="No results."
@@ -135,7 +158,7 @@ export function DetailsStep() {
                         <Combobox
                         value={field.value}
                         onValueChange={field.onChange}
-                        items={colors?.map(c => ({ value: c.value, label: c.name })) || []}
+                        items={colorItems}
                         placeholder="Color"
                         searchPlaceholder="Search..."
                         emptyPlaceholder="No results."
@@ -169,7 +192,7 @@ export function DetailsStep() {
                         <Combobox
                         value={field.value}
                         onValueChange={field.onChange}
-                        items={patterns?.map(p => ({ value: p.value, label: p.name })) || []}
+                        items={patternItems}
                         placeholder="Pattern"
                         searchPlaceholder="Search..."
                         emptyPlaceholder="No results."

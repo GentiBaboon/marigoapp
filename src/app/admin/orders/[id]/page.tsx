@@ -123,6 +123,46 @@ export default function AdminOrderDetailPage() {
     setStatusUpdating(true);
     try {
       await updateDoc(doc(firestore, 'orders', order.id), { status: newStatus });
+
+      // Cancelling or refunding an order releases the reserved products back
+      // to the marketplace so other buyers can purchase them.
+      if (newStatus === 'cancelled' || newStatus === 'refunded') {
+        await Promise.all(
+          (order.items || []).map((it: any) =>
+            updateDoc(doc(firestore, 'products', it.id), { status: 'active' }).catch(() => null),
+          ),
+        );
+      }
+
+      // Notify the buyer + every seller involved so the change is visible
+      // immediately in the bell badge.
+      const { notifyOrderStatus } = await import('@/lib/notifications');
+      const buyerLink = `/profile/orders/${order.id}`;
+      const sellerLink = `/profile/listings/sales/${order.id}`;
+      const targets: Promise<any>[] = [
+        notifyOrderStatus({
+          firestore,
+          userId: order.buyerId,
+          orderNumber: order.orderNumber,
+          status: newStatus,
+          link: buyerLink,
+          audience: 'buyer',
+        }),
+      ];
+      Array.from(new Set(order.sellerIds || [])).forEach((sellerId) => {
+        targets.push(
+          notifyOrderStatus({
+            firestore,
+            userId: sellerId,
+            orderNumber: order.orderNumber,
+            status: newStatus,
+            link: sellerLink,
+            audience: 'seller',
+          }),
+        );
+      });
+      await Promise.all(targets);
+
       await addDoc(collection(firestore, 'admin_logs'), {
         adminId: adminUser.uid,
         adminName: adminUser.displayName || 'Admin',

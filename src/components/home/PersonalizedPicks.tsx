@@ -69,7 +69,9 @@ export function PersonalizedPicks() {
                 const recommendationQuery = await getRecommendations(tasteProfile);
 
                 // 3. Build and fetch recommended products
-                const queryConstraints: QueryConstraint[] = [where('status', '==', 'active')];
+                const queryConstraints: QueryConstraint[] = [
+                  where('status', 'in', ['active', 'reserved']),
+                ];
 
                 if (recommendationQuery.query.brands && recommendationQuery.query.brands.length > 0) {
                     queryConstraints.push(where('brand', 'in', recommendationQuery.query.brands.slice(0, 10)));
@@ -138,6 +140,7 @@ export function PersonalizedPicks() {
                             condition: p.condition,
                             color: p.color,
                             vintage: p.vintage,
+                            status: p.status,
                         }} />
                     ))}
                 </div>

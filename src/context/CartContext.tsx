@@ -17,6 +17,9 @@ export type CartItem = {
     image: string;
     sellerId: string;
     quantity: number;
+    // Maximum available stock for this listing — used to cap cart quantity.
+    // Optional so legacy cart entries (saved before the field existed) still load.
+    stock?: number;
     selectedSize?: string | null;
     selectedColor?: string | null;
     shippingMethod: ShippingMethod;
@@ -165,48 +168,87 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, [appliedCoupon, subtotal]);
 
     const addToCart = useCallback(async (product: any, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => {
-        const quantity = options?.quantity || 1;
+        // Block reserved/sold listings — already promised to another buyer.
+        if (product?.status === 'reserved' || product?.status === 'sold') {
+            toast({
+                variant: 'destructive',
+                title: 'Item reserved',
+                description: 'This listing is already reserved for another buyer.',
+            });
+            return;
+        }
+        const requested = options?.quantity || 1;
         const size = options?.selectedSize || product.size || null;
         const color = options?.selectedColor || product.color || null;
+        // Stock — pulled from the product record. Default to 1 for legacy
+        // listings without the field: most resale items are unique pieces, so
+        // unlimited would let buyers oversell.
+        const rawStock = (product as any).quantity;
+        const stock = typeof rawStock === 'number' && rawStock > 0 ? Math.floor(rawStock) : 1;
 
-        const newItem: CartItem = {
-            id: product.id,
-            brand: product.brand || product.brandId || '',
-            title: product.title,
-            price: product.price,
-            image: product.images?.[0]?.url || product.image || '',
-            sellerId: product.sellerId,
-            quantity,
-            selectedSize: size ?? null,
-            selectedColor: color ?? null,
-            shippingMethod: 'direct',
-            directShippingFee: 10.90,
-        };
+        // Find the existing line in the current cart so we can apply stock limits
+        // against the combined total (existing + requested).
+        let blocked = false;
+        let appliedDelta = requested;
 
         setItems(prev => {
-            const existing = prev.find(i => i.id === newItem.id);
-            if (existing) {
-                return prev.map(i => i.id === newItem.id ? { ...i, quantity: i.quantity + quantity } : i);
+            const existing = prev.find(i => i.id === product.id);
+            const currentQty = existing?.quantity ?? 0;
+            const cap = stock ?? Number.POSITIVE_INFINITY;
+            const nextQty = Math.min(cap, currentQty + requested);
+            appliedDelta = nextQty - currentQty;
+            if (appliedDelta <= 0) {
+                blocked = true;
+                return prev;
             }
-            return [...prev, newItem];
+            const newItem: CartItem = existing
+                ? { ...existing, quantity: nextQty, stock: stock ?? existing.stock }
+                : {
+                    id: product.id,
+                    brand: product.brand || product.brandId || '',
+                    title: product.title,
+                    price: product.price,
+                    image: product.images?.[0]?.url || product.image || '',
+                    sellerId: product.sellerId,
+                    quantity: nextQty,
+                    stock,
+                    selectedSize: size ?? null,
+                    selectedColor: color ?? null,
+                    shippingMethod: 'direct',
+                    directShippingFee: 10.90,
+                };
+
+            // Persist to Firestore (effects-in-render is fine here — same pattern
+            // the original code used).
+            if (user && firestore) {
+                const itemRef = doc(firestore, 'users', user.uid, 'cart', product.id);
+                const cleanItem = JSON.parse(JSON.stringify(newItem));
+                setDoc(itemRef, cleanItem, { merge: true }).catch(() => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: itemRef.path,
+                        operation: 'write',
+                        requestResourceData: newItem,
+                    }));
+                });
+            }
+
+            return existing
+                ? prev.map(i => i.id === product.id ? newItem : i)
+                : [...prev, newItem];
         });
 
-        if (user && firestore) {
-            const itemRef = doc(firestore, 'users', user.uid, 'cart', product.id);
-            // Strip undefined values before writing to Firestore
-            const cleanItem = JSON.parse(JSON.stringify(newItem));
-            setDoc(itemRef, cleanItem, { merge: true }).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: itemRef.path,
-                    operation: 'write',
-                    requestResourceData: newItem
-                }));
+        if (blocked) {
+            toast({
+                variant: 'destructive',
+                title: 'Out of stock',
+                description: `Only ${stock} available — already in your cart.`,
             });
+            return;
         }
 
         toast({
-            title: "Added to bag",
-            description: `${newItem.brand} ${newItem.title} is now in your cart.`,
+            title: 'Added to bag',
+            description: `${product.brand || product.brandId || ''} ${product.title} is now in your cart.`,
         });
     }, [user, firestore, toast]);
 
@@ -230,13 +272,30 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return;
         }
 
-        setItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity } : i));
+        let cappedQty = quantity;
+        let hitStockCap = false;
+
+        setItems(prev => prev.map(i => {
+            if (i.id !== itemId) return i;
+            const cap = typeof i.stock === 'number' && i.stock > 0 ? i.stock : Number.POSITIVE_INFINITY;
+            cappedQty = Math.min(cap, quantity);
+            if (cappedQty < quantity) hitStockCap = true;
+            return { ...i, quantity: cappedQty };
+        }));
+
+        if (hitStockCap) {
+            toast({
+                variant: 'destructive',
+                title: 'Stock limit reached',
+                description: 'You can only buy what the seller has in stock.',
+            });
+        }
 
         if (user && firestore) {
             const itemRef = doc(firestore, 'users', user.uid, 'cart', itemId);
-            setDoc(itemRef, { quantity }, { merge: true });
+            setDoc(itemRef, { quantity: cappedQty }, { merge: true });
         }
-    }, [user, firestore, removeFromCart]);
+    }, [user, firestore, removeFromCart, toast]);
 
     const clearCart = useCallback(async () => {
         setItems([]);
