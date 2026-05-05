@@ -96,14 +96,22 @@ service cloud.firestore {
 
     match /notifications/{id} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isAdmin();
+      // Any signed-in user can create a notification (e.g. seller notifying
+      // buyer of a status change, buyer notifying seller of a refund request).
+      // The targeted userId must be present so it can be queried by recipient.
+      allow create: if isSignedIn() && request.resource.data.userId is string;
       allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
-    // Deliveries: restricted to the assigned courier or admin.
-    // Couriers need read access to browse unassigned jobs (courierId may be null).
+    // Deliveries: courier/admin can read everything; the buyer and sellers
+    // of the linked order can also read their own delivery so the order page
+    // can render tracking. Writes remain restricted.
     match /deliveries/{id} {
-      allow read: if isSignedIn() && (isCourier() || isAdmin());
+      allow read: if isSignedIn() && (
+        isCourier() || isAdmin() ||
+        request.auth.uid == get(/databases/$(database)/documents/orders/$(resource.data.orderId)).data.buyerId ||
+        request.auth.uid in get(/databases/$(database)/documents/orders/$(resource.data.orderId)).data.sellerIds
+      );
       allow create: if isAdmin();
       allow update: if isAdmin() || (isSignedIn() && resource.data.courierId == request.auth.uid);
     }

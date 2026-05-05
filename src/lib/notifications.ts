@@ -2,6 +2,7 @@
 
 import { addDoc, collection, serverTimestamp, type Firestore } from 'firebase/firestore';
 import type { FirestoreNotification } from '@/lib/types';
+import { statusLabel, type Audience } from '@/lib/order-status';
 
 type NotifyArgs = {
   firestore: Firestore;
@@ -14,39 +15,51 @@ type NotifyArgs = {
 };
 
 /**
- * Write a notification document. Failures are swallowed (best-effort) so a
- * non-critical permission error never blocks the underlying mutation that
- * triggered it.
+ * Best-effort notification write. Always resolves — never throws — so callers
+ * can fire-and-forget alongside the action that triggered the notification.
+ * Strips undefined fields so addDoc doesn't reject on serialization.
  */
-export function notifyUser({ firestore, userId, title, message, type = 'order_update', link, imageUrl }: NotifyArgs) {
-  if (!firestore || !userId) return;
-  return addDoc(collection(firestore, 'notifications'), {
-    userId,
-    title,
-    message,
-    type,
-    read: false,
-    createdAt: serverTimestamp(),
-    data: link || imageUrl ? { link, imageUrl } : undefined,
-  }).catch(() => null);
+export async function notifyUser({ firestore, userId, title, message, type = 'order_update', link, imageUrl }: NotifyArgs) {
+  if (!firestore || !userId) return null;
+  try {
+    const data: Record<string, string> = {};
+    if (link) data.link = link;
+    if (imageUrl) data.imageUrl = imageUrl;
+    const payload: Record<string, unknown> = {
+      userId,
+      title,
+      message,
+      type,
+      read: false,
+      createdAt: serverTimestamp(),
+    };
+    if (Object.keys(data).length > 0) payload.data = data;
+    return await addDoc(collection(firestore, 'notifications'), payload);
+  } catch (err) {
+    console.warn('[notifyUser] failed', err);
+    return null;
+  }
 }
 
-/** Convenience wrapper for order-status changes. */
+/** Convenience wrapper for order-status changes. Uses audience-aware labels. */
 export function notifyOrderStatus(args: {
   firestore: Firestore;
   userId: string;
   orderNumber: string;
   status: string;
   link: string;
-  audience: 'buyer' | 'seller';
+  audience: Audience;
 }) {
   const { firestore, userId, orderNumber, status, link, audience } = args;
-  const human = humanReadableStatus(status);
-  const title = audience === 'buyer' ? `Order #${orderNumber} — ${human}` : `Sale #${orderNumber} — ${human}`;
+  const label = statusLabel(status, audience);
+  const prefix = audience === 'seller' ? 'Sale' : 'Order';
+  const title = `${prefix} #${orderNumber} — ${label}`;
   const message =
     audience === 'buyer'
-      ? `Your order is now ${human.toLowerCase()}.`
-      : `Order is now ${human.toLowerCase()}.`;
+      ? `Your order is now: ${label}.`
+      : audience === 'seller'
+        ? `Your sale is now: ${label}.`
+        : `Order status: ${label}.`;
   return notifyUser({ firestore, userId, title, message, type: 'order_update', link });
 }
 

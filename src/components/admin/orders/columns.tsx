@@ -9,6 +9,7 @@ import { ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
+import { statusLabel } from '@/lib/order-status';
 
 const currencyFormatter = new Intl.NumberFormat('de-DE', {
   style: 'currency',
@@ -116,7 +117,7 @@ export const columns: ColumnDef<FirestoreOrder>[] = [
     header: 'Status',
     cell: ({ row }) => {
         const status = row.original.status;
-        return <Badge variant={statusVariants[status] || 'outline'}>{status.replace('_', ' ')}</Badge>
+        return <Badge variant={statusVariants[status] || 'outline'}>{statusLabel(status, 'admin')}</Badge>
     },
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))

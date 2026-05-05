@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreNotification, FirestoreConversation } from '@/lib/types';
+import { toDate } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -198,7 +199,10 @@ export default function NotificationsPage() {
                                         </div>
                                         <div className="flex flex-col items-end gap-1 self-start">
                                             <p className="text-xs text-muted-foreground whitespace-nowrap">
-                                                {formatShortDistanceToNow(new Date(notification.createdAt.seconds * 1000))}
+                                                {(() => {
+                                                    const d = toDate(notification.createdAt as any);
+                                                    return d ? formatShortDistanceToNow(d) : '';
+                                                })()}
                                             </p>
                                             {!notification.read && (
                                                 <span className="h-2 w-2 rounded-full bg-red-500 mt-1"></span>

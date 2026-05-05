@@ -196,11 +196,11 @@ export interface FirestoreOrder {
   totalAmount: number;
   status:
     | "pending_payment"
-    | "processing"
+    | "confirmed"
+    | "processing" // legacy alias for confirmed
     | "in_preparation"
     | "prepared"
     | "shipped"
-    | "delivered"
     | "completed"
     | "cancel_requested"
     | "refund_requested"
@@ -219,6 +219,8 @@ export interface FirestoreOrder {
   discountAmount?: number;
   taxAmount?: number;
   taxRate?: number;
+  /** Append-only log of status transitions for buyer/seller history view. */
+  statusHistory?: Array<{ status: string; at: string; by?: string }>;
 }
 
 // --- Shared Components ---

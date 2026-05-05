@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -43,7 +43,7 @@ const REFUND_REASONS = [
 ];
 
 // Statuses where the customer can still cancel before the item ships.
-const CANCELLABLE = new Set(['processing', 'in_preparation', 'prepared']);
+const CANCELLABLE = new Set(['confirmed', 'processing', 'in_preparation', 'prepared']);
 
 export function OrderCustomerActions({ order }: { order: FirestoreOrder }) {
   const firestore = useFirestore();
@@ -57,7 +57,7 @@ export function OrderCustomerActions({ order }: { order: FirestoreOrder }) {
   const [submitting, setSubmitting] = React.useState(false);
 
   const canCancel = CANCELLABLE.has(order.status);
-  const canRefund = order.status === 'delivered' || order.status === 'completed';
+  const canRefund = order.status === 'completed';
   const alreadyRequestedCancel = order.status === 'cancel_requested';
   const alreadyRequestedRefund = order.status === 'refund_requested';
   const isTerminal = order.status === 'cancelled' || order.status === 'refunded';
@@ -71,40 +71,50 @@ export function OrderCustomerActions({ order }: { order: FirestoreOrder }) {
     }
     setSubmitting(true);
     try {
+      const nextStatus = kind === 'cancel' ? 'cancel_requested' : 'refund_requested';
       const updates: Record<string, any> =
         kind === 'cancel'
           ? {
-              status: 'cancel_requested',
+              status: nextStatus,
               cancellationReason: reason,
               cancelRequestedBy: user.uid,
               updatedAt: serverTimestamp(),
+              statusHistory: arrayUnion({
+                status: nextStatus,
+                at: new Date().toISOString(),
+                by: user.uid,
+              }),
             }
           : {
-              status: 'refund_requested',
+              status: nextStatus,
               refundReason: reason,
               refundRequestedBy: user.uid,
               updatedAt: serverTimestamp(),
+              statusHistory: arrayUnion({
+                status: nextStatus,
+                at: new Date().toISOString(),
+                by: user.uid,
+              }),
             };
       await updateDoc(doc(firestore, 'orders', order.id), updates);
 
-      // Notify each seller in this order.
+      // Notify each seller in this order — fire-and-forget so a failed write
+      // never blocks the success path.
       const link = `/profile/listings/sales/${order.id}`;
       const notifyTitle =
         kind === 'cancel'
           ? `Cancellation requested for #${order.orderNumber}`
           : `Refund requested for #${order.orderNumber}`;
-      await Promise.all(
-        Array.from(new Set(order.sellerIds || [])).map((sellerId) =>
-          notifyUser({
-            firestore,
-            userId: sellerId,
-            title: notifyTitle,
-            message: `Reason: ${reason}`,
-            type: 'order_update',
-            link,
-          }),
-        ),
-      );
+      Array.from(new Set(order.sellerIds || [])).forEach((sellerId) => {
+        notifyUser({
+          firestore,
+          userId: sellerId,
+          title: notifyTitle,
+          message: `Reason: ${reason}`,
+          type: 'order_update',
+          link,
+        }).catch(() => null);
+      });
 
       toast({
         title: kind === 'cancel' ? 'Cancellation requested' : 'Refund requested',

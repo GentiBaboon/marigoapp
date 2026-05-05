@@ -152,6 +152,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Create order document
+    const createdAt = new Date().toISOString();
     const orderId = await firestoreCreate(
       'orders',
       {
@@ -166,7 +167,8 @@ export async function POST(req: NextRequest) {
         paymentIntentId: pi.id,
         paymentMethod: 'card',
         shippingAddress,
-        createdAt: new Date().toISOString(),
+        createdAt,
+        statusHistory: [{ status: 'pending_payment', at: createdAt, by: buyerId }],
       },
       idToken
     );
@@ -196,7 +198,35 @@ export async function POST(req: NextRequest) {
           totalAmount: total,
         }).catch(console.error);
       }
+      firestoreCreate(
+        'notifications',
+        {
+          userId: sellerId,
+          title: `New sale — #${orderNumber}`,
+          message: 'You have a new order to prepare.',
+          type: 'order_update',
+          read: false,
+          createdAt,
+          data: { link: `/profile/listings/sales/${orderId}` },
+        },
+        idToken,
+      ).catch((e) => console.warn('seller notification failed', e));
     }
+
+    // In-app notification for the buyer.
+    firestoreCreate(
+      'notifications',
+      {
+        userId: buyerId,
+        title: `Order placed — #${orderNumber}`,
+        message: 'Your order has been received.',
+        type: 'order_update',
+        read: false,
+        createdAt,
+        data: { link: `/profile/orders/${orderId}` },
+      },
+      idToken,
+    ).catch((e) => console.warn('buyer notification failed', e));
 
     return NextResponse.json({ clientSecret: pi.client_secret, orderId });
   } catch (err: any) {

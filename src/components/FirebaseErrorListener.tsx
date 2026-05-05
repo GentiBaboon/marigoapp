@@ -29,6 +29,13 @@ export function FirebaseErrorListener() {
         console.warn('[Firestore] Settings read permission error (non-fatal):', err.message);
         return;
       }
+      // Deliveries are queried opportunistically by the order detail pages.
+      // A buyer/seller without explicit access just means "no tracking yet" —
+      // never crash the page over it.
+      if (err.message?.includes('/deliveries')) {
+        console.warn('[Firestore] Deliveries read permission error (non-fatal):', err.message);
+        return;
+      }
       setError(err);
     };
 

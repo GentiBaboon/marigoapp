@@ -5,8 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useFirestore, useUser, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, orderBy, limit, updateDoc, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { doc, collection, query, where, orderBy, limit, updateDoc, addDoc, arrayUnion, serverTimestamp, getDocs } from 'firebase/firestore';
 import type { FirestoreOrder, FirestoreUser, FirestoreConversation, FirestoreMessage } from '@/lib/types';
+import { statusLabel } from '@/lib/order-status';
 import { toDate } from '@/lib/types';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,9 +20,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 
 const ORDER_STATUSES = [
-  { value: 'processing', label: 'Processing' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'in_preparation', label: 'In Preparation' },
+  { value: 'prepared', label: 'Prepared' },
   { value: 'shipped', label: 'Shipped' },
-  { value: 'delivered', label: 'Delivered' },
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'refunded', label: 'Refunded' },
@@ -29,12 +31,16 @@ const ORDER_STATUSES = [
 
 const STATUS_COLORS: Record<string, string> = {
   pending_payment: 'bg-yellow-100 text-yellow-800',
+  confirmed: 'bg-blue-100 text-blue-800',
   processing: 'bg-blue-100 text-blue-800',
+  in_preparation: 'bg-blue-100 text-blue-800',
+  prepared: 'bg-indigo-100 text-indigo-800',
   shipped: 'bg-purple-100 text-purple-800',
-  delivered: 'bg-green-100 text-green-800',
   completed: 'bg-green-200 text-green-900',
   cancelled: 'bg-red-100 text-red-800',
   refunded: 'bg-orange-100 text-orange-800',
+  cancel_requested: 'bg-amber-100 text-amber-800',
+  refund_requested: 'bg-amber-100 text-amber-800',
 };
 
 interface ConversationWithMessages {
@@ -122,9 +128,17 @@ export default function AdminOrderDetailPage() {
     if (!firestore || !adminUser || !order) return;
     setStatusUpdating(true);
     try {
-      await updateDoc(doc(firestore, 'orders', order.id), { status: newStatus });
+      await updateDoc(doc(firestore, 'orders', order.id), {
+        status: newStatus,
+        updatedAt: serverTimestamp(),
+        statusHistory: arrayUnion({
+          status: newStatus,
+          at: new Date().toISOString(),
+          by: adminUser.uid,
+        }),
+      });
 
-      // Cancelling or refunding an order releases the reserved products back
+      // Cancelling or refunding an order releases the products back
       // to the marketplace so other buyers can purchase them.
       if (newStatus === 'cancelled' || newStatus === 'refunded') {
         await Promise.all(
@@ -230,7 +244,7 @@ export default function AdminOrderDetailPage() {
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Status</span>
-              <Badge className={STATUS_COLORS[order.status] || ''}>{order.status}</Badge>
+              <Badge className={STATUS_COLORS[order.status] || ''}>{statusLabel(order.status, 'admin')}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Date</span>

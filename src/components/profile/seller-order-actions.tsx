@@ -1,27 +1,28 @@
 'use client';
 
 import * as React from 'react';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Loader2, Package, PackageCheck, Truck } from 'lucide-react';
 import type { FirestoreOrder } from '@/lib/types';
-import { notifyOrderStatus, humanReadableStatus } from '@/lib/notifications';
+import { notifyOrderStatus } from '@/lib/notifications';
+import { nextSellerTransition, statusLabel } from '@/lib/order-status';
 
-// Maps the current status → the next allowed status the seller can move to.
-const NEXT: Record<string, { status: string; label: string; icon: any }> = {
-  processing: { status: 'in_preparation', label: 'Start preparing', icon: Package },
-  in_preparation: { status: 'prepared', label: 'Mark as prepared', icon: PackageCheck },
-  prepared: { status: 'shipped', label: 'Mark as shipped', icon: Truck },
+const ICONS: Record<string, any> = {
+  in_preparation: Package,
+  prepared: PackageCheck,
+  shipped: Truck,
 };
 
 export function SellerOrderActions({ order }: { order: FirestoreOrder }) {
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const [submitting, setSubmitting] = React.useState(false);
 
-  const transition = NEXT[order.status];
+  const transition = nextSellerTransition(order.status);
   const isCancelRequested = order.status === 'cancel_requested';
   const isRefundRequested = order.status === 'refund_requested';
 
@@ -32,27 +33,45 @@ export function SellerOrderActions({ order }: { order: FirestoreOrder }) {
       await updateDoc(doc(firestore, 'orders', order.id), {
         status: transition.status,
         updatedAt: serverTimestamp(),
-      });
-
-      // Tell the buyer the order moved forward.
-      await notifyOrderStatus({
-        firestore,
-        userId: order.buyerId,
-        orderNumber: order.orderNumber,
-        status: transition.status,
-        link: `/profile/orders/${order.id}`,
-        audience: 'buyer',
+        statusHistory: arrayUnion({
+          status: transition.status,
+          at: new Date().toISOString(),
+          by: user?.uid || 'seller',
+        }),
       });
 
       toast({
         title: 'Status updated',
-        description: `Order is now ${humanReadableStatus(transition.status)}.`,
+        description: `Order is now ${statusLabel(transition.status, 'seller')}.`,
       });
-    } catch {
+    } catch (err) {
+      console.error('[seller-order-actions] update failed', err);
       toast({ variant: 'destructive', title: 'Could not update status' });
-    } finally {
       setSubmitting(false);
+      return;
     }
+
+    // Fire-and-forget notifications for both parties.
+    notifyOrderStatus({
+      firestore,
+      userId: order.buyerId,
+      orderNumber: order.orderNumber,
+      status: transition.status,
+      link: `/profile/orders/${order.id}`,
+      audience: 'buyer',
+    }).catch(() => null);
+    Array.from(new Set(order.sellerIds || [])).forEach((sellerId) => {
+      notifyOrderStatus({
+        firestore,
+        userId: sellerId,
+        orderNumber: order.orderNumber,
+        status: transition.status,
+        link: `/profile/listings/sales/${order.id}`,
+        audience: 'seller',
+      }).catch(() => null);
+    });
+
+    setSubmitting(false);
   };
 
   if (isCancelRequested) {
@@ -78,7 +97,7 @@ export function SellerOrderActions({ order }: { order: FirestoreOrder }) {
   }
 
   if (!transition) return null;
-  const Icon = transition.icon;
+  const Icon = ICONS[transition.status] || Package;
 
   return (
     <div className="bg-background p-4 rounded-lg space-y-3">

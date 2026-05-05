@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { MessageSquare, Clock } from 'lucide-react';
 import type { FirestoreOrder } from '@/lib/types';
 import { format, addDays } from 'date-fns';
+import { STATUS_RANK, statusLabel, stepState, TIMELINE_STEPS } from '@/lib/order-status';
 
 const TimelineDot = ({ state }: { state: 'completed' | 'current' | 'upcoming' }) => {
     return (
@@ -31,68 +32,71 @@ function toDate(ts: any): Date {
 
 export function OrderTimeline({ order }: { order: FirestoreOrder }) {
     const { status } = order;
-
+    const rank = STATUS_RANK[status] ?? 0;
     const shipByDate = addDays(toDate(order.createdAt), 7);
     const cancelDate = addDays(shipByDate, 1);
-    
-    // Statuses: processing, shipped, delivered, completed
-    const isProcessing = status === 'processing';
-    const isShipped = status === 'shipped';
-    const isDelivered = status === 'delivered';
-    const isCompleted = status === 'completed';
 
-    const hasPassedProcessing = isShipped || isDelivered || isCompleted;
-    const hasPassedShipping = isDelivered || isCompleted;
-    
+    const isAwaitingShip = status === 'confirmed' || status === 'processing' || status === 'in_preparation' || status === 'prepared';
+
     return (
-        <div className="relative ml-2">
-            {/* Vertical line */}
-            <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-200" />
+        <div className="space-y-6">
+            <div className="relative ml-2">
+                <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-200" />
 
-            {/* Step 1: Order Received */}
-            <div className="relative pl-8 pb-10">
-                <TimelineDot state="completed" />
-                <h4 className="font-semibold">Order received</h4>
-                <p className="text-sm text-muted-foreground">On {format(toDate(order.createdAt), 'MMMM d, yyyy')}</p>
+                {TIMELINE_STEPS.map((step, idx) => {
+                    const stepRank = STATUS_RANK[step] ?? idx + 1;
+                    const state = stepState(rank, stepRank);
+                    const isCurrentPrep = (step === 'in_preparation' || step === 'prepared') && isAwaitingShip && state === 'current';
+
+                    return (
+                        <div key={step} className={cn("relative pl-8", idx === TIMELINE_STEPS.length - 1 ? "" : "pb-10")}>
+                            <TimelineDot state={state} />
+                            {step === 'confirmed' && state !== 'upcoming' ? (
+                                <>
+                                    <h4 className="font-semibold">{statusLabel('confirmed', 'buyer')}</h4>
+                                    <p className="text-sm text-muted-foreground">On {format(toDate(order.createdAt), 'MMMM d, yyyy')}</p>
+                                </>
+                            ) : isCurrentPrep ? (
+                                <Card className="shadow-md -ml-4">
+                                    <CardContent className="p-4 space-y-3">
+                                        <Badge variant="outline" className="border-blue-500 text-blue-600 bg-blue-50 font-semibold">
+                                            <Clock className="mr-1.5 h-3 w-3" />
+                                            IN PROGRESS
+                                        </Badge>
+                                        <h4 className="font-semibold text-lg">{statusLabel(status, 'buyer')}</h4>
+                                        <p className="text-sm text-muted-foreground">Seller has until {format(shipByDate, 'EEEE, MMMM d, yyyy')} to ship the item.</p>
+                                        <p className="text-sm text-muted-foreground">If they do not ship on time, we'll automatically cancel your order on {format(cancelDate, 'EEEE, MMMM d, yyyy')} and issue a full refund.</p>
+                                        <Button variant="outline" className="w-full">
+                                            <MessageSquare className="mr-2 h-4 w-4" />
+                                            Contact seller
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <h4 className={cn("font-semibold", state !== 'upcoming' ? 'text-foreground' : 'text-muted-foreground')}>
+                                    {statusLabel(step, 'buyer')}
+                                </h4>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
 
-            {/* Step 2: Waiting for Seller to Ship */}
-            <div className="relative pl-8 pb-10">
-                <TimelineDot state={isProcessing ? 'current' : hasPassedProcessing ? 'completed' : 'upcoming'} />
-                {isProcessing ? (
-                    <Card className="shadow-md -ml-4">
-                        <CardContent className="p-4 space-y-3">
-                             <Badge variant="outline" className="border-blue-500 text-blue-600 bg-blue-50 font-semibold">
-                                <Clock className="mr-1.5 h-3 w-3" />
-                                IN PROGRESS
-                             </Badge>
-                             <h4 className="font-semibold text-lg">Waiting for seller to ship</h4>
-                             <p className="text-sm text-muted-foreground">Seller has until {format(shipByDate, 'EEEE, MMMM d, yyyy')} to ship the item.</p>
-                             <p className="text-sm text-muted-foreground">If they do not ship on time, we'll automatically cancel your order on {format(cancelDate, 'EEEE, MMMM d, yyyy')} and issue a full refund to your payment method.</p>
-                             <p className="text-sm underline cursor-pointer font-medium text-foreground">See full cancellation policy</p>
-                             <Button variant="outline" className="w-full">
-                                <MessageSquare className="mr-2 h-4 w-4" />
-                                Contact seller
-                            </Button>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <h4 className={cn("font-semibold", hasPassedProcessing ? 'text-foreground' : 'text-muted-foreground')}>Waiting for seller to ship</h4>
-                )}
-            </div>
-
-            {/* Step 3: Delivery */}
-            <div className="relative pl-8 pb-10">
-                <TimelineDot state={isShipped ? 'current' : hasPassedShipping ? 'completed' : 'upcoming'} />
-                 <h4 className={cn("font-semibold", hasPassedShipping ? "text-foreground" : "text-muted-foreground")}>Delivery</h4>
-                 <p className="text-sm text-muted-foreground">Within 5 business days</p>
-            </div>
-            
-            {/* Step 4: Item Received */}
-            <div className="relative pl-8">
-                 <TimelineDot state={isDelivered ? 'current' : isCompleted ? 'completed' : 'upcoming'} />
-                <h4 className={cn("font-semibold", isCompleted ? "text-foreground" : "text-muted-foreground")}>Item received</h4>
-            </div>
+            {order.statusHistory && order.statusHistory.length > 0 && (
+                <div className="border-t pt-4">
+                    <h5 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Status history</h5>
+                    <ul className="space-y-2 text-sm">
+                        {[...order.statusHistory]
+                            .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+                            .map((entry, i) => (
+                                <li key={`${entry.status}-${entry.at}-${i}`} className="flex justify-between gap-4">
+                                    <span className="font-medium">{statusLabel(entry.status, 'buyer')}</span>
+                                    <span className="text-muted-foreground">{format(new Date(entry.at), 'MMM d, yyyy · HH:mm')}</span>
+                                </li>
+                            ))}
+                    </ul>
+                </div>
+            )}
         </div>
-    )
+    );
 }

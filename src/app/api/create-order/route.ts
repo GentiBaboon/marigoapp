@@ -92,14 +92,15 @@ export async function POST(req: NextRequest) {
 
     const orderNumber = `MG-COD-${Date.now()}`;
 
-    // Reserve every product so it can't be ordered again. The card flow does
-    // the same thing in /api/create-payment-intent.
+    // COD orders are confirmed at creation time, so the product comes off the
+    // marketplace immediately — no "reserved" intermediate state.
     await Promise.all(
       validatedItems.map((item: any) =>
-        firestoreUpdate('products', item.id, { status: 'reserved' }, idToken),
+        firestoreUpdate('products', item.id, { status: 'sold' }, idToken),
       ),
     );
 
+    const createdAt = new Date().toISOString();
     const orderId = await firestoreCreate(
       'orders',
       {
@@ -110,13 +111,44 @@ export async function POST(req: NextRequest) {
         totalAmount: total,
         discountAmount: discount,
         couponCode: couponCode || null,
-        status: 'processing',
+        status: 'confirmed',
         paymentMethod: 'cod',
         shippingAddress,
-        createdAt: new Date().toISOString(),
+        createdAt,
+        statusHistory: [{ status: 'confirmed', at: createdAt, by: buyerId }],
       },
       idToken
     );
+
+    // In-app notifications (best-effort).
+    firestoreCreate(
+      'notifications',
+      {
+        userId: buyerId,
+        title: `Order placed — #${orderNumber}`,
+        message: 'Your order has been confirmed.',
+        type: 'order_update',
+        read: false,
+        createdAt,
+        data: { link: `/profile/orders/${orderId}` },
+      },
+      idToken,
+    ).catch((e) => console.warn('buyer notification failed', e));
+    for (const sellerId of sellerIds) {
+      firestoreCreate(
+        'notifications',
+        {
+          userId: sellerId,
+          title: `New sale — #${orderNumber}`,
+          message: 'You have a new order to prepare.',
+          type: 'order_update',
+          read: false,
+          createdAt,
+          data: { link: `/profile/listings/sales/${orderId}` },
+        },
+        idToken,
+      ).catch((e) => console.warn('seller notification failed', e));
+    }
 
     // Send emails (non-blocking — don't fail the order if email fails)
     const buyerData = await firestoreGet('users', buyerId, idToken).catch(() => null);
