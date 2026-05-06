@@ -121,16 +121,20 @@ export async function POST(req: NextRequest) {
     );
 
     // In-app notifications (best-effort).
+    const firstItem: any = validatedItems[0] || {};
+    const productTitle: string = firstItem.title || `#${orderNumber}`;
+    const buildData = (link: string) =>
+      firstItem.image ? { link, imageUrl: firstItem.image } : { link };
     firestoreCreate(
       'notifications',
       {
         userId: buyerId,
-        title: `Order placed — #${orderNumber}`,
+        title: `${productTitle} — Order Confirmed`,
         message: 'Your order has been confirmed.',
         type: 'order_update',
         read: false,
         createdAt,
-        data: { link: `/profile/orders/${orderId}` },
+        data: buildData(`/profile/orders/${orderId}`),
       },
       idToken,
     ).catch((e) => console.warn('buyer notification failed', e));
@@ -139,12 +143,12 @@ export async function POST(req: NextRequest) {
         'notifications',
         {
           userId: sellerId,
-          title: `New sale — #${orderNumber}`,
+          title: `New sale — ${productTitle}`,
           message: 'You have a new order to prepare.',
           type: 'order_update',
           read: false,
           createdAt,
-          data: { link: `/profile/listings/sales/${orderId}` },
+          data: buildData(`/profile/listings/sales/${orderId}`),
         },
         idToken,
       ).catch((e) => console.warn('seller notification failed', e));

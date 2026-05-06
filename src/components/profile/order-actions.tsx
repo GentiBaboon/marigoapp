@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -101,20 +101,60 @@ export function OrderCustomerActions({ order }: { order: FirestoreOrder }) {
       // Notify each seller in this order — fire-and-forget so a failed write
       // never blocks the success path.
       const link = `/profile/listings/sales/${order.id}`;
-      const notifyTitle =
+      const firstItem = order.items?.[0];
+      const subject = firstItem?.title?.trim() || `#${order.orderNumber}`;
+      const titleWithProduct =
         kind === 'cancel'
-          ? `Cancellation requested for #${order.orderNumber}`
-          : `Refund requested for #${order.orderNumber}`;
+          ? `${subject} — Cancellation requested`
+          : `${subject} — Refund requested`;
       Array.from(new Set(order.sellerIds || [])).forEach((sellerId) => {
         notifyUser({
           firestore,
           userId: sellerId,
-          title: notifyTitle,
+          title: titleWithProduct,
           message: `Reason: ${reason}`,
           type: 'order_update',
           link,
+          imageUrl: firstItem?.image,
         }).catch(() => null);
       });
+
+      // Open a dispute so admin sees the request in /admin/disputes and can
+      // chat with both sides via the mirrored conversation.
+      try {
+        const buyerName = user.displayName || user.email || 'Buyer';
+        const primarySellerId = (order.sellerIds && order.sellerIds[0]) || '';
+        await addDoc(collection(firestore, 'disputes'), {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          buyerId: user.uid,
+          buyerName,
+          sellerId: primarySellerId,
+          sellerName: '',
+          reason: kind === 'cancel'
+            ? `Buyer cancellation request: ${reason}`
+            : `Buyer refund request: ${reason}`,
+          status: 'open',
+          source: kind === 'cancel' ? 'buyer_cancel_request' : 'buyer_refund_request',
+          productId: firstItem?.id || null,
+          productTitle: firstItem?.title || null,
+          productImage: firstItem?.image || null,
+          messages: [
+            {
+              senderId: user.uid,
+              senderName: buyerName,
+              senderRole: 'buyer',
+              content: kind === 'cancel'
+                ? `I would like to cancel this order. Reason: ${reason}.`
+                : `I would like a refund. Reason: ${reason}.`,
+              createdAt: new Date().toISOString(),
+            },
+          ],
+          createdAt: serverTimestamp(),
+        });
+      } catch (e) {
+        console.warn('[buyer cancel/refund] could not create dispute', e);
+      }
 
       toast({
         title: kind === 'cancel' ? 'Cancellation requested' : 'Refund requested',

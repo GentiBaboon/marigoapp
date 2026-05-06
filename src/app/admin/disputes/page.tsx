@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { collection, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import type { FirestoreDispute, DisputeMessage } from '@/lib/types';
+import { collection, query, orderBy, doc, updateDoc, addDoc, getDoc, setDoc, increment, serverTimestamp, arrayUnion, Timestamp } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
+import type { FirestoreDispute, DisputeMessage, FirestoreOrder } from '@/lib/types';
 import { toDate } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
@@ -44,6 +44,19 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+
+  // Fall back to the order's first item if the dispute doc itself doesn't
+  // carry product info (legacy rows written before the schema change).
+  const needsOrderLookup = !dispute.productTitle && !!dispute.orderId;
+  const orderRef = useMemoFirebase(
+    () => (needsOrderLookup && firestore ? doc(firestore, 'orders', dispute.orderId) : null),
+    [firestore, needsOrderLookup, dispute.orderId],
+  );
+  const { data: linkedOrder } = useDoc<FirestoreOrder>(orderRef);
+  const linkedItem = linkedOrder?.items?.[0];
+  const productTitle = dispute.productTitle || linkedItem?.title || `Order #${dispute.orderNumber}`;
+  const productImage = dispute.productImage || linkedItem?.image || '';
+  const productId = dispute.productId || linkedItem?.id || '';
 
   const [expanded, setExpanded] = React.useState(false);
   const [newMessage, setNewMessage] = React.useState('');
@@ -90,6 +103,39 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
         updateData.resolution = resolution.trim();
       }
       await updateDoc(doc(firestore, 'disputes', dispute.id), updateData);
+
+      // Mirror status to the linked conversation (if any) so the seller's
+      // chat thread shows it as ended and becomes read-only.
+      if (
+        confirmDialog.newStatus === 'resolved' ||
+        confirmDialog.newStatus === 'closed'
+      ) {
+        try {
+          const convId = `dispute_${dispute.id}`;
+          const convRef = doc(firestore, 'conversations', convId);
+          const convSnap = await getDoc(convRef);
+          if (convSnap.exists()) {
+            const now = Timestamp.now();
+            await updateDoc(convRef, {
+              caseClosed: true,
+              caseStatus: confirmDialog.newStatus,
+              lastMessage: `Case ${confirmDialog.newStatus}.`,
+              lastMessageAt: now,
+            });
+            await addDoc(collection(firestore, 'conversations', convId, 'messages'), {
+              senderId: user?.uid || 'system',
+              senderName: 'Marigo Support',
+              senderRole: 'system',
+              content: `Case ${confirmDialog.newStatus}${resolution.trim() ? ` — ${resolution.trim()}` : '.'}`,
+              read: false,
+              createdAt: now,
+            });
+          }
+        } catch (e) {
+          console.warn('Could not close mirrored conversation', e);
+        }
+      }
+
       await logAction(
         'dispute_status_changed',
         `Changed dispute status to "${confirmDialog.newStatus}" for order #${dispute.orderNumber}`,
@@ -112,17 +158,101 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
     if (!newMessage.trim()) return;
     setIsSending(true);
     try {
+      const adminName = user?.displayName || user?.email || 'Admin';
+      const messageText = newMessage.trim();
       const message: Omit<DisputeMessage, 'createdAt'> & { createdAt: any } = {
         senderId: user?.uid || '',
-        senderName: user?.displayName || user?.email || 'Admin',
+        senderName: adminName,
         senderRole: 'admin',
-        content: newMessage.trim(),
+        content: messageText,
         createdAt: new Date().toISOString(),
       };
       await updateDoc(doc(firestore, 'disputes', dispute.id), {
         messages: arrayUnion(message),
         updatedAt: serverTimestamp(),
       });
+
+      // Mirror the admin reply into a real conversation so the seller can see
+      // it under their Messages tab. The conversation is keyed deterministically
+      // off the dispute id so subsequent admin replies append to the same thread.
+      if (user?.uid) {
+        try {
+          const convId = `dispute_${dispute.id}`;
+          const convRef = doc(firestore, 'conversations', convId);
+          const convSnap = await getDoc(convRef);
+          // Use client-side Timestamp.now() so `lastMessageAt` is populated
+          // immediately and the seller's `orderBy('lastMessageAt')` query
+          // doesn't filter the doc out while a serverTimestamp() resolves.
+          const now = Timestamp.now();
+          // Include both the buyer and the seller in the dispute conversation
+          // so either side can see the admin's replies under their Messages.
+          const counterparts = Array.from(
+            new Set([dispute.sellerId, dispute.buyerId].filter(Boolean) as string[]),
+          );
+          const allParticipants = Array.from(new Set([user.uid, ...counterparts]));
+          if (!convSnap.exists()) {
+            const details: any[] = [{ userId: user.uid, name: adminName, role: 'admin' }];
+            if (dispute.sellerId) details.push({ userId: dispute.sellerId, name: dispute.sellerName || 'Seller', role: 'seller' });
+            if (dispute.buyerId && dispute.buyerId !== dispute.sellerId)
+              details.push({ userId: dispute.buyerId, name: dispute.buyerName || 'Buyer', role: 'buyer' });
+            const initialUnread: Record<string, number> = {};
+            counterparts.forEach((uid) => { initialUnread[uid] = 1; });
+            await setDoc(convRef, {
+              participants: allParticipants,
+              participantDetails: details,
+              productId,
+              productTitle,
+              productImage,
+              lastMessage: messageText,
+              lastMessageAt: now,
+              unreadCount: initialUnread,
+              source: 'dispute',
+              disputeId: dispute.id,
+            });
+          } else {
+            // Make sure all parties are participants on legacy docs that may
+            // have been created with only one side, and bump unread counts.
+            const update: Record<string, any> = {
+              participants: arrayUnion(...allParticipants),
+              lastMessage: messageText,
+              lastMessageAt: now,
+              source: 'dispute',
+              disputeId: dispute.id,
+            };
+            counterparts.forEach((uid) => {
+              update[`unreadCount.${uid}`] = increment(1);
+            });
+            await updateDoc(convRef, update);
+          }
+          await addDoc(collection(firestore, 'conversations', convId, 'messages'), {
+            senderId: user.uid,
+            senderName: adminName,
+            senderRole: 'admin',
+            content: messageText,
+            read: false,
+            createdAt: now,
+          });
+          console.info('[dispute mirror] conversation written', convId);
+
+          // Bell ping for both counterparts (buyer + seller) so neither misses it.
+          const { notifyUser } = await import('@/lib/notifications');
+          const preview = messageText.length > 80 ? messageText.slice(0, 77) + '…' : messageText;
+          counterparts.forEach((uid) => {
+            notifyUser({
+              firestore,
+              userId: uid,
+              title: `${productTitle} — Message from support`,
+              message: preview,
+              type: 'new_message',
+              link: `/messages/${convId}`,
+              imageUrl: productImage || undefined,
+            }).catch(() => null);
+          });
+        } catch (e) {
+          console.warn('Could not mirror dispute message to conversation', e);
+        }
+      }
+
       await logAction('dispute_message_sent', `Sent message on dispute for order #${dispute.orderNumber}`, dispute.id);
       toast({ title: 'Message Sent', description: 'Your message has been added to the dispute thread.' });
       setNewMessage('');
@@ -140,16 +270,24 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
     <>
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">
-              Order #{dispute.orderNumber}
+          <div className="flex items-center justify-between gap-4">
+            <CardTitle className="text-lg flex items-center gap-3 min-w-0">
+              {productImage && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={productImage}
+                  alt=""
+                  className="h-10 w-10 rounded-md object-cover bg-muted flex-shrink-0"
+                />
+              )}
+              <span className="truncate">{productTitle}</span>
             </CardTitle>
             <Badge variant={statusVariant[dispute.status] || 'outline'}>
               {dispute.status}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            {createdDate ? format(createdDate, 'd MMM yyyy') : '-'}
+            Order #{dispute.orderNumber} · {createdDate ? format(createdDate, 'd MMM yyyy') : '-'}
           </p>
         </CardHeader>
         <CardContent className="space-y-3">

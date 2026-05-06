@@ -29,6 +29,7 @@ import { BannerConfigTab } from '@/components/admin/settings/banner-config-tab';
 import { MacroFiltersTab } from '@/components/admin/settings/macro-filters-tab';
 import { HomepageBlocksTab } from '@/components/admin/settings/homepage-blocks-tab';
 import { CategoryConfigTab } from '@/components/admin/settings/category-config-tab';
+import { RelatedProductsTab } from '@/components/admin/settings/related-products-tab';
 
 // --- Sub-components for Management ---
 
@@ -483,6 +484,7 @@ export default function AdminSettingsPage() {
             <TabsTrigger value="banners">Banners</TabsTrigger>
             <TabsTrigger value="macrofilters">MacroFilters</TabsTrigger>
             <TabsTrigger value="homepageblocks">Homepage Blocks</TabsTrigger>
+            <TabsTrigger value="related">Related Products</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
@@ -563,6 +565,10 @@ export default function AdminSettingsPage() {
 
         <TabsContent value="homepageblocks">
             <HomepageBlocksTab />
+        </TabsContent>
+
+        <TabsContent value="related">
+            <RelatedProductsTab />
         </TabsContent>
       </Tabs>
 

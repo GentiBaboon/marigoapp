@@ -198,35 +198,47 @@ export async function POST(req: NextRequest) {
           totalAmount: total,
         }).catch(console.error);
       }
+      const firstItem: any = validatedItems[0] || {};
+      const productTitle: string = firstItem.title || `#${orderNumber}`;
+      const sellerNotifData = firstItem.image
+        ? { link: `/profile/listings/sales/${orderId}`, imageUrl: firstItem.image }
+        : { link: `/profile/listings/sales/${orderId}` };
       firestoreCreate(
         'notifications',
         {
           userId: sellerId,
-          title: `New sale — #${orderNumber}`,
+          title: `New sale — ${productTitle}`,
           message: 'You have a new order to prepare.',
           type: 'order_update',
           read: false,
           createdAt,
-          data: { link: `/profile/listings/sales/${orderId}` },
+          data: sellerNotifData,
         },
         idToken,
       ).catch((e) => console.warn('seller notification failed', e));
     }
 
     // In-app notification for the buyer.
-    firestoreCreate(
-      'notifications',
-      {
-        userId: buyerId,
-        title: `Order placed — #${orderNumber}`,
-        message: 'Your order has been received.',
-        type: 'order_update',
-        read: false,
-        createdAt,
-        data: { link: `/profile/orders/${orderId}` },
-      },
-      idToken,
-    ).catch((e) => console.warn('buyer notification failed', e));
+    {
+      const firstItem: any = validatedItems[0] || {};
+      const productTitle: string = firstItem.title || `#${orderNumber}`;
+      const buyerData = firstItem.image
+        ? { link: `/profile/orders/${orderId}`, imageUrl: firstItem.image }
+        : { link: `/profile/orders/${orderId}` };
+      firestoreCreate(
+        'notifications',
+        {
+          userId: buyerId,
+          title: `${productTitle} — Order placed`,
+          message: 'Your order has been received.',
+          type: 'order_update',
+          read: false,
+          createdAt,
+          data: buyerData,
+        },
+        idToken,
+      ).catch((e) => console.warn('buyer notification failed', e));
+    }
 
     return NextResponse.json({ clientSecret: pi.client_secret, orderId });
   } catch (err: any) {

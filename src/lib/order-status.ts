@@ -22,6 +22,12 @@ export type OrderStatus =
   | 'cancelled'
   | 'refunded';
 
+/**
+ * Synthetic timeline step (not a real order status). Used only on the seller
+ * timeline as the final "waiting for the platform to pay me out" step.
+ */
+export type SellerTimelineStep = OrderStatus | 'awaiting_payout';
+
 export type Audience = 'buyer' | 'seller' | 'admin';
 
 /** Higher = further along the happy path. Off-path values use -1. */
@@ -37,6 +43,7 @@ export const STATUS_RANK: Record<string, number> = {
   refund_requested: 4,
   cancelled: -1,
   refunded: -1,
+  awaiting_payout: 6,
 };
 
 const LABELS: Record<string, Record<Audience, string>> = {
@@ -72,7 +79,7 @@ const LABELS: Record<string, Record<Audience, string>> = {
   },
   completed: {
     buyer: 'Order Completed',
-    seller: 'Waiting for Payment',
+    seller: 'Order Completed',
     admin: 'Completed',
   },
   cancel_requested: {
@@ -87,6 +94,11 @@ const LABELS: Record<string, Record<Audience, string>> = {
   },
   cancelled: { buyer: 'Cancelled', seller: 'Cancelled', admin: 'Cancelled' },
   refunded: { buyer: 'Refunded', seller: 'Refunded', admin: 'Refunded' },
+  awaiting_payout: {
+    buyer: 'Order Completed',
+    seller: 'Waiting for Payment',
+    admin: 'Awaiting Payout',
+  },
 };
 
 export function statusLabel(status: string, audience: Audience): string {
@@ -125,13 +137,23 @@ export function nextAdminTransition(
   }
 }
 
-/** Steps shown on a 5-step timeline, ordered. */
+/** Steps shown on the buyer's 5-step timeline, ordered. */
 export const TIMELINE_STEPS: OrderStatus[] = [
   'confirmed',
   'in_preparation',
   'prepared',
   'shipped',
   'completed',
+];
+
+/** Seller timeline has a 6th step: post-completion payout pending. */
+export const TIMELINE_STEPS_SELLER: SellerTimelineStep[] = [
+  'confirmed',
+  'in_preparation',
+  'prepared',
+  'shipped',
+  'completed',
+  'awaiting_payout',
 ];
 
 export function stepState(

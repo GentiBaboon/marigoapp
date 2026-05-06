@@ -36,7 +36,7 @@ export async function notifyUser({ firestore, userId, title, message, type = 'or
     if (Object.keys(data).length > 0) payload.data = data;
     return await addDoc(collection(firestore, 'notifications'), payload);
   } catch (err) {
-    console.warn('[notifyUser] failed', err);
+    console.error('[notifyUser] failed to write notification for userId:', userId, err);
     return null;
   }
 }
@@ -49,18 +49,29 @@ export function notifyOrderStatus(args: {
   status: string;
   link: string;
   audience: Audience;
+  productTitle?: string;
+  productImage?: string;
 }) {
-  const { firestore, userId, orderNumber, status, link, audience } = args;
+  const { firestore, userId, orderNumber, status, link, audience, productTitle, productImage } = args;
   const label = statusLabel(status, audience);
-  const prefix = audience === 'seller' ? 'Sale' : 'Order';
-  const title = `${prefix} #${orderNumber} — ${label}`;
+  // Prefer product name, fall back to order ref so old code paths still work.
+  const subject = productTitle?.trim() || `#${orderNumber}`;
+  const title = `${subject} — ${label}`;
   const message =
     audience === 'buyer'
       ? `Your order is now: ${label}.`
       : audience === 'seller'
         ? `Your sale is now: ${label}.`
         : `Order status: ${label}.`;
-  return notifyUser({ firestore, userId, title, message, type: 'order_update', link });
+  return notifyUser({
+    firestore,
+    userId,
+    title,
+    message,
+    type: 'order_update',
+    link,
+    imageUrl: productImage,
+  });
 }
 
 export function humanReadableStatus(status: string): string {

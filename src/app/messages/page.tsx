@@ -75,7 +75,7 @@ export default function MessagesPage() {
     }, [user, firestore]);
 
     const { data: conversations, isLoading: areConversationsLoading } = useCollection<FirestoreConversation>(conversationsQuery);
-    
+
     const isLoading = isUserLoading || areConversationsLoading || isUserProfileLoading;
 
     if (!user && !isUserLoading) {

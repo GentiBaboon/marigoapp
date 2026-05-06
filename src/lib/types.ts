@@ -221,6 +221,9 @@ export interface FirestoreOrder {
   taxRate?: number;
   /** Append-only log of status transitions for buyer/seller history view. */
   statusHistory?: Array<{ status: string; at: string; by?: string }>;
+  /** Set when the seller has filed a cancellation request (pending admin review). */
+  sellerCancelRequested?: boolean;
+  sellerCancelReason?: string;
 }
 
 // --- Shared Components ---
@@ -409,19 +412,46 @@ export interface FirestoreSettings {
   taxEnabled?: boolean;
   taxRate?: number;
   taxLabel?: string;
+  relatedProducts?: RelatedProductsConfig;
 }
+
+export interface RelatedProductsConfig {
+  enabled: boolean;
+  /** How many products to show in the rail. */
+  count: number;
+  /** Primary similarity field used to find related items. */
+  matchBy: 'subcategory' | 'brand' | 'gender';
+  /** Whether to additionally restrict to the same gender. */
+  sameGender: boolean;
+  /** Sort order applied client-side after the Firestore query. */
+  sortBy: 'newest' | 'priceAsc' | 'priceDesc';
+}
+
+export const DEFAULT_RELATED_PRODUCTS_CONFIG: RelatedProductsConfig = {
+  enabled: true,
+  count: 8,
+  matchBy: 'subcategory',
+  sameGender: true,
+  sortBy: 'newest',
+};
 
 // --- Messaging ---
 export interface FirestoreConversation {
   id: string;
   participants: string[];
-  participantDetails: Array<{ userId: string; name: string; avatar?: string }>;
+  participantDetails: Array<{ userId: string; name: string; avatar?: string; role?: string }>;
   productId: string;
   productTitle: string;
   productImage: string;
   lastMessage: string;
   lastMessageAt: FirestoreTimestamp;
   unreadCount: Record<string, number>;
+  /** Where the conversation originated. 'dispute' = admin support thread. */
+  source?: 'dispute' | string;
+  /** Set when the linked dispute is closed/resolved so the thread becomes read-only. */
+  caseClosed?: boolean;
+  caseStatus?: 'open' | 'investigating' | 'resolved' | 'closed';
+  disputeId?: string;
 }
 
 export interface FirestoreMessage {
@@ -430,6 +460,9 @@ export interface FirestoreMessage {
   content: string;
   createdAt: FirestoreTimestamp;
   read: boolean;
+  /** Author role — used to style admin/dispute messages distinctly. */
+  senderRole?: 'buyer' | 'seller' | 'admin' | 'system';
+  senderName?: string;
 }
 
 // --- Reviews & Notifications ---
@@ -549,6 +582,14 @@ export interface FirestoreDispute {
   createdAt: FirestoreTimestamp;
   resolvedAt?: FirestoreTimestamp;
   resolvedBy?: string;
+  /** Tags how the dispute was opened, e.g. "seller_cancel_request". */
+  source?: string;
+  cancellationFee?: number;
+  /** Denormalized product info so admin views and chat threads can show
+   *  the item name/image without fetching the order. */
+  productId?: string;
+  productTitle?: string;
+  productImage?: string;
 }
 
 // --- Returns ---

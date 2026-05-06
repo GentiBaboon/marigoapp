@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { notifyOrderStatus } from '@/lib/notifications';
 
 const ORDER_STATUSES = [
   { value: 'confirmed', label: 'Confirmed' },
@@ -150,32 +151,36 @@ export default function AdminOrderDetailPage() {
 
       // Notify the buyer + every seller involved so the change is visible
       // immediately in the bell badge.
-      const { notifyOrderStatus } = await import('@/lib/notifications');
       const buyerLink = `/profile/orders/${order.id}`;
       const sellerLink = `/profile/listings/sales/${order.id}`;
-      const targets: Promise<any>[] = [
-        notifyOrderStatus({
-          firestore,
-          userId: order.buyerId,
-          orderNumber: order.orderNumber,
-          status: newStatus,
-          link: buyerLink,
-          audience: 'buyer',
-        }),
-      ];
+      const firstItem = order.items?.[0];
+      const productTitle = firstItem?.title;
+      const productImage = firstItem?.image;
+      const notifyTargets: Array<{ userId: string; audience: 'buyer' | 'seller'; link: string }> = [];
+      if (order.buyerId) {
+        notifyTargets.push({ userId: order.buyerId, audience: 'buyer', link: buyerLink });
+      }
       Array.from(new Set(order.sellerIds || [])).forEach((sellerId) => {
-        targets.push(
+        if (sellerId) notifyTargets.push({ userId: sellerId, audience: 'seller', link: sellerLink });
+      });
+
+      await Promise.all(
+        notifyTargets.map(({ userId, audience, link }) =>
           notifyOrderStatus({
             firestore,
-            userId: sellerId,
+            userId,
             orderNumber: order.orderNumber,
             status: newStatus,
-            link: sellerLink,
-            audience: 'seller',
+            link,
+            audience,
+            productTitle,
+            productImage,
+          }).then((result) => {
+            if (!result) console.error(`[admin] notification failed for ${audience} userId=${userId}`);
+            return result;
           }),
-        );
-      });
-      await Promise.all(targets);
+        ),
+      );
 
       await addDoc(collection(firestore, 'admin_logs'), {
         adminId: adminUser.uid,
@@ -285,6 +290,25 @@ export default function AdminOrderDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Status History */}
+      {order.statusHistory && order.statusHistory.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle>Status history</CardTitle></CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm">
+              {[...order.statusHistory]
+                .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+                .map((entry, i) => (
+                  <li key={`${entry.status}-${entry.at}-${i}`} className="flex justify-between gap-4 border-b pb-2 last:border-b-0">
+                    <span className="font-medium">{statusLabel(entry.status, 'admin')}</span>
+                    <span className="text-muted-foreground">{format(new Date(entry.at), 'd MMM yyyy · HH:mm')}</span>
+                  </li>
+                ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Items */}
       <Card>

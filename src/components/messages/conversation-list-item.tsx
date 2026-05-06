@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { FirestoreConversation } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ShieldCheck, Lock } from 'lucide-react';
 
 function tsToDate(ts: any): Date | null {
   if (!ts) return null;
@@ -20,26 +21,52 @@ interface ConversationListItemProps {
 }
 
 export function ConversationListItem({ conversation, currentUserId }: ConversationListItemProps) {
-  const otherParticipant = conversation.participantDetails.find(p => p.userId !== currentUserId);
+  const isDispute = conversation.source === 'dispute';
+  // Fall back to a synthetic "Marigo Support" identity for dispute threads
+  // when the current user happens to be the only participant (e.g. an admin
+  // who is also the seller in the same account, or a placeholder fixture).
+  const otherFromDetails = conversation.participantDetails.find(p => p.userId !== currentUserId);
+  const otherParticipant =
+    otherFromDetails ||
+    (isDispute
+      ? ({ userId: 'support', name: 'Marigo Support', avatar: undefined, role: 'admin' } as any)
+      : conversation.participantDetails.find(p => (p as any).role === 'admin'));
   const unreadCount = conversation.unreadCount?.[currentUserId] ?? 0;
   const hasUnread = unreadCount > 0;
   const date = tsToDate(conversation.lastMessageAt);
 
   if (!otherParticipant) return null;
 
+  const isClosed = !!conversation.caseClosed;
+
   return (
-    <Link href={`/messages/${conversation.id}`} className="block hover:bg-muted/50 transition-colors">
+    <Link href={`/messages/${conversation.id}`} className={cn('block hover:bg-muted/50 transition-colors', isDispute && !isClosed && 'bg-amber-50/50')}>
       <div className="flex items-center gap-4 p-4 border-b">
         <div className="relative flex-shrink-0">
-          <Avatar className="h-12 w-12">
+          <Avatar className={cn('h-12 w-12', isDispute && 'ring-2 ring-amber-400')}>
             <AvatarImage src={otherParticipant.avatar} alt={otherParticipant.name} />
             <AvatarFallback>{otherParticipant.name.charAt(0)}</AvatarFallback>
           </Avatar>
+          {isDispute && (
+            <span className="absolute -bottom-1 -right-1 bg-amber-500 text-white rounded-full p-0.5 border-2 border-background">
+              {isClosed ? <Lock className="h-2.5 w-2.5" /> : <ShieldCheck className="h-2.5 w-2.5" />}
+            </span>
+          )}
         </div>
         <div className="flex-1 overflow-hidden">
           <div className="flex justify-between items-center">
-            <p className={cn('truncate', hasUnread ? 'font-bold text-foreground' : 'font-semibold')}>
+            <p className={cn('truncate flex items-center gap-2', hasUnread ? 'font-bold text-foreground' : 'font-semibold')}>
               {otherParticipant.name}
+              {isDispute && (
+                <span className={cn(
+                  'text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded-full border',
+                  isClosed
+                    ? 'bg-muted text-muted-foreground border-muted-foreground/20'
+                    : 'bg-amber-100 text-amber-900 border-amber-300'
+                )}>
+                  {isClosed ? `Case ${conversation.caseStatus || 'closed'}` : 'Dispute case'}
+                </span>
+              )}
             </p>
             <p className="text-xs text-muted-foreground whitespace-nowrap ml-2">
               {date ? formatDistanceToNow(date, { addSuffix: true }) : ''}

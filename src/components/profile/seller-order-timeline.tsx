@@ -8,7 +8,7 @@ import { MessageSquare, Clock, Copy, Pencil } from 'lucide-react';
 import type { FirestoreOrder, FirestoreAddress } from '@/lib/types';
 import { format, addDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { STATUS_RANK, statusLabel, stepState, TIMELINE_STEPS } from '@/lib/order-status';
+import { STATUS_RANK, statusLabel, stepState, TIMELINE_STEPS_SELLER } from '@/lib/order-status';
 
 const TimelineDot = ({ state }: { state: 'completed' | 'current' | 'upcoming' }) => {
     return (
@@ -32,7 +32,13 @@ interface SellerOrderTimelineProps {
 export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderTimelineProps) {
     const { status } = order;
     const { toast } = useToast();
-    const rank = STATUS_RANK[status] ?? 0;
+    const isTerminal = status === 'cancelled' || status === 'refunded';
+    const historyMaxRank = (order.statusHistory || []).reduce((max, e) => {
+        const r = STATUS_RANK[e.status] ?? -1;
+        return r > max ? r : max;
+    }, -1);
+    const liveRank = STATUS_RANK[status] ?? 0;
+    const rank = isTerminal ? Math.max(historyMaxRank, 0) : liveRank;
 
     const createdMs = (() => {
         const c = order.createdAt as any;
@@ -45,7 +51,7 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
     const saleDate = new Date(createdMs);
     const shipByDate = addDays(saleDate, 7);
 
-    const isAwaitingShip = status === 'confirmed' || status === 'processing' || status === 'in_preparation' || status === 'prepared';
+    const isAwaitingShip = !isTerminal && (status === 'confirmed' || status === 'processing' || status === 'in_preparation' || status === 'prepared');
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text).then(() => {
@@ -55,16 +61,22 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
 
     return (
         <div>
+            {isTerminal && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 mb-4">
+                    <p className="font-semibold">Sale {status === 'cancelled' ? 'cancelled' : 'refunded'}</p>
+                    <p className="text-xs text-red-700/80">Steps completed before this point remain marked done below.</p>
+                </div>
+            )}
             <div className="relative ml-2">
                 <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-200" />
 
-                {TIMELINE_STEPS.map((step, idx) => {
+                {TIMELINE_STEPS_SELLER.map((step, idx) => {
                     const stepRank = STATUS_RANK[step] ?? idx + 1;
                     const state = stepState(rank, stepRank);
                     const renderActionCard = (step === 'in_preparation' || step === 'prepared') && isAwaitingShip && state === 'current';
 
                     return (
-                        <div key={step} className={cn("relative pl-8", idx === TIMELINE_STEPS.length - 1 ? "" : "pb-10")}>
+                        <div key={step} className={cn("relative pl-8", idx === TIMELINE_STEPS_SELLER.length - 1 ? "" : "pb-10")}>
                             <TimelineDot state={state} />
                             {step === 'confirmed' && state !== 'upcoming' ? (
                                 <>

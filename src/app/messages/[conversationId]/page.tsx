@@ -10,6 +10,7 @@ import { ChatInput } from '@/components/messages/chat-input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ShieldCheck, Lock } from 'lucide-react';
 
 function ChatSkeleton() {
   return (
@@ -68,7 +69,12 @@ export default function ChatPage({ params }: { params: { conversationId: string 
 
   const { data: messages } = useCollection<FirestoreMessage>(messagesQuery);
 
-  const otherUser = conversation?.participantDetails.find(p => p.userId !== user?.uid);
+  const isDisputeConv = conversation?.source === 'dispute';
+  const fallbackOtherUser = isDisputeConv
+    ? ({ userId: 'support', name: 'Marigo Support', avatar: undefined } as any)
+    : undefined;
+  const otherUser =
+    conversation?.participantDetails.find(p => p.userId !== user?.uid) || fallbackOtherUser;
   const otherUserId = otherUser?.userId;
 
   // Detect if the other user is typing
@@ -76,29 +82,31 @@ export default function ChatPage({ params }: { params: { conversationId: string 
     ? (conversation as any)?.typing?.[otherUserId] === true
     : false;
 
-  // Mark unread messages as read when conversation opens
+  // Mark unread messages as read AND clear the user's unreadCount on open.
+  // The count is always reset, even if every message is already flagged read,
+  // so the bell badge clears for cases where the count drifted out of sync
+  // (e.g. dispute mirrors where senderId == currentUser.uid).
   React.useEffect(() => {
-    if (!user || !firestore || !messages || hasMarkedRead.current) return;
+    if (!user || !firestore || !messages || !conversation || hasMarkedRead.current) return;
     hasMarkedRead.current = true;
-
-    const unreadFromOther = messages.filter(m => m.senderId !== user.uid && !m.read);
-    if (unreadFromOther.length === 0) return;
 
     const batch = writeBatch(firestore);
 
-    // Mark individual messages as read
+    const unreadFromOther = messages.filter(m => m.senderId !== user.uid && !m.read);
     unreadFromOther.forEach(m => {
       const msgRef = doc(firestore, 'conversations', conversationId, 'messages', m.id);
       batch.update(msgRef, { read: true });
     });
 
-    // Reset unread count for current user
-    if (conversationRef) {
+    const currentCount = conversation.unreadCount?.[user.uid] ?? 0;
+    if (conversationRef && (currentCount > 0 || unreadFromOther.length > 0)) {
       batch.update(conversationRef, { [`unreadCount.${user.uid}`]: 0 });
     }
 
-    batch.commit().catch(() => {/* ignore */});
-  }, [messages, user, firestore, conversationId, conversationRef]);
+    if (unreadFromOther.length > 0 || currentCount > 0) {
+      batch.commit().catch(() => {/* ignore */});
+    }
+  }, [messages, user, firestore, conversationId, conversationRef, conversation]);
 
   // Scroll to bottom on new messages
   React.useEffect(() => {
@@ -109,6 +117,9 @@ export default function ChatPage({ params }: { params: { conversationId: string 
     return <Card className="h-full flex flex-col"><ChatSkeleton /></Card>;
   }
 
+  const isDispute = conversation?.source === 'dispute';
+  const isClosed = !!conversation?.caseClosed;
+
   return (
     <Card className="h-full flex flex-col overflow-hidden">
       {otherUser && conversation && (
@@ -117,6 +128,23 @@ export default function ChatPage({ params }: { params: { conversationId: string 
           product={{ id: conversation.productId, title: conversation.productTitle, image: conversation.productImage }}
           isTyping={otherUserTyping}
         />
+      )}
+
+      {isDispute && (
+        <div
+          className={
+            isClosed
+              ? 'bg-muted text-muted-foreground border-b px-4 py-2 text-xs flex items-center gap-2'
+              : 'bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2 text-xs flex items-center gap-2 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-100'
+          }
+        >
+          {isClosed ? <Lock className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+          <span className="font-semibold">
+            {isClosed
+              ? `Dispute case ${conversation?.caseStatus || 'closed'} — this thread is read-only.`
+              : 'Dispute case in progress — handled by Marigo Support.'}
+          </span>
+        </div>
       )}
 
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -131,7 +159,13 @@ export default function ChatPage({ params }: { params: { conversationId: string 
         <div ref={bottomRef} />
       </div>
 
-      <ChatInput conversationId={conversationId} otherUserId={otherUserId} />
+      {isClosed ? (
+        <div className="border-t p-4 text-center text-sm text-muted-foreground bg-muted/40">
+          This case has ended. You can no longer reply in this thread.
+        </div>
+      ) : (
+        <ChatInput conversationId={conversationId} otherUserId={otherUserId} />
+      )}
     </Card>
   );
 }

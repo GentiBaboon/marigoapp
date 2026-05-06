@@ -39,6 +39,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrency } from '@/context/CurrencyContext';
 import { AuthenticityBadge } from '@/components/product/AuthenticityBadge';
 import { ProductJsonLd } from '@/components/product/ProductJsonLd';
+import { RelatedProducts } from '@/components/product/RelatedProducts';
 
 function ProductPageSkeleton() {
     return (
@@ -264,6 +265,8 @@ export default function ProductDetailPage() {
             </Accordion>
         </div>
   
+        <RelatedProducts product={product} />
+
         <MakeOfferSheet
           isOpen={isOfferSheetOpen}
           onOpenChange={setIsOfferSheetOpen}

@@ -32,11 +32,19 @@ function toDate(ts: any): Date {
 
 export function OrderTimeline({ order }: { order: FirestoreOrder }) {
     const { status } = order;
-    const rank = STATUS_RANK[status] ?? 0;
+    const isTerminal = status === 'cancelled' || status === 'refunded';
+    // When the order is cancelled/refunded, freeze the timeline at the
+    // highest stage previously reached so completed steps stay green.
+    const historyMaxRank = (order.statusHistory || []).reduce((max, e) => {
+        const r = STATUS_RANK[e.status] ?? -1;
+        return r > max ? r : max;
+    }, -1);
+    const liveRank = STATUS_RANK[status] ?? 0;
+    const rank = isTerminal ? Math.max(historyMaxRank, 0) : liveRank;
     const shipByDate = addDays(toDate(order.createdAt), 7);
     const cancelDate = addDays(shipByDate, 1);
 
-    const isAwaitingShip = status === 'confirmed' || status === 'processing' || status === 'in_preparation' || status === 'prepared';
+    const isAwaitingShip = !isTerminal && (status === 'confirmed' || status === 'processing' || status === 'in_preparation' || status === 'prepared');
 
     return (
         <div className="space-y-6">
@@ -88,12 +96,27 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
                     <ul className="space-y-2 text-sm">
                         {[...order.statusHistory]
                             .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
-                            .map((entry, i) => (
-                                <li key={`${entry.status}-${entry.at}-${i}`} className="flex justify-between gap-4">
-                                    <span className="font-medium">{statusLabel(entry.status, 'buyer')}</span>
-                                    <span className="text-muted-foreground">{format(new Date(entry.at), 'MMM d, yyyy · HH:mm')}</span>
-                                </li>
-                            ))}
+                            .map((entry, i) => {
+                                const isBuyerAction = entry.by && entry.by === order.buyerId;
+                                const isSellerAction = entry.by && (order.sellerIds || []).includes(entry.by);
+                                const isAdminAction = entry.by && !isBuyerAction && !isSellerAction;
+                                let label = statusLabel(entry.status, 'buyer');
+                                if (entry.status === 'cancelled') {
+                                    if (isAdminAction) label = 'Order cancelled by admin';
+                                    else if (isSellerAction) label = 'Order cancelled by seller';
+                                    else if (isBuyerAction) label = 'Order cancelled by customer';
+                                } else if (entry.status === 'refunded') {
+                                    if (isAdminAction) label = 'Order refunded by admin';
+                                    else if (isSellerAction) label = 'Order refunded by seller';
+                                    else if (isBuyerAction) label = 'Order refunded by customer';
+                                }
+                                return (
+                                    <li key={`${entry.status}-${entry.at}-${i}`} className="flex justify-between gap-4">
+                                        <span className="font-medium">{label}</span>
+                                        <span className="text-muted-foreground">{format(new Date(entry.at), 'MMM d, yyyy · HH:mm')}</span>
+                                    </li>
+                                );
+                            })}
                     </ul>
                 </div>
             )}
