@@ -3,9 +3,11 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreProduct, FirestoreOrder } from '@/lib/types';
+import { toDate } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -51,9 +53,25 @@ function EmptyState({ title, description }: { title: string, description: string
     )
 }
 
+const VALID_TABS = ['active', 'sold', 'inactive'] as const;
+type TabValue = (typeof VALID_TABS)[number];
+
 export default function ListingsPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const activeTab: TabValue = (VALID_TABS as readonly string[]).includes(tabParam || '')
+    ? (tabParam as TabValue)
+    : 'active';
+  const handleTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'active') params.delete('tab');
+    else params.set('tab', value);
+    const qs = params.toString();
+    router.replace(qs ? `/profile/listings?${qs}` : '/profile/listings', { scroll: false });
+  };
 
   // Query for products owned by user
   const productsQuery = useMemoFirebase(() => {
@@ -80,9 +98,15 @@ export default function ListingsPage() {
 
   const { active, sold, inactive } = React.useMemo(() => {
     const listingsData = listings || [];
+    const salesData = [...(sales || [])].sort((a, b) => {
+      // Newest first. Fall back to 0 so missing/legacy timestamps sink to the end.
+      const ad = toDate(a.createdAt)?.getTime() ?? 0;
+      const bd = toDate(b.createdAt)?.getTime() ?? 0;
+      return bd - ad;
+    });
     return {
       active: listingsData.filter(l => l.status === 'active'),
-      sold: sales || [], 
+      sold: salesData,
       inactive: listingsData.filter(l => !['active', 'sold'].includes(l.status)),
     };
   }, [listings, sales]);
@@ -117,7 +141,7 @@ export default function ListingsPage() {
               <p className="text-muted-foreground">Manage your boutique and track fulfillment.</p>
           </div>
 
-          <Tabs defaultValue="active" className="w-full">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="grid w-full grid-cols-3 h-12 bg-muted/50 rounded-full p-1 mb-8">
               <TabsTrigger value="active" className="rounded-full">Active ({active.length})</TabsTrigger>
               <TabsTrigger value="sold" className="rounded-full">Sold ({sold.length})</TabsTrigger>

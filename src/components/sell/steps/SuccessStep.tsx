@@ -1,5 +1,5 @@
 'use client';
-import { Sprout, Check, ExternalLink, ArrowRight } from 'lucide-react';
+import { Sprout, Check, ExternalLink, ArrowRight, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useSellForm } from '@/components/sell/SellFormContext';
@@ -30,14 +30,14 @@ export function SuccessStep() {
 
     return (
         <div className="flex flex-col items-center text-center space-y-6 pt-4 pb-12 animate-in fade-in zoom-in duration-700">
-            <div className="h-20 w-20 rounded-full bg-green-500 flex items-center justify-center mb-2 shadow-xl shadow-green-100">
-                <Check className="h-10 w-10 text-white" strokeWidth={4} />
+            <div className="h-20 w-20 rounded-full bg-amber-500 flex items-center justify-center mb-2 shadow-xl shadow-amber-100">
+                <Clock className="h-10 w-10 text-white" strokeWidth={3} />
             </div>
-            
+
             <div className="space-y-2">
-                <h1 className="text-3xl font-bold font-headline">Listing Successful!</h1>
+                <h1 className="text-3xl font-bold font-headline">Submitted for review</h1>
                 <p className="text-muted-foreground text-sm max-w-xs mx-auto">
-                    Your luxury item is now live on the marketplace. We'll notify you as soon as someone makes an offer.
+                    Our team will review your listing within 24 hours. You&apos;ll get a notification as soon as it goes live on the marketplace.
                 </p>
             </div>
 
@@ -73,8 +73,8 @@ export function SuccessStep() {
 
             {finalData.id && (
                 <Button variant="link" asChild className="text-sm font-bold text-primary group">
-                    <Link href={`/products/${finalData.id}`}>
-                        View my live listing <ExternalLink className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:scale-110" />
+                    <Link href={`/profile/listings`}>
+                        View in my drafts <ExternalLink className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:scale-110" />
                     </Link>
                 </Button>
             )}

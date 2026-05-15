@@ -43,6 +43,13 @@ export function CategoryStep() {
   const brandsQuery = useMemoFirebase(() => collection(firestore, 'brands'), [firestore]);
   const { data: brands } = useCollection<FirestoreBrand>(brandsQuery);
 
+  // Build the dropdown using each subcategory's unique doc `id` as the option
+  // value. Slugs are NOT unique across parents (e.g. "Sandals" exists under
+  // both women's "Shoes" and "Children's Shoes"), so using the slug as the
+  // option value caused selecting one to silently resolve to the other on
+  // read. We still write the slug to formData.subcategoryId on selection so
+  // downstream readers (search filter, related products, edit pages) keep
+  // working without a schema migration.
   const categoryTree = React.useMemo(() => {
     if (!categories) return [];
     const active = categories.filter(c => c.isActive !== false);
@@ -56,10 +63,11 @@ export function CategoryStep() {
           .filter(s => s.parentId === p.id)
           .slice()
           .sort((a, b) => a.name.localeCompare(b.name))
-          .map(s => ({ value: s.slug, label: s.name })),
+          .map(s => ({ value: s.id, label: s.name })),
       }))
       .filter(g => g.items.length > 0);
   }, [categories]);
+
 
   const form = useForm<Step2Values>({
     resolver: zodResolver(sellStep2Schema),
@@ -130,11 +138,24 @@ export function CategoryStep() {
                 <FormLabel className="font-semibold">Category</FormLabel>
                 <FormControl>
                   <Combobox
-                      value={field.value}
-                      onValueChange={(val) => {
-                          field.onChange(val);
-                          const sub = categories?.find(c => c.slug === val);
-                          const parent = categories?.find(c => c.id === sub?.parentId);
+                      value={(() => {
+                        const slug = field.value;
+                        if (!slug || !categories) return '';
+                        const cands = categories.filter(c => c.slug === slug);
+                        if (cands.length <= 1) return cands[0]?.id || '';
+                        const parentName = form.getValues('categoryId');
+                        const match = cands.find(c => categories.find(p => p.id === c.parentId)?.name === parentName);
+                        return (match || cands[0]).id;
+                      })()}
+                      onValueChange={(id) => {
+                          // `id` is the subcategory doc id (unique). Resolve
+                          // back to slug for storage so existing readers
+                          // (search, related products, edit pages) keep
+                          // working unchanged.
+                          const sub = categories?.find(c => c.id === id);
+                          if (!sub) return;
+                          field.onChange(sub.slug);
+                          const parent = categories?.find(c => c.id === sub.parentId);
                           if (parent) form.setValue('categoryId', parent.name);
                       }}
                       items={categoryTree}

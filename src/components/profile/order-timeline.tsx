@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { MessageSquare, Clock } from 'lucide-react';
+import { MessageSquare, Clock, Truck, CheckCircle2 } from 'lucide-react';
 import type { FirestoreOrder } from '@/lib/types';
 import { format, addDays } from 'date-fns';
 import { STATUS_RANK, statusLabel, stepState, TIMELINE_STEPS } from '@/lib/order-status';
@@ -55,6 +55,8 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
                     const stepRank = STATUS_RANK[step] ?? idx + 1;
                     const state = stepState(rank, stepRank);
                     const isCurrentPrep = (step === 'in_preparation' || step === 'prepared') && isAwaitingShip && state === 'current';
+                    const isCurrentShipped = step === 'shipped' && status === 'shipped' && state === 'current';
+                    const isCurrentCompleted = step === 'completed' && status === 'completed' && state === 'current';
 
                     return (
                         <div key={step} className={cn("relative pl-8", idx === TIMELINE_STEPS.length - 1 ? "" : "pb-10")}>
@@ -64,6 +66,28 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
                                     <h4 className="font-semibold">{statusLabel('confirmed', 'buyer')}</h4>
                                     <p className="text-sm text-muted-foreground">On {format(toDate(order.createdAt), 'MMMM d, yyyy')}</p>
                                 </>
+                            ) : isCurrentShipped ? (
+                                <Card className="shadow-md -ml-4 border-purple-500">
+                                    <CardContent className="p-4 space-y-2">
+                                        <Badge variant="outline" className="border-purple-500 text-purple-700 bg-purple-50 font-semibold">
+                                            <Truck className="mr-1.5 h-3 w-3" />
+                                            ON ITS WAY
+                                        </Badge>
+                                        <h4 className="font-semibold text-lg">{statusLabel('shipped', 'buyer')}</h4>
+                                        <p className="text-sm text-muted-foreground">Your package is on its way and the courier will contact you in 24 hours. Please make sure to be available to pick up your order and not cause delays.</p>
+                                    </CardContent>
+                                </Card>
+                            ) : isCurrentCompleted ? (
+                                <Card className="shadow-md -ml-4 border-green-500">
+                                    <CardContent className="p-4 space-y-2">
+                                        <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50 font-semibold">
+                                            <CheckCircle2 className="mr-1.5 h-3 w-3" />
+                                            DELIVERED
+                                        </Badge>
+                                        <h4 className="font-semibold text-lg">{statusLabel('completed', 'buyer')}</h4>
+                                        <p className="text-sm text-muted-foreground">Your order has been delivered. Thank you for shopping with Marigo!</p>
+                                    </CardContent>
+                                </Card>
                             ) : isCurrentPrep ? (
                                 <Card className="shadow-md -ml-4">
                                     <CardContent className="p-4 space-y-3">

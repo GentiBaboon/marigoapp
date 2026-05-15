@@ -43,20 +43,33 @@ export const updateOrderStatus = onCall({region: "europe-west1"}, async (request
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  // 1. Mark products as sold
-  if (["paid", "processing", "shipped"].includes(newStatus) && !["paid", "processing", "shipped"].includes(oldStatus)) {
+  // 1. On completion, only flip out-of-stock listings to "sold". Listings
+  //    with remaining stock stay "active" so other buyers can keep ordering
+  //    the remaining units. Stock was decremented at checkout time.
+  if (newStatus === "completed" && oldStatus !== "completed") {
     const batch = db.batch();
-    (order.items || []).forEach((item: any) => {
-      batch.update(db.collection("products").doc(item.id), {status: "sold", updatedAt: admin.firestore.FieldValue.serverTimestamp()});
-    });
+    for (const item of (order.items || [])) {
+      const ref = db.collection("products").doc(item.id);
+      const snap = await ref.get();
+      const data = snap.exists ? (snap.data() as any) : null;
+      if (data && (data.quantity ?? 0) <= 0 && data.status !== "sold") {
+        batch.update(ref, {status: "sold", updatedAt: admin.firestore.FieldValue.serverTimestamp()});
+      }
+    }
     await batch.commit();
   }
 
-  // 2. Release products back if cancelled/refunded
-  if (["cancelled", "refunded"].includes(newStatus)) {
+  // 2. Cancelled/refunded → restore stock and re-list each item. Uses
+  //    increment(qty) so concurrent restocks don't clobber each other.
+  if (["cancelled", "refunded"].includes(newStatus) && !["cancelled", "refunded"].includes(oldStatus)) {
     const batch = db.batch();
     (order.items || []).forEach((item: any) => {
-      batch.update(db.collection("products").doc(item.id), {status: "active", updatedAt: admin.firestore.FieldValue.serverTimestamp()});
+      const qty = typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : 1;
+      batch.update(db.collection("products").doc(item.id), {
+        quantity: admin.firestore.FieldValue.increment(qty),
+        status: "active",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
     });
     await batch.commit();
   }

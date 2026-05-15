@@ -92,14 +92,32 @@ export const ProductCard = React.memo(function ProductCard({ product, className 
           </Button>
         </div>
         <div className="mt-1">
-          {product.originalPrice && (
-            <p className="text-[10px] text-muted-foreground line-through">
-              {formatPrice(product.originalPrice)}
-            </p>
-          )}
-          <p className="font-bold text-sm">
-            {product.price ? formatPrice(product.price) : 'Contact for price'}
-          </p>
+          {(() => {
+            const hasDiscount =
+              typeof product.originalPrice === 'number' &&
+              typeof product.price === 'number' &&
+              product.originalPrice > product.price;
+            const pct = hasDiscount
+              ? Math.round(((product.originalPrice! - product.price!) / product.originalPrice!) * 100)
+              : 0;
+            return (
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <p className="font-bold text-sm">
+                  {product.price ? formatPrice(product.price) : 'Contact for price'}
+                </p>
+                {hasDiscount && (
+                  <>
+                    <p className="text-[10px] text-[#E63946] line-through">
+                      {formatPrice(product.originalPrice!)}
+                    </p>
+                    <span className="text-[9px] font-bold text-green-700">
+                      −{pct}%
+                    </span>
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

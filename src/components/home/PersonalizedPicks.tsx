@@ -70,7 +70,7 @@ export function PersonalizedPicks() {
 
                 // 3. Build and fetch recommended products
                 const queryConstraints: QueryConstraint[] = [
-                  where('status', 'in', ['active', 'reserved']),
+                  where('status', 'in', ['active', 'reserved', 'sold']),
                 ];
 
                 if (recommendationQuery.query.brands && recommendationQuery.query.brands.length > 0) {
@@ -134,6 +134,7 @@ export function PersonalizedPicks() {
                             brandId: p.brandId,
                             title: p.title,
                             price: p.price,
+                            originalPrice: p.originalPrice,
                             images: p.images,
                             sellerId: p.sellerId,
                             size: p.size,

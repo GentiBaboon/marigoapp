@@ -97,8 +97,11 @@ export default function EditListingPage() {
   const { data: product, isLoading: isProductLoading } = useDoc<FirestoreProduct>(productRef);
 
   // ── Dynamic Metadata ──
+  // Pull all categories and filter active client-side. A strict
+  // `where('isActive','==',true)` filter silently drops seeded records that
+  // are missing the field.
   const categoriesQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'categories'), where('isActive', '==', true)) : null),
+    () => (firestore ? collection(firestore, 'categories') : null),
     [firestore]
   );
   const brandsQuery = useMemoFirebase(
@@ -135,14 +138,23 @@ export default function EditListingPage() {
   const { data: addresses } = useCollection<FirestoreAddress>(addressesCollection);
 
   // ── Category Tree for Combobox ──
+  // Option values use each subcategory's unique doc `id`. Slugs collide
+  // across parents (e.g. "Sandals" under both women's and children's shoes),
+  // so using the slug as the option value would make the dropdown ambiguous.
+  // On selection we still write the slug to `subcategoryId` for storage.
   const categoryTree = React.useMemo(() => {
     if (!categories) return [];
-    const parents = categories.filter(c => !c.parentId);
-    const subs = categories.filter(c => c.parentId);
+    const active = categories.filter(c => c.isActive !== false);
+    const parents = active.filter(c => !c.parentId).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    const subs = active.filter(c => c.parentId).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     return parents
       .map(p => ({
         heading: p.name,
-        items: subs.filter(s => s.parentId === p.id).map(s => ({ value: s.slug, label: s.name })),
+        items: subs
+          .filter(s => s.parentId === p.id)
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(s => ({ value: s.id, label: s.name })),
       }))
       .filter(g => g.items.length > 0);
   }, [categories]);
@@ -432,11 +444,18 @@ export default function EditListingPage() {
           <div className="space-y-2">
             <Label className="font-semibold">Category</Label>
             <Combobox
-              value={subcategoryId}
-              onValueChange={(val) => {
-                setSubcategoryId(val);
-                const sub = categories?.find(c => c.slug === val);
-                const parent = categories?.find(c => c.id === sub?.parentId);
+              value={(() => {
+                if (!subcategoryId || !categories) return '';
+                const cands = categories.filter(c => c.slug === subcategoryId);
+                if (cands.length <= 1) return cands[0]?.id || '';
+                const match = cands.find(c => categories.find(p => p.id === c.parentId)?.name === categoryId);
+                return (match || cands[0]).id;
+              })()}
+              onValueChange={(id) => {
+                const sub = categories?.find(c => c.id === id);
+                if (!sub) return;
+                setSubcategoryId(sub.slug);
+                const parent = categories?.find(c => c.id === sub.parentId);
                 if (parent) setCategoryId(parent.name);
               }}
               items={categoryTree}

@@ -51,7 +51,10 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
 
   const getStatusLabel = (s: string) => {
       if (s === 'processing') return 'Action Needed';
-      if (s === 'pending_review') return 'In Review';
+      // New listings sit in `pending_review` until an admin approves them.
+      // From the seller's perspective the listing isn't live yet — show
+      // "Draft" so it's clear at a glance.
+      if (s === 'pending_review') return 'Draft';
       return s.charAt(0).toUpperCase() + s.slice(1);
   };
 

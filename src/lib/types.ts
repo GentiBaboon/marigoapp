@@ -129,6 +129,28 @@ export interface FirestoreUser {
   kycDocuments?: Array<{ url: string; type: string; uploadedAt: string }>;
   isVerifiedSeller?: boolean;
   kycRejectionReason?: string;
+  // Denormalized count of completed sales — drives the seller badge level.
+  // Bumped when admin marks an order as completed in the order detail page.
+  salesCount?: number;
+  // Admin-controlled flag. When true, the seller gets the "Official Registered
+  // Brand" badge regardless of sales count, AND unlocks multi-variant
+  // (per-size inventory) listings.
+  isOfficialBrand?: boolean;
+}
+
+export type SellerBadgeLevel = 'trusted' | 'expert' | 'activist' | 'official';
+
+export interface SellerBadge {
+  level: SellerBadgeLevel;
+  label: string;
+}
+
+export function getSellerLevel(user: Partial<FirestoreUser> | null | undefined): SellerBadge {
+  if (user?.isOfficialBrand) return { level: 'official', label: 'Official Registered Brand' };
+  const sales = typeof user?.salesCount === 'number' ? user.salesCount : 0;
+  if (sales >= 10) return { level: 'activist', label: 'Fashion Activist' };
+  if (sales >= 5) return { level: 'expert', label: 'Expert Seller' };
+  return { level: 'trusted', label: 'Trusted Seller' };
 }
 
 // --- Products ---
@@ -138,6 +160,13 @@ export interface ProductImage {
   url: string;
   thumbnailUrl?: string;
   position: number;
+}
+
+export interface ProductVariant {
+  /** Size label exactly as it appears in the size chart (e.g. "38", "M"). */
+  size: string;
+  /** Remaining units in stock for this variant. */
+  quantity: number;
 }
 
 export interface FirestoreProduct {
@@ -154,9 +183,22 @@ export interface FirestoreProduct {
   originalPrice?: number;
   currency: "EUR";
   // Available inventory for this listing. Defaults to 1 (unique item) when
-  // older records are missing the field.
+  // older records are missing the field. For multi-variant listings (only
+  // available to Official Registered Brand sellers) this is the sum of all
+  // variant quantities; checkout decrements both the matching variant and
+  // this top-level field so existing readers keep working.
   quantity?: number;
+  // Per-size inventory. Present only when the seller is an "Official
+  // Registered Brand" and they chose to list per-size stock. When this array
+  // exists and is non-empty, the public product page shows a size picker
+  // with stock per size, and checkout decrements the matching variant.
+  variants?: ProductVariant[];
   size?: string;
+  /** Size system the `size` (and any variant sizes) belong to: e.g. "EU",
+   * "US", "UK", "IT", "FR", "International". Set from the seller's size
+   * chart pick in the sell wizard; used by the size-guide popover on the
+   * product page and by the size facet on search. */
+  sizeSystem?: string;
   color?: string;
   material?: string;
   gender: "women" | "men" | "children" | "unisex";
@@ -267,6 +309,7 @@ export const sellStep4Schema = z.object({
   material: z.string().min(1, "Material is required"),
   color: z.string().min(1, "Color is required"),
   sizeValue: z.string().optional(),
+  sizeSystem: z.string().optional(),
   pattern: z.string().optional(),
   vintage: z.boolean().default(false),
 });
@@ -287,11 +330,13 @@ export interface SellFormValues {
   material: string;
   color: string;
   sizeValue?: string;
+  sizeSystem?: string;
   pattern?: string;
   vintage: boolean;
   price: number;
   originalPrice?: number;
   quantity: number;
+  variants?: ProductVariant[];
   listingType: "fixed_price" | "auction";
   allowOffers: boolean;
   shippingMethod: 'baboon' | 'other' | 'free';
@@ -452,6 +497,25 @@ export interface FirestoreConversation {
   caseClosed?: boolean;
   caseStatus?: 'open' | 'investigating' | 'resolved' | 'closed';
   disputeId?: string;
+  /** Mirrors `dispute.source` so the chat header can show what the case
+   *  is about (refund request, cancellation request, …) without an
+   *  extra Firestore read. */
+  disputeKind?: string;
+}
+
+/** Human label for a dispute's `source` tag. Used on chat headers and on
+ *  the admin disputes board so all three audiences see the same wording. */
+export function disputeKindLabel(source?: string): string {
+  switch (source) {
+    case 'buyer_cancel_request':
+      return 'Cancellation request';
+    case 'seller_cancel_request':
+      return 'Cancellation request (seller)';
+    case 'buyer_refund_request':
+      return 'Refund request';
+    default:
+      return 'Dispute';
+  }
 }
 
 export interface FirestoreMessage {

@@ -149,7 +149,7 @@ export async function firestoreUpdate(
     .map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`)
     .join('&');
 
-  await fetch(`${BASE}/${collection}/${docId}?${updateMask}`, {
+  const res = await fetch(`${BASE}/${collection}/${docId}?${updateMask}`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${idToken}`,
@@ -157,6 +157,10 @@ export async function firestoreUpdate(
     },
     body: JSON.stringify({ fields }),
   });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`firestoreUpdate ${collection}/${docId} failed: ${res.status} ${detail}`);
+  }
 }
 
 /** CREATE a new document (POST, auto-generated ID) */

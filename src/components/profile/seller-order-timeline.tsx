@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { MessageSquare, Clock, Copy, Pencil } from 'lucide-react';
+import { MessageSquare, Clock, Copy, Pencil, Truck, CheckCircle2 } from 'lucide-react';
 import type { FirestoreOrder, FirestoreAddress } from '@/lib/types';
 import { format, addDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -74,6 +74,8 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                     const stepRank = STATUS_RANK[step] ?? idx + 1;
                     const state = stepState(rank, stepRank);
                     const renderActionCard = (step === 'in_preparation' || step === 'prepared') && isAwaitingShip && state === 'current';
+                    const isCurrentShipped = step === 'shipped' && status === 'shipped' && state === 'current';
+                    const isCurrentCompleted = step === 'completed' && status === 'completed' && state === 'current';
 
                     return (
                         <div key={step} className={cn("relative pl-8", idx === TIMELINE_STEPS_SELLER.length - 1 ? "" : "pb-10")}>
@@ -83,6 +85,28 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                                     <h4 className="font-semibold">Sale confirmed</h4>
                                     <p className="text-sm text-muted-foreground">On {format(saleDate, 'MMMM d, yyyy')}</p>
                                 </>
+                            ) : isCurrentShipped ? (
+                                <Card className="shadow-md -ml-4 border-purple-500">
+                                    <CardContent className="p-4 space-y-2">
+                                        <Badge variant="outline" className="border-purple-500 text-purple-700 bg-purple-50 font-semibold">
+                                            <Truck className="mr-1.5 h-3 w-3" />
+                                            ON ITS WAY
+                                        </Badge>
+                                        <h4 className="font-semibold text-lg">{statusLabel('shipped', 'seller')}</h4>
+                                        <p className="text-sm text-muted-foreground">Your package is on its way to the customer and you will be notified when they have received it. Delivery estimated in 24 h.</p>
+                                    </CardContent>
+                                </Card>
+                            ) : isCurrentCompleted ? (
+                                <Card className="shadow-md -ml-4 border-green-500">
+                                    <CardContent className="p-4 space-y-2">
+                                        <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50 font-semibold">
+                                            <CheckCircle2 className="mr-1.5 h-3 w-3" />
+                                            DELIVERED
+                                        </Badge>
+                                        <h4 className="font-semibold text-lg">{statusLabel('completed', 'seller')}</h4>
+                                        <p className="text-sm text-muted-foreground">The buyer has received the package. Your payout will be processed shortly.</p>
+                                    </CardContent>
+                                </Card>
                             ) : renderActionCard ? (
                                 <Card className="shadow-md -ml-4 border-orange-500">
                                     <CardContent className="p-4 space-y-4">

@@ -96,6 +96,7 @@ export function RecentlyViewedSection() {
                     brand: p.brand,
                     title: p.title,
                     price: p.price,
+                    originalPrice: p.originalPrice,
                     image: p.images?.[0]?.url || '',
                     sellerId: p.sellerId,
                     size: p.size,

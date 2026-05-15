@@ -17,6 +17,11 @@ import {
   addDoc,
   serverTimestamp,
   getDocs,
+  getDoc,
+  setDoc,
+  arrayUnion,
+  increment,
+  Timestamp,
 } from 'firebase/firestore';
 import type {
   FirestoreProduct,
@@ -137,8 +142,12 @@ export default function AdminProductReviewPage() {
   const { data: offers } = useCollection<FirestoreOffer>(offersQuery);
 
   // ── Attribute collections ──
+  // Pull all categories and filter active client-side. A strict
+  // `where('isActive','==',true)` filter silently drops seeded records that
+  // are missing the `isActive` field — which used to leave this dropdown
+  // showing only a handful of categories.
   const categoriesQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'categories'), where('isActive', '==', true)) : null),
+    () => (firestore ? collection(firestore, 'categories') : null),
     [firestore]
   );
   const brandsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'brands') : null), [firestore]);
@@ -161,17 +170,46 @@ export default function AdminProductReviewPage() {
   const { data: macroFiltersConfig } = useDoc<MacroFiltersConfig>(macroFiltersRef);
 
   // ── Category tree for combobox ──
+  // Uses each subcategory's unique doc `id` as the option value so the
+  // dropdown can disambiguate slugs that collide across parents (e.g.
+  // "Sandals" exists under both women's "Shoes" and "Children's Shoes").
+  // On selection we still write the slug to `subcategoryId` so the rest of
+  // the system (search, related products, product display) keeps working.
   const categoryTree = React.useMemo(() => {
     if (!categories) return [];
-    const parents = categories.filter(c => !c.parentId);
-    const subs = categories.filter(c => c.parentId);
+    const active = categories.filter(c => c.isActive !== false);
+    const parents = active.filter(c => !c.parentId).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    const subs = active.filter(c => c.parentId).slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     return parents
       .map(p => ({
         heading: p.name,
-        items: subs.filter(s => s.parentId === p.id).map(s => ({ value: s.slug, label: s.name })),
+        items: subs
+          .filter(s => s.parentId === p.id)
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(s => ({ value: s.id, label: s.name })),
       }))
       .filter(g => g.items.length > 0);
   }, [categories]);
+
+  // Build combobox items from a Firestore attribute collection. Seeded records
+  // can be missing the `value` field — fall back to a slugified name so the
+  // option still renders. Otherwise the dropdown silently drops most entries.
+  const slugify = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const toAttributeItems = React.useCallback((rows?: FirestoreAttribute[] | null) => {
+    if (!rows) return [];
+    return rows
+      .filter((r) => typeof r?.name === 'string' && r.name.trim().length > 0)
+      .map((r) => ({
+        value: (r.value && r.value.trim()) || slugify(r.name),
+        label: r.name,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, []);
+  const materialItems = React.useMemo(() => toAttributeItems(materials), [materials, toAttributeItems]);
+  const colorItems = React.useMemo(() => toAttributeItems(colors), [colors, toAttributeItems]);
+  const patternItems = React.useMemo(() => toAttributeItems(patterns), [patterns, toAttributeItems]);
 
   // ── Form state ──
   const [images, setImages] = React.useState<ProductImage[]>([]);
@@ -379,8 +417,30 @@ export default function AdminProductReviewPage() {
     if (!firestore || !adminUser || !product) return;
     setIsUpdating(true);
     try {
+      const previousStatus = product.status;
       await updateDoc(doc(firestore, 'products', id), { status: newStatus });
       await logAction('product_status_changed', `Changed "${product.title}" status to "${newStatus}"`);
+
+      // First time a listing is approved for the marketplace: notify the
+      // seller so they know their item is now visible. We only fire this on
+      // the pending_review → active transition (not every time admin pokes
+      // the status, e.g. active → reserved → active during stock changes).
+      if (newStatus === 'active' && previousStatus === 'pending_review' && product.sellerId) {
+        const firstImage = product.images?.[0]?.url || (product.images?.[0] as any)?.thumbnailUrl;
+        await addDoc(collection(firestore, 'notifications'), {
+          userId: product.sellerId,
+          title: `${product.title} — Approved & live`,
+          message: 'Your listing has been approved and is now visible on the marketplace.',
+          type: 'listing_approved',
+          read: false,
+          createdAt: serverTimestamp(),
+          data: {
+            link: `/products/${id}`,
+            ...(firstImage ? { imageUrl: firstImage } : {}),
+          },
+        }).catch(() => null);
+      }
+
       toast({ title: 'Status Updated', description: `Product is now "${newStatus}".` });
     } catch {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to update product status.' });
@@ -556,11 +616,21 @@ export default function AdminProductReviewPage() {
             <div className="space-y-1.5">
               <Label className="font-semibold text-sm">Category</Label>
               <Combobox
-                value={subcategoryId}
-                onValueChange={val => {
-                  setSubcategoryId(val);
-                  const sub = categories?.find(c => c.slug === val);
-                  const parent = categories?.find(c => c.id === sub?.parentId);
+                value={(() => {
+                  if (!subcategoryId || !categories) return '';
+                  const cands = categories.filter(c => c.slug === subcategoryId);
+                  if (cands.length <= 1) return cands[0]?.id || '';
+                  const match = cands.find(c => categories.find(p => p.id === c.parentId)?.name === categoryId);
+                  return (match || cands[0]).id;
+                })()}
+                onValueChange={id => {
+                  // `id` is the subcategory doc id (unique). Resolve to slug
+                  // for storage so the field on the product doc stays in the
+                  // slug format the rest of the app expects.
+                  const sub = categories?.find(c => c.id === id);
+                  if (!sub) return;
+                  setSubcategoryId(sub.slug);
+                  const parent = categories?.find(c => c.id === sub.parentId);
                   if (parent) setCategoryId(parent.name);
                 }}
                 items={categoryTree}
@@ -635,7 +705,7 @@ export default function AdminProductReviewPage() {
                 <Combobox
                   value={material}
                   onValueChange={setMaterial}
-                  items={materials?.map(m => ({ value: m.value, label: m.name })) || []}
+                  items={materialItems}
                   placeholder="Material"
                   searchPlaceholder="Search..."
                   emptyPlaceholder="No results."
@@ -646,7 +716,7 @@ export default function AdminProductReviewPage() {
                 <Combobox
                   value={color}
                   onValueChange={setColor}
-                  items={colors?.map(c => ({ value: c.value, label: c.name })) || []}
+                  items={colorItems}
                   placeholder="Color"
                   searchPlaceholder="Search..."
                   emptyPlaceholder="No results."
@@ -665,7 +735,7 @@ export default function AdminProductReviewPage() {
                 <Combobox
                   value={pattern}
                   onValueChange={setPattern}
-                  items={patterns?.map(p => ({ value: p.value, label: p.name })) || []}
+                  items={patternItems}
                   placeholder="Pattern"
                   searchPlaceholder="Search..."
                   emptyPlaceholder="No results."
@@ -987,6 +1057,14 @@ export default function AdminProductReviewPage() {
         </CardContent>
       </Card>
 
+      <MessageSellerCard
+        firestore={firestore}
+        adminUser={adminUser}
+        product={product}
+        seller={seller}
+        logAction={logAction}
+      />
+
       <ConfirmActionDialog
         open={confirmDeleteOpen}
         onOpenChange={setConfirmDeleteOpen}
@@ -998,5 +1076,129 @@ export default function AdminProductReviewPage() {
         isLoading={isUpdating}
       />
     </div>
+  );
+}
+
+function MessageSellerCard({
+  firestore,
+  adminUser,
+  product,
+  seller,
+  logAction,
+}: {
+  firestore: any;
+  adminUser: any;
+  product: any;
+  seller: any;
+  logAction: (type: string, details: string) => Promise<void> | void;
+}) {
+  const { toast } = useToast();
+  const [text, setText] = React.useState('');
+  const [isSending, setIsSending] = React.useState(false);
+
+  const handleSend = async () => {
+    if (!firestore || !adminUser || !product?.sellerId) return;
+    const message = text.trim();
+    if (!message) {
+      toast({ variant: 'destructive', title: 'Type a message first.' });
+      return;
+    }
+    setIsSending(true);
+    try {
+      const convId = `productmsg_${product.id}`;
+      const convRef = doc(firestore, 'conversations', convId);
+      const convSnap = await getDoc(convRef);
+      const now = Timestamp.now();
+      const supportName = 'Marigo Support';
+      const supportAvatar = '/marigo-logo-icon.svg';
+      const productImage = product.images?.[0]?.url || (product.images?.[0] as any)?.thumbnailUrl || '';
+      const participants = [adminUser.uid, product.sellerId];
+      const details = [
+        { userId: adminUser.uid, name: supportName, avatar: supportAvatar, role: 'admin' },
+        { userId: product.sellerId, name: seller?.name || 'Seller', role: 'seller' },
+      ];
+
+      if (!convSnap.exists()) {
+        await setDoc(convRef, {
+          participants,
+          participantDetails: details,
+          productId: product.id,
+          productTitle: product.title,
+          productImage,
+          lastMessage: message,
+          lastMessageAt: now,
+          unreadCount: { [product.sellerId]: 1 },
+          source: 'admin_message',
+          createdAt: now,
+        });
+      } else {
+        await updateDoc(convRef, {
+          participants: arrayUnion(...participants),
+          participantDetails: details,
+          lastMessage: message,
+          lastMessageAt: now,
+          source: 'admin_message',
+          [`unreadCount.${product.sellerId}`]: increment(1),
+        });
+      }
+      await addDoc(collection(firestore, 'conversations', convId, 'messages'), {
+        senderId: adminUser.uid,
+        senderName: supportName,
+        senderRole: 'admin',
+        content: message,
+        read: false,
+        createdAt: now,
+      });
+
+      // Bell ping for the seller so they notice the new message immediately.
+      await addDoc(collection(firestore, 'notifications'), {
+        userId: product.sellerId,
+        title: `${product.title} — Message from support`,
+        message: message.length > 80 ? `${message.slice(0, 77)}…` : message,
+        type: 'new_message',
+        read: false,
+        createdAt: now,
+        data: {
+          link: `/messages/${convId}`,
+          ...(productImage ? { imageUrl: productImage } : {}),
+        },
+      }).catch(() => null);
+
+      await logAction('admin_message_to_seller', `Messaged seller about "${product.title}"`);
+      toast({ title: 'Sent', description: 'The seller has been notified.' });
+      setText('');
+    } catch (err) {
+      console.warn('admin message send failed:', err);
+      toast({ variant: 'destructive', title: 'Failed to send', description: 'Could not deliver the message.' });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Message Seller</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Send a note to {seller?.name || 'the seller'} about this listing. They&apos;ll receive it as a regular
+          message under <span className="font-semibold">Marigo Support</span>, with a bell notification.
+        </p>
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="e.g. Please add a clearer photo of the back of the bag so we can approve this listing."
+          rows={4}
+          disabled={isSending || !product?.sellerId}
+        />
+        <div className="flex justify-end">
+          <Button onClick={handleSend} disabled={isSending || !text.trim() || !product?.sellerId}>
+            {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Send message
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

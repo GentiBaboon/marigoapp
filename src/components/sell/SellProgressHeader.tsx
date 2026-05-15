@@ -6,7 +6,7 @@ import { ChevronLeft, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export function SellProgressHeader() {
-  const { currentStep, totalSteps, prevStep, goToStep } = useSellForm();
+  const { currentStep, totalSteps, prevStep, goToStep, deselectDraft } = useSellForm();
   const router = useRouter();
   const progress = (currentStep / totalSteps) * 100;
 
@@ -20,14 +20,18 @@ export function SellProgressHeader() {
   ];
 
   const handleClose = () => {
-    // If we're far in the process, prompt or just exit back to main sell page
+    // Step 1's X icon closes the wizard and returns to the Sell home page
+    // (with the drafts list + "List a New Item" button). Deselect the active
+    // draft so /sell renders its landing view instead of resuming the wizard.
+    // The draft itself is preserved and stays in the pending drafts list.
+    deselectDraft();
     router.push('/sell');
   };
 
   return (
     <div className="sticky top-16 bg-background z-30 pt-4 pb-2 space-y-4">
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="icon" onClick={currentStep > 1 ? prevStep : handleClose}>
+        <Button type="button" variant="ghost" size="icon" onClick={currentStep > 1 ? prevStep : handleClose}>
           {currentStep > 1 ? <ChevronLeft className="h-6 w-6" /> : <X className="h-6 w-6" />}
         </Button>
         <div className="text-center">

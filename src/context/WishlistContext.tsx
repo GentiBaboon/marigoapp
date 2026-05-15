@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
@@ -48,6 +48,11 @@ export const WishlistProvider: React.FC<{ children: ReactNode }> = ({ children }
         try {
             const wishlistItemRef = doc(firestore, 'users', user.uid, 'wishlist', productId);
             await setDoc(wishlistItemRef, { addedAt: serverTimestamp() });
+            // Best-effort counter bump on the product doc. Permitted by the
+            // narrow `wishlistCount: ±1` carve-out in firestore.rules. If it
+            // fails (offline, etc.) the wishlist itself is still saved.
+            updateDoc(doc(firestore, 'products', productId), { wishlistCount: increment(1) })
+              .catch((err) => console.warn('wishlistCount bump failed:', err));
             toast({
                 title: 'Added to favorites!',
             });
@@ -76,6 +81,8 @@ export const WishlistProvider: React.FC<{ children: ReactNode }> = ({ children }
         try {
             const wishlistItemRef = doc(firestore, 'users', user.uid, 'wishlist', productId);
             await deleteDoc(wishlistItemRef);
+            updateDoc(doc(firestore, 'products', productId), { wishlistCount: increment(-1) })
+              .catch((err) => console.warn('wishlistCount decrement failed:', err));
             toast({
                 title: 'Removed from favorites.',
             });

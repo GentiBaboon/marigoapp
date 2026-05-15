@@ -18,7 +18,7 @@ import {
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Skeleton } from './ui/skeleton';
 import {
   Info,
@@ -39,6 +39,9 @@ import { useCart } from '@/context/CartContext';
 import { doc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { FirestoreUser } from '@/lib/types';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { NotificationsPopover } from './header-popovers/NotificationsPopover';
+import { MessagesPopover } from './header-popovers/MessagesPopover';
+import { CartPopover } from './header-popovers/CartPopover';
 
 
 const getInitials = (name: string | null | undefined) => {
@@ -55,6 +58,19 @@ export function UserNav() {
   const auth = useAuth();
   const firestore = useFirestore();
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Toggle nav: if the user is already on the target route, treat a second
+  // click on the icon as "close" and navigate back to wherever they came
+  // from. Falls back to /home if there's no history to pop.
+  const toggleNav = (target: string) => {
+    if (pathname === target || pathname?.startsWith(target + '/')) {
+      if (typeof window !== 'undefined' && window.history.length > 1) router.back();
+      else router.push('/home');
+    } else {
+      router.push(target);
+    }
+  };
   const { currency, setCurrency } = useCurrency();
   const { t } = useTranslation();
   const { items: cartItems } = useCart();
@@ -128,38 +144,9 @@ export function UserNav() {
         <LanguageSwitcher />
       </div>
       
-      <Button asChild variant="ghost" size="icon" aria-label="Notifications" className="relative">
-        <Link href="/notifications">
-          <Bell className="h-6 w-6" />
-          {unreadNotifications > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
-              {unreadNotifications > 9 ? '9+' : unreadNotifications}
-            </span>
-          )}
-        </Link>
-      </Button>
-
-      <Button asChild variant="ghost" size="icon" aria-label="Messages" className="relative">
-        <Link href="/messages">
-          <MessageSquare className="h-6 w-6" />
-          {totalUnread > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
-              {totalUnread > 9 ? '9+' : totalUnread}
-            </span>
-          )}
-        </Link>
-      </Button>
-
-      <Button asChild variant="ghost" size="icon" aria-label="Shopping Cart" className="relative">
-        <Link href="/cart">
-          <ShoppingCart className="h-6 w-6" />
-          {cartCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
-              {cartCount > 9 ? '9+' : cartCount}
-            </span>
-          )}
-        </Link>
-      </Button>
+      <NotificationsPopover />
+      <MessagesPopover totalUnread={totalUnread} />
+      <CartPopover />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

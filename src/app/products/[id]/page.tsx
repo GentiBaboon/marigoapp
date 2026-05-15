@@ -34,12 +34,14 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import type { FirestoreProduct, FirestoreUser } from '@/lib/types';
 import { useWishlist } from '@/context/WishlistContext';
 import { useCollection, useDoc, useMemoFirebase, useFirestore, useUser } from '@/firebase';
-import { collection, query, where, limit, doc, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, limit, doc, getDocs, addDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrency } from '@/context/CurrencyContext';
 import { AuthenticityBadge } from '@/components/product/AuthenticityBadge';
 import { ProductJsonLd } from '@/components/product/ProductJsonLd';
 import { RelatedProducts } from '@/components/product/RelatedProducts';
+import { SellerBadge } from '@/components/SellerBadge';
+import { SizeGuide } from '@/components/product/SizeGuide';
 
 function ProductPageSkeleton() {
     return (
@@ -92,7 +94,17 @@ export default function ProductDetailPage() {
     const [isOfferSheetOpen, setIsOfferSheetOpen] = React.useState(false);
     const [failedImages, setFailedImages] = React.useState<Set<number>>(new Set());
     const [isChatLoading, setIsChatLoading] = React.useState(false);
+    const [selectedSize, setSelectedSize] = React.useState<string | null>(null);
     const { isFavorite, addToWishlist, removeFromWishlist } = useWishlist();
+
+    // Multi-variant listings carry a per-size inventory table. For those we
+    // require the buyer to pick a size before adding to cart, and we show
+    // "X left" indicators on each size pill.
+    const hasVariants = Array.isArray(product?.variants) && product!.variants!.length > 0;
+    const selectedVariant = hasVariants
+      ? product!.variants!.find(v => v.size === selectedSize)
+      : undefined;
+    const variantOutOfStock = hasVariants && !!selectedVariant && selectedVariant.quantity <= 0;
 
     const isSeller = user?.uid === product?.sellerId;
     const isSoldOrReserved = product?.status === 'sold' || product?.status === 'reserved';
@@ -104,6 +116,19 @@ export default function ProductDetailPage() {
         api.on('select', () => setCurrent(api.selectedScrollSnap() + 1));
     }, [api]);
 
+    // Bump the product's view count once per browser session. Sellers don't
+    // inflate their own views, and a session-storage key per product means
+    // refreshes within the same tab session don't double-count.
+    React.useEffect(() => {
+        if (!firestore || !product?.id || !user) return;
+        if (user.uid === product.sellerId) return;
+        const key = `marigo_viewed_${product.id}`;
+        if (typeof window === 'undefined' || sessionStorage.getItem(key)) return;
+        sessionStorage.setItem(key, '1');
+        updateDoc(doc(firestore, 'products', product.id), { views: increment(1) })
+          .catch((err) => console.warn('views bump failed:', err));
+    }, [firestore, product?.id, product?.sellerId, user]);
+
     if (isProductLoading || isUserLoading) return <ProductPageSkeleton />;
     if (!product) return (
         <div className="container mx-auto max-w-4xl px-4 py-8 text-center">
@@ -114,7 +139,17 @@ export default function ProductDetailPage() {
 
     const handleAddToCart = () => {
         if (!user) { router.push('/auth'); return; }
-        addToCart(product);
+        if (hasVariants) {
+            if (!selectedSize) {
+                toast({ variant: 'destructive', title: 'Select a size first.' });
+                return;
+            }
+            if (variantOutOfStock) {
+                toast({ variant: 'destructive', title: 'That size is out of stock.' });
+                return;
+            }
+        }
+        addToCart(product, { selectedSize: selectedSize ?? undefined });
     };
 
     const handleToggleFavorite = (e: React.MouseEvent) => {
@@ -200,9 +235,77 @@ export default function ProductDetailPage() {
             </div>
             
             <div className="space-y-1 text-sm">
-                <p className="text-2xl font-bold">{formatPrice(product.price)}</p>
-                {product.size && (<p>Size: {product.size}</p>)}
+                {(() => {
+                  const hasDiscount = typeof product.originalPrice === 'number' && product.originalPrice > product.price;
+                  const pct = hasDiscount
+                    ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100)
+                    : 0;
+                  return (
+                    <div className="flex items-baseline gap-3 flex-wrap">
+                      <p className="text-2xl font-bold">{formatPrice(product.price)}</p>
+                      {hasDiscount && (
+                        <>
+                          <p className="text-base text-[#E63946] line-through">
+                            {formatPrice(product.originalPrice!)}
+                          </p>
+                          <span className="text-xs font-bold text-green-700 bg-green-50 rounded px-2 py-0.5">
+                            −{pct}%
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+                {hasVariants ? (
+                  <div className="pt-2 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Select size{product.sizeSystem ? ` (${product.sizeSystem})` : ''}
+                      </p>
+                      <SizeGuide categoryType={product.categoryId} sizeSystem={product.sizeSystem} currentSize={selectedSize ?? undefined} />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {product.variants!.map((v) => {
+                        const outOfStock = (v.quantity ?? 0) <= 0;
+                        const isSelected = selectedSize === v.size;
+                        return (
+                          <button
+                            key={v.size}
+                            type="button"
+                            disabled={outOfStock}
+                            onClick={() => setSelectedSize(v.size)}
+                            className={cn(
+                              'min-w-[3.5rem] px-3 py-2 rounded-md border text-sm font-semibold transition-all',
+                              isSelected && !outOfStock && 'border-foreground bg-foreground text-background',
+                              !isSelected && !outOfStock && 'border-input hover:border-foreground',
+                              outOfStock && 'border-input text-muted-foreground line-through cursor-not-allowed opacity-60',
+                            )}
+                          >
+                            {v.size}
+                            <span className="block text-[10px] font-normal opacity-75">
+                              {outOfStock ? 'Sold out' : `${v.quantity} left`}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  product.size && (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <p>Size: {product.size}{product.sizeSystem ? ` (${product.sizeSystem})` : ''}</p>
+                      <SizeGuide categoryType={product.categoryId} sizeSystem={product.sizeSystem} currentSize={product.size} />
+                    </div>
+                  )
+                )}
                 {product.condition && (<p>Condition: {product.condition.replace('_', ' ')}</p>)}
+                {(product.views || product.wishlistCount) ? (
+                  <p className="text-xs text-muted-foreground pt-1">
+                    {(product.views ?? 0).toLocaleString()} {product.views === 1 ? 'view' : 'views'}
+                    {' · '}
+                    {(product.wishlistCount ?? 0).toLocaleString()} {product.wishlistCount === 1 ? 'favorite' : 'favorites'}
+                  </p>
+                ) : null}
             </div>
 
             <div className="flex flex-col gap-3">
@@ -216,9 +319,15 @@ export default function ProductDetailPage() {
                             size="lg"
                             className="w-full bg-foreground text-background"
                             onClick={handleAddToCart}
-                            disabled={isSoldOrReserved}
+                            disabled={isSoldOrReserved || (hasVariants && (!selectedSize || variantOutOfStock))}
                         >
-                            {isSoldOrReserved ? 'Reserved' : 'Add to bag'}
+                            {isSoldOrReserved
+                              ? 'Reserved'
+                              : hasVariants && !selectedSize
+                                ? 'Select a size'
+                                : variantOutOfStock
+                                  ? 'Out of stock'
+                                  : 'Add to bag'}
                         </Button>
                         {!isSoldOrReserved && (
                             <Button
@@ -237,6 +346,21 @@ export default function ProductDetailPage() {
                     </>
                 )}
             </div>
+
+            {seller && (
+              <div className="flex items-center gap-3 rounded-lg border p-3">
+                <Avatar className="h-10 w-10">
+                  {seller.profileImage && <AvatarImage src={seller.profileImage} alt={seller.name || 'Seller'} />}
+                  <AvatarFallback>{(seller.name?.[0] || 'S').toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{seller.name || 'Marigo Seller'}</p>
+                  <div className="mt-1">
+                    <SellerBadge user={seller} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         

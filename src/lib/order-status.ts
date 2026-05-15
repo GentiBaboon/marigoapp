@@ -70,10 +70,10 @@ const LABELS: Record<string, Record<Audience, string>> = {
   prepared: {
     buyer: 'Order Prepared',
     seller: 'Order Prepared',
-    admin: 'Prepared',
+    admin: 'Ready to Ship',
   },
   shipped: {
-    buyer: 'On its way',
+    buyer: 'Shipped',
     seller: 'Shipped',
     admin: 'Shipped',
   },

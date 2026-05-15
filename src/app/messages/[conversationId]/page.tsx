@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, orderBy, updateDoc, writeBatch, getDocs, where } from 'firebase/firestore';
-import type { FirestoreConversation, FirestoreMessage } from '@/lib/types';
+import { disputeKindLabel, type FirestoreConversation, type FirestoreMessage } from '@/lib/types';
 import { ChatHeader } from '@/components/messages/chat-header';
 import { ChatBubble } from '@/components/messages/chat-bubble';
 import { ChatInput } from '@/components/messages/chat-input';
@@ -71,10 +71,15 @@ export default function ChatPage({ params }: { params: { conversationId: string 
 
   const isDisputeConv = conversation?.source === 'dispute';
   const fallbackOtherUser = isDisputeConv
-    ? ({ userId: 'support', name: 'Marigo Support', avatar: undefined } as any)
+    ? ({ userId: 'support', name: 'Marigo Support', avatar: '/app-icon.png' } as any)
     : undefined;
-  const otherUser =
-    conversation?.participantDetails.find(p => p.userId !== user?.uid) || fallbackOtherUser;
+  // For dispute threads, always present the support identity (logo +
+  // "Marigo Support") instead of the stored admin name/photo so buyers
+  // and sellers never see an internal email address.
+  const rawOther = conversation?.participantDetails.find(p => p.userId !== user?.uid) || fallbackOtherUser;
+  const otherUser = isDisputeConv && rawOther
+    ? { ...rawOther, name: 'Marigo Support', avatar: '/app-icon.png' }
+    : rawOther;
   const otherUserId = otherUser?.userId;
 
   // Detect if the other user is typing
@@ -140,9 +145,13 @@ export default function ChatPage({ params }: { params: { conversationId: string 
         >
           {isClosed ? <Lock className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
           <span className="font-semibold">
-            {isClosed
-              ? `Dispute case ${conversation?.caseStatus || 'closed'} — this thread is read-only.`
-              : 'Dispute case in progress — handled by Marigo Support.'}
+            {(() => {
+              const kind = disputeKindLabel(conversation?.disputeKind);
+              if (isClosed) {
+                return `${kind} ${conversation?.caseStatus || 'closed'} — this thread is read-only.`;
+              }
+              return `${kind} in progress — handled by Marigo Support.`;
+            })()}
           </span>
         </div>
       )}

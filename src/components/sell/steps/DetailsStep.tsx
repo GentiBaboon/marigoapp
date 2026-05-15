@@ -49,6 +49,11 @@ export function DetailsStep() {
   const patternsQuery = useMemoFirebase(() => collection(firestore, 'patterns'), [firestore]);
   const { data: patterns } = useCollection<FirestoreAttribute>(patternsQuery);
 
+  // Size charts, used to populate the Size System + Size dropdowns based on
+  // the chosen category (e.g. Shoes / Clothing / Bags).
+  const sizeChartsQuery = useMemoFirebase(() => collection(firestore, 'size_charts'), [firestore]);
+  const { data: sizeChartsRaw } = useCollection<{ id: string; categoryType: string; sizeSystem: string; sizes: string[]; isActive?: boolean }>(sizeChartsQuery);
+
   const form = useForm<Step4Values>({
     resolver: zodResolver(sellStep4Schema),
     defaultValues: {
@@ -56,6 +61,7 @@ export function DetailsStep() {
       material: formData.material || '',
       color: formData.color || '',
       sizeValue: formData.sizeValue || '',
+      sizeSystem: formData.sizeSystem || '',
       pattern: formData.pattern || '',
       vintage: formData.vintage || false,
     },
@@ -63,10 +69,16 @@ export function DetailsStep() {
 
   const categoryPath = React.useMemo(() => {
     if (!formData.subcategoryId || !categories) return '';
-    const sub = categories.find(c => c.slug === formData.subcategoryId);
+    // Multiple subcategories can share a slug across different parents
+    // (e.g. "Sandals" under both women's "Shoes" and "Children's Shoes").
+    // Disambiguate using formData.categoryId, which stores the parent name.
+    const candidates = categories.filter(c => c.slug === formData.subcategoryId);
+    const sub = candidates.length > 1
+      ? candidates.find(c => categories.find(p => p.id === c.parentId)?.name === formData.categoryId) || candidates[0]
+      : candidates[0];
     const parent = categories.find(c => c.id === sub?.parentId);
     return parent ? `${parent.name} / ${sub?.name}` : sub?.name || '';
-  }, [formData.subcategoryId, categories]);
+  }, [formData.subcategoryId, formData.categoryId, categories]);
 
   // Build combobox items from a Firestore attribute collection. Some seeded
   // records lack the `value` field — fall back to a slugified name so the
@@ -87,6 +99,27 @@ export function DetailsStep() {
   const materialItems = React.useMemo(() => toAttributeItems(materials), [materials, toAttributeItems]);
   const colorItems = React.useMemo(() => toAttributeItems(colors), [colors, toAttributeItems]);
   const patternItems = React.useMemo(() => toAttributeItems(patterns), [patterns, toAttributeItems]);
+
+  // Charts whose categoryType matches the product's parent category (e.g.
+  // "Shoes" for a sandals listing). If none match we fall back to all
+  // active charts so the seller still has something to choose from.
+  const applicableCharts = React.useMemo(() => {
+    if (!sizeChartsRaw) return [];
+    const all = sizeChartsRaw.filter(c => c.isActive !== false);
+    const match = all.filter(c => c.categoryType === formData.categoryId);
+    return match.length > 0 ? match : all;
+  }, [sizeChartsRaw, formData.categoryId]);
+
+  const availableSystems = React.useMemo(
+    () => Array.from(new Set(applicableCharts.map(c => c.sizeSystem))),
+    [applicableCharts],
+  );
+
+  const watchedSizeSystem = form.watch('sizeSystem');
+  const activeChart = React.useMemo(
+    () => applicableCharts.find(c => c.sizeSystem === watchedSizeSystem),
+    [applicableCharts, watchedSizeSystem],
+  );
 
   const onSubmit = (data: Step4Values) => {
     setFormData(data);
@@ -170,39 +203,97 @@ export function DetailsStep() {
             />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-3">
+          <FormLabel className="font-semibold">Size</FormLabel>
+          <div className="grid grid-cols-2 gap-4">
             <FormField
-                control={form.control}
-                name="sizeValue"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel className="font-semibold">Size</FormLabel>
-                    <FormControl><Input placeholder="e.g. 42 / M" className="h-12" {...field} /></FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <FormField
-                control={form.control}
-                name="pattern"
-                render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                    <FormLabel className="font-semibold">Pattern</FormLabel>
+              control={form.control}
+              name="sizeSystem"
+              render={({ field }) => (
+                <FormItem>
+                  <Select
+                    value={field.value || ''}
+                    onValueChange={(v) => {
+                      field.onChange(v);
+                      // Changing the system invalidates the previously
+                      // chosen size — reset it so the user can pick a
+                      // value that exists in the new chart.
+                      form.setValue('sizeValue', '');
+                    }}
+                  >
                     <FormControl>
-                        <Combobox
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        items={patternItems}
-                        placeholder="Pattern"
-                        searchPlaceholder="Search..."
-                        emptyPlaceholder="No results."
-                        />
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="System (EU, US, ...)" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
+                    <SelectContent>
+                      {availableSystems.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">No size chart for this category.</div>
+                      ) : (
+                        availableSystems.map(s => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
+            <FormField
+              control={form.control}
+              name="sizeValue"
+              render={({ field }) => (
+                <FormItem>
+                  {activeChart && activeChart.sizes.length > 0 ? (
+                    <Select value={field.value || ''} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="h-12">
+                          <SelectValue placeholder="Size" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {activeChart.sizes.map(s => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <FormControl>
+                      <Input
+                        placeholder={watchedSizeSystem ? 'Size' : 'e.g. 42 / M'}
+                        className="h-12"
+                        {...field}
+                      />
+                    </FormControl>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
+
+        <FormField
+          control={form.control}
+          name="pattern"
+          render={({ field }) => (
+            <FormItem className="flex flex-col">
+              <FormLabel className="font-semibold">Pattern</FormLabel>
+              <FormControl>
+                <Combobox
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  items={patternItems}
+                  placeholder="Pattern"
+                  searchPlaceholder="Search..."
+                  emptyPlaceholder="No results."
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

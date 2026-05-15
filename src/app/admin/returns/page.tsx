@@ -1,9 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { collection, query, orderBy, limit, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, doc, updateDoc, addDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import type { FirestoreReturn } from '@/lib/types';
+import { notifyOrderStatus } from '@/lib/notifications';
+import { releaseOrderItems } from '@/lib/order-inventory';
 import { toDate } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
@@ -190,7 +192,42 @@ export default function AdminReturnsPage() {
       async () => {
         await updateDoc(doc(firestore, 'returns', ret.id), { status: 'processed', updatedAt: serverTimestamp() });
         if (ret.type === 'return') {
-          await updateDoc(doc(firestore, 'orders', ret.orderId), { status: 'refunded' });
+          await updateDoc(doc(firestore, 'orders', ret.orderId), {
+            status: 'refunded',
+            updatedAt: serverTimestamp(),
+            statusHistory: arrayUnion({
+              status: 'refunded',
+              at: new Date().toISOString(),
+              by: user?.uid || 'admin',
+            }),
+          });
+
+          // Restore stock and re-list returned items.
+          await releaseOrderItems(firestore, ret.items as any);
+
+          const firstItem = ret.items?.[0];
+          notifyOrderStatus({
+            firestore,
+            userId: ret.buyerId,
+            orderNumber: ret.orderNumber,
+            status: 'refunded',
+            link: `/profile/orders/${ret.orderId}`,
+            audience: 'buyer',
+            productTitle: firstItem?.title,
+            productImage: firstItem?.image,
+          }).catch(() => null);
+          if (ret.sellerId) {
+            notifyOrderStatus({
+              firestore,
+              userId: ret.sellerId,
+              orderNumber: ret.orderNumber,
+              status: 'refunded',
+              link: `/profile/listings/sales/${ret.orderId}`,
+              audience: 'seller',
+              productTitle: firstItem?.title,
+              productImage: firstItem?.image,
+            }).catch(() => null);
+          }
         }
         await logAction('return_processed', `Processed ${ret.type} for order #${ret.orderNumber}`, ret.id);
         toast({ title: `${ret.type === 'return' ? 'Refund' : 'Exchange'} Processed`, description: `${ret.type === 'return' ? 'Refund' : 'Exchange'} for order #${ret.orderNumber} has been processed.` });

@@ -109,13 +109,18 @@ export default function OrderDetailsPage() {
                     </div>
                 </div>
 
+                {/* Status timeline always renders so the buyer sees the
+                    current stage (incl. shipped / delivered banners) regardless
+                    of whether a courier delivery doc has been created. */}
                 <div className="bg-background p-4 rounded-lg">
-                    {delivery ? (
-                        <DeliveryTracking order={order} delivery={delivery} />
-                    ) : (
-                        <OrderTimeline order={order} />
-                    )}
+                    <OrderTimeline order={order} />
                 </div>
+
+                {delivery && (
+                    <div className="bg-background p-4 rounded-lg">
+                        <DeliveryTracking order={order} delivery={delivery} />
+                    </div>
+                )}
 
                 <OrderCustomerActions order={order} />
 

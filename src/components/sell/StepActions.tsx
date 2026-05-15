@@ -30,6 +30,7 @@ export function StepActions({
   return (
     <div className="flex flex-col gap-4 mt-8">
        <Button
+        type={onNext ? 'button' : 'submit'}
         onClick={handleNext}
         disabled={isNextLoading || isNextDisabled}
         className="w-full bg-foreground text-background hover:bg-foreground/90"
@@ -39,7 +40,7 @@ export function StepActions({
         {nextText || 'Continue'}
       </Button>
       {!hideBack && (
-        <Button variant="outline" onClick={handleBack} className="w-full" size="lg">
+        <Button type="button" variant="outline" onClick={handleBack} className="w-full" size="lg">
           {backText || 'Back'}
         </Button>
       )}

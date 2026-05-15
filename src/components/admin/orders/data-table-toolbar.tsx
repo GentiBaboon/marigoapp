@@ -11,13 +11,19 @@ interface DataTableToolbarProps<TData> {
   table: Table<TData>;
 }
 
+// Canonical order statuses surfaced to admin. `confirmed` is the new name
+// for the post-payment "Processing" stage; legacy `processing` orders still
+// match because they share rank/labels in `lib/order-status`.
 const statuses = [
-    { label: 'Processing', value: 'processing' },
-    { label: 'Completed', value: 'completed' },
-    { label: 'Shipped', value: 'shipped' },
-    { label: 'Delivered', value: 'delivered' },
     { label: 'Pending Payment', value: 'pending_payment' },
-    { label: 'Payment Failed', value: 'payment_failed' },
+    { label: 'Processing', value: 'confirmed' },
+    { label: 'In Preparation', value: 'in_preparation' },
+    { label: 'Ready to Ship', value: 'prepared' },
+    { label: 'Shipped', value: 'shipped' },
+    { label: 'Completed', value: 'completed' },
+    { label: 'Cancellation Requested', value: 'cancel_requested' },
+    { label: 'Refund Requested', value: 'refund_requested' },
+    { label: 'Cancelled', value: 'cancelled' },
     { label: 'Refunded', value: 'refunded' },
 ];
 

@@ -34,7 +34,7 @@ export function CategoriesSection() {
   const productsQuery = useMemoFirebase(
     () => query(
       collection(firestore, 'products'),
-      where('status', 'in', ['active', 'reserved']),
+      where('status', 'in', ['active', 'reserved', 'sold']),
       orderBy('views', 'desc'),
       limit(100)
     ),
@@ -168,6 +168,7 @@ export function CategoriesSection() {
                           brandId: p.brandId,
                           title: p.title,
                           price: p.price,
+                          originalPrice: p.originalPrice,
                           images: p.images,
                           sellerId: p.sellerId,
                           size: p.size,

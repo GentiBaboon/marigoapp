@@ -4,7 +4,9 @@ import * as React from 'react';
 import { collection, query, orderBy, doc, updateDoc, addDoc, getDoc, setDoc, increment, serverTimestamp, arrayUnion, Timestamp } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import type { FirestoreDispute, DisputeMessage, FirestoreOrder } from '@/lib/types';
-import { toDate } from '@/lib/types';
+import { notifyOrderStatus } from '@/lib/notifications';
+import { releaseOrderItems } from '@/lib/order-inventory';
+import { toDate, disputeKindLabel } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 import Link from 'next/link';
@@ -104,6 +106,90 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
       }
       await updateDoc(doc(firestore, 'disputes', dispute.id), updateData);
 
+      // Sync the linked order so it doesn't get stuck in *_requested.
+      // Resolve = honor the request (cancel/refund the order). Close without
+      // resolving = the request was denied; revert to the prior status.
+      if (
+        (confirmDialog.newStatus === 'resolved' || confirmDialog.newStatus === 'closed') &&
+        dispute.orderId
+      ) {
+        try {
+          const orderRef = doc(firestore, 'orders', dispute.orderId);
+          const orderSnap = await getDoc(orderRef);
+          if (orderSnap.exists()) {
+            const orderData = orderSnap.data() as FirestoreOrder;
+            const isCancelSrc =
+              dispute.source === 'buyer_cancel_request' ||
+              dispute.source === 'seller_cancel_request';
+            const isRefundSrc = dispute.source === 'buyer_refund_request';
+            const inRequested =
+              orderData.status === 'cancel_requested' ||
+              orderData.status === 'refund_requested';
+
+            let nextStatus: string | null = null;
+            if (confirmDialog.newStatus === 'resolved') {
+              if (isCancelSrc) nextStatus = 'cancelled';
+              else if (isRefundSrc) nextStatus = 'refunded';
+            } else if (confirmDialog.newStatus === 'closed' && inRequested) {
+              // Revert: find the most recent status before the request was opened.
+              const history = Array.isArray(orderData.statusHistory) ? orderData.statusHistory : [];
+              const prior = [...history]
+                .reverse()
+                .find(
+                  (h: any) =>
+                    h?.status &&
+                    h.status !== 'cancel_requested' &&
+                    h.status !== 'refund_requested',
+                );
+              nextStatus = prior?.status || (isRefundSrc ? 'completed' : 'confirmed');
+            }
+
+            if (nextStatus && nextStatus !== orderData.status) {
+              await updateDoc(orderRef, {
+                status: nextStatus,
+                updatedAt: serverTimestamp(),
+                statusHistory: arrayUnion({
+                  status: nextStatus,
+                  at: new Date().toISOString(),
+                  by: user?.uid || 'admin',
+                }),
+              });
+
+              // Cancelled/refunded → restore stock and flip listings active.
+              if (nextStatus === 'cancelled' || nextStatus === 'refunded') {
+                await releaseOrderItems(firestore, orderData.items as any);
+              }
+
+              const firstItem = orderData.items?.[0];
+              notifyOrderStatus({
+                firestore,
+                userId: orderData.buyerId,
+                orderNumber: dispute.orderNumber,
+                status: nextStatus,
+                link: `/profile/orders/${dispute.orderId}`,
+                audience: 'buyer',
+                productTitle: firstItem?.title,
+                productImage: firstItem?.image,
+              }).catch(() => null);
+              Array.from(new Set(orderData.sellerIds || [])).forEach((sellerId) => {
+                notifyOrderStatus({
+                  firestore,
+                  userId: sellerId,
+                  orderNumber: dispute.orderNumber,
+                  status: nextStatus!,
+                  link: `/profile/listings/sales/${dispute.orderId}`,
+                  audience: 'seller',
+                  productTitle: firstItem?.title,
+                  productImage: firstItem?.image,
+                }).catch(() => null);
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('Could not sync linked order on dispute close', e);
+        }
+      }
+
       // Mirror status to the linked conversation (if any) so the seller's
       // chat thread shows it as ended and becomes read-only.
       if (
@@ -159,6 +245,10 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
     setIsSending(true);
     try {
       const adminName = user?.displayName || user?.email || 'Admin';
+      // Buyers and sellers see admin messages as coming from "Marigo Support"
+      // with the Marigo logo as the avatar, not the admin's email/photo.
+      const supportName = 'Marigo Support';
+      const supportAvatar = '/app-icon.png';
       const messageText = newMessage.trim();
       const message: Omit<DisputeMessage, 'createdAt'> & { createdAt: any } = {
         senderId: user?.uid || '',
@@ -191,7 +281,7 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
           );
           const allParticipants = Array.from(new Set([user.uid, ...counterparts]));
           if (!convSnap.exists()) {
-            const details: any[] = [{ userId: user.uid, name: adminName, role: 'admin' }];
+            const details: any[] = [{ userId: user.uid, name: supportName, avatar: supportAvatar, role: 'admin' }];
             if (dispute.sellerId) details.push({ userId: dispute.sellerId, name: dispute.sellerName || 'Seller', role: 'seller' });
             if (dispute.buyerId && dispute.buyerId !== dispute.sellerId)
               details.push({ userId: dispute.buyerId, name: dispute.buyerName || 'Buyer', role: 'buyer' });
@@ -208,16 +298,29 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
               unreadCount: initialUnread,
               source: 'dispute',
               disputeId: dispute.id,
+              disputeKind: dispute.source || 'dispute',
             });
           } else {
             // Make sure all parties are participants on legacy docs that may
             // have been created with only one side, and bump unread counts.
+            // Also overwrite participantDetails so the admin entry shows up
+            // as "Marigo Support" with the logo (older threads were created
+            // with the admin's email + photo).
+            const rebuiltDetails: any[] = [
+              { userId: user.uid, name: supportName, avatar: supportAvatar, role: 'admin' },
+            ];
+            if (dispute.sellerId)
+              rebuiltDetails.push({ userId: dispute.sellerId, name: dispute.sellerName || 'Seller', role: 'seller' });
+            if (dispute.buyerId && dispute.buyerId !== dispute.sellerId)
+              rebuiltDetails.push({ userId: dispute.buyerId, name: dispute.buyerName || 'Buyer', role: 'buyer' });
             const update: Record<string, any> = {
               participants: arrayUnion(...allParticipants),
+              participantDetails: rebuiltDetails,
               lastMessage: messageText,
               lastMessageAt: now,
               source: 'dispute',
               disputeId: dispute.id,
+              disputeKind: dispute.source || 'dispute',
             };
             counterparts.forEach((uid) => {
               update[`unreadCount.${uid}`] = increment(1);
@@ -226,7 +329,7 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
           }
           await addDoc(collection(firestore, 'conversations', convId, 'messages'), {
             senderId: user.uid,
-            senderName: adminName,
+            senderName: supportName,
             senderRole: 'admin',
             content: messageText,
             read: false,
@@ -287,7 +390,8 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Order #{dispute.orderNumber} · {createdDate ? format(createdDate, 'd MMM yyyy') : '-'}
+            <span className="font-medium text-foreground">{disputeKindLabel(dispute.source)}</span>
+            {' · '}Order #{dispute.orderNumber} · {createdDate ? format(createdDate, 'd MMM yyyy') : '-'}
           </p>
         </CardHeader>
         <CardContent className="space-y-3">

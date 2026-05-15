@@ -9,6 +9,7 @@ interface SellFormContextType {
   activeDraft: SellDraft | undefined;
   startNewDraft: () => void;
   selectDraft: (draftId: string) => void;
+  deselectDraft: () => void;
   deleteDraft: (draftId: string) => void;
   deleteActiveDraft: () => void;
   setFormData: (data: Partial<SellFormValues>) => void;
@@ -179,6 +180,7 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, []);
 
   const selectDraft = (id: string) => setActiveDraftId(id);
+  const deselectDraft = () => setActiveDraftId(null);
   
   const deleteDraft = useCallback((id: string) => {
     setDrafts(prev => prev.filter(d => d.id !== id));
@@ -201,9 +203,10 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
     <SellFormContext.Provider value={{ 
         drafts, 
         activeDraft, 
-        startNewDraft, 
-        selectDraft, 
-        deleteDraft, 
+        startNewDraft,
+        selectDraft,
+        deselectDraft,
+        deleteDraft,
         deleteActiveDraft,
         setFormData, 
         currentStep: activeDraft?.currentStep || 1,

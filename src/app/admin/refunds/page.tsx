@@ -1,9 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { collection, query, orderBy, limit, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, doc, updateDoc, addDoc, getDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import type { FirestoreRefund } from '@/lib/types';
+import type { FirestoreRefund, FirestoreOrder } from '@/lib/types';
+import { notifyOrderStatus, notifyUser } from '@/lib/notifications';
+import { releaseOrderItems } from '@/lib/order-inventory';
 import { toDate } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
@@ -101,9 +103,52 @@ export default function AdminRefundsPage() {
             status: 'approved',
             updatedAt: serverTimestamp(),
           });
-          await updateDoc(doc(firestore, 'orders', refund.orderId), {
+          const orderRef = doc(firestore, 'orders', refund.orderId);
+          const orderSnap = await getDoc(orderRef);
+          const orderData = orderSnap.exists() ? (orderSnap.data() as FirestoreOrder) : null;
+          await updateDoc(orderRef, {
             status: 'refunded',
+            updatedAt: serverTimestamp(),
+            statusHistory: arrayUnion({
+              status: 'refunded',
+              at: new Date().toISOString(),
+              by: user?.uid || 'admin',
+            }),
           });
+
+          // Restore stock and re-list each item.
+          if (orderData) {
+            await releaseOrderItems(firestore, orderData.items as any);
+          }
+
+          if (orderData) {
+            const firstItem = orderData.items?.[0];
+            const productTitle = firstItem?.title;
+            const productImage = firstItem?.image;
+            notifyOrderStatus({
+              firestore,
+              userId: orderData.buyerId,
+              orderNumber: refund.orderNumber,
+              status: 'refunded',
+              link: `/profile/orders/${refund.orderId}`,
+              audience: 'buyer',
+              productTitle,
+              productImage,
+            }).catch(() => null);
+            Array.from(new Set(orderData.sellerIds || [])).forEach((sellerId) => {
+              notifyOrderStatus({
+                firestore,
+                userId: sellerId,
+                orderNumber: refund.orderNumber,
+                status: 'refunded',
+                link: `/profile/listings/sales/${refund.orderId}`,
+                audience: 'seller',
+                productTitle,
+                productImage,
+              }).catch(() => null);
+            });
+          }
+
           await logAction('refund_approved', `Approved refund of ${currencyFormatter.format(refund.amount)} for order #${refund.orderNumber}`, refund.id);
           toast({ title: 'Refund Approved', description: `Refund for order #${refund.orderNumber} has been approved.` });
           setConfirmDialog((prev) => ({ ...prev, open: false }));
@@ -130,6 +175,28 @@ export default function AdminRefundsPage() {
             status: 'rejected',
             updatedAt: serverTimestamp(),
           });
+
+          // Notify the buyer that their refund request was rejected.
+          try {
+            const orderSnap = await getDoc(doc(firestore, 'orders', refund.orderId));
+            const orderData = orderSnap.exists() ? (orderSnap.data() as FirestoreOrder) : null;
+            if (orderData) {
+              const firstItem = orderData.items?.[0];
+              const subject = firstItem?.title?.trim() || `#${refund.orderNumber}`;
+              notifyUser({
+                firestore,
+                userId: orderData.buyerId,
+                title: `${subject} — Refund request rejected`,
+                message: 'Your refund request has been reviewed and was not approved.',
+                type: 'order_update',
+                link: `/profile/orders/${refund.orderId}`,
+                imageUrl: firstItem?.image,
+              }).catch(() => null);
+            }
+          } catch (e) {
+            console.warn('[refund reject] could not notify buyer', e);
+          }
+
           await logAction('refund_rejected', `Rejected refund of ${currencyFormatter.format(refund.amount)} for order #${refund.orderNumber}`, refund.id);
           toast({ title: 'Refund Rejected', description: `Refund for order #${refund.orderNumber} has been rejected.` });
           setConfirmDialog((prev) => ({ ...prev, open: false }));

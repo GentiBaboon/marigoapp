@@ -7,12 +7,14 @@ import { Switch } from '@/components/ui/switch';
 import { Sparkles, MapPin, Truck, Plus, Edit, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
-import type { FirestoreAddress } from '@/lib/types';
+import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import type { FirestoreAddress, FirestoreUser, ProductVariant } from '@/lib/types';
+import { Trash2 } from 'lucide-react';
 import { AddressForm } from '@/components/profile/address-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function PricingStep() {
@@ -21,8 +23,15 @@ export function PricingStep() {
   const firestore = useFirestore();
   
   const [price, setPrice] = useState(formData.price?.toString() || '');
+  const [originalPrice, setOriginalPrice] = useState(formData.originalPrice?.toString() || '');
   // Default to 1 — most listings on a resale marketplace are unique pieces.
   const [quantity, setQuantity] = useState((formData.quantity ?? 1).toString());
+  // Per-size variant inventory. Only Official Registered Brand sellers see
+  // this UI; everyone else just edits the single quantity field above. All
+  // variants share a single size system (EU / US / ...) — switching it
+  // resets the per-row size labels.
+  const [variants, setVariants] = useState<ProductVariant[]>(formData.variants ?? []);
+  const [variantSizeSystem, setVariantSizeSystem] = useState<string>(formData.sizeSystem ?? '');
   const [selectedAddressId, setSelectedAddressId] = useState<string | undefined>(formData.shippingFromAddressId);
   const [isAddrDialogOpen, setIsAddrDialogOpen] = useState(false);
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -31,6 +40,34 @@ export function PricingStep() {
   const currentPrice = parseFloat(price) || 0;
   const fee = currentPrice * platformFeeRate;
   const earnings = currentPrice - fee;
+  const parsedOriginalPrice = parseFloat(originalPrice) || 0;
+  // Only treat it as a real "original price" if it's higher than the asking
+  // price — otherwise the strikethrough makes no sense.
+  const hasDiscount = parsedOriginalPrice > currentPrice && currentPrice > 0;
+  const discountPercent = hasDiscount
+    ? Math.round(((parsedOriginalPrice - currentPrice) / parsedOriginalPrice) * 100)
+    : 0;
+
+  // Fetch the seller's own user doc to read the `isOfficialBrand` flag. Only
+  // Official Brand sellers get the multi-variant per-size inventory UI.
+  const userRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: sellerProfile } = useDoc<FirestoreUser>(userRef);
+  const isOfficialBrand = !!sellerProfile?.isOfficialBrand;
+
+  // Size charts to drive variant-row size dropdowns.
+  const sizeChartsQuery = useMemoFirebase(() => collection(firestore, 'size_charts'), [firestore]);
+  const { data: sizeChartsRaw } = useCollection<{ id: string; categoryType: string; sizeSystem: string; sizes: string[]; isActive?: boolean }>(sizeChartsQuery);
+  const applicableCharts = (sizeChartsRaw ?? [])
+    .filter(c => c.isActive !== false)
+    .filter(c => !formData.categoryId || c.categoryType === formData.categoryId);
+  const fallbackCharts = (sizeChartsRaw ?? []).filter(c => c.isActive !== false);
+  const variantCharts = applicableCharts.length > 0 ? applicableCharts : fallbackCharts;
+  const variantSystems = Array.from(new Set(variantCharts.map(c => c.sizeSystem)));
+  const variantActiveChart = variantCharts.find(c => c.sizeSystem === variantSizeSystem);
+  const variantSizeOptions = variantActiveChart?.sizes ?? [];
 
   // Fetch user addresses
   const addressesCollection = useMemoFirebase(() => {
@@ -51,13 +88,35 @@ export function PricingStep() {
   // Parse quantity → positive integer, default 1.
   const parsedQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
 
+  // For multi-variant listings, total inventory = sum of variant quantities.
+  // We persist BOTH `variants` (per-size detail) and `quantity` (the rolled-up
+  // total) so existing readers — search, cards, the cart, and stock-decrement
+  // at checkout — keep working without any awareness of variants.
+  const useVariants = isOfficialBrand && variants.length > 0;
+  const variantTotal = variants.reduce((s, v) => s + (Number(v.quantity) || 0), 0);
+  const effectiveQuantity = useVariants ? Math.max(0, variantTotal) : parsedQuantity;
+
   useEffect(() => {
     setFormData({
         price: currentPrice,
-        quantity: parsedQuantity,
+        // Store originalPrice only when it's a meaningful discount. Anything
+        // else (blank, zero, or below the asking price) is persisted as null
+        // so the strikethrough doesn't render on the storefront.
+        originalPrice: hasDiscount ? parsedOriginalPrice : null,
+        quantity: Math.max(1, effectiveQuantity),
+        variants: useVariants ? variants : null,
+        // Persist the variants' size system so ReviewStep can attach it to
+        // the product doc — drives the size guide on the product page and
+        // the size facet on search.
+        sizeSystem: useVariants && variantSizeSystem ? variantSizeSystem : (formData.sizeSystem || null),
         shippingFromAddressId: selectedAddressId
     });
-  }, [price, selectedAddressId, setFormData, currentPrice, parsedQuantity]);
+  }, [price, originalPrice, selectedAddressId, setFormData, currentPrice, parsedOriginalPrice, hasDiscount, parsedQuantity, useVariants, variants, effectiveQuantity, variantSizeSystem, formData.sizeSystem]);
+
+  const addVariant = () => setVariants(prev => [...prev, { size: '', quantity: 1 }]);
+  const removeVariant = (i: number) => setVariants(prev => prev.filter((_, idx) => idx !== i));
+  const updateVariant = (i: number, patch: Partial<ProductVariant>) =>
+    setVariants(prev => prev.map((v, idx) => idx === i ? { ...v, ...patch } : v));
 
   const selectedAddress = addresses?.find(a => a.id === selectedAddressId);
 
@@ -78,48 +137,163 @@ export function PricingStep() {
           />
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground">€</span>
         </div>
-      </div>
 
-      {/* Quantity Section */}
-      <div className="space-y-2">
-        <Label className="text-base font-bold">Quantity</Label>
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-12 w-12 rounded-full"
-            onClick={() => setQuantity((prev) => String(Math.max(1, Math.floor(Number(prev) || 1) - 1)))}
-            disabled={parsedQuantity <= 1}
-            aria-label="Decrease quantity"
-          >
-            –
-          </Button>
-          <Input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            step={1}
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            onBlur={() => setQuantity(String(parsedQuantity))}
-            className="h-12 w-24 text-center text-lg font-semibold"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-12 w-12 rounded-full"
-            onClick={() => setQuantity((prev) => String(Math.max(1, Math.floor(Number(prev) || 1) + 1)))}
-            aria-label="Increase quantity"
-          >
-            +
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            {parsedQuantity === 1 ? 'Unique item' : `${parsedQuantity} pieces available`}
+        {/* Optional original / retail price for a discount display */}
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between">
+            <Label htmlFor="originalPrice" className="text-sm font-semibold">Original price <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            {hasDiscount && (
+              <span className="text-xs font-bold text-green-700">−{discountPercent}% off</span>
+            )}
+          </div>
+          <div className="relative">
+            <Input
+              id="originalPrice"
+              type="number"
+              value={originalPrice}
+              onChange={(e) => setOriginalPrice(e.target.value)}
+              className="h-12 pl-10"
+              placeholder="Retail price"
+            />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base font-bold text-muted-foreground">€</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            If set higher than your asking price, buyers see it crossed out next to the current price.
           </p>
         </div>
       </div>
+
+      {/* Quantity / Variants Section */}
+      {isOfficialBrand ? (
+        <div className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <Label className="text-base font-bold">Inventory by size</Label>
+            <span className="text-xs text-muted-foreground">{variantTotal} total in stock</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Pick a size system, then add one row per size you stock. Buyers see a size picker with per-size availability on the product page.
+          </p>
+          <div className="flex items-center gap-2">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Size system</Label>
+            <Select
+              value={variantSizeSystem || ''}
+              onValueChange={(v) => {
+                setVariantSizeSystem(v);
+                // Switching systems invalidates per-row sizes — clear them so
+                // the seller picks fresh values that exist in the new chart.
+                setVariants((prev) => prev.map((row) => ({ ...row, size: '' })));
+              }}
+            >
+              <SelectTrigger className="h-9 w-40">
+                <SelectValue placeholder="System" />
+              </SelectTrigger>
+              <SelectContent>
+                {variantSystems.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">No chart for this category.</div>
+                ) : (
+                  variantSystems.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          {variants.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+              No size variants yet. Add your first size below.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {variants.map((v, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  {variantSizeOptions.length > 0 ? (
+                    <Select
+                      value={v.size || ''}
+                      onValueChange={(val) => updateVariant(i, { size: val })}
+                    >
+                      <SelectTrigger className="h-11 flex-1">
+                        <SelectValue placeholder="Size" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {variantSizeOptions
+                          .filter(s => s === v.size || !variants.some(other => other !== v && other.size === s))
+                          .map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      placeholder="Size (e.g. 38)"
+                      value={v.size}
+                      onChange={(e) => updateVariant(i, { size: e.target.value })}
+                      className="h-11 flex-1"
+                    />
+                  )}
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="Qty"
+                    value={String(v.quantity ?? 0)}
+                    onChange={(e) => updateVariant(i, { quantity: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                    className="h-11 w-24 text-center"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 text-muted-foreground hover:text-destructive"
+                    onClick={() => removeVariant(i)}
+                    aria-label="Remove variant"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          <Button type="button" variant="outline" onClick={addVariant} className="w-full">
+            <Plus className="mr-2 h-4 w-4" /> Add size
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Label className="text-base font-bold">Quantity</Label>
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-12 w-12 rounded-full"
+              onClick={() => setQuantity((prev) => String(Math.max(1, Math.floor(Number(prev) || 1) - 1)))}
+              disabled={parsedQuantity <= 1}
+              aria-label="Decrease quantity"
+            >
+              –
+            </Button>
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              onBlur={() => setQuantity(String(parsedQuantity))}
+              className="h-12 w-24 text-center text-lg font-semibold"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-12 w-12 rounded-full"
+              onClick={() => setQuantity((prev) => String(Math.max(1, Math.floor(Number(prev) || 1) + 1)))}
+              aria-label="Increase quantity"
+            >
+              +
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              {parsedQuantity === 1 ? 'Unique item' : `${parsedQuantity} pieces available`}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="bg-primary/5 rounded-xl p-6 border border-primary/10 space-y-4">
         <div className="flex justify-between items-center text-sm">

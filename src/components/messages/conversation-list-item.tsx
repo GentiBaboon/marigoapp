@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { FirestoreConversation } from '@/lib/types';
+import { disputeKindLabel, type FirestoreConversation } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ShieldCheck, Lock } from 'lucide-react';
@@ -26,11 +26,14 @@ export function ConversationListItem({ conversation, currentUserId }: Conversati
   // when the current user happens to be the only participant (e.g. an admin
   // who is also the seller in the same account, or a placeholder fixture).
   const otherFromDetails = conversation.participantDetails.find(p => p.userId !== currentUserId);
-  const otherParticipant =
-    otherFromDetails ||
-    (isDispute
-      ? ({ userId: 'support', name: 'Marigo Support', avatar: undefined, role: 'admin' } as any)
-      : conversation.participantDetails.find(p => (p as any).role === 'admin'));
+  // For dispute threads, always present the admin participant as
+  // "Marigo Support" with the Marigo logo, even if the stored details
+  // still carry the admin's email/photo (legacy threads).
+  const supportIdentity = ({ userId: 'support', name: 'Marigo Support', avatar: '/app-icon.png', role: 'admin' } as any);
+  const adminFromDetails = conversation.participantDetails.find(p => (p as any).role === 'admin');
+  const otherParticipant = isDispute
+    ? { ...(adminFromDetails || supportIdentity), name: 'Marigo Support', avatar: '/app-icon.png' }
+    : (otherFromDetails || conversation.participantDetails.find(p => (p as any).role === 'admin'));
   const unreadCount = conversation.unreadCount?.[currentUserId] ?? 0;
   const hasUnread = unreadCount > 0;
   const date = tsToDate(conversation.lastMessageAt);
@@ -64,7 +67,9 @@ export function ConversationListItem({ conversation, currentUserId }: Conversati
                     ? 'bg-muted text-muted-foreground border-muted-foreground/20'
                     : 'bg-amber-100 text-amber-900 border-amber-300'
                 )}>
-                  {isClosed ? `Case ${conversation.caseStatus || 'closed'}` : 'Dispute case'}
+                  {isClosed
+                    ? `${disputeKindLabel(conversation.disputeKind)} ${conversation.caseStatus || 'closed'}`
+                    : disputeKindLabel(conversation.disputeKind)}
                 </span>
               )}
             </p>

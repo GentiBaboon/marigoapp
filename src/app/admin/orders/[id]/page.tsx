@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useFirestore, useUser, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, orderBy, limit, updateDoc, addDoc, arrayUnion, serverTimestamp, getDocs } from 'firebase/firestore';
+import { doc, collection, query, where, orderBy, limit, updateDoc, addDoc, arrayUnion, serverTimestamp, getDocs, increment } from 'firebase/firestore';
 import type { FirestoreOrder, FirestoreUser, FirestoreConversation, FirestoreMessage } from '@/lib/types';
 import { statusLabel } from '@/lib/order-status';
 import { toDate } from '@/lib/types';
@@ -19,11 +19,12 @@ import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { notifyOrderStatus } from '@/lib/notifications';
+import { releaseOrderItems, markOrderItemsSoldIfDepleted } from '@/lib/order-inventory';
 
 const ORDER_STATUSES = [
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'confirmed', label: 'Processing' },
   { value: 'in_preparation', label: 'In Preparation' },
-  { value: 'prepared', label: 'Prepared' },
+  { value: 'prepared', label: 'Ready to Ship' },
   { value: 'shipped', label: 'Shipped' },
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
@@ -139,12 +140,23 @@ export default function AdminOrderDetailPage() {
         }),
       });
 
-      // Cancelling or refunding an order releases the products back
-      // to the marketplace so other buyers can purchase them.
-      if (newStatus === 'cancelled' || newStatus === 'refunded') {
+      // Cancelling/refunding restores stock and flips listings back to
+      // "active". Completing finalizes the sale — only listings that ran
+      // out of stock during this order flip "reserved" → "sold"; listings
+      // with remaining stock stay "active".
+      const wasTerminal = order.status === 'cancelled' || order.status === 'refunded';
+      if ((newStatus === 'cancelled' || newStatus === 'refunded') && !wasTerminal) {
+        await releaseOrderItems(firestore, order.items as any);
+      } else if (newStatus === 'completed' && order.status !== 'completed') {
+        await markOrderItemsSoldIfDepleted(firestore, order.items as any);
+        // Bump the seller-badge counter — one increment per unique seller in
+        // the order, so a seller who shipped multiple items in the same order
+        // still counts as a single "sale" against their badge tier.
+        const uniqueSellers = Array.from(new Set((order.sellerIds || []).filter(Boolean)));
         await Promise.all(
-          (order.items || []).map((it: any) =>
-            updateDoc(doc(firestore, 'products', it.id), { status: 'active' }).catch(() => null),
+          uniqueSellers.map((sellerId) =>
+            updateDoc(doc(firestore, 'users', sellerId), { salesCount: increment(1) })
+              .catch((err) => console.warn('salesCount bump failed:', err))
           ),
         );
       }

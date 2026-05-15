@@ -94,6 +94,12 @@ async function findExistingConversation(
   for (const r of results as any[]) {
     if (!r.document) continue;
     const fields = r.document.fields || {};
+    // Skip dispute mirror threads — those are created by admin replies on a
+    // refund/dispute case and happen to share productId + participants with a
+    // regular buyer↔seller inquiry. "Contact Seller" must always land on a
+    // normal product conversation, never on the dispute thread.
+    const source = fromFS(fields.source);
+    if (source === 'dispute' || fields.disputeId) continue;
     const participants = fromFS(fields.participants) as string[];
     if (participants.includes(sellerId)) {
       return r.document.name.split('/').pop();

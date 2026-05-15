@@ -121,7 +121,7 @@ function useFilteredProducts(
   const buildConstraints = React.useCallback((): QueryConstraint[] => {
     // Include reserved items too — they stay browsable so shoppers see them
     // marked "Reserved" instead of disappearing entirely.
-    const c: QueryConstraint[] = [where('status', 'in', ['active', 'reserved'])];
+    const c: QueryConstraint[] = [where('status', 'in', ['active', 'reserved', 'sold'])];
     if (category) c.push(where('subcategoryId', '==', category));
     c.push(orderBy('listingCreated', 'desc'));
     return c;
@@ -244,6 +244,12 @@ function FilterSheet({
   const patternsQ = useMemoFirebase(() => (firestore ? collection(firestore, 'patterns') : null), [firestore]);
   const { data: patterns } = useCollection<FirestoreAttribute>(patternsQ);
 
+  // Size charts feed the Size facet — sizes shown depend on the selected
+  // parent category (and size system if any), so the buyer only sees the
+  // values that actually apply.
+  const sizeChartsQ = useMemoFirebase(() => (firestore ? collection(firestore, 'size_charts') : null), [firestore]);
+  const { data: sizeChartsRaw } = useCollection<{ id: string; categoryType: string; sizeSystem: string; sizes: string[]; isActive?: boolean }>(sizeChartsQ);
+
   // Local draft state
   const buildDraftFromParams = React.useCallback(
     () => ({
@@ -255,6 +261,7 @@ function FilterSheet({
       color: searchParams.get('color') ?? '',
       material: searchParams.get('material') ?? '',
       pattern: searchParams.get('pattern') ?? '',
+      size: searchParams.get('size') ?? '',
       minPrice: searchParams.get('minPrice') ?? '',
       maxPrice: searchParams.get('maxPrice') ?? '',
     }),
@@ -276,7 +283,7 @@ function FilterSheet({
 
   const applyFilters = () => {
     const params = new URLSearchParams(searchParams.toString());
-    const keys = ['gender', 'categoryId', 'category', 'brand', 'condition', 'color', 'material', 'pattern', 'minPrice', 'maxPrice'];
+    const keys = ['gender', 'categoryId', 'category', 'brand', 'condition', 'color', 'material', 'pattern', 'size', 'minPrice', 'maxPrice'];
     keys.forEach((k) => {
       const v = draft[k as keyof typeof draft];
       if (v) params.set(k, v);
@@ -287,7 +294,7 @@ function FilterSheet({
   };
 
   const clearAll = () => {
-    setDraft({ gender: '', categoryId: '', category: '', brand: '', condition: '', color: '', material: '', pattern: '', minPrice: '', maxPrice: '' });
+    setDraft({ gender: '', categoryId: '', category: '', brand: '', condition: '', color: '', material: '', pattern: '', size: '', minPrice: '', maxPrice: '' });
   };
 
   // Parent categories registered in admin, sorted by admin order then name.
@@ -366,6 +373,28 @@ function FilterSheet({
 
   // Default-open Gender; the rest collapsed so the sheet starts compact.
   const [openSections, setOpenSections] = React.useState<string[]>(['gender']);
+
+  // Sizes facet: derive available sizes from size_charts, scoped to the
+  // selected parent category when there is one. Sizes are deduped across
+  // systems (EU 38 + IT 38 would only render one "38" pill) since the buyer
+  // is filtering by the raw size value stored on products.
+  const sizeOptions = React.useMemo(() => {
+    if (!sizeChartsRaw) return [] as { value: string; label: string }[];
+    const active = sizeChartsRaw.filter(c => c.isActive !== false);
+    const parent = parentCategories.find((p) => p.slug === draft.categoryId || p.id === draft.categoryId);
+    const scoped = parent ? active.filter(c => c.categoryType === parent.name) : active;
+    const seen = new Set<string>();
+    const out: { value: string; label: string }[] = [];
+    scoped.forEach((c) => {
+      c.sizes.forEach((s) => {
+        if (!seen.has(s)) {
+          seen.add(s);
+          out.push({ value: s, label: s });
+        }
+      });
+    });
+    return out;
+  }, [sizeChartsRaw, parentCategories, draft.categoryId]);
 
   // Render helpers — defined as plain functions (not React components) so
   // they're inlined into the parent's element tree on each render. Defining
@@ -620,6 +649,20 @@ function FilterSheet({
                         </button>
                       ))}
                   </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+
+            {/* Size — sourced from admin-configured size charts, scoped to
+                 the parent category when one is selected so EU 38 doesn't
+                 appear when the buyer is browsing bags, etc. */}
+            {sizeOptions.length > 0 && (
+              <AccordionItem value="size">
+                <AccordionTrigger className="py-3">
+                  {renderSectionTrigger('Size', draft.size || undefined)}
+                </AccordionTrigger>
+                <AccordionContent>
+                  {renderPills(sizeOptions, 'size')}
                 </AccordionContent>
               </AccordionItem>
             )}

@@ -115,7 +115,7 @@ export function ReviewStep() {
           sellerId: user.uid,
           title: formData.title,
           price: formData.price,
-          status: 'active'
+          status: 'pending_review'
       });
 
       if (!validation.success) {
@@ -168,15 +168,31 @@ export function ReviewStep() {
         condition: formData.condition || 'good',
         listingType: formData.listingType || 'fixed_price',
         price: formData.price || 0,
+        originalPrice: typeof formData.originalPrice === 'number' && formData.originalPrice > (formData.price || 0)
+          ? formData.originalPrice
+          : undefined,
         currency: 'EUR',
         // Available stock — defaults to 1 when the seller didn't change it.
+        // For variant listings this is the sum of per-size quantities; the
+        // detailed per-size breakdown lives in `variants` below.
         quantity: Math.max(1, Math.floor(formData.quantity ?? 1)),
+        // Persist variants only when at least one was added with a non-empty
+        // size label. Empty or unset → omit so the field stays clean.
+        variants: Array.isArray(formData.variants) && formData.variants.some(v => v?.size?.trim())
+          ? formData.variants
+              .filter(v => v?.size?.trim())
+              .map(v => ({ size: v.size.trim(), quantity: Math.max(0, Math.floor(Number(v.quantity) || 0)) }))
+          : undefined,
         size: formData.sizeValue || '',
+        sizeSystem: formData.sizeSystem || undefined,
         color: formData.color,
         material: formData.material,
         gender: formData.gender || 'unisex',
         images: finalImages,
-        status: 'active',
+        // New listings start in admin review. The admin product detail page
+        // flips this to "active" after a moderation pass, at which point the
+        // seller is notified and the item becomes visible on the marketplace.
+        status: 'pending_review',
         vintage: formData.vintage,
         pattern: formData.pattern,
         shippingFromAddressId: formData.shippingFromAddressId,

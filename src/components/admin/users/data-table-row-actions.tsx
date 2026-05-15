@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import { Row } from '@tanstack/react-table';
-import { MoreHorizontal, Ban, Trash2, ShieldCheck, View, CircleSlash, Loader2 } from 'lucide-react';
+import { MoreHorizontal, Ban, Trash2, ShieldCheck, View, CircleSlash, Loader2, BadgeCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -93,6 +93,31 @@ export function DataTableRowActions<TData>({
     }
   };
 
+  const handleToggleOfficialBrand = async () => {
+    if (!firestore || !adminUser) return;
+    setIsLoading(true);
+    const newValue = !targetUser.isOfficialBrand;
+    try {
+      await updateDoc(doc(firestore, 'users', targetUser.id), { isOfficialBrand: newValue });
+      await addDoc(collection(firestore, 'admin_logs'), {
+        adminId: adminUser.uid,
+        adminName: adminUser.displayName || 'Admin',
+        actionType: newValue ? 'official_brand_granted' : 'official_brand_revoked',
+        details: `${newValue ? 'Granted' : 'Revoked'} Official Registered Brand status for "${displayName}"`,
+        targetId: targetUser.id,
+        timestamp: serverTimestamp(),
+      });
+      toast({
+        title: newValue ? 'Official Brand granted' : 'Official Brand revoked',
+        description: `${displayName} is ${newValue ? 'now an Official Registered Brand' : 'no longer an Official Brand'}.`,
+      });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update official brand flag.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!firestore || !adminUser) return;
     setIsLoading(true);
@@ -151,6 +176,10 @@ export function DataTableRowActions<TData>({
                 </DropdownMenuSubContent>
             </DropdownMenuPortal>
         </DropdownMenuSub>
+        <DropdownMenuItem onClick={handleToggleOfficialBrand}>
+          <BadgeCheck className="mr-2 h-4 w-4" />
+          {targetUser.isOfficialBrand ? 'Revoke Official Brand' : 'Mark as Official Brand'}
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         {isBanned ? (
             <DropdownMenuItem onClick={() => handleUpdateStatus('active')}>

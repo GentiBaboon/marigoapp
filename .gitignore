@@ -57,3 +57,8 @@ public/workbox-*.js
 public/workbox-*.js.map
 public/worker-*.js
 public/worker-*.js.map
+# Local-only screenshots for product imports
+ImportPhotos/
+
+# Claude harness worktrees
+.claude/worktrees/

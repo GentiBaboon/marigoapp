@@ -144,11 +144,32 @@ export async function POST(req: NextRequest) {
 
     const pi = await stripe.paymentIntents.create(piOptions);
 
-    // Reserve products
+    // Decrement stock by the ordered amount (mirrors the COD path in
+    // create-order). Listings with remaining stock stay buyable; only when
+    // quantity hits zero do we flip to "reserved" so the listing stays
+    // visible but can't be ordered again.
     await Promise.all(
-      items.map((item: any) =>
-        firestoreUpdate('products', item.id, { status: 'reserved' }, idToken)
-      )
+      validatedItems.map(async (item: any) => {
+        const p = await firestoreGet('products', item.id, idToken);
+        const currentQty = typeof p?.quantity === 'number' ? p.quantity : 1;
+        const orderedQty =
+          typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
+        const remaining = Math.max(0, currentQty - orderedQty);
+        const update: Record<string, unknown> = { quantity: remaining };
+        if (remaining === 0) update.status = 'reserved';
+        // Multi-variant listings: decrement the matching size's stock alongside
+        // the top-level quantity so the size picker stays in sync.
+        const variants = Array.isArray(p?.variants) ? p.variants : null;
+        const itemSize = item.selectedSize || item.size;
+        if (variants && itemSize) {
+          update.variants = variants.map((v: any) =>
+            v?.size === itemSize
+              ? { ...v, quantity: Math.max(0, (Number(v.quantity) || 0) - orderedQty) }
+              : v
+          );
+        }
+        await firestoreUpdate('products', item.id, update, idToken);
+      }),
     );
 
     // Create order document

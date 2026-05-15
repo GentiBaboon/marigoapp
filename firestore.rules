@@ -54,7 +54,39 @@ service cloud.firestore {
     match /products/{productId} {
       allow read: if true;
       allow create: if isSignedIn() && request.resource.data.sellerId == request.auth.uid;
-      allow update: if isSignedIn() && (resource.data.sellerId == request.auth.uid || isAdmin());
+      // Seller or admin can update freely. Additionally, any signed-in user
+      // can perform two narrow updates:
+      //   1. Decrement `quantity` (and optionally flip `status` to `reserved`)
+      //      — buyer-at-checkout flow.
+      //   2. Increment `views` by 1 — product-detail view counter.
+      //   3. Adjust `wishlistCount` by ±1 — wishlist add/remove flow.
+      // Anything touching other fields requires seller or admin.
+      allow update: if isSignedIn() && (
+        resource.data.sellerId == request.auth.uid
+        || isAdmin()
+        || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity', 'status'])
+          && request.resource.data.quantity is int
+          && request.resource.data.quantity >= 0
+          && request.resource.data.quantity < resource.data.get('quantity', 1)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
+              || request.resource.data.status == 'reserved')
+        )
+        || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views'])
+          && request.resource.data.views is int
+          && request.resource.data.views == resource.data.get('views', 0) + 1
+        )
+        || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['wishlistCount'])
+          && request.resource.data.wishlistCount is int
+          && (
+            request.resource.data.wishlistCount == resource.data.get('wishlistCount', 0) + 1
+            || request.resource.data.wishlistCount == resource.data.get('wishlistCount', 0) - 1
+          )
+          && request.resource.data.wishlistCount >= 0
+        )
+      );
       allow delete: if isAdmin() || (isSignedIn() && resource.data.sellerId == request.auth.uid);
 
       match /offers/{offerId} {

@@ -36,7 +36,7 @@ async function fetchProductsByIds(
         query(
           collection(firestore, 'products'),
           where(documentId(), 'in', batch),
-          where('status', 'in', ['active', 'reserved'])
+          where('status', 'in', ['active', 'reserved', 'sold'])
         )
       );
       snap.docs.forEach((d) => results.push({ id: d.id, ...d.data() } as FirestoreProduct));
@@ -102,6 +102,7 @@ export function MacroFilteredProducts({ filterId }: Props) {
                 brandId: p.brandId,
                 title: p.title,
                 price: p.price,
+                originalPrice: p.originalPrice,
                 images: p.images,
                 sellerId: p.sellerId,
                 size: p.size,

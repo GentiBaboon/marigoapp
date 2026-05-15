@@ -119,7 +119,11 @@ export function PhotosStep() {
     }
   };
 
-  const canContinue = localImages.length >= 3;
+  // Continue is enabled as soon as the seller has at least one photo. Skipping
+  // the photo step entirely is still allowed via the "Skip for now" link
+  // below — the final publish guard in ReviewStep blocks zero-photo listings,
+  // so the requirement is enforced at the right moment rather than this step.
+  const canContinue = localImages.length >= 1;
 
   return (
     <div className="space-y-6">
@@ -213,19 +217,25 @@ export function PhotosStep() {
         </div>
       )}
 
-      <div className="pt-4 space-y-4">
-        <Button 
-          className="w-full h-16 text-lg font-bold shadow-xl shadow-primary/20 rounded-full" 
-          size="lg" 
-          disabled={!canContinue || !!isProcessing} 
+      <div className="pt-4 space-y-3">
+        <Button
+          className="w-full h-16 text-lg font-bold shadow-xl shadow-primary/20 rounded-full"
+          size="lg"
+          disabled={!canContinue || !!isProcessing}
           onClick={nextStep}
         >
           Continue ({localImages.length}/8)
         </Button>
         {!canContinue && (
-          <p className="text-center text-xs font-bold text-muted-foreground uppercase tracking-widest">
-            Add {3 - localImages.length} more photo(s) to continue
-          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full h-12 text-sm font-bold text-muted-foreground hover:text-foreground"
+            disabled={!!isProcessing}
+            onClick={nextStep}
+          >
+            Skip for now
+          </Button>
         )}
       </div>
     </div>

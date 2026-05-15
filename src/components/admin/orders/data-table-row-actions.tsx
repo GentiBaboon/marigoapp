@@ -18,18 +18,24 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { useFirestore, useUser } from '@/firebase';
-import { doc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestoreOrder } from '@/lib/types';
+import { notifyOrderStatus } from '@/lib/notifications';
+import { releaseOrderItems, markOrderItemsSoldIfDepleted } from '@/lib/order-inventory';
 
 interface DataTableRowActionsProps<TData> {
   row: Row<TData>;
 }
 
+// Statuses match the canonical flow defined in lib/order-status.ts. Note the
+// dropdown shows `Processing` for value `confirmed` — this is the stage
+// label admins use, even though the underlying status is `confirmed`.
 const ORDER_STATUSES = [
-  { value: 'processing', label: 'Processing' },
+  { value: 'confirmed', label: 'Processing' },
+  { value: 'in_preparation', label: 'In Preparation' },
+  { value: 'prepared', label: 'Ready to Ship' },
   { value: 'shipped', label: 'Shipped' },
-  { value: 'delivered', label: 'Delivered' },
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'refunded', label: 'Refunded' },
@@ -48,17 +54,54 @@ export function DataTableRowActions<TData>({
     if (!firestore || !adminUser) return;
     setIsLoading(true);
     try {
-      await updateDoc(doc(firestore, 'orders', order.id), { status: newStatus });
+      await updateDoc(doc(firestore, 'orders', order.id), {
+        status: newStatus,
+        updatedAt: serverTimestamp(),
+        statusHistory: arrayUnion({
+          status: newStatus,
+          at: new Date().toISOString(),
+          by: adminUser.uid,
+        }),
+      });
 
-      // Cancelling/refunding releases each product back to active so it can
-      // be ordered again.
-      if (newStatus === 'cancelled' || newStatus === 'refunded') {
-        await Promise.all(
-          (order.items || []).map((it: any) =>
-            updateDoc(doc(firestore, 'products', it.id), { status: 'active' }).catch(() => null),
-          ),
-        );
+      // Quantity-aware inventory sync (see lib/order-inventory).
+      const wasTerminal = order.status === 'cancelled' || order.status === 'refunded';
+      if ((newStatus === 'cancelled' || newStatus === 'refunded') && !wasTerminal) {
+        await releaseOrderItems(firestore, order.items as any);
+      } else if (newStatus === 'completed' && order.status !== 'completed') {
+        await markOrderItemsSoldIfDepleted(firestore, order.items as any);
       }
+
+      // Notify buyer + every seller so the status change shows up in the bell
+      // immediately, regardless of which admin surface triggered it.
+      const firstItem = order.items?.[0];
+      const productTitle = firstItem?.title;
+      const productImage = firstItem?.image;
+      if (order.buyerId) {
+        notifyOrderStatus({
+          firestore,
+          userId: order.buyerId,
+          orderNumber: order.orderNumber,
+          status: newStatus,
+          link: `/profile/orders/${order.id}`,
+          audience: 'buyer',
+          productTitle,
+          productImage,
+        }).catch(() => null);
+      }
+      Array.from(new Set(order.sellerIds || [])).forEach((sellerId) => {
+        if (!sellerId) return;
+        notifyOrderStatus({
+          firestore,
+          userId: sellerId,
+          orderNumber: order.orderNumber,
+          status: newStatus,
+          link: `/profile/listings/sales/${order.id}`,
+          audience: 'seller',
+          productTitle,
+          productImage,
+        }).catch(() => null);
+      });
 
       await addDoc(collection(firestore, 'admin_logs'), {
         adminId: adminUser.uid,

@@ -141,15 +141,22 @@ export default function SaleDetailsPage() {
                     <p className="font-semibold text-lg">{format(estimatedPaymentDate, 'MMMM d, yyyy')}</p>
                 </div>
 
+                {/* Status timeline always renders so the seller sees the
+                    current stage (incl. shipped / delivered banners) regardless
+                    of whether a courier delivery doc has been created. */}
                 <div className="bg-background p-4 rounded-lg">
-                    {delivery ? (
-                        <DeliveryTracking order={order} delivery={delivery} />
-                    ) : shippingFromAddress ? (
+                    {shippingFromAddress ? (
                         <SellerOrderTimeline order={order} shippingFromAddress={shippingFromAddress} />
                     ) : (
                         <p className="text-center text-muted-foreground">Waiting for shipping details...</p>
                     )}
                 </div>
+
+                {delivery && (
+                    <div className="bg-background p-4 rounded-lg">
+                        <DeliveryTracking order={order} delivery={delivery} />
+                    </div>
+                )}
 
                 <SellerOrderActions order={order} />
             </main>
