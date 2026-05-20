@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, limit, documentId, getDocs, QueryConstraint } from 'firebase/firestore';
+import { useShoppingPreference } from '@/hooks/use-shopping-preference';
 import type { FirestoreProduct } from '@/lib/types';
 import { ProductCard } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,10 +26,15 @@ export function PersonalizedPicks() {
     const { user } = useUser();
     const firestore = useFirestore();
     const { wishlistItems, isLoading: isWishlistLoading } = useWishlist();
+    const gender = useShoppingPreference();
 
     const [recommendations, setRecommendations] = React.useState<{ products: FirestoreProduct[], title: string } | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const hasFetchedRef = React.useRef(false);
+
+    // Reset the once-only fetch gate whenever the gender preference flips, so a
+    // freshly-chosen audience triggers a new recommendation pull.
+    React.useEffect(() => { hasFetchedRef.current = false; }, [gender]);
 
     React.useEffect(() => {
         // Prevent multiple simultaneous AI calls or re-fetches if data is already loaded for this user
@@ -87,9 +93,14 @@ export function PersonalizedPicks() {
                 queryConstraints.push(limit(12));
 
                 const recommendedProductsSnapshot = await getDocs(query(productsRef, ...queryConstraints));
+                // Respect the visitor's gender preference. We filter client-side
+                // here (rather than adding a where('gender', ...) clause) because
+                // we already have a `where('brand'|'category', 'in', …)` clause —
+                // Firestore allows only one `in` filter per query.
                 const fetchedProducts = recommendedProductsSnapshot.docs
                     .map(d => ({ id: d.id, ...d.data() } as FirestoreProduct))
-                    .filter(p => !wishlistedProductIds.includes(p.id));
+                    .filter(p => !wishlistedProductIds.includes(p.id))
+                    .filter(p => !gender || p.gender === gender || p.gender === 'unisex');
 
                 setRecommendations({
                     products: fetchedProducts.slice(0, 8),
@@ -105,7 +116,7 @@ export function PersonalizedPicks() {
         
         generateAndFetchRecommendations();
 
-    }, [user, firestore, wishlistItems, isWishlistLoading]);
+    }, [user, firestore, wishlistItems, isWishlistLoading, gender]);
     
     if (!user || (!isLoading && (!recommendations || recommendations.products.length === 0))) {
         return null;

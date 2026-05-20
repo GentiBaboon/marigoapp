@@ -43,7 +43,13 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
 
       const orderPayload = {
         items: items.map(i => ({
-          id: i.id,
+          // `i.id` is the cart-line id (`${productId}__${size}` for variant
+          // products) — the API needs the real Firestore product id, plus the
+          // selected size so it can decrement the matching variant's stock.
+          id: i.productId || i.id,
+          productId: i.productId || i.id,
+          size: i.selectedSize ?? null,
+          quantity: i.quantity ?? 1,
           sellerId: i.sellerId,
           title: i.title,
           price: i.price,

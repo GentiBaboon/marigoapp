@@ -109,6 +109,7 @@ service cloud.firestore {
     match /settings/banners { allow read: if true; allow write: if isAdmin(); }
     match /settings/macro_filters { allow read: if true; allow write: if isAdmin(); }
     match /settings/homepage_blocks { allow read: if true; allow write: if isAdmin(); }
+    match /settings/badges { allow read: if true; allow write: if isAdmin(); }
     match /config/exchangeRates { allow read: if true; }
     match /admin_logs/{logId} { allow read, write: if isAdmin(); }
 
@@ -124,6 +125,10 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || request.auth.uid in resource.data.sellerIds || isAdmin());
       allow create: if isSignedIn();
       allow update: if isAdmin() || (isSignedIn() && (resource.data.buyerId == request.auth.uid || request.auth.uid in resource.data.sellerIds));
+      // Admin-only delete — used by the operator reset tool at
+      // /admin/danger/reset-orders. No buyer/seller delete path; cancellations
+      // go through status updates, not deletions.
+      allow delete: if isAdmin();
     }
 
     match /notifications/{id} {
@@ -207,18 +212,50 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource.data.requestedBy == request.auth.uid || isAdmin());
       allow create: if isSignedIn();
       allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /disputes/{disputeId} {
       allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdmin());
       allow create: if isSignedIn();
       allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /returns/{returnId} {
       allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdmin());
       allow create: if isSignedIn();
-      allow update: if isAdmin();
+      // Admins can do anything. The buyer drives the in-transit phase (packs
+      // the item, hands it to the courier): `approved → ready_for_pickup`
+      // and `ready_for_pickup → shipping`. The seller drives the receiving
+      // phase: `shipping → received`. Any other transition (refund / reject /
+      // etc.) stays admin-only.
+      allow update: if isAdmin() || (
+        isSignedIn()
+        && resource.data.buyerId == request.auth.uid
+        && (
+          (resource.data.status == 'approved' && request.resource.data.status == 'ready_for_pickup')
+          || (resource.data.status == 'ready_for_pickup' && request.resource.data.status == 'shipping')
+        )
+      ) || (
+        isSignedIn()
+        && resource.data.sellerId == request.auth.uid
+        && resource.data.status == 'shipping'
+        && request.resource.data.status == 'received'
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Finance ledger. Append-only: admins create rows from order-lifecycle
+    // helpers; nobody updates or deletes them. Readable by the buyer/seller
+    // tied to the transaction so each side can show their own history.
+    match /transactions/{txnId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAdmin();
+      allow update: if false;
+      // Admin-only delete — used by the operator reset tool to clear out
+      // ledger rows that referenced wiped orders.
+      allow delete: if isAdmin();
     }
 
     // No wildcard catch-all rule. Every collection must have explicit rules.

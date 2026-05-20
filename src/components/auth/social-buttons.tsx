@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/firebase';
 import { signInWithGoogle, signInWithApple } from '@/firebase/auth/actions';
@@ -36,6 +36,9 @@ const AppleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 export function SocialButtons({ variant = 'outline', className }: { variant?: ButtonProps['variant'], className?: string}) {
   const [loading, setLoading] = useState<null | 'google' | 'apple'>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get('next');
+  const nextPath = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/home';
   const auth = useAuth();
   const { toast } = useToast();
 
@@ -46,7 +49,7 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
       const result = await action(auth);
 
       if (result.success) {
-        router.push('/home');
+        router.push(nextPath);
       } else {
         toast({
           variant: 'destructive',

@@ -20,11 +20,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useSellForm } from '@/components/sell/SellFormContext';
-import { sellStep4Schema, type FirestoreCategory, type FirestoreAttribute } from '@/lib/types';
+import { sellStep4Schema, canUseVariants, type FirestoreCategory, type FirestoreAttribute, type FirestoreUser } from '@/lib/types';
+import { useBadgeSettings } from '@/hooks/use-badge-settings';
 import type { z } from 'zod';
 import { StepActions } from '@/components/sell/StepActions';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, doc, query } from 'firebase/firestore';
 import { Combobox } from '@/components/ui/combobox';
 
 type Step4Values = z.infer<typeof sellStep4Schema>;
@@ -32,6 +33,20 @@ type Step4Values = z.infer<typeof sellStep4Schema>;
 export function DetailsStep() {
   const { formData, setFormData, nextStep } = useSellForm();
   const firestore = useFirestore();
+  const { user } = useUser();
+
+  // Official Brand sellers set size per-variant in PricingStep, so we hide the
+  // single-size picker here to avoid asking twice.
+  const sellerRef = useMemoFirebase(
+    () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
+    [user, firestore],
+  );
+  const { data: sellerProfile } = useDoc<FirestoreUser>(sellerRef);
+  const { data: badgeSettings } = useBadgeSettings();
+  // Per-tier feature: which sellers can list with per-size variants. When a
+  // seller can use variants, the single-size picker on this step is hidden;
+  // they set size per-variant in PricingStep instead.
+  const isOfficialBrand = canUseVariants(sellerProfile, badgeSettings);
 
   // Dynamic Metadata Fetching
   const categoriesQuery = useMemoFirebase(() => collection(firestore, 'categories'), [firestore]);
@@ -203,6 +218,7 @@ export function DetailsStep() {
             />
         </div>
 
+        {!isOfficialBrand && (
         <div className="space-y-3">
           <FormLabel className="font-semibold">Size</FormLabel>
           <div className="grid grid-cols-2 gap-4">
@@ -273,6 +289,7 @@ export function DetailsStep() {
             />
           </div>
         </div>
+        )}
 
         <FormField
           control={form.control}

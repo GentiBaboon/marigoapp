@@ -19,6 +19,7 @@ export type OrderStatus =
   | 'completed'
   | 'cancel_requested'
   | 'refund_requested'
+  | 'return_initiated'
   | 'cancelled'
   | 'refunded';
 
@@ -41,6 +42,7 @@ export const STATUS_RANK: Record<string, number> = {
   completed: 5,
   cancel_requested: 1,
   refund_requested: 4,
+  return_initiated: 4,
   cancelled: -1,
   refunded: -1,
   awaiting_payout: 6,
@@ -91,6 +93,11 @@ const LABELS: Record<string, Record<Audience, string>> = {
     buyer: 'Refund Requested',
     seller: 'Refund Requested',
     admin: 'Refund Requested',
+  },
+  return_initiated: {
+    buyer: 'Return Initiated',
+    seller: 'Return Initiated',
+    admin: 'Return Initiated',
   },
   cancelled: { buyer: 'Cancelled', seller: 'Cancelled', admin: 'Cancelled' },
   refunded: { buyer: 'Refunded', seller: 'Refunded', admin: 'Refunded' },

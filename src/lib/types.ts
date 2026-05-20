@@ -136,6 +136,9 @@ export interface FirestoreUser {
   // Brand" badge regardless of sales count, AND unlocks multi-variant
   // (per-size inventory) listings.
   isOfficialBrand?: boolean;
+  // Admin override for the seller badge. When set, takes precedence over the
+  // auto-computed level derived from salesCount. `null` or unset → auto.
+  badgeOverride?: SellerBadgeLevel | null;
 }
 
 export type SellerBadgeLevel = 'trusted' | 'expert' | 'activist' | 'official';
@@ -145,12 +148,83 @@ export interface SellerBadge {
   label: string;
 }
 
-export function getSellerLevel(user: Partial<FirestoreUser> | null | undefined): SellerBadge {
-  if (user?.isOfficialBrand) return { level: 'official', label: 'Official Registered Brand' };
+// Admin-configurable thresholds + labels for the seller-badge ladder. Stored
+// at settings/badges. Read by getSellerLevel when provided; falls back to the
+// historical defaults so callers without settings still get sensible output.
+export interface BadgeSettings {
+  // Minimum completed sales required to qualify for each tier. Sellers below
+  // `trustedMinSales` get no visible badge.
+  trustedMinSales: number;
+  expertMinSales: number;
+  activistMinSales: number;
+  labels: Record<SellerBadgeLevel, string>;
+  // Per-tier feature gates. Currently only `variantsEnabled` controls whether
+  // sellers at that tier can list products with per-size variants (multi-
+  // variant inventory). Official defaults to true to preserve prior behavior.
+  variantsEnabled: Record<SellerBadgeLevel, boolean>;
+}
+
+export const DEFAULT_BADGE_SETTINGS: BadgeSettings = {
+  trustedMinSales: 0,
+  expertMinSales: 5,
+  activistMinSales: 10,
+  labels: {
+    trusted: 'Trusted Seller',
+    expert: 'Expert Seller',
+    activist: 'Fashion Activist',
+    official: 'Official Registered Brand',
+  },
+  variantsEnabled: {
+    trusted: false,
+    expert: false,
+    activist: false,
+    official: true,
+  },
+};
+
+// Resolve the effective settings, merging stored values onto the defaults so
+// callers always receive a complete object regardless of partial saves.
+export function resolveBadgeSettings(stored?: Partial<BadgeSettings> | null): BadgeSettings {
+  return {
+    trustedMinSales: stored?.trustedMinSales ?? DEFAULT_BADGE_SETTINGS.trustedMinSales,
+    expertMinSales: stored?.expertMinSales ?? DEFAULT_BADGE_SETTINGS.expertMinSales,
+    activistMinSales: stored?.activistMinSales ?? DEFAULT_BADGE_SETTINGS.activistMinSales,
+    labels: { ...DEFAULT_BADGE_SETTINGS.labels, ...(stored?.labels ?? {}) },
+    variantsEnabled: { ...DEFAULT_BADGE_SETTINGS.variantsEnabled, ...(stored?.variantsEnabled ?? {}) },
+  };
+}
+
+export function getSellerLevel(
+  user: Partial<FirestoreUser> | null | undefined,
+  settings?: Partial<BadgeSettings> | null,
+): SellerBadge | null {
+  const s = resolveBadgeSettings(settings);
+
+  // 1. Explicit admin override wins — bypasses thresholds entirely.
+  if (user?.badgeOverride) {
+    return { level: user.badgeOverride, label: s.labels[user.badgeOverride] };
+  }
+  // 2. Official-brand flag remains a shortcut to the top-tier badge.
+  if (user?.isOfficialBrand) return { level: 'official', label: s.labels.official };
+  // 3. Otherwise compute from sales count + configurable thresholds.
   const sales = typeof user?.salesCount === 'number' ? user.salesCount : 0;
-  if (sales >= 10) return { level: 'activist', label: 'Fashion Activist' };
-  if (sales >= 5) return { level: 'expert', label: 'Expert Seller' };
-  return { level: 'trusted', label: 'Trusted Seller' };
+  if (sales >= s.activistMinSales) return { level: 'activist', label: s.labels.activist };
+  if (sales >= s.expertMinSales) return { level: 'expert', label: s.labels.expert };
+  if (sales >= s.trustedMinSales) return { level: 'trusted', label: s.labels.trusted };
+  // Below the Trusted threshold → no badge.
+  return null;
+}
+
+// Whether this user is allowed to list products with per-size variant
+// inventory. Driven by their effective badge level + the per-tier toggle in
+// settings. Sellers with no badge cannot use variants.
+export function canUseVariants(
+  user: Partial<FirestoreUser> | null | undefined,
+  settings?: Partial<BadgeSettings> | null,
+): boolean {
+  const s = resolveBadgeSettings(settings);
+  const badge = getSellerLevel(user, settings);
+  return !!badge && !!s.variantsEnabled[badge.level];
 }
 
 // --- Products ---
@@ -246,6 +320,7 @@ export interface FirestoreOrder {
     | "completed"
     | "cancel_requested"
     | "refund_requested"
+    | "return_initiated"
     | "cancelled"
     | "refunded";
   paymentMethod: "card" | "cod";
@@ -266,6 +341,46 @@ export interface FirestoreOrder {
   /** Set when the seller has filed a cancellation request (pending admin review). */
   sellerCancelRequested?: boolean;
   sellerCancelReason?: string;
+  // --- Shopify-style cross-references (Phase A) ---
+  // IDs of related child records living in their own collections. Lets the
+  // order page render "see related dispute / return / refund" links without
+  // querying every collection.
+  disputeIds?: string[];
+  returnIds?: string[];
+  refundIds?: string[];
+  // Running total of all refunds applied to this order (positive number).
+  // When equals totalAmount → fully refunded; between 0 and totalAmount →
+  // partially refunded.
+  refundedAmount?: number;
+}
+
+// Append-only finance ledger. Every money movement (sale, refund, partial
+// refund, cancellation reversal, payout) gets one row here so /admin/finance
+// can render an immutable history without recomputing from orders.
+export interface FirestoreTransaction {
+  id: string;
+  // 'sale' is the original capture; refund/cancellation are reversals and
+  // carry a negative `amount`.
+  type: 'sale' | 'refund' | 'partial_refund' | 'cancellation' | 'payout';
+  orderId: string;
+  orderNumber: string;
+  // Optional child references that triggered this transaction.
+  refundId?: string;
+  returnId?: string;
+  disputeId?: string;
+  // Buyer for sales; seller for payouts. Kept generic so the row stays useful
+  // regardless of direction.
+  userId: string;
+  // Positive for inflows (sale, payout) and negative for outflows (refund,
+  // cancellation), expressed in the order's currency. The finance page sums
+  // them directly without sign juggling.
+  amount: number;
+  commission: number;
+  sellerPayout: number;
+  paymentMethod?: 'card' | 'cod' | 'stripe' | string;
+  note?: string;
+  createdAt: FirestoreTimestamp;
+  createdBy?: string;
 }
 
 // --- Shared Components ---
@@ -299,7 +414,7 @@ export const sellStep3Schema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   origin: z.string().optional(),
-  yearOfPurchase: z.string().min(1, "Year is required"),
+  yearOfPurchase: z.string().optional(),
   serialNumber: z.string().optional(),
   packaging: z.array(z.string()).optional(),
 });
@@ -620,6 +735,14 @@ export interface FirestoreRefund {
   processedBy?: string;
   createdAt: FirestoreTimestamp;
   updatedAt?: FirestoreTimestamp;
+  // Cross-references (Phase A). At least one of disputeId/returnId is set when
+  // the refund was triggered by the lifecycle helpers.
+  disputeId?: string;
+  returnId?: string;
+  // 'full' vs 'partial' vs 'cancellation' (no item ever shipped).
+  type?: 'full' | 'partial' | 'cancellation';
+  // Mirror of the transaction row this refund created in the ledger.
+  transactionId?: string;
 }
 
 // --- Disputes ---
@@ -649,6 +772,14 @@ export interface FirestoreDispute {
   /** Tags how the dispute was opened, e.g. "seller_cancel_request". */
   source?: string;
   cancellationFee?: number;
+  // Shopify-style type tag for what the dispute is asking for. Drives the
+  // lifecycle helper that fires on resolve (cancellation / return / refund).
+  // Derived from `source` when missing.
+  disputeType?: 'cancellation' | 'return_request' | 'refund_request';
+  // Cross-references back to the child records spawned by resolving this
+  // dispute.
+  refundId?: string;
+  returnId?: string;
   /** Denormalized product info so admin views and chat threads can show
    *  the item name/image without fetching the order. */
   productId?: string;
@@ -660,6 +791,7 @@ export interface FirestoreDispute {
 export const ReturnStatusEnum = {
   REQUESTED: 'requested',
   APPROVED: 'approved',
+  READY_FOR_PICKUP: 'ready_for_pickup',
   SHIPPING: 'shipping',
   RECEIVED: 'received',
   REFUNDED: 'refunded',
@@ -677,9 +809,15 @@ export interface FirestoreReturn {
   items: Array<{ id: string; title: string; price: number; image: string }>;
   type: 'return' | 'exchange';
   reason: string;
-  status: 'requested' | 'approved' | 'shipping' | 'received' | 'refunded' | 'exchanged' | 'rejected';
+  status: 'requested' | 'approved' | 'ready_for_pickup' | 'shipping' | 'received' | 'refunded' | 'exchanged' | 'rejected';
   adminNotes?: string;
   processedBy?: string;
   createdAt: FirestoreTimestamp;
   updatedAt?: FirestoreTimestamp;
+  // Cross-references (Phase A).
+  disputeId?: string;
+  refundId?: string;
+  // Shipping label tracking for the reverse shipment.
+  trackingNumber?: string;
+  shippingLabelUrl?: string;
 }

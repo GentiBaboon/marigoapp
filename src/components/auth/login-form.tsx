@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -25,6 +25,9 @@ import { Input } from '@/components/ui/input';
 export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get('next');
+  const nextPath = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/home';
   const auth = useAuth();
   const { toast } = useToast();
 
@@ -40,7 +43,7 @@ export function LoginForm() {
     setLoading(true);
     const result = await signInWithEmail(auth, data.email, data.password);
     if (result.success) {
-      router.push('/home');
+      router.push(nextPath);
     } else {
       toast({
         variant: 'destructive',

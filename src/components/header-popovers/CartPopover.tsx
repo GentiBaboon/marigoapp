@@ -42,15 +42,15 @@ export function CartPopover() {
           ) : (
             <div className="divide-y">
               {items.map((item) => (
-                <div key={item.id + (item.selectedSize || '')} className="flex items-start gap-3 p-3">
-                  <Link href={`/products/${item.id}`} onClick={() => setOpen(false)} className="relative h-14 w-14 flex-shrink-0 rounded-md bg-muted overflow-hidden">
+                <div key={item.id} className="flex items-start gap-3 p-3">
+                  <Link href={`/products/${item.productId || item.id}`} onClick={() => setOpen(false)} className="relative h-14 w-14 flex-shrink-0 rounded-md bg-muted overflow-hidden">
                     {item.image ? (
                       <Image src={item.image} alt={item.title} fill sizes="56px" className="object-cover" />
                     ) : null}
                   </Link>
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider truncate">{item.brand}</p>
-                    <Link href={`/products/${item.id}`} onClick={() => setOpen(false)} className="text-sm leading-tight line-clamp-2 hover:underline">
+                    <Link href={`/products/${item.productId || item.id}`} onClick={() => setOpen(false)} className="text-sm leading-tight line-clamp-2 hover:underline">
                       {item.title}
                     </Link>
                     <div className="flex items-baseline gap-2 mt-1">

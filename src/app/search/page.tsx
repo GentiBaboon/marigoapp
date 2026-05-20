@@ -181,7 +181,18 @@ function useFilteredProducts(
         const s = (p.subcategoryId ?? '').toLowerCase();
         return parentMatchSet.has(c) || parentMatchSet.has(s);
       });
-    if (size) list = list.filter((p) => p.size === size);
+    if (size) {
+      // Match either the legacy top-level `size` field or any in-stock variant
+      // for products that use per-size inventory.
+      list = list.filter((p) => {
+        if (p.size === size) return true;
+        const variants = (p as any).variants;
+        if (Array.isArray(variants)) {
+          return variants.some((v: any) => v?.size === size && (Number(v?.quantity) || 0) > 0);
+        }
+        return false;
+      });
+    }
     if (color) list = list.filter((p) => p.color === color);
     if (condition) list = list.filter((p) => p.condition === condition);
     if (material) list = list.filter((p) => (p as any).material === material);

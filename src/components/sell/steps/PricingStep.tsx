@@ -10,6 +10,8 @@ import { useState, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import type { FirestoreAddress, FirestoreUser, ProductVariant } from '@/lib/types';
+import { canUseVariants } from '@/lib/types';
+import { useBadgeSettings } from '@/hooks/use-badge-settings';
 import { Trash2 } from 'lucide-react';
 import { AddressForm } from '@/components/profile/address-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -48,14 +50,17 @@ export function PricingStep() {
     ? Math.round(((parsedOriginalPrice - currentPrice) / parsedOriginalPrice) * 100)
     : 0;
 
-  // Fetch the seller's own user doc to read the `isOfficialBrand` flag. Only
-  // Official Brand sellers get the multi-variant per-size inventory UI.
+  // Fetch the seller's own user doc + the per-tier "variants enabled" toggle
+  // configured by admin. Whether this seller sees the multi-variant per-size
+  // inventory UI is driven by canUseVariants(), so admins can enable variants
+  // for tiers beyond Official without touching code.
   const userRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
   const { data: sellerProfile } = useDoc<FirestoreUser>(userRef);
-  const isOfficialBrand = !!sellerProfile?.isOfficialBrand;
+  const { data: badgeSettings } = useBadgeSettings();
+  const isOfficialBrand = canUseVariants(sellerProfile, badgeSettings);
 
   // Size charts to drive variant-row size dropdowns.
   const sizeChartsQuery = useMemoFirebase(() => collection(firestore, 'size_charts'), [firestore]);

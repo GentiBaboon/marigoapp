@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { collection, query, orderBy, limit, doc, updateDoc, addDoc, getDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { collection, query, orderBy, limit, doc, updateDoc, addDoc, getDoc, serverTimestamp, arrayUnion, where } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import type { FirestoreRefund, FirestoreOrder } from '@/lib/types';
 import { notifyOrderStatus, notifyUser } from '@/lib/notifications';
@@ -76,7 +76,53 @@ export default function AdminRefundsPage() {
     () => query(collection(firestore, 'refunds'), orderBy('createdAt', 'desc'), limit(100)),
     [firestore]
   );
-  const { data: refunds, isLoading } = useCollection<FirestoreRefund>(refundsQuery);
+  const { data: refunds, isLoading: refundsLoading } = useCollection<FirestoreRefund>(refundsQuery);
+
+  // Orders are the source of truth for whether a refund happened. Any order
+  // in `refunded` or `cancelled` status must appear in this list, even when
+  // no Refund doc was ever written (legacy data or silent failures). No
+  // `orderBy` here so we don't need a composite index — we sort client-side
+  // when merging.
+  const ordersQuery = useMemoFirebase(
+    () => query(
+      collection(firestore, 'orders'),
+      where('status', 'in', ['refunded', 'cancelled']),
+      limit(200),
+    ),
+    [firestore],
+  );
+  const { data: refundedOrders, isLoading: ordersLoading } = useCollection<FirestoreOrder>(ordersQuery);
+
+  const mergedRefunds = React.useMemo<FirestoreRefund[]>(() => {
+    const real = refunds ?? [];
+    const orders = refundedOrders ?? [];
+    const orderIdsWithRefund = new Set(real.map(r => r.orderId));
+    // Synthetic refund rows for refunded/cancelled orders that have no real
+    // Refund doc. They render in the same table with status='processed' so
+    // admins can see them in finance/refunds without manual backfill.
+    const synthetic: FirestoreRefund[] = orders
+      .filter(o => !orderIdsWithRefund.has(o.id))
+      .map(o => ({
+        id: `synthetic_${o.id}`,
+        orderId: o.id,
+        orderNumber: o.orderNumber,
+        requestedBy: o.buyerId,
+        requestedByName: 'Buyer',
+        reason: o.status === 'cancelled' ? 'Order cancelled' : 'Order refunded',
+        amount: Number(o.totalAmount) || 0,
+        status: 'processed',
+        createdAt: o.createdAt,
+        type: o.status === 'cancelled' ? 'cancellation' : 'full',
+      } as FirestoreRefund));
+    // Merge + sort by createdAt desc so the table order is consistent.
+    return [...real, ...synthetic].sort((a, b) => {
+      const ad = toDate(a.createdAt as any)?.getTime() ?? 0;
+      const bd = toDate(b.createdAt as any)?.getTime() ?? 0;
+      return bd - ad;
+    });
+  }, [refunds, refundedOrders]);
+
+  const isLoading = refundsLoading || ordersLoading;
 
   const logAction = async (actionType: string, details: string, targetId: string) => {
     await addDoc(collection(firestore, 'admin_logs'), {
@@ -317,7 +363,7 @@ export default function AdminRefundsPage() {
   ];
 
   const table = useReactTable({
-    data: refunds || [],
+    data: mergedRefunds,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -361,6 +407,7 @@ export default function AdminRefundsPage() {
           className="max-w-sm"
         />
       </div>
+
 
       <div className="rounded-md border">
         <Table>

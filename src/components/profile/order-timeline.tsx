@@ -33,6 +33,10 @@ function toDate(ts: any): Date {
 export function OrderTimeline({ order }: { order: FirestoreOrder }) {
     const { status } = order;
     const isTerminal = status === 'cancelled' || status === 'refunded';
+    // A refund/return flow only starts AFTER the order was delivered and
+    // completed, so the happy-path timeline must show all 5 steps as done.
+    // The active return progress is rendered by <ReturnTimeline /> below.
+    const isInReturnFlow = status === 'refund_requested' || status === 'return_initiated';
     // When the order is cancelled/refunded, freeze the timeline at the
     // highest stage previously reached so completed steps stay green.
     const historyMaxRank = (order.statusHistory || []).reduce((max, e) => {
@@ -40,7 +44,13 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
         return r > max ? r : max;
     }, -1);
     const liveRank = STATUS_RANK[status] ?? 0;
-    const rank = isTerminal ? Math.max(historyMaxRank, 0) : liveRank;
+    // For return-flow orders, force rank past `completed` (rank 5) so every
+    // step renders as completed (green).
+    const rank = isInReturnFlow
+      ? 6
+      : isTerminal
+        ? Math.max(historyMaxRank, 0)
+        : liveRank;
     const shipByDate = addDays(toDate(order.createdAt), 7);
     const cancelDate = addDays(shipByDate, 1);
 
@@ -48,12 +58,28 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
 
     return (
         <div className="space-y-6">
+            {isTerminal && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                    <p className="font-semibold">
+                        Order {status === 'cancelled' ? 'cancelled' : 'refunded'}
+                    </p>
+                    <p className="text-xs text-red-700/80">
+                        The order didn&apos;t continue past this point. Steps reached before are marked done below.
+                    </p>
+                </div>
+            )}
             <div className="relative ml-2">
                 <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-200" />
 
                 {TIMELINE_STEPS.map((step, idx) => {
                     const stepRank = STATUS_RANK[step] ?? idx + 1;
-                    const state = stepState(rank, stepRank);
+                    // When the order is terminal, the last reached step is the
+                    // place the order *stopped*, not the place it's actively
+                    // sitting. Render it as completed (green) instead of
+                    // current (blue) so the timeline doesn't look like the
+                    // order is still in flight.
+                    const rawState = stepState(rank, stepRank);
+                    const state = isTerminal && rawState === 'current' ? 'completed' : rawState;
                     const isCurrentPrep = (step === 'in_preparation' || step === 'prepared') && isAwaitingShip && state === 'current';
                     const isCurrentShipped = step === 'shipped' && status === 'shipped' && state === 'current';
                     const isCurrentCompleted = step === 'completed' && status === 'completed' && state === 'current';

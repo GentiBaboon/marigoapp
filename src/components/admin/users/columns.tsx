@@ -4,7 +4,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { FirestoreUser } from '@/lib/types';
+import { FirestoreUser, getSellerLevel, type BadgeSettings } from '@/lib/types';
 import { format } from 'date-fns';
 import { DataTableRowActions } from './data-table-row-actions';
 import { ArrowUpDown } from 'lucide-react';
@@ -36,7 +36,16 @@ const getUserRole = (user: FirestoreUser) => {
 };
 
 
-export const columns: ColumnDef<FirestoreUser>[] = [
+// Columns depend on the admin-editable badge settings (labels + thresholds),
+// so we build them at render time once the settings doc has loaded. The
+// settings argument is nullable — when not available we fall back to the
+// hardcoded defaults inside getSellerLevel.
+export function buildColumns(badgeSettings: Partial<BadgeSettings> | null): ColumnDef<FirestoreUser>[] {
+  return columnsFor(badgeSettings);
+}
+
+function columnsFor(badgeSettings: Partial<BadgeSettings> | null): ColumnDef<FirestoreUser>[] {
+  return [
   {
     id: 'select',
     header: ({ table }) => (
@@ -100,6 +109,21 @@ export const columns: ColumnDef<FirestoreUser>[] = [
         return value.includes(role);
     },
   },
+  {
+    id: 'badge',
+    accessorFn: (row) => getSellerLevel(row, badgeSettings)?.level ?? 'none',
+    header: 'Badge',
+    cell: ({ row }) => {
+        const badge = getSellerLevel(row.original, badgeSettings);
+        return badge
+          ? <Badge variant="outline">{badge.label}</Badge>
+          : <span className="text-muted-foreground text-xs">—</span>;
+    },
+    filterFn: (row, id, value) => {
+        const level = getSellerLevel(row.original, badgeSettings)?.level ?? 'none';
+        return value.includes(level);
+    },
+  },
    {
     accessorKey: 'createdAt',
     header: 'Join Date',
@@ -123,4 +147,9 @@ export const columns: ColumnDef<FirestoreUser>[] = [
     id: 'actions',
     cell: ({ row }) => <DataTableRowActions row={row} />,
   },
-];
+  ];
+}
+
+// Backwards-compatible export for callers that don't have badge settings yet.
+// Uses the hardcoded defaults inside getSellerLevel.
+export const columns = columnsFor(null);

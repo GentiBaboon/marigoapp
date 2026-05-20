@@ -28,6 +28,13 @@ const statuses = [
     { label: 'Banned', value: 'banned' }
 ]
 
+const badges = [
+    { label: 'Trusted Seller', value: 'trusted' },
+    { label: 'Expert Seller', value: 'expert' },
+    { label: 'Fashion Activist', value: 'activist' },
+    { label: 'Official Registered Brand', value: 'official' },
+]
+
 export function DataTableToolbar<TData>({
   table,
 }: DataTableToolbarProps<TData>) {
@@ -87,6 +94,13 @@ export function DataTableToolbar<TData>({
             column={table.getColumn('role')}
             title="Role"
             options={roles}
+          />
+        )}
+        {table.getColumn('badge') && (
+          <DataTableFacetedFilter
+            column={table.getColumn('badge')}
+            title="Badge"
+            options={badges}
           />
         )}
         {table.getColumn('status') && (

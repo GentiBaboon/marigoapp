@@ -62,8 +62,12 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed: SellDraft[] = JSON.parse(saved);
-        // Rehydrate: convert persisted data URIs back to File objects
-        const rehydrated = parsed.map(d => ({
+        // Auto-drop drafts that already reached the success step (step > 6):
+        // the product was published and lives in Firestore. The local draft is
+        // just leftover state from a flow the user navigated away from, and
+        // showing it as a "Pending Draft" is misleading.
+        const fresh = parsed.filter(d => (d.currentStep ?? 1) <= totalSteps);
+        const rehydrated = fresh.map(d => ({
           ...d,
           formData: {
             ...d.formData,

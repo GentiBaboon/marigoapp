@@ -19,8 +19,17 @@ async function calculateOrderTotal(
   const validatedItems: any[] = [];
 
   for (const item of items) {
-    const pData = await firestoreGet('products', item.id, idToken);
+    const lookupId = item.productId || item.id;
+    const pData = await firestoreGet('products', lookupId, idToken);
     if (!pData || !['active', 'reserved'].includes(pData.status)) {
+      console.warn('[create-order] item rejected', {
+        title: item.title,
+        lookupId,
+        rawId: item.id,
+        rawProductId: item.productId,
+        found: !!pData,
+        status: pData?.status,
+      });
       throw new Error(`Item "${item.title}" is no longer available.`);
     }
     subtotal += pData.price || 0;
@@ -100,7 +109,7 @@ export async function POST(req: NextRequest) {
     // order is cancelled/refunded (with quantity restored).
     await Promise.all(
       validatedItems.map(async (item: any) => {
-        const p = await firestoreGet('products', item.id, idToken);
+        const p = await firestoreGet('products', item.productId || item.id, idToken);
         const currentQty = typeof p?.quantity === 'number' ? p.quantity : 1;
         const orderedQty =
           typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
@@ -122,7 +131,7 @@ export async function POST(req: NextRequest) {
           );
           update.variants = nextVariants;
         }
-        await firestoreUpdate('products', item.id, update, idToken);
+        await firestoreUpdate('products', item.productId || item.id, update, idToken);
       }),
     );
 

@@ -172,17 +172,28 @@ export function ReviewStep() {
           ? formData.originalPrice
           : undefined,
         currency: 'EUR',
-        // Available stock — defaults to 1 when the seller didn't change it.
-        // For variant listings this is the sum of per-size quantities; the
-        // detailed per-size breakdown lives in `variants` below.
-        quantity: Math.max(1, Math.floor(formData.quantity ?? 1)),
-        // Persist variants only when at least one was added with a non-empty
-        // size label. Empty or unset → omit so the field stays clean.
-        variants: Array.isArray(formData.variants) && formData.variants.some(v => v?.size?.trim())
-          ? formData.variants
-              .filter(v => v?.size?.trim())
-              .map(v => ({ size: v.size.trim(), quantity: Math.max(0, Math.floor(Number(v.quantity) || 0)) }))
-          : undefined,
+        // Variants and quantity must stay consistent. Compute them together so
+        // the top-level `quantity` (read by search, cards, the cart) is always
+        // the sum of per-size stock when variants exist, regardless of what
+        // value `formData.quantity` happens to hold at this moment.
+        ...(() => {
+          const cleaned = Array.isArray(formData.variants)
+            ? formData.variants
+                .filter(v => v?.size?.trim())
+                .map(v => ({
+                  size: v.size.trim(),
+                  quantity: Math.max(0, Math.floor(Number(v.quantity) || 0)),
+                }))
+            : [];
+          if (cleaned.length > 0) {
+            const total = cleaned.reduce((s, v) => s + v.quantity, 0);
+            return { variants: cleaned, quantity: Math.max(0, total) };
+          }
+          return {
+            variants: undefined,
+            quantity: Math.max(1, Math.floor(formData.quantity ?? 1)),
+          };
+        })(),
         size: formData.sizeValue || '',
         sizeSystem: formData.sizeSystem || undefined,
         color: formData.color,
@@ -296,10 +307,12 @@ export function ReviewStep() {
                         <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Condition</p>
                         <p className="font-bold text-sm capitalize">{formData.condition?.replace('_', ' ') || 'N/A'}</p>
                     </div>
-                    <div className="space-y-1">
-                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Size</p>
-                        <p className="font-bold text-sm">{formData.sizeValue || 'O/S'}</p>
-                    </div>
+                    {!(formData.variants && formData.variants.length > 0) && (
+                      <div className="space-y-1">
+                          <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Size</p>
+                          <p className="font-bold text-sm">{formData.sizeValue || 'O/S'}</p>
+                      </div>
+                    )}
                     <div className="space-y-1">
                         <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Material</p>
                         <p className="font-bold text-sm capitalize">{formData.material || 'N/A'}</p>
@@ -308,12 +321,27 @@ export function ReviewStep() {
                         <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Color</p>
                         <p className="font-bold text-sm capitalize">{formData.color || 'N/A'}</p>
                     </div>
-                    <div className="space-y-1">
-                        <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Quantity</p>
-                        <p className="font-bold text-sm">{Math.max(1, Math.floor(formData.quantity ?? 1))}</p>
-                    </div>
+                    {!(formData.variants && formData.variants.length > 0) && (
+                      <div className="space-y-1">
+                          <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Quantity</p>
+                          <p className="font-bold text-sm">{Math.max(1, Math.floor(formData.quantity ?? 1))}</p>
+                      </div>
+                    )}
                 </div>
-                
+
+                {formData.variants && formData.variants.length > 0 && (
+                  <div className="pt-4 border-t border-muted-foreground/10 space-y-2">
+                    <p className="text-muted-foreground uppercase text-[9px] font-black tracking-widest">Inventory by size{formData.sizeSystem ? ` · ${formData.sizeSystem}` : ''}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.variants.filter(v => v?.size?.trim()).map((v, i) => (
+                        <div key={i} className="px-3 py-1.5 rounded-full border bg-background text-xs font-bold">
+                          {v.size} <span className="text-muted-foreground font-medium">· {Math.max(0, Math.floor(Number(v.quantity) || 0))}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="pt-4 border-t border-muted-foreground/10">
                     <div className="flex justify-between items-center">
                         <div className="space-y-0.5">

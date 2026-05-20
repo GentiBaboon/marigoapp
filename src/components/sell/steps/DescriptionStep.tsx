@@ -231,7 +231,7 @@ export function DescriptionStep() {
               name="yearOfPurchase"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Year of purchase</FormLabel>
+                  <FormLabel>Year of purchase <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>

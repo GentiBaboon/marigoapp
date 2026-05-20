@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { useUser } from '@/firebase';
 
 const preferences = [
   {
@@ -25,6 +27,8 @@ export function ShoppingPreferenceModal() {
   const [isOpen, setIsOpen] = useState(false);
   // Default to womenswear as requested
   const [selectedPreference, setSelectedPreference] = useState<string | null>('womenswear');
+  const router = useRouter();
+  const { user } = useUser();
 
   useEffect(() => {
     const preference = localStorage.getItem('marigo_shopping_preference');
@@ -34,9 +38,19 @@ export function ShoppingPreferenceModal() {
   }, []);
 
   const handleContinue = () => {
-    if (selectedPreference) {
-      localStorage.setItem('marigo_shopping_preference', selectedPreference);
-      setIsOpen(false);
+    if (!selectedPreference) return;
+    // Persist the choice. Home-page sections subscribe to this key via the
+    // `useShoppingPreference` hook and re-render with a gender filter applied,
+    // so the visible homepage itself becomes personalized (no redirect needed).
+    localStorage.setItem('marigo_shopping_preference', selectedPreference);
+    // Notify same-tab listeners (the native `storage` event only fires in
+    // other tabs). The hook listens for both.
+    window.dispatchEvent(new Event('marigo:preference-changed'));
+    setIsOpen(false);
+    // Logged-out visitors are routed to sign-up; on success they land back on
+    // the now-personalized home. Logged-in users stay on the home page.
+    if (!user) {
+      router.push(`/auth/signup?next=${encodeURIComponent('/home')}`);
     }
   };
   

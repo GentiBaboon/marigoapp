@@ -82,7 +82,7 @@ export default function CartPage() {
                         <Card key={item.id} className="overflow-hidden border-none shadow-sm bg-muted/20">
                             <CardContent className="p-4 sm:p-6">
                                 <div className="flex gap-4 sm:gap-6">
-                                    <Link href={`/products/${item.id}`} className="relative h-32 w-24 sm:h-40 sm:w-32 flex-shrink-0 overflow-hidden rounded-md bg-muted">
+                                    <Link href={`/products/${item.productId || item.id}`} className="relative h-32 w-24 sm:h-40 sm:w-32 flex-shrink-0 overflow-hidden rounded-md bg-muted">
                                         <Image
                                             src={item.image}
                                             alt={item.title}

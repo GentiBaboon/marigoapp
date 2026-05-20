@@ -76,7 +76,7 @@ export class ProductService {
     const productRef = doc(db, this.collectionName, productData.id);
     const now = serverTimestamp();
     
-    const finalData = {
+    const finalData: Record<string, any> = {
       ...productData,
       createdAt: now,
       updatedAt: now,
@@ -88,8 +88,25 @@ export class ProductService {
       status: productData.status || 'active',
     };
 
+    // Firestore rejects `undefined` anywhere in the payload (top-level *or*
+    // nested inside arrays/objects). Strip recursively so callers can use
+    // `field: condition ? value : undefined` freely.
+    const stripUndefined = (v: any): any => {
+      if (Array.isArray(v)) return v.map(stripUndefined).filter(x => x !== undefined);
+      if (v && typeof v === 'object' && v.constructor === Object) {
+        const out: Record<string, any> = {};
+        for (const [k, val] of Object.entries(v)) {
+          const cleaned = stripUndefined(val);
+          if (cleaned !== undefined) out[k] = cleaned;
+        }
+        return out;
+      }
+      return v;
+    };
+    const sanitized = stripUndefined(finalData);
+
     try {
-        await setDoc(productRef, finalData, { merge: true });
+        await setDoc(productRef, sanitized, { merge: true });
     } catch (error: any) {
         console.error("ProductService Error:", error);
         throw new Error(error.message || "Failed to finalize the listing document.");

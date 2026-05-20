@@ -6,6 +6,7 @@ import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@
 import type { FirestoreDispute, DisputeMessage, FirestoreOrder } from '@/lib/types';
 import { notifyOrderStatus } from '@/lib/notifications';
 import { releaseOrderItems } from '@/lib/order-inventory';
+import { recordRefundForDispute, recordReturn } from '@/lib/order-lifecycle';
 import { toDate, disputeKindLabel } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
@@ -27,6 +28,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+
+// Display-only labels for the persisted dispute status. We keep the stored
+// values (`resolved` / `closed`) for backwards compatibility but show the
+// product-facing wording (`Request accepted` / `Request denied`) everywhere.
+const STATUS_LABEL: Record<string, string> = {
+  open: 'Open',
+  investigating: 'Investigating',
+  resolved: 'Request accepted',
+  closed: 'Request denied',
+};
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   open: 'outline',
@@ -85,11 +96,13 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
   };
 
   const handleStatusChange = (newStatus: string) => {
+    const nextLabel = STATUS_LABEL[newStatus] || newStatus;
+    const curLabel = STATUS_LABEL[dispute.status] || dispute.status;
     setConfirmDialog({
       open: true,
-      title: `Change Status to "${newStatus}"`,
-      description: `Change dispute for order #${dispute.orderNumber} from "${dispute.status}" to "${newStatus}"?`,
-      actionLabel: `Set ${newStatus}`,
+      title: nextLabel,
+      description: `Change dispute for order #${dispute.orderNumber} from "${curLabel}" to "${nextLabel}"?`,
+      actionLabel: nextLabel,
       newStatus,
     });
   };
@@ -127,9 +140,45 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
               orderData.status === 'refund_requested';
 
             let nextStatus: string | null = null;
+            // ── Shopify-style lifecycle hook ──────────────────────────────────
+            // When the dispute is resolved, spawn the appropriate child record:
+            // cancellation → Refund (no Return; nothing shipped)
+            // refund_request → Refund (no Return; item missing or undelivered)
+            // return_request → Return (Refund follows after item received)
+            // Each creates a finance-ledger row + cross-links back on the order.
+            const isReturnSrc =
+              dispute.disputeType === 'return_request' ||
+              dispute.source === 'buyer_return_request';
             if (confirmDialog.newStatus === 'resolved') {
-              if (isCancelSrc) nextStatus = 'cancelled';
-              else if (isRefundSrc) nextStatus = 'refunded';
+              if (isCancelSrc) {
+                // Cancellation accepted → order is immediately cancelled and a
+                // refund is booked (nothing shipped, so no return).
+                nextStatus = 'cancelled';
+                await recordRefundForDispute({
+                  firestore,
+                  order: { id: dispute.orderId, ...orderData } as FirestoreOrder,
+                  dispute,
+                  reason: resolution.trim() || 'Cancellation approved',
+                  type: 'cancellation',
+                  processedBy: user?.uid,
+                  processedByName: user?.displayName || 'Admin',
+                }).catch((e) => console.warn('[disputes] recordRefundForDispute failed', e));
+              } else if (isRefundSrc || isReturnSrc) {
+                // Refund / return request accepted → order enters the Return
+                // flow (item must come back before money moves). A Return
+                // record is created in /admin/returns; the actual refund is
+                // booked there once the item is received & inspected.
+                nextStatus = 'return_initiated';
+                await recordReturn({
+                  firestore,
+                  order: { id: dispute.orderId, ...orderData } as FirestoreOrder,
+                  reason: resolution.trim() || dispute.reason || 'Return approved',
+                  type: 'return',
+                  disputeId: dispute.id,
+                  buyerName: dispute.buyerName,
+                  processedBy: user?.uid,
+                }).catch((e) => console.warn('[disputes] recordReturn failed', e));
+              }
             } else if (confirmDialog.newStatus === 'closed' && inRequested) {
               // Revert: find the most recent status before the request was opened.
               const history = Array.isArray(orderData.statusHistory) ? orderData.statusHistory : [];
@@ -229,7 +278,7 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
       );
       toast({
         title: 'Status Updated',
-        description: `Dispute status changed to "${confirmDialog.newStatus}".`,
+        description: `Dispute status changed to "${STATUS_LABEL[confirmDialog.newStatus] || confirmDialog.newStatus}".`,
       });
       setConfirmDialog((prev) => ({ ...prev, open: false }));
       setResolution('');
@@ -386,7 +435,7 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
               <span className="truncate">{productTitle}</span>
             </CardTitle>
             <Badge variant={statusVariant[dispute.status] || 'outline'}>
-              {dispute.status}
+              {STATUS_LABEL[dispute.status] || dispute.status}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -503,7 +552,7 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
               <SelectContent>
                 {availableStatuses.map((s) => (
                   <SelectItem key={s} value={s}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                    {STATUS_LABEL[s] || (s.charAt(0).toUpperCase() + s.slice(1))}
                   </SelectItem>
                 ))}
               </SelectContent>

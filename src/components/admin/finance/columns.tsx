@@ -2,6 +2,7 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
 import type { FirestoreOrder, FirestoreUser } from '@/lib/types';
+import { toDate } from '@/lib/types';
 import { format } from 'date-fns';
 import { ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,14 +24,20 @@ const statusVariants: { [key: string]: 'default' | 'secondary' | 'destructive' }
   refunded: 'destructive',
 };
 
-// Helper component to fetch and display user name
-const UserName = ({ userId }: { userId: string }) => {
+// Helper component to fetch and display the buyer's name. Guards against
+// empty/missing ids (Firestore `doc(...)` throws on empty path) and falls back
+// through `name` → `email` → shortened uid so the column never renders blank.
+const UserName = ({ userId }: { userId?: string | null }) => {
     const firestore = useFirestore();
-    const userRef = useMemoFirebase(() => doc(firestore, 'users', userId), [firestore, userId]);
+    const userRef = useMemoFirebase(
+      () => (firestore && userId ? doc(firestore, 'users', userId) : null),
+      [firestore, userId],
+    );
     const { data: user, isLoading } = useDoc<FirestoreUser>(userRef);
 
-    if (isLoading) return <span className="text-muted-foreground">Loading...</span>;
-    return <span>{user?.displayName || userId}</span>;
+    if (!userId) return <span className="text-muted-foreground">—</span>;
+    if (isLoading) return <span className="text-muted-foreground">Loading…</span>;
+    return <span>{user?.name || user?.email || `${userId.slice(0, 8)}…`}</span>;
 }
 
 const COMMISSION_RATE = 0.15;
@@ -44,8 +51,11 @@ export const columns: ColumnDef<FirestoreOrder>[] = [
     accessorKey: 'createdAt',
     header: 'Date',
     cell: ({ row }) => {
-      const { createdAt } = row.original;
-      return createdAt?.toDate ? format(createdAt.toDate(), 'd MMM, yyyy, HH:mm') : 'N/A';
+      // Use the shared `toDate` helper — it accepts both real Firestore
+      // Timestamps and serialized representations (ISO strings, plain objects
+      // with seconds/nanoseconds) which sneak in after SSR/JSON round-trips.
+      const d = toDate(row.original.createdAt as any);
+      return d ? format(d, 'd MMM, yyyy, HH:mm') : 'N/A';
     },
   },
   {
@@ -83,8 +93,19 @@ export const columns: ColumnDef<FirestoreOrder>[] = [
     header: () => <div className="text-right">Commission</div>,
     cell: ({ row }) => {
         const order = row.original;
-        const commission = order.status === 'completed' ? order.totalAmount * COMMISSION_RATE : 0;
-        return <div className="text-right">{currencyFormatter.format(commission)}</div>
+        // Show the projected commission on every paid order, not just
+        // `completed` ones — the prior gate made every in-flight order render
+        // €0.00 and the column looked broken. Refunded orders show a negative
+        // (commission was already booked and is being reversed).
+        const amount = Number(order.totalAmount) || 0;
+        const isRefunded = order.status === 'refunded';
+        const isCancelled = order.status === 'cancelled' || order.status === 'payment_failed';
+        const commission = isCancelled ? 0 : amount * COMMISSION_RATE * (isRefunded ? -1 : 1);
+        return (
+          <div className={`text-right ${isRefunded ? 'text-destructive' : ''}`}>
+            {currencyFormatter.format(commission)}
+          </div>
+        );
     },
   },
   {
@@ -92,9 +113,16 @@ export const columns: ColumnDef<FirestoreOrder>[] = [
     header: () => <div className="text-right">Seller Payout</div>,
     cell: ({ row }) => {
         const order = row.original;
-        const commission = order.status === 'completed' ? order.totalAmount * COMMISSION_RATE : 0;
-        const payout = order.status === 'completed' ? order.totalAmount - commission : 0;
-        return <div className="text-right">{currencyFormatter.format(payout)}</div>
+        const amount = Number(order.totalAmount) || 0;
+        const isRefunded = order.status === 'refunded';
+        const isCancelled = order.status === 'cancelled' || order.status === 'payment_failed';
+        const commission = isCancelled ? 0 : amount * COMMISSION_RATE;
+        const payout = isCancelled ? 0 : (amount - commission) * (isRefunded ? -1 : 1);
+        return (
+          <div className={`text-right ${isRefunded ? 'text-destructive' : ''}`}>
+            {currencyFormatter.format(payout)}
+          </div>
+        );
     },
   },
   {

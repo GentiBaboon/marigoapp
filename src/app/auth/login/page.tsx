@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 
-export default function LoginPage() {
+export default function LoginPage({ searchParams }: { searchParams?: { next?: string } }) {
+  const next = searchParams?.next;
+  const signupHref = next ? `/auth/signup?next=${encodeURIComponent(next)}` : '/auth/signup';
   return (
     <div className="relative min-h-screen bg-background p-8 flex flex-col justify-center">
         <Button asChild variant="ghost" size="icon" className="absolute top-4 right-4 z-10">
@@ -33,7 +35,7 @@ export default function LoginPage() {
                 <SocialButtons />
                 <div className="mt-4 text-center text-sm">
                   Don&apos;t have an account?{' '}
-                  <Link href="/auth/signup" className="underline">
+                  <Link href={signupHref} className="underline">
                     Sign Up
                   </Link>
                 </div>

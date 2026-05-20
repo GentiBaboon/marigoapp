@@ -10,7 +10,17 @@ import type { FirestoreCoupon, FirestoreSettings } from '@/lib/types';
 export type ShippingMethod = 'direct' | 'authentication';
 
 export type CartItem = {
+    // Unique cart-line id. For variant products this is `${productId}__${size}`
+    // so the same product in two different sizes appears as two separate lines.
+    // For non-variant products it equals the productId. Used as the Firestore
+    // doc id under users/{uid}/cart/{id} and as the React key in lists.
     id: string;
+    // The underlying product id (always the original product doc id, even for
+    // variant lines). Use this to navigate to /products/{productId} and for
+    // checkout stock lookups. Optional only because legacy cart entries saved
+    // before this field existed may not have it — at runtime treat `id` as
+    // the productId in that case.
+    productId?: string;
     brand: string;
     title: string;
     price: number;
@@ -25,6 +35,11 @@ export type CartItem = {
     shippingMethod: ShippingMethod;
     directShippingFee: number;
 };
+
+// Build a stable cart-line id from a product id + size. Items without a size
+// keep the productId as their line id (legacy compatibility).
+const buildLineId = (productId: string, size?: string | null) =>
+    size && size.trim() ? `${productId}__${size.trim()}` : productId;
 
 interface CartContextType {
     items: CartItem[];
@@ -180,11 +195,20 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const requested = options?.quantity || 1;
         const size = options?.selectedSize || product.size || null;
         const color = options?.selectedColor || product.color || null;
-        // Stock — pulled from the product record. Default to 1 for legacy
-        // listings without the field: most resale items are unique pieces, so
-        // unlimited would let buyers oversell.
-        const rawStock = (product as any).quantity;
+        // For variant products, stock is per-size — find the matching variant
+        // and use its quantity as the cap. For non-variant listings, fall back
+        // to the top-level product quantity.
+        const variants = Array.isArray((product as any).variants) ? (product as any).variants : null;
+        const matchedVariant = variants && size
+            ? variants.find((v: any) => v?.size === size)
+            : null;
+        const rawStock = matchedVariant
+            ? Number(matchedVariant.quantity)
+            : (product as any).quantity;
         const stock = typeof rawStock === 'number' && rawStock > 0 ? Math.floor(rawStock) : 1;
+
+        // Each (productId, size) pair is its own cart line.
+        const lineId = buildLineId(product.id, size);
 
         // Find the existing line in the current cart so we can apply stock limits
         // against the combined total (existing + requested).
@@ -192,7 +216,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let appliedDelta = requested;
 
         setItems(prev => {
-            const existing = prev.find(i => i.id === product.id);
+            const existing = prev.find(i => i.id === lineId);
             const currentQty = existing?.quantity ?? 0;
             const cap = stock ?? Number.POSITIVE_INFINITY;
             const nextQty = Math.min(cap, currentQty + requested);
@@ -204,7 +228,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const newItem: CartItem = existing
                 ? { ...existing, quantity: nextQty, stock: stock ?? existing.stock }
                 : {
-                    id: product.id,
+                    id: lineId,
+                    productId: product.id,
                     brand: product.brand || product.brandId || '',
                     title: product.title,
                     price: product.price,
@@ -221,7 +246,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Persist to Firestore (effects-in-render is fine here — same pattern
             // the original code used).
             if (user && firestore) {
-                const itemRef = doc(firestore, 'users', user.uid, 'cart', product.id);
+                const itemRef = doc(firestore, 'users', user.uid, 'cart', lineId);
                 const cleanItem = JSON.parse(JSON.stringify(newItem));
                 setDoc(itemRef, cleanItem, { merge: true }).catch(() => {
                     errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -233,7 +258,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
 
             return existing
-                ? prev.map(i => i.id === product.id ? newItem : i)
+                ? prev.map(i => i.id === lineId ? newItem : i)
                 : [...prev, newItem];
         });
 

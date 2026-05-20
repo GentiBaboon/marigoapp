@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useShoppingPreference } from '@/hooks/use-shopping-preference';
 import type { FirestoreProduct } from '@/lib/types';
 import { ProductCard } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,18 +25,31 @@ function ProductCardSkeleton() {
 export function NewArrivalsSection() {
   const firestore = useFirestore();
 
-  // Filter active products server-side instead of fetching all and filtering on client
+  // Personalized feed: when the visitor picked a shopping preference, only
+  // show products matching that gender. Unisex listings are included so they
+  // don't disappear for either audience. Gender is applied client-side —
+  // adding it to the Firestore query forces a composite index (gender + status
+  // + listingCreated) we haven't deployed; with only 10 rows fetched the
+  // post-filter cost is negligible. The fetch limit is bumped so we still
+  // have enough rows after filtering.
+  const gender = useShoppingPreference();
   const productsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(
       collection(firestore, 'products'),
       where('status', 'in', ['active', 'reserved', 'sold']),
       orderBy('listingCreated', 'desc'),
-      limit(10)
+      limit(gender ? 30 : 10),
     );
-  }, [firestore]);
+  }, [firestore, gender]);
 
-  const { data: activeProducts, isLoading } = useCollection<FirestoreProduct>(productsQuery);
+  const { data: rawProducts, isLoading } = useCollection<FirestoreProduct>(productsQuery);
+  const activeProducts = React.useMemo(
+    () => (gender
+      ? (rawProducts ?? []).filter(p => p.gender === gender || p.gender === 'unisex').slice(0, 10)
+      : rawProducts),
+    [rawProducts, gender],
+  );
 
   if (!isLoading && (!activeProducts || activeProducts.length === 0)) {
     return null; // Hide the block if no active new products exist

@@ -26,7 +26,7 @@ async function calculateOrderTotal(
   const validatedItems: any[] = [];
 
   for (const item of items) {
-    const pData = await firestoreGet('products', item.id, idToken);
+    const pData = await firestoreGet('products', item.productId || item.id, idToken);
     if (!pData || !['active', 'reserved'].includes(pData.status)) {
       throw new Error(`Item "${item.title}" is no longer available.`);
     }
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
     // visible but can't be ordered again.
     await Promise.all(
       validatedItems.map(async (item: any) => {
-        const p = await firestoreGet('products', item.id, idToken);
+        const p = await firestoreGet('products', item.productId || item.id, idToken);
         const currentQty = typeof p?.quantity === 'number' ? p.quantity : 1;
         const orderedQty =
           typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
               : v
           );
         }
-        await firestoreUpdate('products', item.id, update, idToken);
+        await firestoreUpdate('products', item.productId || item.id, update, idToken);
       }),
     );
 

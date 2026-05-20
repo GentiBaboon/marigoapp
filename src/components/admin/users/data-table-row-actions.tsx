@@ -20,7 +20,8 @@ import {
 import { useFirestore, useUser } from '@/firebase';
 import { doc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { FirestoreUser } from '@/lib/types';
+import { FirestoreUser, type SellerBadgeLevel, getSellerLevel } from '@/lib/types';
+import { useBadgeSettings } from '@/hooks/use-badge-settings';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 
 interface DataTableRowActionsProps<TData> {
@@ -37,6 +38,13 @@ export function DataTableRowActions<TData>({
   const [confirmBanOpen, setConfirmBanOpen] = React.useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
   const targetUser = row.original as FirestoreUser;
+  const { data: badgeSettings } = useBadgeSettings();
+  const badgeLabels = {
+    trusted: badgeSettings?.labels?.trusted ?? 'Trusted Seller',
+    expert: badgeSettings?.labels?.expert ?? 'Expert Seller',
+    activist: badgeSettings?.labels?.activist ?? 'Fashion Activist',
+    official: badgeSettings?.labels?.official ?? 'Official Registered Brand',
+  };
 
   const handleUpdateStatus = async (newStatus: 'active' | 'banned') => {
     if (!firestore || !adminUser) {
@@ -93,26 +101,35 @@ export function DataTableRowActions<TData>({
     }
   };
 
-  const handleToggleOfficialBrand = async () => {
+  // Admin sets the user's badge directly. `'auto'` clears the override so the
+  // badge is recomputed from salesCount + thresholds. Setting `official` also
+  // flips `isOfficialBrand` so existing read paths (multi-variant gating,
+  // seller card on PDP) keep working without changes.
+  const handleSetBadge = async (next: SellerBadgeLevel | 'auto') => {
     if (!firestore || !adminUser) return;
     setIsLoading(true);
-    const newValue = !targetUser.isOfficialBrand;
     try {
-      await updateDoc(doc(firestore, 'users', targetUser.id), { isOfficialBrand: newValue });
+      const update: Record<string, any> = {
+        badgeOverride: next === 'auto' ? null : next,
+        isOfficialBrand: next === 'official' ? true : next === 'auto' ? !!targetUser.isOfficialBrand : false,
+      };
+      await updateDoc(doc(firestore, 'users', targetUser.id), update);
       await addDoc(collection(firestore, 'admin_logs'), {
         adminId: adminUser.uid,
         adminName: adminUser.displayName || 'Admin',
-        actionType: newValue ? 'official_brand_granted' : 'official_brand_revoked',
-        details: `${newValue ? 'Granted' : 'Revoked'} Official Registered Brand status for "${displayName}"`,
+        actionType: 'user_badge_changed',
+        details: `Set badge of "${displayName}" to "${next}"`,
         targetId: targetUser.id,
         timestamp: serverTimestamp(),
       });
       toast({
-        title: newValue ? 'Official Brand granted' : 'Official Brand revoked',
-        description: `${displayName} is ${newValue ? 'now an Official Registered Brand' : 'no longer an Official Brand'}.`,
+        title: 'Badge updated',
+        description: next === 'auto'
+          ? `${displayName} now uses the auto-computed badge.`
+          : `${displayName} is now "${next}".`,
       });
     } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update official brand flag.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update badge.' });
     } finally {
       setIsLoading(false);
     }
@@ -176,10 +193,26 @@ export function DataTableRowActions<TData>({
                 </DropdownMenuSubContent>
             </DropdownMenuPortal>
         </DropdownMenuSub>
-        <DropdownMenuItem onClick={handleToggleOfficialBrand}>
-          <BadgeCheck className="mr-2 h-4 w-4" />
-          {targetUser.isOfficialBrand ? 'Revoke Official Brand' : 'Mark as Official Brand'}
-        </DropdownMenuItem>
+        <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+                <BadgeCheck className="mr-2 h-4 w-4" />
+                Set Badge
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+                <DropdownMenuSubContent>
+                    <DropdownMenuRadioGroup
+                      value={targetUser.badgeOverride ?? 'auto'}
+                      onValueChange={(v) => handleSetBadge(v as any)}
+                    >
+                        <DropdownMenuRadioItem value="auto">Auto (from sales)</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="trusted">{badgeLabels.trusted}</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="expert">{badgeLabels.expert}</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="activist">{badgeLabels.activist}</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="official">{badgeLabels.official}</DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         {isBanned ? (
             <DropdownMenuItem onClick={() => handleUpdateStatus('active')}>

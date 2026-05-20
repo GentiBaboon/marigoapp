@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 import { signupSchema, type SignupValues } from '@/lib/types';
@@ -27,6 +27,12 @@ import Link from 'next/link';
 export function SignupForm() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Optional post-auth redirect target — only honored when it points to a
+  // same-origin path, so an attacker can't open-redirect a freshly-signed-up
+  // user to an external phishing URL.
+  const nextParam = searchParams.get('next');
+  const nextPath = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/home';
   const auth = useAuth();
   const { toast } = useToast();
 
@@ -44,7 +50,7 @@ export function SignupForm() {
     setLoading(true);
     const result = await signUpWithEmail(auth, data.email, data.password, data.name);
     if (result.success && result.user) {
-      router.push('/home');
+      router.push(nextPath);
     } else {
       toast({
         variant: 'destructive',

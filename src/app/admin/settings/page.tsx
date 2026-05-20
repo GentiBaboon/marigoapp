@@ -30,6 +30,7 @@ import { MacroFiltersTab } from '@/components/admin/settings/macro-filters-tab';
 import { HomepageBlocksTab } from '@/components/admin/settings/homepage-blocks-tab';
 import { CategoryConfigTab } from '@/components/admin/settings/category-config-tab';
 import { RelatedProductsTab } from '@/components/admin/settings/related-products-tab';
+import { BadgeConfigTab } from '@/components/admin/settings/badge-config-tab';
 
 // --- Sub-components for Management ---
 
@@ -485,6 +486,7 @@ export default function AdminSettingsPage() {
             <TabsTrigger value="macrofilters">MacroFilters</TabsTrigger>
             <TabsTrigger value="homepageblocks">Homepage Blocks</TabsTrigger>
             <TabsTrigger value="related">Related Products</TabsTrigger>
+            <TabsTrigger value="badges">Badges</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
@@ -569,6 +571,10 @@ export default function AdminSettingsPage() {
 
         <TabsContent value="related">
             <RelatedProductsTab />
+        </TabsContent>
+
+        <TabsContent value="badges">
+            <BadgeConfigTab firestore={firestore} toast={toast} />
         </TabsContent>
       </Tabs>
 

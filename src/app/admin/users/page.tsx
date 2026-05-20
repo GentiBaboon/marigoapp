@@ -1,10 +1,11 @@
 'use client';
 
-import { collection, query, limit } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import type { FirestoreUser } from '@/lib/types';
+import * as React from 'react';
+import { collection, query, limit, doc } from 'firebase/firestore';
+import { useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import type { FirestoreUser, BadgeSettings } from '@/lib/types';
 import { DataTable } from '@/components/admin/users/data-table';
-import { columns } from '@/components/admin/users/columns';
+import { buildColumns } from '@/components/admin/users/columns';
 import {
   Card,
   CardContent,
@@ -26,6 +27,15 @@ export default function AdminUsersPage() {
   );
   const { data: users, isLoading: usersLoading } =
     useCollection<FirestoreUser>(usersQuery);
+
+  // Subscribe to admin-editable badge thresholds + labels so the table
+  // reflects setting changes live.
+  const badgeSettingsRef = useMemoFirebase(
+    () => (firestore ? doc(firestore, 'settings', 'badges') : null),
+    [firestore]
+  );
+  const { data: badgeSettings } = useDoc<BadgeSettings>(badgeSettingsRef);
+  const columns = React.useMemo(() => buildColumns(badgeSettings ?? null), [badgeSettings]);
 
   if (usersLoading) {
     return <UsersLoading />;

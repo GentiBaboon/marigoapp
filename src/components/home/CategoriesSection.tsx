@@ -4,6 +4,7 @@ import * as React from 'react';
 import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreProduct, FirestoreCategory } from '@/lib/types';
+import { useShoppingPreference } from '@/hooks/use-shopping-preference';
 import { ProductCard } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -22,6 +23,7 @@ function ProductCardSkeleton() {
 
 export function CategoriesSection() {
   const firestore = useFirestore();
+  const gender = useShoppingPreference();
 
   const categoriesQuery = useMemoFirebase(
     () => collection(firestore, 'categories'),
@@ -31,6 +33,10 @@ export function CategoriesSection() {
 
   // Top 100 by views. Include reserved alongside active so shoppers see them
   // labelled "Reserved" instead of vanishing from category tabs.
+  // Gender is applied client-side (filter below) — adding a second `in`
+  // clause here would require a new composite index (gender + status + views)
+  // that isn't deployed; with the result cap of 100 rows, post-filtering is
+  // effectively free.
   const productsQuery = useMemoFirebase(
     () => query(
       collection(firestore, 'products'),
@@ -40,7 +46,13 @@ export function CategoriesSection() {
     ),
     [firestore]
   );
-  const { data: products, isLoading: productsLoading } = useCollection<FirestoreProduct>(productsQuery);
+  const { data: rawProducts, isLoading: productsLoading } = useCollection<FirestoreProduct>(productsQuery);
+  const products = React.useMemo(
+    () => (gender
+      ? (rawProducts ?? []).filter(p => p.gender === gender || p.gender === 'unisex')
+      : rawProducts),
+    [rawProducts, gender],
+  );
 
   // Build category lookup
   const categoryMap = React.useMemo(() => {
@@ -100,6 +112,10 @@ export function CategoriesSection() {
 
     const sortedTabs = visibleParents
       .slice()
+      // Drop tabs that have no matching products for the active shopping
+      // preference — e.g. when the visitor picked Womenswear, the "Men's"
+      // top-level tab disappears entirely instead of showing an empty list.
+      .filter(c => (productGroups[c.id]?.length ?? 0) > 0)
       .sort((a, b) => {
         const va = totalViews[a.id] ?? 0;
         const vb = totalViews[b.id] ?? 0;

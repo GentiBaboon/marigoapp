@@ -5,6 +5,7 @@ import { doc, collection, query, where, documentId, getDocs } from 'firebase/fir
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import type { FirestoreProduct } from '@/lib/types';
 import type { MacroFiltersConfig } from '@/components/home/MacroFilters';
+import { useShoppingPreference } from '@/hooks/use-shopping-preference';
 import { ProductCard } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -51,6 +52,7 @@ interface Props {
 
 export function MacroFilteredProducts({ filterId }: Props) {
   const firestore = useFirestore();
+  const gender = useShoppingPreference();
 
   const filtersRef = useMemoFirebase(
     () => (firestore ? doc(firestore, 'settings', 'macro_filters') : null),
@@ -78,6 +80,15 @@ export function MacroFilteredProducts({ filterId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firestore, configLoading, productIdsKey]);
 
+  // Apply the home-page shopping preference. We filter client-side because the
+  // server query already uses two `in` filters (id + status) and Firestore caps
+  // at one extra `in` clause; mixing 'in' + '==' is fine but per-row filtering
+  // is simpler given the small result size.
+  const visibleProducts = React.useMemo(
+    () => (gender ? products.filter((p) => p.gender === gender || p.gender === 'unisex') : products),
+    [products, gender],
+  );
+
   const isLoading = configLoading || productsLoading;
 
   return (
@@ -88,13 +99,13 @@ export function MacroFilteredProducts({ filterId }: Props) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
           {[...Array(8)].map((_, i) => <ProductCardSkeleton key={i} />)}
         </div>
-      ) : products.length === 0 ? (
+      ) : visibleProducts.length === 0 ? (
         <p className="text-muted-foreground py-12 text-center">
           No active products in this filter yet.
         </p>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
-          {products.map((p) => (
+          {visibleProducts.map((p) => (
             <ProductCard
               key={p.id}
               product={{

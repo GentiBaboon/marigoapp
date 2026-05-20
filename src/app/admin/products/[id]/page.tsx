@@ -35,6 +35,7 @@ import type {
 } from '@/lib/types';
 import type { MacroFilter, MacroFiltersConfig } from '@/components/home/MacroFilters';
 import { toDate } from '@/lib/types';
+import { notifyUser } from '@/lib/notifications';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -233,6 +234,9 @@ export default function AdminProductReviewPage() {
   // Inventory — defaults to 1 for legacy products with no field set.
   const [quantity, setQuantity] = React.useState('1');
   const [listingType, setListingType] = React.useState<'fixed_price' | 'auction'>('fixed_price');
+  // Per-size variants — populated for Official Brand listings. Editable here
+  // so admins can adjust stock per size.
+  const [variants, setVariants] = React.useState<{ size: string; quantity: number }[]>([]);
 
   const [seeded, setSeeded] = React.useState(false);
 
@@ -256,6 +260,7 @@ export default function AdminProductReviewPage() {
       setOriginalPrice(product.originalPrice?.toString() ?? '');
       setQuantity(((product as any).quantity ?? 1).toString());
       setListingType(product.listingType ?? 'fixed_price');
+      setVariants(Array.isArray((product as any).variants) ? (product as any).variants : []);
       setSeeded(true);
     }
   }, [product, seeded]);
@@ -380,6 +385,13 @@ export default function AdminProductReviewPage() {
       const parsedPrice = parseFloat(price) || product.price;
       const parsedOriginalPrice = originalPrice ? parseFloat(originalPrice) : null;
       const parsedQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
+      // Clean variants and roll up the total. If variants exist, they are the
+      // source of truth for stock — the top-level `quantity` field mirrors the
+      // sum so legacy readers (search, cards) keep working.
+      const cleanedVariants = variants
+        .map(v => ({ size: (v.size || '').trim(), quantity: Math.max(0, Math.floor(Number(v.quantity) || 0)) }))
+        .filter(v => v.size.length > 0);
+      const variantTotal = cleanedVariants.reduce((s, v) => s + v.quantity, 0);
 
       const updates: Record<string, any> = {
         images: images.map((img, i) => ({ ...img, position: i })),
@@ -396,7 +408,8 @@ export default function AdminProductReviewPage() {
         pattern,
         vintage,
         price: parsedPrice,
-        quantity: parsedQuantity,
+        quantity: cleanedVariants.length > 0 ? Math.max(0, variantTotal) : parsedQuantity,
+        variants: cleanedVariants.length > 0 ? cleanedVariants : null,
         listingType,
         updatedAt: serverTimestamp(),
       };
@@ -425,20 +438,23 @@ export default function AdminProductReviewPage() {
       // seller so they know their item is now visible. We only fire this on
       // the pending_review → active transition (not every time admin pokes
       // the status, e.g. active → reserved → active during stock changes).
-      if (newStatus === 'active' && previousStatus === 'pending_review' && product.sellerId) {
+      // Notify the seller when their pending listing is approved or rejected.
+      if (previousStatus === 'pending_review' && product.sellerId && (newStatus === 'active' || newStatus === 'rejected')) {
         const firstImage = product.images?.[0]?.url || (product.images?.[0] as any)?.thumbnailUrl;
-        await addDoc(collection(firestore, 'notifications'), {
+        const approved = newStatus === 'active';
+        await notifyUser({
+          firestore,
           userId: product.sellerId,
-          title: `${product.title} — Approved & live`,
-          message: 'Your listing has been approved and is now visible on the marketplace.',
-          type: 'listing_approved',
-          read: false,
-          createdAt: serverTimestamp(),
-          data: {
-            link: `/products/${id}`,
-            ...(firstImage ? { imageUrl: firstImage } : {}),
-          },
-        }).catch(() => null);
+          title: approved
+            ? `${product.title} — Approved & live`
+            : `${product.title} — Not approved`,
+          message: approved
+            ? 'Your listing has been approved and is now visible on the marketplace.'
+            : 'Your listing was reviewed and could not be approved. Check the item details and resubmit.',
+          type: 'order_update',
+          link: approved ? `/products/${id}` : `/profile/listings`,
+          imageUrl: firstImage,
+        });
       }
 
       toast({ title: 'Status Updated', description: `Product is now "${newStatus}".` });
@@ -810,11 +826,48 @@ export default function AdminProductReviewPage() {
                 onChange={e => setQuantity(e.target.value)}
                 onBlur={() => setQuantity(String(Math.max(1, Math.floor(Number(quantity) || 1))))}
                 className="w-32"
+                disabled={variants.length > 0}
               />
               <p className="text-xs text-muted-foreground">
-                Available stock for this listing. Set to 1 for unique items.
+                {variants.length > 0
+                  ? 'Total stock is summed from the per-size rows below.'
+                  : 'Available stock for this listing. Set to 1 for unique items.'}
               </p>
             </div>
+
+            {variants.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-baseline justify-between">
+                  <Label className="font-semibold text-sm">Inventory by size{(product as any).sizeSystem ? ` · ${(product as any).sizeSystem}` : ''}</Label>
+                  <span className="text-xs text-muted-foreground">
+                    {variants.reduce((s, v) => s + (Number(v.quantity) || 0), 0)} total
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {variants.map((v, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Input
+                        value={v.size}
+                        onChange={e => setVariants(prev => prev.map((row, idx) => idx === i ? { ...row, size: e.target.value } : row))}
+                        className="h-9 flex-1"
+                        placeholder="Size"
+                      />
+                      <Input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={String(v.quantity ?? 0)}
+                        onChange={e => setVariants(prev => prev.map((row, idx) => idx === i ? { ...row, quantity: Math.max(0, Math.floor(Number(e.target.value) || 0)) } : row))}
+                        className="h-9 w-24 text-center"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Edit per-size quantities. The total above is persisted as the listing&apos;s top-level stock.
+                </p>
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-2 pt-1 text-sm text-muted-foreground">
               <span>{product.views} views</span>

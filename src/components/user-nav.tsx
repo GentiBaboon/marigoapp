@@ -31,7 +31,8 @@ import {
   ShoppingCart,
   Bell,
   Globe,
-  Coins
+  Coins,
+  Wallet,
 } from 'lucide-react';
 import { useCurrency, type Currency } from '@/context/CurrencyContext';
 import { useTranslation, type Locale } from '@/context/LanguageContext';
@@ -197,6 +198,14 @@ export function UserNav() {
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/sell">Sell an item</Link>
+            </DropdownMenuItem>
+            {/* Wallet sits at the bottom of the Selling group, green-accented
+                so it visually anchors the seller's financial entry point. */}
+            <DropdownMenuItem asChild className="text-emerald-700 focus:text-emerald-800 focus:bg-emerald-50">
+              <Link href="/profile/wallet">
+                <Wallet className="mr-2 h-4 w-4" />
+                My Wallet
+              </Link>
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />

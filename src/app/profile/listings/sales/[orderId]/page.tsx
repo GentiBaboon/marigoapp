@@ -3,12 +3,13 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, where, limit } from 'firebase/firestore';
-import type { FirestoreOrder, FirestoreAddress, FirestoreDelivery } from '@/lib/types';
+import type { FirestoreOrder, FirestoreAddress, FirestoreDelivery, FirestoreReturn } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PackageCheck, Copy } from 'lucide-react';
 import Image from 'next/image';
 import { SellerOrderTimeline } from '@/components/profile/seller-order-timeline';
+import { ReturnTimeline } from '@/components/profile/return-timeline';
 import { useParams } from 'next/navigation';
 import { format, addDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -75,6 +76,23 @@ export default function SaleDetailsPage() {
     }, [firestore, orderId]);
     const { data: deliveries, isLoading: isDeliveryLoading } = useCollection<FirestoreDelivery>(deliveryQuery);
     const delivery = deliveries?.[0];
+
+    // Mirror of the buyer view: when a return is in progress for this sale,
+    // surface the same timeline so the seller can follow along.
+    const returnsQuery = useMemoFirebase(() => {
+        if (!firestore || !orderId || !user?.uid) return null;
+        // Constrain by sellerId so the Firestore rule allows the list query,
+        // and by orderId to pinpoint the right return. No orderBy → no
+        // composite index needed.
+        return query(
+            collection(firestore, 'returns'),
+            where('sellerId', '==', user.uid),
+            where('orderId', '==', orderId),
+            limit(1),
+        );
+    }, [firestore, orderId, user?.uid]);
+    const { data: returns } = useCollection<FirestoreReturn>(returnsQuery);
+    const activeReturn = returns?.[0];
 
     const isLoading = isUserLoading || isOrderLoading || areAddressesLoading || isDeliveryLoading;
 
@@ -151,6 +169,10 @@ export default function SaleDetailsPage() {
                         <p className="text-center text-muted-foreground">Waiting for shipping details...</p>
                     )}
                 </div>
+
+                {activeReturn && (
+                    <ReturnTimeline returnDoc={activeReturn} audience="seller" />
+                )}
 
                 {delivery && (
                     <div className="bg-background p-4 rounded-lg">

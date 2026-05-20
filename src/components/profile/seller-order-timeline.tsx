@@ -33,12 +33,20 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
     const { status } = order;
     const { toast } = useToast();
     const isTerminal = status === 'cancelled' || status === 'refunded';
+    // A return flow runs after the order has been delivered + completed, so
+    // every happy-path step must render as done. The active return progress
+    // is shown in the separate <ReturnTimeline /> card.
+    const isInReturnFlow = status === 'refund_requested' || status === 'return_initiated';
     const historyMaxRank = (order.statusHistory || []).reduce((max, e) => {
         const r = STATUS_RANK[e.status] ?? -1;
         return r > max ? r : max;
     }, -1);
     const liveRank = STATUS_RANK[status] ?? 0;
-    const rank = isTerminal ? Math.max(historyMaxRank, 0) : liveRank;
+    const rank = isInReturnFlow
+      ? 6
+      : isTerminal
+        ? Math.max(historyMaxRank, 0)
+        : liveRank;
 
     const createdMs = (() => {
         const c = order.createdAt as any;

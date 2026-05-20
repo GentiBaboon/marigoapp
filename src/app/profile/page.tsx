@@ -37,7 +37,8 @@ import {
   Truck,
   LayoutDashboard,
   ShieldAlert,
-  Coins
+  Coins,
+  Wallet,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { FirestoreUser } from '@/lib/types';
@@ -110,6 +111,12 @@ export default function ProfilePage() {
     ...(isCourier ? [{ href: '/courier/dashboard', label: 'Courier Dashboard', icon: LayoutDashboard }] : []),
     ...(role === 'buyer' ? [{ href: '/delivery-partner', label: 'Become a Delivery Partner', icon: Truck }] : []),
     { href: '/sell', label: 'Sell an Item', icon: null, special: true },
+    // Wallet sits right below the Sell button so it's the first thing a
+    // would-be seller sees. Shown to every signed-in user — the page itself
+    // renders an empty state for accounts with no sales, so non-sellers get
+    // a sensible "List an item to start earning" message instead of a
+    // hidden link.
+    { href: '/profile/wallet', label: 'My Wallet', icon: Wallet, green: true },
     { href: '/profile/addresses', label: 'My Addresses', icon: MapPin },
     { href: '/profile/payments', label: 'Payment Methods', icon: CreditCard },
     { href: '/profile/settings', label: 'Settings', icon: Settings },
@@ -188,19 +195,28 @@ export default function ProfilePage() {
                     );
                   }
                   
+                  // Items with `green: true` are seller-money entries (Wallet)
+                  // and use the emerald palette so they stand out from the
+                  // neutral profile menu without competing with the primary
+                  // "Sell an Item" CTA.
+                  const isGreen = (item as any).green;
                   return (
                     <li key={item.href}>
                       <Link
                         href={item.href}
-                        className="flex items-center p-4 hover:bg-muted rounded-md transition-colors"
+                        className={
+                          isGreen
+                            ? 'flex items-center p-4 rounded-md transition-colors bg-emerald-50/40 hover:bg-emerald-50 text-emerald-800'
+                            : 'flex items-center p-4 hover:bg-muted rounded-md transition-colors'
+                        }
                       >
                         {item.icon && (
-                          <item.icon className="mr-4 h-5 w-5 text-muted-foreground" />
+                          <item.icon className={`mr-4 h-5 w-5 ${isGreen ? 'text-emerald-700' : 'text-muted-foreground'}`} />
                         )}
                         <span className="flex-1 font-medium">
                           {item.label}
                         </span>
-                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                        <ChevronRight className={`h-5 w-5 ${isGreen ? 'text-emerald-700' : 'text-muted-foreground'}`} />
                       </Link>
                       {index < menuItems.length - 1 && !menuItems[index + 1]?.special && (
                           <Separator className="ml-4" />

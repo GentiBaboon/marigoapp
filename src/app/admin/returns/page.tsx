@@ -6,6 +6,7 @@ import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebas
 import type { FirestoreReturn } from '@/lib/types';
 import { notifyOrderStatus } from '@/lib/notifications';
 import { releaseOrderItems } from '@/lib/order-inventory';
+import { recordRefundForReturn, loadOrder } from '@/lib/order-lifecycle';
 import { toDate } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
@@ -59,10 +60,27 @@ const currencyFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', cu
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   requested: 'outline',
   approved: 'default',
-  rejected: 'destructive',
+  ready_for_pickup: 'outline',
+  shipping: 'secondary',
   shipped: 'secondary',
   received: 'secondary',
+  refunded: 'default',
   processed: 'default',
+  rejected: 'destructive',
+};
+
+// Display labels that mirror the buyer-facing return-timeline copy so admin
+// and buyer/seller see the same wording.
+const STATUS_LABEL: Record<string, string> = {
+  requested: 'Requested',
+  approved: 'Return Initiated',
+  ready_for_pickup: 'Return Package Ready',
+  shipping: 'Return Package Shipped',
+  shipped: 'Return Package Shipped',
+  received: 'Return Package Delivered',
+  refunded: 'Refunded',
+  processed: 'Refunded',
+  rejected: 'Rejected',
 };
 
 export default function AdminReturnsPage() {
@@ -190,8 +208,17 @@ export default function AdminReturnsPage() {
       ret.type === 'return' ? 'Process Refund' : 'Process Exchange',
       'default',
       async () => {
-        await updateDoc(doc(firestore, 'returns', ret.id), { status: 'processed', updatedAt: serverTimestamp() });
+        // ── Shopify-style lifecycle: create the Refund + ledger row, link
+        //    everything together, then flip the order status. The helper sets
+        //    return.status = 'refunded' for us, so we don't need to touch it
+        //    here (no double-write to 'processed').
         if (ret.type === 'return') {
+          // ── Source of truth: the order's `status` field. We flip it to
+          //    `refunded` FIRST so the order shows up correctly in finance and
+          //    refunds tables regardless of what happens to the side-collection
+          //    writes that follow. Without this ordering, a silent failure on
+          //    the refund/transaction write would leave the order looking
+          //    un-refunded — which is what was happening before.
           await updateDoc(doc(firestore, 'orders', ret.orderId), {
             status: 'refunded',
             updatedAt: serverTimestamp(),
@@ -201,6 +228,32 @@ export default function AdminReturnsPage() {
               by: user?.uid || 'admin',
             }),
           });
+
+          // Best-effort refund + transaction docs. These are useful metadata
+          // (reason, processed-by, ledger entries) but their absence must NOT
+          // make the order look un-refunded in admin views.
+          const order = await loadOrder(firestore, ret.orderId);
+          if (order) {
+            try {
+              const { refundId, transactionId } = await recordRefundForReturn({
+                firestore,
+                order,
+                returnDoc: ret,
+                processedBy: user?.uid,
+                processedByName: user?.displayName || 'Admin',
+              });
+              console.log('[returns] refund metadata created', { refundId, transactionId });
+            } catch (e: any) {
+              // Don't block the workflow — the order is already correctly
+              // marked refunded. Just warn so we can see the cause.
+              console.warn('[returns] refund/transaction docs not created (order is still refunded):', e);
+              toast({
+                variant: 'destructive',
+                title: 'Refund recorded but metadata write failed',
+                description: e?.message || 'Order is marked refunded; the refund/transaction docs were not written. Check console.',
+              });
+            }
+          }
 
           // Restore stock and re-list returned items.
           await releaseOrderItems(firestore, ret.items as any);
@@ -228,10 +281,60 @@ export default function AdminReturnsPage() {
               productImage: firstItem?.image,
             }).catch(() => null);
           }
+        } else {
+          // Exchange path: keep the legacy behavior of flipping the return to
+          // 'exchanged' so admin filters still work. No refund is issued.
+          await updateDoc(doc(firestore, 'returns', ret.id), {
+            status: 'exchanged',
+            updatedAt: serverTimestamp(),
+          });
         }
         await logAction('return_processed', `Processed ${ret.type} for order #${ret.orderNumber}`, ret.id);
         toast({ title: `${ret.type === 'return' ? 'Refund' : 'Exchange'} Processed`, description: `${ret.type === 'return' ? 'Refund' : 'Exchange'} for order #${ret.orderNumber} has been processed.` });
       }
+    );
+  };
+
+  // Re-runs the refund-creation step for a return that already shows as
+  // `refunded` but is missing a refund + transaction row. Happens when the
+  // original Process Refund click pre-dated the lifecycle wiring (or hit a
+  // silent failure). Idempotent on the order side: the helper just appends
+  // another refund + transaction; double-runs are safe to recognize manually.
+  const handleBackfillRefund = (ret: FirestoreReturn) => {
+    const totalAmount = ret.items.reduce((sum, item) => sum + item.price, 0);
+    openConfirm(
+      'Backfill refund record',
+      `Create the missing refund + finance entries for order #${ret.orderNumber} (${currencyFormatter.format(totalAmount)})? Use this when /admin/refunds and /admin/finance don't reflect a refund that was already processed.`,
+      'Backfill',
+      'default',
+      async () => {
+        try {
+          const order = await loadOrder(firestore, ret.orderId);
+          if (!order) {
+            toast({ variant: 'destructive', title: 'Order not found', description: `Order ${ret.orderId} couldn't be loaded.` });
+            return;
+          }
+          const { refundId, transactionId } = await recordRefundForReturn({
+            firestore,
+            order,
+            returnDoc: ret,
+            processedBy: user?.uid,
+            processedByName: user?.displayName || 'Admin',
+          });
+          await logAction('refund_backfilled', `Backfilled refund record for order #${ret.orderNumber}`, ret.id);
+          toast({
+            title: 'Refund record created',
+            description: `Refund ${refundId.slice(0, 8)}… and transaction ${transactionId.slice(0, 8)}… are now written.`,
+          });
+        } catch (e: any) {
+          console.error('[returns] backfill failed', e);
+          toast({
+            variant: 'destructive',
+            title: 'Backfill failed',
+            description: e?.message || 'See console for details.',
+          });
+        }
+      },
     );
   };
 
@@ -273,7 +376,7 @@ export default function AdminReturnsPage() {
       header: 'Status',
       cell: ({ row }) => (
         <Badge variant={statusVariant[row.original.status] || 'outline'}>
-          {row.original.status}
+          {STATUS_LABEL[row.original.status] || row.original.status}
         </Badge>
       ),
     },
@@ -290,11 +393,19 @@ export default function AdminReturnsPage() {
       header: 'Actions',
       cell: ({ row }) => {
         const ret = row.original;
+        // `needsBackfill` covers returns that were processed before the
+        // refund/transaction lifecycle wiring was deployed (or in any case
+        // where the refund row is missing). Surfacing the action here lets
+        // admin retroactively create the missing finance + refund records
+        // without re-running the full flow.
+        const needsBackfill = ret.status === 'refunded' && !ret.refundId;
         const hasActions =
           ret.status === 'requested' ||
           ret.status === 'approved' ||
+          ret.status === 'ready_for_pickup' ||
           ret.status === 'shipping' ||
-          ret.status === 'received';
+          ret.status === 'received' ||
+          needsBackfill;
 
         if (!hasActions) return null;
 
@@ -320,7 +431,7 @@ export default function AdminReturnsPage() {
                   </DropdownMenuItem>
                 </>
               )}
-              {ret.status === 'approved' && (
+              {(ret.status === 'approved' || ret.status === 'ready_for_pickup') && (
                 <DropdownMenuItem onClick={() => handleMarkShipped(ret)}>
                   <Truck className="mr-2 h-4 w-4" />
                   Mark as Shipped
@@ -336,6 +447,12 @@ export default function AdminReturnsPage() {
                 <DropdownMenuItem onClick={() => handleProcessRefund(ret)}>
                   <CreditCard className="mr-2 h-4 w-4" />
                   {ret.type === 'return' ? 'Process Refund' : 'Process Exchange'}
+                </DropdownMenuItem>
+              )}
+              {needsBackfill && (
+                <DropdownMenuItem onClick={() => handleBackfillRefund(ret)}>
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Backfill refund record
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>

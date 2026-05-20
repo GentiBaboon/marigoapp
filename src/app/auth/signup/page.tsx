@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 
-export default function SignupPage() {
+export default function SignupPage({ searchParams }: { searchParams?: { next?: string } }) {
+  // Preserve the post-auth redirect target across the signup ↔ login link so
+  // users who hit signup first don't lose their original destination.
+  const next = searchParams?.next;
+  const loginHref = next ? `/auth/login?next=${encodeURIComponent(next)}` : '/auth/login';
   return (
      <div className="relative min-h-screen bg-background p-8 flex flex-col justify-center">
         <Button asChild variant="ghost" size="icon" className="absolute top-4 right-4 z-10">
@@ -33,7 +37,7 @@ export default function SignupPage() {
                 <SocialButtons />
                 <div className="mt-4 text-center text-sm">
                   Already have an account?{' '}
-                  <Link href="/auth/login" className="underline">
+                  <Link href={loginHref} className="underline">
                     Sign In
                   </Link>
                 </div>

@@ -38,8 +38,16 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
   const displayTitle = itemData.title ?? 'Untitled';
   const displayBrand = isSale ? (order.items[0].brand || 'Luxury Item') : (product?.brandId || 'Luxury Item');
 
-  const link = isSale ? `/profile/listings/sales/${order.id}` : `/products/${product!.id}`;
   const status = isSale ? order.status : product!.status;
+  // Active/sold listings: show the public product page. Anything inactive
+  // (pending_review, rejected, removed, draft) routes to the edit page so the
+  // seller can fix and resubmit — the public page wouldn't show it anyway.
+  const isPubliclyViewable = status === 'active' || status === 'sold' || status === 'reserved';
+  const link = isSale
+    ? `/profile/listings/sales/${order.id}`
+    : isPubliclyViewable
+      ? `/products/${product!.id}`
+      : `/products/${product!.id}/edit`;
   
   const offersQuery = useMemoFirebase(() => {
     if (isSale || !firestore || !product) return null;
@@ -51,10 +59,7 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
 
   const getStatusLabel = (s: string) => {
       if (s === 'processing') return 'Action Needed';
-      // New listings sit in `pending_review` until an admin approves them.
-      // From the seller's perspective the listing isn't live yet — show
-      // "Draft" so it's clear at a glance.
-      if (s === 'pending_review') return 'Draft';
+      if (s === 'pending_review') return 'Waiting for approval';
       return s.charAt(0).toUpperCase() + s.slice(1);
   };
 

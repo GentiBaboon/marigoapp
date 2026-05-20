@@ -1,14 +1,15 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { useDoc, useFirestore, useMemoFirebase, useCollection, useUser } from '@/firebase';
 import { doc, collection, query, where, limit } from 'firebase/firestore';
-import type { FirestoreOrder, FirestoreDelivery } from '@/lib/types';
+import type { FirestoreOrder, FirestoreDelivery, FirestoreReturn } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { HelpCircle, PackageCheck } from 'lucide-react';
 import Image from 'next/image';
 import { OrderTimeline } from '@/components/profile/order-timeline';
+import { ReturnTimeline } from '@/components/profile/return-timeline';
 import { useParams } from 'next/navigation';
 import { DeliveryTracking } from '@/components/tracking/DeliveryTracking';
 import { OrderCustomerActions } from '@/components/profile/order-actions';
@@ -53,6 +54,7 @@ export default function OrderDetailsPage() {
     const params = useParams();
     const orderId = params.orderId as string;
     const firestore = useFirestore();
+    const { user } = useUser();
 
     const orderRef = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -67,6 +69,22 @@ export default function OrderDetailsPage() {
     }, [firestore, orderId]);
     const { data: deliveries, isLoading: isDeliveryLoading } = useCollection<FirestoreDelivery>(deliveryQuery);
     const delivery = deliveries?.[0];
+
+    // Pull the active return tied to this order. The Firestore rule on
+    // /returns requires the query to constrain by `buyerId` (so the user can
+    // only list documents they own), and we also filter by orderId to find
+    // the right one. No orderBy → no composite index needed.
+    const returnsQuery = useMemoFirebase(() => {
+        if (!firestore || !orderId || !user?.uid) return null;
+        return query(
+            collection(firestore, 'returns'),
+            where('buyerId', '==', user.uid),
+            where('orderId', '==', orderId),
+            limit(1),
+        );
+    }, [firestore, orderId, user?.uid]);
+    const { data: returns } = useCollection<FirestoreReturn>(returnsQuery);
+    const activeReturn = returns?.[0];
 
     const isLoading = isOrderLoading || isDeliveryLoading;
     
@@ -115,6 +133,10 @@ export default function OrderDetailsPage() {
                 <div className="bg-background p-4 rounded-lg">
                     <OrderTimeline order={order} />
                 </div>
+
+                {activeReturn && (
+                    <ReturnTimeline returnDoc={activeReturn} audience="buyer" />
+                )}
 
                 {delivery && (
                     <div className="bg-background p-4 rounded-lg">

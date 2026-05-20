@@ -34,37 +34,32 @@ export default function AdminFinancePage() {
   const { data: orders, isLoading } =
     useCollection<FirestoreOrder>(ordersQuery);
 
+  // Stats are derived from the orders collection directly. `order.status` is
+  // the single source of truth: completed → revenue + commission, refunded /
+  // cancelled → counted in Total Refunds and subtracted from pending payouts.
+  // No ledger query is needed — every refunded order shows up automatically
+  // without requiring a separate `refund` or `transaction` doc to exist.
   const financialStats = useMemo(() => {
     const safeOrders = orders || [];
-    
+
     const completedOrders = safeOrders.filter(o => o.status === 'completed');
-    const refundedOrders = safeOrders.filter(o => o.status === 'refunded');
+    const refundedOrders = safeOrders.filter(o => o.status === 'refunded' || o.status === 'cancelled');
 
-    const totalRevenue = completedOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+    const totalRevenue = completedOrders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0);
     const commissionEarned = totalRevenue * commissionRate;
-    const totalRefunds = refundedOrders.reduce((sum, order) => sum + order.totalAmount, 0);
-
-    // Placeholder for pending payouts, would need more complex logic
+    const totalRefunds = refundedOrders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0);
     const pendingPayouts = totalRevenue - commissionEarned - totalRefunds;
-
-    // Tax collected
     const taxCollected = safeOrders.reduce((sum, o) => sum + ((o as any).taxAmount || 0), 0);
 
-    return {
-        totalRevenue,
-        commissionEarned,
-        pendingPayouts,
-        totalRefunds,
-        taxCollected,
-    };
+    return { totalRevenue, commissionEarned, pendingPayouts, totalRefunds, taxCollected };
   }, [orders, commissionRate]);
 
   if (isLoading) {
     return <FinanceLoading />;
   }
 
-  // Treat orders as transactions for the data table
-  const transactions = orders || [];
+  // Data-table source: orders list (unchanged).
+  const transactionRows = orders || [];
 
   return (
     <div className="space-y-6">
@@ -144,7 +139,7 @@ export default function AdminFinancePage() {
         
         <div className="space-y-4">
             <h2 className="text-xl font-bold tracking-tight">Transaction Log</h2>
-            <DataTable columns={columns} data={transactions} />
+            <DataTable columns={columns} data={transactionRows} />
         </div>
     </div>
   );
