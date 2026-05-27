@@ -113,15 +113,15 @@ const ModerationCard: React.FC<ModerationCardProps> = ({ product }) => {
         <div className="flex justify-between items-start">
             <div>
                 <CardTitle>{product.title}</CardTitle>
-                <CardDescription>{product.brand}</CardDescription>
+                <CardDescription>{product.brandId}</CardDescription>
             </div>
             <SellerInfo sellerId={product.sellerId} />
         </div>
       </CardHeader>
       <CardContent className="grid md:grid-cols-2 gap-6">
         <div className="relative aspect-[4/3] bg-muted rounded-md overflow-hidden">
-            <Image 
-                src={product.images?.[0] || '/placeholder.png'} 
+            <Image
+                src={product.images?.[0]?.url || '/placeholder.png'}
                 alt={product.title} 
                 fill 
                 className="object-cover" 
@@ -136,7 +136,7 @@ const ModerationCard: React.FC<ModerationCardProps> = ({ product }) => {
             <div>
                 <h4 className="font-semibold">Details</h4>
                 <div className="text-sm space-y-1 mt-1">
-                    <p><span className="text-muted-foreground">Category:</span> {product.category}</p>
+                    <p><span className="text-muted-foreground">Category:</span> {product.categoryId}</p>
                     <p><span className="text-muted-foreground">Condition:</span> {product.condition}</p>
                     <p><span className="text-muted-foreground">Price:</span> {currencyFormatter.format(product.price)}</p>
                 </div>

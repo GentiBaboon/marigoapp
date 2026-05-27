@@ -6,7 +6,7 @@ import { Handshake } from 'lucide-react';
 import { collectionGroup, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 
 import { useUser, useFirestore } from '@/firebase';
-import type { FirestoreOffer, FirestoreProduct } from '@/lib/types';
+import { type FirestoreOffer, type FirestoreProduct, toDate } from '@/lib/types';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -92,7 +92,7 @@ export default function OffersPage() {
                 );
                 
                 const validOffers = offersWithProductData.filter((o): o is OfferWithProduct => o !== null)
-                    .sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
+                    .sort((a, b) => (toDate(b.createdAt)?.getTime() ?? 0) - (toDate(a.createdAt)?.getTime() ?? 0));
 
                 setOffers(validOffers);
 

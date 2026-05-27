@@ -102,10 +102,14 @@ export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 export interface FirestoreUser {
   id: string;
   name: string | null;
+  /** Alias for `name` — used by Firebase Auth-derived shapes. */
+  displayName?: string | null;
   email: string | null;
   phone: string | null;
   role: "buyer" | "seller" | "courier" | "admin" | "super_admin" | "moderator" | "analyst";
   profileImage: string | null;
+  /** Alias for `profileImage` — used by Firebase Auth-derived shapes. */
+  photoURL?: string | null;
   bio?: string | null;
   language: "sq" | "en" | "it";
   currency: "EUR" | "ALL" | "USD";
@@ -312,11 +316,13 @@ export interface FirestoreOrder {
   totalAmount: number;
   status:
     | "pending_payment"
+    | "payment_failed"
     | "confirmed"
     | "processing" // legacy alias for confirmed
     | "in_preparation"
     | "prepared"
     | "shipped"
+    | "delivered"
     | "completed"
     | "cancel_requested"
     | "refund_requested"
@@ -568,12 +574,27 @@ export interface FirestoreCoupon {
 export interface FirestoreSettings {
   isFreeDeliveryActive: boolean;
   freeDeliveryThreshold: number;
+  /** Platform commission, expressed as a fraction (0.15 == 15%). Default 0.15. */
   commissionRate?: number;
   taxEnabled?: boolean;
   taxRate?: number;
   taxLabel?: string;
   relatedProducts?: RelatedProductsConfig;
+  /** Hours to hold escrow after delivery before auto-capturing + paying out
+   *  the seller. Default 72. The hourly `releaseEscrow` job reads this. */
+  payoutHoldHours?: number;
+  /** Days after delivery during which a buyer can still request a refund.
+   *  After this window the order is locked. Default 14. */
+  refundWindowDays?: number;
+  /** When true, sellers without a connected Stripe account are paid via a
+   *  manual bank transfer (admin handles offline). When false, only Stripe
+   *  Connect-onboarded sellers can sell. Default false. */
+  allowOfflineSellers?: boolean;
 }
+
+export const DEFAULT_PAYOUT_HOLD_HOURS = 72;
+export const DEFAULT_REFUND_WINDOW_DAYS = 14;
+export const DEFAULT_COMMISSION_RATE = 0.15;
 
 export interface RelatedProductsConfig {
   enabled: boolean;
@@ -697,9 +718,20 @@ export interface FirestoreOffer {
   buyerId: string;
   buyerName: string;
   amount: number;
+  /** Alias for `amount` (buyer's offer amount). */
+  offerAmount?: number;
+  /** Seller's counter amount when status === 'countered'. */
+  counterOfferAmount?: number;
   message?: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  status: 'pending' | 'accepted' | 'rejected' | 'expired' | 'countered' | 'withdrawn' | 'declined';
   createdAt: FirestoreTimestamp;
+  /** Append-only history of actions on this offer. */
+  history?: Array<{
+    action: string;
+    amount?: number;
+    by_user: string;
+    timestamp: FirestoreTimestamp;
+  }>;
 }
 
 // --- Chat Commerce ---

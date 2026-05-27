@@ -284,12 +284,12 @@ export const mockConversations = [
 
 export const mockMessages = {
     'convo-1': [
-        { id: 'msg-1', senderId: 'seller-1', content: 'Yes, it is!', createdAt: { seconds: Date.now() / 1000 - 3610, nanoseconds: 0 } },
-        { id: 'msg-2', senderId: 'user-A', content: 'Is this still available?', createdAt: { seconds: Date.now() / 1000 - 3600, nanoseconds: 0 } },
+        { id: 'msg-1', senderId: 'seller-1', content: 'Yes, it is!', read: true, createdAt: { seconds: Date.now() / 1000 - 3610, nanoseconds: 0 } },
+        { id: 'msg-2', senderId: 'user-A', content: 'Is this still available?', read: true, createdAt: { seconds: Date.now() / 1000 - 3600, nanoseconds: 0 } },
     ],
     'convo-2': [
-        { id: 'msg-3', senderId: 'seller-2', content: 'I can ship it tomorrow morning.', createdAt: { seconds: Date.now() / 1000 - 86410, nanoseconds: 0 } },
-        { id: 'msg-4', senderId: 'user-A', content: 'Ok, thank you!', createdAt: { seconds: Date.now() / 1000 - 86400, nanoseconds: 0 } },
+        { id: 'msg-3', senderId: 'seller-2', content: 'I can ship it tomorrow morning.', read: true, createdAt: { seconds: Date.now() / 1000 - 86410, nanoseconds: 0 } },
+        { id: 'msg-4', senderId: 'user-A', content: 'Ok, thank you!', read: true, createdAt: { seconds: Date.now() / 1000 - 86400, nanoseconds: 0 } },
     ]
 } as Record<string, FirestoreMessage[]>;
 

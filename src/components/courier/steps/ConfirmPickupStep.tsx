@@ -111,7 +111,8 @@ export function ConfirmPickupStep({ delivery }: ConfirmPickupStepProps) {
     const signatureDataUrl = signatureRef.current?.toDataURL();
     
     // Compress the captured image before submitting
-    const imageFile = await (await fetch(capturedImage)).blob();
+    const imageBlob = await (await fetch(capturedImage)).blob();
+    const imageFile = new File([imageBlob], 'pickup.jpg', { type: imageBlob.type || 'image/jpeg' });
     const compressedFile = await imageCompression(imageFile, {
         maxSizeMB: 0.8,
         maxWidthOrHeight: 1200,

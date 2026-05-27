@@ -107,7 +107,7 @@ export const ProductCard = React.memo(function ProductCard({ product, className 
                 </p>
                 {hasDiscount && (
                   <>
-                    <p className="text-[10px] text-[#E63946] line-through">
+                    <p className="text-[10px] text-muted-foreground line-through">
                       {formatPrice(product.originalPrice!)}
                     </p>
                     <span className="text-[9px] font-bold text-green-700">

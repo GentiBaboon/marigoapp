@@ -42,7 +42,7 @@ export function OrderItem({ order }: { order: FirestoreOrder }) {
       processing: { label: 'In Progress', color: 'bg-blue-100 text-blue-700', icon: Package },
       shipped: { label: 'Shipped', color: 'bg-purple-100 text-purple-700', icon: Truck },
       delivered: { label: 'Delivered', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
-      completed: { label: 'Completed', color: 'bg-gray-100 text-gray-700', icon: CheckCircle2 },
+      completed: { label: 'Completed', color: 'bg-muted text-muted-foreground', icon: CheckCircle2 },
   };
 
   const status = statusConfig[order.status] || { label: order.status, color: 'bg-gray-100', icon: Package };

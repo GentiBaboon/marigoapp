@@ -1,6 +1,7 @@
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
+import { Logo } from '@/components/logo';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -44,7 +45,7 @@ export default function AuthGatePage() {
             <div className="absolute inset-0 flex flex-col justify-end p-8 space-y-5">
                 <div className="text-center mb-4">
                     <div className="flex justify-center mb-2">
-                        <Image src="/logo.png" alt="Marigo" width={140} height={40} className="h-10 w-auto brightness-0 invert" />
+                        <Logo size="lg" invert />
                     </div>
                     <p className="mt-2 text-lg">Register today for a special discount off your first purchase.</p>
                 </div>

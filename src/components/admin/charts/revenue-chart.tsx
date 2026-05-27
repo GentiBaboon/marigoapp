@@ -9,7 +9,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import type { FirestoreOrder } from '@/lib/types';
+import { type FirestoreOrder, toDate } from '@/lib/types';
 import { useMemo } from 'react';
 import { format, subMonths } from 'date-fns';
 
@@ -33,9 +33,8 @@ export function RevenueChart({ orders }: RevenueChartProps) {
     }
 
     orders.forEach(order => {
-        // Ensure createdAt exists and has a toDate method
-        if (order.createdAt?.toDate) {
-            const orderDate = order.createdAt.toDate();
+        const orderDate = toDate(order.createdAt);
+        if (orderDate) {
             const month = format(orderDate, 'MMM yyyy');
             if (monthlyRevenue.hasOwnProperty(month)) {
                monthlyRevenue[month] += order.totalAmount;

@@ -9,7 +9,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import type { FirestoreUser } from '@/lib/types';
+import { type FirestoreUser, toDate } from '@/lib/types';
 import { useMemo } from 'react';
 import { format, subDays, eachDayOfInterval } from 'date-fns';
 
@@ -30,8 +30,8 @@ export function UsersChart({ users }: UsersChartProps) {
     });
 
     users.forEach(user => {
-      if (user.createdAt?.toDate) {
-        const signupDate = user.createdAt.toDate();
+      const signupDate = toDate(user.createdAt);
+      if (signupDate) {
         if (signupDate >= thirtyDaysAgo) {
           const dateKey = format(signupDate, 'MMM d');
           if (dailySignups[dateKey] !== undefined) {

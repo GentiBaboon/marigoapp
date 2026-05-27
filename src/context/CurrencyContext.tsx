@@ -70,7 +70,7 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
         return new Intl.NumberFormat(locale, {
             style: 'currency',
             currency: c,
-            maximumFractionDigits: c === 'ALL' ? 0 : 2
+            maximumFractionDigits: 2
         }).format(convertedPrice);
 
     }, [currency, exchangeRates]);

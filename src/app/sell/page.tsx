@@ -24,7 +24,7 @@ export default function SellPage() {
           <p className="text-muted-foreground text-sm">Give your luxury items a new life in just a few steps.</p>
         </div>
 
-        <Button className="w-full h-16 text-lg gap-3 bg-black hover:bg-black/90 shadow-lg" onClick={startNewDraft}>
+        <Button className="w-full h-16 text-lg gap-3 bg-black text-white hover:bg-black/90 shadow-lg" onClick={startNewDraft}>
           <Plus className="h-6 w-6" />
           List a New Item
         </Button>

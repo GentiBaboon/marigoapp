@@ -156,7 +156,7 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
                 nextStatus = 'cancelled';
                 await recordRefundForDispute({
                   firestore,
-                  order: { id: dispute.orderId, ...orderData } as FirestoreOrder,
+                  order: { ...orderData, id: dispute.orderId } as FirestoreOrder,
                   dispute,
                   reason: resolution.trim() || 'Cancellation approved',
                   type: 'cancellation',
@@ -171,7 +171,7 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
                 nextStatus = 'return_initiated';
                 await recordReturn({
                   firestore,
-                  order: { id: dispute.orderId, ...orderData } as FirestoreOrder,
+                  order: { ...orderData, id: dispute.orderId } as FirestoreOrder,
                   reason: resolution.trim() || dispute.reason || 'Return approved',
                   type: 'return',
                   disputeId: dispute.id,

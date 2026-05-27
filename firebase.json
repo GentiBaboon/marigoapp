@@ -6,6 +6,23 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "hosting": {
+    "public": "firebase-hosting",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/stripe/webhook",
+        "function": {
+          "functionId": "handleStripeWebhook",
+          "region": "europe-west1"
+        }
+      }
+    ]
+  },
   "functions": [
     {
       "source": "functions",
@@ -18,5 +35,20 @@
         "*.local"
       ]
     }
-  ]
+  ],
+  "emulators": {
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "auth": {
+      "port": 9099
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
+  }
 }

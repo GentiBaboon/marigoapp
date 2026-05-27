@@ -17,11 +17,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { ProductCard } from '@/components/product-card';
-import { newArrivals, trendingProducts } from '@/lib/mock-data';
 import { ListFilter, Search as SearchIcon, ChevronDown } from 'lucide-react';
 import { Product } from '@/lib/mock-data';
 
-const allProducts = [...newArrivals, ...trendingProducts];
+const allProducts: Product[] = [];
 
 export function SearchClientPage() {
   const [sortOption, setSortOption] = React.useState('newest');

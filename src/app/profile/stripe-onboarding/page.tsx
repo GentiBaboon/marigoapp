@@ -1,8 +1,6 @@
-
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useUser } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +12,6 @@ export default function StripeOnboardingPage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
-    const functions = getFunctions();
 
     useEffect(() => {
         if (!isUserLoading && !user) {
@@ -23,13 +20,27 @@ export default function StripeOnboardingPage() {
     }, [user, isUserLoading, router]);
 
     const handleOnboarding = async () => {
+        if (!user) return;
         setIsLoading(true);
         try {
-            const createStripeConnectedAccount = httpsCallable(functions, 'createStripeConnectedAccount');
-            const result: any = await createStripeConnectedAccount();
-            const { url } = result.data;
-            if (url) {
-                window.location.href = url;
+            // Call the Next.js API route (same-origin → no CORS, no IAM hassle).
+            // Auth via Firebase ID token in the Bearer header.
+            const idToken = await user.getIdToken();
+            const res = await fetch('/api/stripe/create-connected-account', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({ baseUrl: window.location.origin }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data?.error || `Request failed: ${res.status}`);
+            }
+            const onboardingUrl = data?.onboardingUrl;
+            if (onboardingUrl) {
+                window.location.href = onboardingUrl;
             } else {
                 throw new Error("Could not get onboarding URL.");
             }

@@ -4,7 +4,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { FirestoreUser, getSellerLevel, type BadgeSettings } from '@/lib/types';
+import { FirestoreUser, getSellerLevel, type BadgeSettings, toDate } from '@/lib/types';
 import { format } from 'date-fns';
 import { DataTableRowActions } from './data-table-row-actions';
 import { ArrowUpDown } from 'lucide-react';
@@ -129,7 +129,8 @@ function columnsFor(badgeSettings: Partial<BadgeSettings> | null): ColumnDef<Fir
     header: 'Join Date',
     cell: ({ row }) => {
       const { createdAt } = row.original;
-      return createdAt?.toDate ? format(createdAt.toDate(), 'd MMM, yyyy') : 'N/A';
+      const d = toDate(createdAt);
+      return d ? format(d, 'd MMM, yyyy') : 'N/A';
     },
   },
   {

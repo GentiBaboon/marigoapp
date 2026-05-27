@@ -8,13 +8,14 @@ import {
   useDoc,
   useMemoFirebase,
 } from '@/firebase';
-import type {
-  FirestoreUser,
-  FirestoreProduct,
-  FirestoreOrder,
-  FirestoreReview,
-  FirestoreReport,
-  FirestoreSettings,
+import {
+  type FirestoreUser,
+  type FirestoreProduct,
+  type FirestoreOrder,
+  type FirestoreReview,
+  type FirestoreReport,
+  type FirestoreSettings,
+  toDate,
 } from '@/lib/types';
 
 import {
@@ -90,20 +91,20 @@ export default function AdminDashboardPage() {
     const safeReviews = reviews || [];
 
     const totalUsers = safeUsers.length;
-    const newUsers = safeUsers.filter(u => u.createdAt?.toDate && u.createdAt.toDate() > periodAgo).length;
+    const newUsers = safeUsers.filter(u => { const d = toDate(u.createdAt); return d && d > periodAgo; }).length;
 
     const totalProducts = safeProducts.length;
     const activeListings = safeProducts.filter(p => p.status === 'active').length;
     const soldItems = safeOrders.reduce((sum, order) => sum + order.items.length, 0);
 
     const totalOrders = safeOrders.length;
-    const ordersInPeriod = safeOrders.filter(o => o.createdAt?.toDate && o.createdAt.toDate() > periodAgo).length;
+    const ordersInPeriod = safeOrders.filter(o => { const d = toDate(o.createdAt); return d && d > periodAgo; }).length;
 
     const totalRevenue = safeOrders.reduce((sum, order) => sum + order.totalAmount, 0);
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     const commissionEarned = totalRevenue * commissionRate;
 
-    const activeUsers = safeUsers.filter(u => u.lastLoginAt?.toDate && u.lastLoginAt.toDate() > periodAgo).length;
+    const activeUsers = safeUsers.filter(u => { const d = toDate(u.lastLoginAt); return d && d > periodAgo; }).length;
 
     // For now, "pending" reviews are just all reviews, since there's no status field
     const pendingReviews = safeReviews.length;

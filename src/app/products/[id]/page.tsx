@@ -245,7 +245,7 @@ export default function ProductDetailPage() {
                       <p className="text-2xl font-bold">{formatPrice(product.price)}</p>
                       {hasDiscount && (
                         <>
-                          <p className="text-base text-[#E63946] line-through">
+                          <p className="text-base text-muted-foreground line-through">
                             {formatPrice(product.originalPrice!)}
                           </p>
                           <span className="text-xs font-bold text-green-700 bg-green-50 rounded px-2 py-0.5">

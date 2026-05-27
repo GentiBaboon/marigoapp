@@ -2,8 +2,15 @@ import * as admin from "firebase-admin";
 import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError, onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import {defineSecret} from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
 import Stripe from "stripe";
+
+// Secrets pulled from Google Secret Manager at runtime. Bind these on each
+// function that needs them via { secrets: [...] }.
+const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
+const STRIPE_WH_SECRET = defineSecret("STRIPE_WH_SECRET");
+const APP_URL_PARAM = defineSecret("APP_URL");
 
 initializeApp();
 const db = admin.firestore();
@@ -18,6 +25,147 @@ const getStripe = () => {
     apiVersion: "2024-06-20" as Stripe.LatestApiVersion,
   });
 };
+
+// Defaults mirror src/lib/types.ts (DEFAULT_*). Keep these in sync.
+const DEFAULT_PAYOUT_HOLD_HOURS = 72;
+const DEFAULT_COMMISSION_RATE = 0.15;
+
+/** Read settings/global once and return a normalized config with defaults
+ *  applied. Returns sane defaults if the doc is missing so callers don't
+ *  have to handle the empty case. */
+async function getPlatformSettings(): Promise<{
+  commissionRate: number;
+  payoutHoldHours: number;
+}> {
+  const snap = await db.collection("settings").doc("global").get();
+  const data = snap.exists ? (snap.data() as any) : {};
+  return {
+    commissionRate: typeof data?.commissionRate === "number" ? data.commissionRate : DEFAULT_COMMISSION_RATE,
+    payoutHoldHours: typeof data?.payoutHoldHours === "number" ? data.payoutHoldHours : DEFAULT_PAYOUT_HOLD_HOURS,
+  };
+}
+
+/** Split an order's captured funds among its sellers and transfer each
+ *  seller their net (subtotal × (1 - commissionRate)) into their connected
+ *  Stripe account. Also writes one ledger row per movement.
+ *
+ *  Skips sellers without a stripeAccountId — those payouts are flagged on
+ *  the order so an admin can settle them manually offline.
+ *
+ *  Idempotent on (orderId, sellerId) via a transferKey. Safe to call twice
+ *  if a capture retries — the second call no-ops for sellers already paid.
+ */
+async function distributeOrderToSellers(params: {
+  orderId: string;
+  order: FirebaseFirestore.DocumentData;
+  stripe: Stripe;
+}): Promise<{transferred: number; skipped: string[]}> {
+  const {orderId, order, stripe} = params;
+  const {commissionRate} = await getPlatformSettings();
+  const items: any[] = Array.isArray(order.items) ? order.items : [];
+  const sellerIds: string[] = Array.isArray(order.sellerIds) ? order.sellerIds : [];
+  const orderNumber: string = order.orderNumber || orderId;
+
+  let transferredCents = 0;
+  const skipped: string[] = [];
+
+  // Track which sellers already received a transfer for this order so retries
+  // are idempotent. Stored on the order doc as `payouts: { [sellerId]: ... }`.
+  const existingPayouts: Record<string, any> = order.payouts || {};
+
+  for (const sellerId of sellerIds) {
+    if (existingPayouts[sellerId]?.transferId) continue; // already paid
+
+    const sellerItems = items.filter((it: any) => it?.sellerId === sellerId);
+    const sellerSubtotal = sellerItems.reduce((s, it: any) => s + (Number(it?.price) || 0), 0);
+    if (sellerSubtotal <= 0) continue;
+
+    const sellerNetCents = Math.round(sellerSubtotal * (1 - commissionRate) * 100);
+    const commissionCents = Math.round(sellerSubtotal * commissionRate * 100);
+
+    // Look up seller's connected account.
+    const sellerSnap = await db.collection("users").doc(sellerId).get();
+    const stripeAccountId = sellerSnap.data()?.stripeAccountId;
+
+    if (!stripeAccountId) {
+      // No Connect account — record the obligation and let admin settle.
+      skipped.push(sellerId);
+      await db.collection("orders").doc(orderId).update({
+        [`payouts.${sellerId}`]: {
+          status: "manual_payout_required",
+          amount: sellerNetCents / 100,
+          commission: commissionCents / 100,
+          recordedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      });
+      await db.collection("transactions").add({
+        type: "sale",
+        orderId,
+        orderNumber,
+        userId: sellerId,
+        amount: sellerSubtotal,
+        commission: commissionCents / 100,
+        sellerPayout: sellerNetCents / 100,
+        paymentMethod: order.paymentMethod || "card",
+        note: "Sale recorded; seller has no Stripe Connect account — pending manual payout",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      logger.warn(`No stripeAccountId for seller ${sellerId} on order ${orderId} — flagged for manual payout`);
+      continue;
+    }
+
+    try {
+      const transfer = await stripe.transfers.create({
+        amount: sellerNetCents,
+        currency: order.currency || "eur",
+        destination: stripeAccountId,
+        transfer_group: `order_${orderId}`,
+        description: `Marigo payout — Order ${orderNumber}`,
+        metadata: {orderId, orderNumber, sellerId, commissionCents: String(commissionCents)},
+      }, {
+        // Idempotency key prevents double-transfer on webhook retry.
+        idempotencyKey: `payout_${orderId}_${sellerId}`,
+      });
+
+      transferredCents += sellerNetCents;
+
+      // Record on the order + write a ledger row.
+      await db.collection("orders").doc(orderId).update({
+        [`payouts.${sellerId}`]: {
+          status: "paid",
+          transferId: transfer.id,
+          amount: sellerNetCents / 100,
+          commission: commissionCents / 100,
+          paidAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      });
+      await db.collection("transactions").add({
+        type: "sale",
+        orderId,
+        orderNumber,
+        userId: sellerId,
+        amount: sellerSubtotal,
+        commission: commissionCents / 100,
+        sellerPayout: sellerNetCents / 100,
+        paymentMethod: order.paymentMethod || "card",
+        note: `Stripe transfer ${transfer.id}`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (err: any) {
+      logger.error(`Transfer to seller ${sellerId} for order ${orderId} failed`, err.message);
+      skipped.push(sellerId);
+      await db.collection("orders").doc(orderId).update({
+        [`payouts.${sellerId}`]: {
+          status: "failed",
+          error: err.message,
+          attemptedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      });
+    }
+  }
+
+  return {transferred: transferredCents / 100, skipped};
+}
 
 // ═══════════════════════════════════════════════════════
 // UPDATE ORDER STATUS (Called by admin/system)
@@ -159,7 +307,7 @@ async function calculateOrderTotal(items: any[], couponCode?: string) {
 // ═══════════════════════════════════════════════════════
 // CREATE PAYMENT INTENT (Card Payments - Escrow)
 // ═══════════════════════════════════════════════════════
-export const createPaymentIntent = onCall({region: "europe-west1"}, async (request) => {
+export const createPaymentIntent = onCall({region: "europe-west1", secrets: [STRIPE_SECRET_KEY]}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
 
   const {items, shippingAddress, paymentMethodId, couponCode} = request.data;
@@ -293,7 +441,7 @@ export const createOrder = onCall({region: "europe-west1"}, async (request) => {
 // ═══════════════════════════════════════════════════════
 // STRIPE WEBHOOK HANDLER
 // ═══════════════════════════════════════════════════════
-export const handleStripeWebhook = onRequest({region: "europe-west1"}, async (req, res) => {
+export const handleStripeWebhook = onRequest({region: "europe-west1", secrets: [STRIPE_SECRET_KEY, STRIPE_WH_SECRET]}, async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).send("Method Not Allowed");
     return;
@@ -315,32 +463,76 @@ export const handleStripeWebhook = onRequest({region: "europe-west1"}, async (re
 
   try {
     switch (event.type) {
+    // With capture_method:'manual', this fires when the buyer's card has
+    // been authorized — funds are held but not yet captured. Treat this
+    // as "payment confirmed" and move the order to processing.
+    case "payment_intent.amount_capturable_updated":
     case "payment_intent.succeeded": {
       const pi = event.data.object as Stripe.PaymentIntent;
-      // Find order by paymentIntentId
       const orderSnap = await db.collection("orders").where("paymentIntentId", "==", pi.id).limit(1).get();
       if (!orderSnap.empty) {
         const orderDoc = orderSnap.docs[0];
-        if (orderDoc.data().status === "pending_payment") {
+        const data = orderDoc.data();
+        if (data.status === "pending_payment") {
           await orderDoc.ref.update({
             status: "processing",
             paidAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         }
+        // If this was a full-capture event (not just auth), and we haven't
+        // distributed yet, run the per-seller split now.
+        if (event.type === "payment_intent.succeeded" && pi.amount_received > 0 && !data.payouts) {
+          const fresh = (await orderDoc.ref.get()).data() || data;
+          await distributeOrderToSellers({orderId: orderDoc.id, order: fresh, stripe});
+        }
       }
       break;
     }
 
-    case "payment_intent.payment_failed": {
+    case "payment_intent.payment_failed":
+    case "payment_intent.canceled": {
       const pi = event.data.object as Stripe.PaymentIntent;
       const orderSnap = await db.collection("orders").where("paymentIntentId", "==", pi.id).limit(1).get();
       if (!orderSnap.empty) {
         const orderDoc = orderSnap.docs[0];
-        await orderDoc.ref.update({
-          status: "cancelled",
-          failureReason: pi.last_payment_error?.message || "Payment failed",
+        const data = orderDoc.data();
+
+        // Restore stock: re-increment quantities and re-list any item that
+        // was flipped to `reserved` because we ran it down to zero at
+        // checkout. Mirrors the inverse of create-payment-intent's stock
+        // decrement step.
+        const items: any[] = Array.isArray(data.items) ? data.items : [];
+        const batch = db.batch();
+        for (const item of items) {
+          const ref = db.collection("products").doc(item.id || item.productId);
+          const snap = await ref.get();
+          if (!snap.exists) continue;
+          const p = snap.data() as any;
+          const orderedQty = typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : 1;
+          const newQty = Math.max(0, Number(p.quantity || 0)) + orderedQty;
+          const update: Record<string, unknown> = {
+            quantity: newQty,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          };
+          if (p.status === "reserved") update.status = "active";
+
+          // Restore variant stock if applicable.
+          const variants = Array.isArray(p.variants) ? p.variants : null;
+          const itemSize = item.selectedSize || item.size;
+          if (variants && itemSize) {
+            update.variants = variants.map((v: any) =>
+              v?.size === itemSize ? {...v, quantity: Math.max(0, (Number(v.quantity) || 0) + orderedQty)} : v
+            );
+          }
+          batch.update(ref, update as FirebaseFirestore.UpdateData<any>);
+        }
+
+        batch.update(orderDoc.ref, {
+          status: event.type === "payment_intent.canceled" ? "cancelled" : "payment_failed",
+          failureReason: pi.last_payment_error?.message || (event.type === "payment_intent.canceled" ? "Payment cancelled" : "Payment failed"),
           cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+        await batch.commit();
       }
       break;
     }
@@ -351,9 +543,31 @@ export const handleStripeWebhook = onRequest({region: "europe-west1"}, async (re
       if (piId) {
         const orderSnap = await db.collection("orders").where("paymentIntentId", "==", piId).limit(1).get();
         if (!orderSnap.empty) {
-          await orderSnap.docs[0].ref.update({
+          const orderDoc = orderSnap.docs[0];
+          const data = orderDoc.data();
+          const refundCents = charge.amount_refunded;
+          const refundAmount = refundCents / 100;
+          const totalCents = (data.totalAmount || 0) * 100;
+          const isFull = Math.abs(refundCents - totalCents) < 1;
+
+          await orderDoc.ref.update({
             status: "refunded",
             refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+            refundedAmount: refundAmount,
+          });
+
+          // Append a negative ledger row so /admin/finance reconciles.
+          await db.collection("transactions").add({
+            type: isFull ? "refund" : "partial_refund",
+            orderId: orderDoc.id,
+            orderNumber: data.orderNumber,
+            userId: data.buyerId,
+            amount: -refundAmount,
+            commission: 0,
+            sellerPayout: 0,
+            paymentMethod: data.paymentMethod || "card",
+            note: `Stripe refund on charge ${charge.id}`,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         }
       }
@@ -373,7 +587,7 @@ export const handleStripeWebhook = onRequest({region: "europe-west1"}, async (re
 // ═══════════════════════════════════════════════════════
 // CAPTURE PAYMENT (Admin/System - Escrow Release)
 // ═══════════════════════════════════════════════════════
-export const capturePayment = onCall({region: "europe-west1"}, async (request) => {
+export const capturePayment = onCall({region: "europe-west1", secrets: [STRIPE_SECRET_KEY]}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
 
   const {orderId} = request.data;
@@ -390,7 +604,7 @@ export const capturePayment = onCall({region: "europe-west1"}, async (request) =
       throw new HttpsError("failed-precondition", `Cannot capture payment for order in status: ${order.status}`);
     }
 
-    // Capture the held funds
+    // Capture the held funds into the platform account.
     const pi = await stripe.paymentIntents.capture(order.paymentIntentId);
 
     await orderDoc.ref.update({
@@ -399,7 +613,16 @@ export const capturePayment = onCall({region: "europe-west1"}, async (request) =
       capturedAmount: pi.amount_received / 100,
     });
 
-    return {success: true, capturedAmount: pi.amount_received / 100};
+    // Now split funds out to each seller's Connect account.
+    const fresh = (await orderDoc.ref.get()).data() || order;
+    const dist = await distributeOrderToSellers({orderId, order: fresh, stripe});
+
+    return {
+      success: true,
+      capturedAmount: pi.amount_received / 100,
+      sellerPayoutAmount: dist.transferred,
+      sellersPendingManualPayout: dist.skipped,
+    };
   } catch (error: any) {
     logger.error("capturePayment error", error);
     if (error instanceof HttpsError) throw error;
@@ -410,7 +633,7 @@ export const capturePayment = onCall({region: "europe-west1"}, async (request) =
 // ═══════════════════════════════════════════════════════
 // PROCESS REFUND (Admin only)
 // ═══════════════════════════════════════════════════════
-export const processRefund = onCall({region: "europe-west1"}, async (request) => {
+export const processRefund = onCall({region: "europe-west1", secrets: [STRIPE_SECRET_KEY]}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
 
   const {orderId, amount, reason} = request.data;
@@ -464,9 +687,11 @@ export const processRefund = onCall({region: "europe-west1"}, async (request) =>
 export const releaseEscrow = onSchedule({
   schedule: "every 60 minutes",
   region: "europe-west1",
+  secrets: [STRIPE_SECRET_KEY],
 }, async () => {
   const stripe = getStripe();
-  const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000); // 72 hours ago
+  const {payoutHoldHours} = await getPlatformSettings();
+  const cutoff = new Date(Date.now() - payoutHoldHours * 60 * 60 * 1000);
 
   try {
     const ordersSnap = await db.collection("orders")
@@ -479,7 +704,7 @@ export const releaseEscrow = onSchedule({
     for (const doc of ordersSnap.docs) {
       const order = doc.data();
 
-      // Check if delivered more than 72 hours ago
+      // Only capture orders delivered before the cutoff.
       const deliveredAt = order.deliveredAt?.toDate?.() || order.updatedAt?.toDate?.();
       if (!deliveredAt || deliveredAt > cutoff) continue;
 
@@ -495,14 +720,18 @@ export const releaseEscrow = onSchedule({
           autoReleased: true,
         });
 
+        // Split to sellers.
+        const fresh = (await doc.ref.get()).data() || order;
+        await distributeOrderToSellers({orderId: doc.id, order: fresh, stripe});
+
         capturedCount++;
-        logger.info(`Auto-captured payment for order ${doc.id}`);
+        logger.info(`Auto-captured + distributed order ${doc.id}`);
       } catch (err: any) {
         logger.error(`Failed to capture order ${doc.id}:`, err.message);
       }
     }
 
-    logger.info(`Escrow release complete. Captured ${capturedCount} orders.`);
+    logger.info(`Escrow release complete. Captured ${capturedCount} orders (hold = ${payoutHoldHours}h).`);
   } catch (error: any) {
     logger.error("releaseEscrow error", error);
   }
@@ -511,11 +740,19 @@ export const releaseEscrow = onSchedule({
 // ═══════════════════════════════════════════════════════
 // STRIPE CONNECT - Create Connected Account for Sellers
 // ═══════════════════════════════════════════════════════
-export const createStripeConnectedAccount = onCall({region: "europe-west1"}, async (request) => {
+export const createStripeConnectedAccount = onCall({region: "europe-west1", secrets: [STRIPE_SECRET_KEY, APP_URL_PARAM]}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
 
   const stripe = getStripe();
   const uid = request.auth.uid;
+
+  // Resolve which origin to redirect the seller back to after Stripe
+  // onboarding. Priority: data passed by the caller → APP_URL env →
+  // legacy hardcoded fallback. Optional-chained so callers may omit args.
+  const baseUrl =
+    request.data?.baseUrl ||
+    process.env.APP_URL ||
+    "https://marigo10.vercel.app";
 
   try {
     const userDoc = await db.collection("users").doc(uid).get();
@@ -526,8 +763,8 @@ export const createStripeConnectedAccount = onCall({region: "europe-west1"}, asy
       // Return new onboarding link if not fully onboarded
       const link = await stripe.accountLinks.create({
         account: userData.stripeAccountId,
-        refresh_url: `${request.data.baseUrl || "https://marigo10.vercel.app"}/profile/seller/onboarding?refresh=true`,
-        return_url: `${request.data.baseUrl || "https://marigo10.vercel.app"}/profile/seller/onboarding?success=true`,
+        refresh_url: `${baseUrl}/profile/seller/onboarding?refresh=true`,
+        return_url: `${baseUrl}/profile/seller/onboarding?success=true`,
         type: "account_onboarding",
       });
       return {accountId: userData.stripeAccountId, onboardingUrl: link.url};
@@ -544,17 +781,20 @@ export const createStripeConnectedAccount = onCall({region: "europe-west1"}, asy
       },
     });
 
-    // Save to Firestore
-    await db.collection("users").doc(uid).update({
+    // Save to Firestore. Use set+merge so the call also succeeds for users
+    // whose `users/{uid}` doc doesn't exist yet (e.g. fresh sign-ups whose
+    // user-doc-creation flow hasn't run, or local testing against an empty
+    // Firestore emulator).
+    await db.collection("users").doc(uid).set({
       stripeAccountId: account.id,
       isSeller: true,
-    });
+    }, {merge: true});
 
     // Create onboarding link
     const link = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: `${request.data.baseUrl || "https://marigo10.vercel.app"}/profile/seller/onboarding?refresh=true`,
-      return_url: `${request.data.baseUrl || "https://marigo10.vercel.app"}/profile/seller/onboarding?success=true`,
+      refresh_url: `${baseUrl}/profile/seller/onboarding?refresh=true`,
+      return_url: `${baseUrl}/profile/seller/onboarding?success=true`,
       type: "account_onboarding",
     });
 
@@ -620,7 +860,7 @@ export const sendPasswordResetLink = onRequest({region: "europe-west1"}, async (
 // ═══════════════════════════════════════════════════════
 // SELLER BALANCE & PAYOUTS
 // ═══════════════════════════════════════════════════════
-export const getSellerBalance = onCall({region: "europe-west1"}, async (request) => {
+export const getSellerBalance = onCall({region: "europe-west1", secrets: [STRIPE_SECRET_KEY]}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
   const stripe = getStripe();
   const uid = request.auth.uid;
@@ -640,7 +880,7 @@ export const getSellerBalance = onCall({region: "europe-west1"}, async (request)
   }
 });
 
-export const requestPayout = onCall({region: "europe-west1"}, async (request) => {
+export const requestPayout = onCall({region: "europe-west1", secrets: [STRIPE_SECRET_KEY]}, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Access denied.");
   const stripe = getStripe();
   const uid = request.auth.uid;

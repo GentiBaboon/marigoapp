@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { collection, query, orderBy, limit, doc } from 'firebase/firestore';
 import { useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import type { FirestoreOrder, FirestoreSettings } from '@/lib/types';
+import { type FirestoreOrder, type FirestoreSettings, toDate } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Download } from 'lucide-react';
 import Link from 'next/link';
@@ -86,7 +86,7 @@ export default function AdminFinancePage() {
                       o.orderNumber,
                       o.totalAmount.toFixed(2),
                       o.status,
-                      o.createdAt?.toDate ? new Date(o.createdAt.toDate()).toISOString() : '',
+                      toDate(o.createdAt)?.toISOString() ?? '',
                     ].join(','))
                   ];
                   const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, useAuth } from '@/firebase';
-import type { FirestoreUser, FirestoreReview } from '@/lib/types';
+import { type FirestoreUser, type FirestoreReview, toDate } from '@/lib/types';
 import { StatCard } from '@/components/admin/stat-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -39,12 +39,12 @@ function ReviewItem({ review }: { review: FirestoreReview }) {
             <div className="flex items-center gap-2">
                 <p className="font-semibold">{reviewer?.displayName || 'Anonymous'}</p>
                 <p className="text-xs text-muted-foreground">
-                    {review.createdAt?.toDate ? format(review.createdAt.toDate(), 'MMM d, yyyy') : 'Recently'}
+                    {(() => { const d = toDate(review.createdAt); return d ? format(d, 'MMM d, yyyy') : 'Recently'; })()}
                 </p>
             </div>
             <div className="flex items-center">
                 {[...Array(5)].map((_, i) => (
-                    <Star key={i} className={`h-4 w-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
+                    <Star key={i} className={`h-4 w-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/40'}`} />
                 ))}
             </div>
             <p className="text-sm text-muted-foreground">{review.content}</p>

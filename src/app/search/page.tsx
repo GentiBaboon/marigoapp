@@ -723,22 +723,22 @@ function FilterSheet({
               </AccordionTrigger>
               <AccordionContent>
                 <div className="flex items-center gap-2 pt-1">
-                  <input
+                  <Input
                     type="number"
                     placeholder="€0"
                     value={draft.minPrice}
                     onChange={(e) => setDraft((d) => ({ ...d, minPrice: e.target.value }))}
-                    className="flex-1 h-10 rounded-md border border-border px-3 text-sm bg-background"
+                    className="flex-1"
                     min={0}
                     max={priceRange?.max}
                   />
                   <span className="text-muted-foreground">–</span>
-                  <input
+                  <Input
                     type="number"
                     placeholder={priceRange ? `€${priceRange.max}` : 'Max'}
                     value={draft.maxPrice}
                     onChange={(e) => setDraft((d) => ({ ...d, maxPrice: e.target.value }))}
-                    className="flex-1 h-10 rounded-md border border-border px-3 text-sm bg-background"
+                    className="flex-1"
                     min={0}
                     max={priceRange?.max}
                   />

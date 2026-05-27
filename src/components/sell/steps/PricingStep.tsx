@@ -107,13 +107,13 @@ export function PricingStep() {
         // Store originalPrice only when it's a meaningful discount. Anything
         // else (blank, zero, or below the asking price) is persisted as null
         // so the strikethrough doesn't render on the storefront.
-        originalPrice: hasDiscount ? parsedOriginalPrice : null,
+        originalPrice: hasDiscount ? parsedOriginalPrice : undefined,
         quantity: Math.max(1, effectiveQuantity),
-        variants: useVariants ? variants : null,
+        variants: useVariants ? variants : undefined,
         // Persist the variants' size system so ReviewStep can attach it to
         // the product doc — drives the size guide on the product page and
         // the size facet on search.
-        sizeSystem: useVariants && variantSizeSystem ? variantSizeSystem : (formData.sizeSystem || null),
+        sizeSystem: useVariants && variantSizeSystem ? variantSizeSystem : (formData.sizeSystem || undefined),
         shippingFromAddressId: selectedAddressId
     });
   }, [price, originalPrice, selectedAddressId, setFormData, currentPrice, parsedOriginalPrice, hasDiscount, parsedQuantity, useVariants, variants, effectiveQuantity, variantSizeSystem, formData.sizeSystem]);
@@ -337,15 +337,19 @@ export function PricingStep() {
             Shipping details
           </Label>
           <div className="grid gap-4">
-            <select 
-              className="w-full h-12 rounded-md border border-input bg-background px-3 text-sm font-medium"
+            <Select
               value={formData.shippingMethod || 'baboon'}
-              onChange={(e) => setFormData({ shippingMethod: e.target.value as any })}
+              onValueChange={(v) => setFormData({ shippingMethod: v as any })}
             >
-              <option value="baboon">Baboon Delivery (€5.00 - Recommended)</option>
-              <option value="other">Other courier</option>
-              <option value="free">Free shipping</option>
-            </select>
+              <SelectTrigger className="h-12 font-medium">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="baboon">Baboon Delivery (€5.00 - Recommended)</SelectItem>
+                <SelectItem value="other">Other courier</SelectItem>
+                <SelectItem value="free">Free shipping</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Shipping From Address */}

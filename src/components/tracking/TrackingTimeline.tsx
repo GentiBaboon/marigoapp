@@ -1,6 +1,6 @@
 'use client';
 import { cn } from '@/lib/utils';
-import type { FirestoreDelivery } from '@/lib/types';
+import { type FirestoreDelivery, toDate } from '@/lib/types';
 import { format } from 'date-fns';
 
 const TimelineDot = ({ state }: { state: 'completed' | 'current' | 'upcoming' }) => {
@@ -54,7 +54,7 @@ export function TrackingTimeline({ delivery }: TrackingTimelineProps) {
                         </h4>
                         {historyEntry && (
                             <p className="text-sm text-muted-foreground">
-                                {format(new Date(historyEntry.timestamp.seconds * 1000), 'MMM d, yyyy, HH:mm')}
+                                {format(toDate(historyEntry.timestamp) ?? new Date(), 'MMM d, yyyy, HH:mm')}
                             </p>
                         )}
                         {isCurrent && (

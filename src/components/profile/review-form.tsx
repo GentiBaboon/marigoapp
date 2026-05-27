@@ -67,7 +67,7 @@ export function ReviewForm({ order }: ReviewFormProps) {
     try {
         const reviewData = {
             orderId: order.id,
-            productId: order.items[0].productId, // Assuming review is for the first item for now
+            productId: order.items[0].id, // Assuming review is for the first item for now
             reviewerId: user.uid,
             revieweeId: order.sellerIds[0], // Assuming single seller for now
             rating: data.rating,

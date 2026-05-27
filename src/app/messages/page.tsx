@@ -121,7 +121,7 @@ export default function MessagesPage() {
                     ) : conversations && conversations.length > 0 ? (
                         <div className="border-t">
                             {conversations.map(convo => (
-                                <ConversationListItem key={convo.id} conversation={convo} currentUserId={user.uid} />
+                                <ConversationListItem key={convo.id} conversation={convo} currentUserId={user?.uid ?? ''} />
                             ))}
                         </div>
                     ) : (

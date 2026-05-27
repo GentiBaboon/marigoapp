@@ -3,7 +3,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, where, limit } from 'firebase/firestore';
-import type { FirestoreOrder, FirestoreAddress, FirestoreDelivery } from '@/lib/types';
+import { type FirestoreOrder, type FirestoreAddress, type FirestoreDelivery, toDate } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PackageCheck, Copy } from 'lucide-react';
@@ -96,7 +96,7 @@ export default function SaleDetailsPage() {
     const item = order.items[0];
     const displayTitle = item.title;
 
-    const estimatedPaymentDate = addDays(new Date(order.createdAt.seconds * 1000), 10); // Placeholder logic
+    const estimatedPaymentDate = addDays(toDate(order.createdAt) ?? new Date(), 10); // Placeholder logic
     const shippingFromAddress = addresses?.find(a => a.isDefault) || addresses?.[0];
 
     const copyToClipboard = (text: string) => {
@@ -117,8 +117,8 @@ export default function SaleDetailsPage() {
                             <p className="font-bold text-lg uppercase">{item.brand}</p>
                             <p>{displayTitle}</p>
                              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                                Ref. {item.productId.slice(0, 8)}
-                                <Copy className="h-3 w-3 cursor-pointer" onClick={() => copyToClipboard(item.productId)} />
+                                Ref. {item.id.slice(0, 8)}
+                                <Copy className="h-3 w-3 cursor-pointer" onClick={() => copyToClipboard(item.id)} />
                             </p>
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
                                 <PackageCheck className="h-4 w-4" />

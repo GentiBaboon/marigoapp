@@ -8,22 +8,24 @@ import type { OfferWithProduct } from '@/app/profile/offers/page';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/context/CurrencyContext';
+import { toDate } from '@/lib/types';
 
 const statusStyles: { [key: string]: string } = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   countered: 'bg-blue-100 text-blue-800 border-blue-200',
   accepted: 'bg-green-100 text-green-800 border-green-200',
   rejected: 'bg-red-100 text-red-800 border-red-200',
-  withdrawn: 'bg-gray-100 text-gray-800 border-gray-200',
-  expired: 'bg-gray-100 text-gray-800 border-gray-200',
-  default: 'bg-gray-100 text-gray-800 border-gray-200',
+  withdrawn: 'bg-muted text-muted-foreground border-border',
+  expired: 'bg-muted text-muted-foreground border-border',
+  default: 'bg-muted text-muted-foreground border-border',
 };
 
 export function OfferListItem({ offer }: { offer: OfferWithProduct }) {
     const { product } = offer;
     const { formatPrice } = useCurrency();
 
-    const imageUrl = product.images?.[0] || 'https://placehold.co/96x96/E2E8F0/A0AEC0?text=MARIGO';
+    const firstImage = product.images?.[0];
+    const imageUrl = (typeof firstImage === 'string' ? firstImage : firstImage?.url) || 'https://placehold.co/96x96/E2E8F0/A0AEC0?text=MARIGO';
     const displayTitle = product.title;
     const imageAlt = displayTitle;
 
@@ -47,12 +49,12 @@ export function OfferListItem({ offer }: { offer: OfferWithProduct }) {
                         <Image src={imageUrl} alt={imageAlt} fill className="object-cover" sizes="96px" />
                     </div>
                     <div className="flex-1 space-y-1">
-                        <p className="font-semibold text-lg">{formatPrice(offer.offerAmount)}</p>
+                        <p className="font-semibold text-lg">{formatPrice(offer.offerAmount ?? offer.amount)}</p>
                         {offer.status === 'countered' && offer.counterOfferAmount && (
                             <p className="text-sm font-semibold">Seller countered: <span className="text-primary">{formatPrice(offer.counterOfferAmount)}</span></p>
                         )}
                         <p className="text-sm text-muted-foreground">
-                           Sent on {format(new Date(offer.createdAt.seconds * 1000), 'PPP')}
+                           Sent on {format(toDate(offer.createdAt) ?? new Date(), 'PPP')}
                         </p>
                     </div>
                 </div>

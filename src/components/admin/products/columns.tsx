@@ -2,7 +2,7 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import type { FirestoreProduct } from '@/lib/types';
+import { type FirestoreProduct, toDate } from '@/lib/types';
 import { format } from 'date-fns';
 import { DataTableRowActions } from './data-table-row-actions';
 import { ArrowUpDown, CheckCircle, Clock } from 'lucide-react';
@@ -99,7 +99,7 @@ export const columns: ColumnDef<FirestoreProduct>[] = [
         <Badge variant="outline" className={cn(
           'font-mono',
           q === 0 ? 'bg-red-100 text-red-800 border-transparent' :
-          q === 1 ? 'bg-gray-100 text-gray-800 border-transparent' :
+          q === 1 ? 'bg-muted text-muted-foreground border-transparent' :
                     'bg-blue-100 text-blue-800 border-transparent',
         )}>
           {q}
@@ -112,17 +112,21 @@ export const columns: ColumnDef<FirestoreProduct>[] = [
     header: 'Status',
     cell: ({ row }) => {
         const status = row.original.status;
-        const statusConfig = {
+        const statusConfig: Record<string, { icon: typeof Clock | null; className: string }> = {
+            'draft': { icon: null, className: 'bg-muted text-muted-foreground' },
             'pending_review': { icon: Clock, className: 'bg-yellow-100 text-yellow-800' },
             'active': { icon: CheckCircle, className: 'bg-green-100 text-green-800' },
-            'sold': { icon: null, className: 'bg-gray-100 text-gray-800' },
+            'sold': { icon: null, className: 'bg-muted text-muted-foreground' },
             'rejected': { icon: null, className: 'bg-red-100 text-red-800' },
-            'reserved': { icon: null, className: 'bg-blue-100 text-blue-800' }
-        }[status] || { icon: null, className: 'bg-gray-100 text-gray-800' };
+            'reserved': { icon: null, className: 'bg-blue-100 text-blue-800' },
+            'expired': { icon: null, className: 'bg-orange-100 text-orange-800' },
+            'removed': { icon: null, className: 'bg-red-100 text-red-800' },
+        };
+        const cfg = statusConfig[status] || { icon: null, className: 'bg-muted text-muted-foreground' };
 
-        const Icon = statusConfig.icon;
+        const Icon = cfg.icon;
 
-        return <Badge variant="outline" className={cn('capitalize border-transparent', statusConfig.className)}>
+        return <Badge variant="outline" className={cn('capitalize border-transparent', cfg.className)}>
             {Icon && <Icon className="mr-1.5 h-3.5 w-3.5" />}
             {status.replace('_', ' ')}
         </Badge>
@@ -156,7 +160,8 @@ export const columns: ColumnDef<FirestoreProduct>[] = [
     },
     cell: ({ row }) => {
       const { listingCreated } = row.original;
-      return listingCreated?.toDate ? format(listingCreated.toDate(), 'd MMM, yyyy') : 'N/A';
+      const d = toDate(listingCreated);
+      return d ? format(d, 'd MMM, yyyy') : 'N/A';
     },
   },
   {

@@ -241,7 +241,7 @@ export default function AddressesPage() {
                 {editingAddress ? 'Modify your saved address details.' : 'Provide the details for your new shipping address.'}
             </DialogDescription>
           </DialogHeader>
-          {addressesCollection && (
+          {addressesCollection && user && (
             <AddressForm
               userId={user.uid}
               addressToEdit={editingAddress}

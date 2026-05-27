@@ -61,8 +61,8 @@ export function PersonalizedPicks() {
                 const wishlistProducts = wishlistProductsSnapshot.docs.map(doc => doc.data() as FirestoreProduct);
 
                 const tasteProfile: RecommendationInput = {
-                    wishlistedBrands: [...new Set(wishlistProducts.map(p => p.brand))],
-                    wishlistedCategories: [...new Set(wishlistProducts.map(p => p.category))],
+                    wishlistedBrands: [...new Set(wishlistProducts.map(p => p.brandId))],
+                    wishlistedCategories: [...new Set(wishlistProducts.map(p => p.categoryId))],
                 };
 
                 if (tasteProfile.wishlistedBrands.length === 0 && tasteProfile.wishlistedCategories.length === 0) {

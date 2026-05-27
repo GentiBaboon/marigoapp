@@ -73,6 +73,12 @@ const nextConfig = {
     ],
   },
   async headers() {
+    // In dev, allow connections to the Firebase emulator suite + the
+    // Stripe-CLI forwarder. Production keeps the strict CSP.
+    const isDev = process.env.NODE_ENV !== 'production';
+    const emulatorOrigins = isDev
+      ? ' http://127.0.0.1:5001 http://localhost:5001 http://127.0.0.1:8080 http://localhost:8080 http://127.0.0.1:9099 http://localhost:9099 ws://127.0.0.1:9099 ws://localhost:9099'
+      : '';
     return [
       {
         source: '/(.*)',
@@ -109,7 +115,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: blob: https: http:",
               "font-src 'self' https://fonts.gstatic.com",
-              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.supabase.co wss://*.firebaseio.com https://api.stripe.com https://api.mailtrap.io https://*.google-analytics.com",
+              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.supabase.co wss://*.firebaseio.com https://api.stripe.com https://api.mailtrap.io https://*.google-analytics.com" + emulatorOrigins,
               "frame-src 'self' https://js.stripe.com https://*.firebaseapp.com",
               "object-src 'none'",
               "base-uri 'self'",

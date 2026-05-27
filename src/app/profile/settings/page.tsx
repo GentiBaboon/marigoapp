@@ -35,7 +35,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
+import { getMarigoFunctions } from '@/firebase/functions';
 import { signOutUser } from '@/firebase/auth/actions';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -58,7 +59,7 @@ export default function ProfileSettingsPage() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
-  const functions = getFunctions();
+  const functions = getMarigoFunctions();
   const { toast } = useToast();
   const router = useRouter();
 

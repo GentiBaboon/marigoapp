@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
 import Image from 'next/image';
+import { Logo } from './logo';
 import { Button } from './ui/button';
 import { Bell, Search, ShoppingCart, ArrowLeft } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
@@ -54,7 +55,7 @@ function HeaderContent() {
             </Button>
           )}
           <Link href="/home">
-            <Image src="/logo.png" alt="Marigo" width={100} height={28} className="h-7 w-auto brightness-0" priority />
+            <Logo size="md" priority />
           </Link>
           <nav className="hidden md:flex items-center gap-6 ml-6">
             {navLinks.map(link => (
@@ -87,7 +88,7 @@ function HeaderSkeleton() {
                 </div>
                 <div className="flex justify-center">
                     <Link href="/home">
-                        <Image src="/logo.png" alt="Marigo" width={100} height={28} className="h-7 w-auto brightness-0" />
+                        <Logo size="md" />
                     </Link>
                 </div>
                 <div className="flex items-center justify-end gap-2">

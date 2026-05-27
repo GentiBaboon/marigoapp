@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Plus, Edit, Trash2, Loader2, Save } from 'lucide-react';
@@ -104,16 +105,20 @@ const CategoryDialog = ({
                     </div>
                     <div className="space-y-2">
                         <Label>Parent Category</Label>
-                        <select 
-                            className="w-full h-10 px-3 border rounded-md"
-                            value={formData.parentId} 
-                            onChange={e => setFormData({ ...formData, parentId: e.target.value })}
+                        <Select
+                            value={formData.parentId || '__none__'}
+                            onValueChange={v => setFormData({ ...formData, parentId: v === '__none__' ? '' : v })}
                         >
-                            <option value="">None (Top Level)</option>
-                            {parentCategories.map(c => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                        </select>
+                            <SelectTrigger>
+                                <SelectValue placeholder="None (Top Level)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="__none__">None (Top Level)</SelectItem>
+                                {parentCategories.map(c => (
+                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="flex items-center justify-between">
                         <Label>Active</Label>
@@ -301,6 +306,8 @@ const GeneralSettingsTab = ({
         taxEnabled: false,
         taxRate: 0,
         taxLabel: 'VAT',
+        payoutHoldHours: 72,
+        refundWindowDays: 14,
     });
 
     React.useEffect(() => {
@@ -310,6 +317,8 @@ const GeneralSettingsTab = ({
                 taxEnabled: settings.taxEnabled ?? false,
                 taxRate: (settings.taxRate ?? 0) * 100,
                 taxLabel: settings.taxLabel ?? 'VAT',
+                payoutHoldHours: settings.payoutHoldHours ?? 72,
+                refundWindowDays: settings.refundWindowDays ?? 14,
             });
         }
     }, [settings]);
@@ -322,6 +331,8 @@ const GeneralSettingsTab = ({
                 taxEnabled: formData.taxEnabled,
                 taxRate: formData.taxRate / 100,
                 taxLabel: formData.taxLabel,
+                payoutHoldHours: formData.payoutHoldHours,
+                refundWindowDays: formData.refundWindowDays,
             }, { merge: true });
             toast({ title: 'Settings saved successfully.' });
         } catch (e) {
@@ -351,6 +362,37 @@ const GeneralSettingsTab = ({
                     <p className="text-xs text-muted-foreground">
                         The percentage of each sale kept as platform commission.
                     </p>
+                </div>
+
+                <Separator />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>Payout Hold (hours)</Label>
+                        <Input
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={formData.payoutHoldHours}
+                            onChange={e => setFormData({ ...formData, payoutHoldHours: parseInt(e.target.value, 10) || 0 })}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Hours to hold escrow after delivery before auto-capturing the payment and transferring the seller&apos;s net to their Stripe account.
+                        </p>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Refund Window (days)</Label>
+                        <Input
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={formData.refundWindowDays}
+                            onChange={e => setFormData({ ...formData, refundWindowDays: parseInt(e.target.value, 10) || 0 })}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Days after delivery during which the buyer can still request a refund.
+                        </p>
+                    </div>
                 </div>
 
                 <Separator />
@@ -539,8 +581,8 @@ export default function AdminSettingsPage() {
                                 <div key={attr.id} className="flex items-center gap-2 px-3 py-1 bg-muted rounded-full">
                                     {col === 'colors' && attr.hex && <div className="w-3 h-3 rounded-full border" style={{ backgroundColor: attr.hex }} />}
                                     <span className="text-xs font-medium">{attr.name}</span>
-                                    <button onClick={() => { setActiveAttrCollection(col); setEditingAttr(attr); setAttrDialogOpen(true); }}><Edit className="h-3 w-3 text-muted-foreground" /></button>
-                                    <button onClick={() => handleDeleteItem(col, attr.id)}><Trash2 className="h-3 w-3 text-destructive" /></button>
+                                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setActiveAttrCollection(col); setEditingAttr(attr); setAttrDialogOpen(true); }} aria-label="Edit"><Edit className="h-3 w-3" /></button>
+                                    <button type="button" className="text-destructive hover:text-destructive/80 transition-colors" onClick={() => handleDeleteItem(col, attr.id)} aria-label="Delete"><Trash2 className="h-3 w-3" /></button>
                                 </div>
                             ))}
                         </div>

@@ -21,7 +21,7 @@ import { useCurrency } from '@/context/CurrencyContext';
 
 const statusStyles: Record<string, string> = {
   active: 'bg-green-100 text-green-800',
-  sold: 'bg-gray-100 text-gray-800',
+  sold: 'bg-muted text-muted-foreground',
   processing: 'bg-blue-100 text-blue-800',
   shipped: 'bg-purple-100 text-purple-800',
   pending_review: 'bg-yellow-100 text-yellow-800',
@@ -81,7 +81,7 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
                   <h3 className="font-bold text-sm uppercase tracking-tight truncate">{displayBrand}</h3>
                   <p className="text-sm text-muted-foreground truncate">{displayTitle}</p>
               </div>
-              <Badge className={cn("border-none shrink-0", statusStyles[status] || 'bg-gray-100 text-gray-800')}>
+              <Badge className={cn("border-none shrink-0", statusStyles[status] || 'bg-muted text-muted-foreground')}>
                   {getStatusLabel(status)}
               </Badge>
           </div>

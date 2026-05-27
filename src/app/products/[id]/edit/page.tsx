@@ -726,15 +726,16 @@ export default function EditListingPage() {
               <Truck className="h-5 w-5" />
               Shipping details
             </Label>
-            <select
-              className="w-full h-12 rounded-md border border-input bg-background px-3 text-sm font-medium"
-              value={shippingMethod}
-              onChange={e => setShippingMethod(e.target.value)}
-            >
-              <option value="baboon">Baboon Delivery (€5.00 — Recommended)</option>
-              <option value="other">Other courier</option>
-              <option value="free">Free shipping</option>
-            </select>
+            <Select value={shippingMethod} onValueChange={setShippingMethod}>
+              <SelectTrigger className="h-12 font-medium">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="baboon">Baboon Delivery (€5.00 — Recommended)</SelectItem>
+                <SelectItem value="other">Other courier</SelectItem>
+                <SelectItem value="free">Free shipping</SelectItem>
+              </SelectContent>
+            </Select>
 
             {/* Shipping Address */}
             <div className="space-y-3 pt-2">

@@ -82,7 +82,7 @@ const PRODUCT_STATUSES = [
 ] as const;
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-800',
+  draft: 'bg-muted text-muted-foreground',
   pending_review: 'bg-yellow-100 text-yellow-800',
   active: 'bg-green-100 text-green-800',
   sold: 'bg-blue-100 text-blue-800',

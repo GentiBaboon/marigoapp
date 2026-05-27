@@ -21,26 +21,26 @@ export function AuthenticityBadge({ authenticityCheck }: AuthenticityBadgeProps)
 
   const { confidence, findings } = authenticityCheck;
 
-  const config = {
+  const config = ({
     high: {
       icon: <ShieldCheck className="h-5 w-5 text-green-600" />,
       text: 'High Authenticity Confidence',
-      variant: 'default',
+      variant: 'default' as const,
       className: 'bg-green-100 text-green-800 border-green-300 hover:bg-green-100',
     },
     medium: {
       icon: <ShieldAlert className="h-5 w-5 text-yellow-600" />,
       text: 'Medium Authenticity Confidence',
-      variant: 'secondary',
+      variant: 'secondary' as const,
       className: 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-100',
     },
     low: {
       icon: <Shield className="h-5 w-5 text-gray-600" />,
       text: 'Authenticity Pre-Check',
-      variant: 'outline',
-      className: 'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-100',
+      variant: 'outline' as const,
+      className: 'bg-muted text-muted-foreground border-border hover:bg-gray-100',
     },
-  }[confidence];
+  } as const)[confidence];
 
   if (!config) return null;
 

@@ -7,6 +7,7 @@ import { DataTableRowActions } from './data-table-row-actions';
 import { ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { CourierData } from '@/app/admin/logistics/page';
+import { toDate } from '@/lib/types';
 
 
 const getInitials = (name?: string | null) => {
@@ -80,7 +81,8 @@ export const courierColumns: ColumnDef<CourierData>[] = [
     accessorFn: (row) => row.createdAt,
     cell: ({ row }) => {
       const { createdAt } = row.original;
-      return createdAt?.toDate ? format(createdAt.toDate(), 'd MMM, yyyy') : 'N/A';
+      const d = toDate(createdAt);
+      return d ? format(d, 'd MMM, yyyy') : 'N/A';
     },
   },
   {

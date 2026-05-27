@@ -25,7 +25,7 @@ export default function CourierApplyPage() {
         );
     }
     
-    if (user.isCourier) {
+    if ((user as any).isCourier) {
          return (
              <div className="container mx-auto py-8 px-4 max-w-lg">
                  <Card>

@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { X, Check, Package, MapPin, CreditCard, ShoppingBag, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
+import { Logo } from '@/components/logo';
 import { motion } from 'framer-motion';
 import Confetti from 'react-confetti';
 import { useWindowSize } from '@/hooks/use-window-size';
@@ -67,7 +68,10 @@ export default function OrderSuccessPage() {
     <div className="relative container mx-auto max-w-xl py-12 px-4">
         {width && height && <Confetti width={width} height={height} recycle={false} numberOfPieces={200} />}
       
-      <header className="flex justify-end mb-4">
+      <header className="flex items-center justify-between mb-4">
+        <Link href="/home" aria-label="Marigo home">
+          <Logo size="md" />
+        </Link>
         <Button variant="ghost" size="icon" asChild className="rounded-full">
             <Link href="/home">
                 <X className="h-6 w-6" />
@@ -186,7 +190,7 @@ export default function OrderSuccessPage() {
                 <Button
                     size="lg"
                     asChild
-                    className="w-full h-14 text-base font-bold bg-black hover:bg-black/90"
+                    className="w-full h-14 text-base font-bold bg-black text-white hover:bg-black/90"
                 >
                     <Link href="/home">
                         Continue Shopping

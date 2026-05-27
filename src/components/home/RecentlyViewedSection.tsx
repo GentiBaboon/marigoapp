@@ -93,7 +93,7 @@ export function RecentlyViewedSection() {
             {products.map((p) => {
                 const productForCard = {
                     id: p.id,
-                    brand: p.brand,
+                    brand: p.brandId,
                     title: p.title,
                     price: p.price,
                     originalPrice: p.originalPrice,

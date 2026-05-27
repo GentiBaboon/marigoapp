@@ -15,11 +15,11 @@ export const ProductJsonLd = ({ product, seller }: ProductJsonLdProps) => {
         '@type': 'Product',
         name: nameText,
         description: descriptionText.substring(0, 5000), // Max length for description
-        image: product.images?.[0] || '',
+        image: product.images?.[0]?.url || '',
         sku: product.id,
         brand: {
             '@type': 'Brand',
-            name: product.brand,
+            name: product.brandId,
         },
         offers: {
             '@type': 'Offer',
@@ -29,7 +29,7 @@ export const ProductJsonLd = ({ product, seller }: ProductJsonLdProps) => {
             availability: product.status === 'active' ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
             seller: {
                 '@type': 'Person',
-                name: seller?.displayName || 'Marigo Seller',
+                name: seller?.displayName || seller?.name || 'Marigo Seller',
             },
             itemCondition: `https://schema.org/${product.condition === 'new' ? 'NewCondition' : 'UsedCondition'}`,
         },
@@ -46,8 +46,8 @@ export const ProductJsonLd = ({ product, seller }: ProductJsonLdProps) => {
       },{
         "@type": "ListItem",
         "position": 2,
-        "name": product.category,
-        "item": `https://www.marigo.app/search?category=${product.category}`
+        "name": product.categoryId,
+        "item": `https://www.marigo.app/search?category=${product.categoryId}`
       },{
         "@type": "ListItem",
         "position": 3,

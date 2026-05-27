@@ -41,7 +41,7 @@ export default function DeliveryPartnerPage() {
       
       <div className="bg-background py-12 md:py-20">
           <div className="container mx-auto px-4">
-               <h2 className="text-3xl font-bold text-center mb-10">Why deliver with Marigo?</h2>
+               <h2 className="text-3xl font-bold font-headline text-center mb-10">Why deliver with Marigo?</h2>
                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                    {benefits.map((benefit) => (
                        <Card key={benefit.title} className="text-center">

@@ -1,7 +1,7 @@
 'use client';
 import { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
-import type { FirestoreAdminLog } from '@/lib/types';
+import { type FirestoreAdminLog, toDate } from '@/lib/types';
 import { format } from 'date-fns';
 import { ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -41,7 +41,8 @@ export const columns: ColumnDef<FirestoreAdminLog>[] = [
     },
     cell: ({ row }) => {
       const { timestamp } = row.original;
-      return timestamp?.toDate ? format(timestamp.toDate(), 'd MMM, yyyy, HH:mm:ss') : 'N/A';
+      const d = toDate(timestamp);
+      return d ? format(d, 'd MMM, yyyy, HH:mm:ss') : 'N/A';
     },
   },
   {

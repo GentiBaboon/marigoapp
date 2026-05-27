@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, limit } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
+import { getMarigoFunctions } from '@/firebase/functions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,14 +30,14 @@ import {
 } from 'recharts';
 import { format, subDays, isWithinInterval, startOfDay } from 'date-fns';
 import Link from 'next/link';
-import type { FirestoreOrder } from '@/lib/types';
+import { type FirestoreOrder, toDate } from '@/lib/types';
 
 export default function SellerEarningsPage() {
     const { user } = useUser();
     const firestore = useFirestore();
     const { formatPrice } = useCurrency();
     const { toast } = useToast();
-    const functions = getFunctions();
+    const functions = getMarigoFunctions();
 
     const [stripeBalance, setStripeBalance] = useState({ available: 0, pending: 0 });
     const [isBalanceLoading, setIsBalanceLoading] = useState(true);
@@ -117,7 +118,8 @@ export default function SellerEarningsPage() {
 
         sales.forEach(sale => {
             if (sale.status === 'completed' || sale.status === 'delivered' || sale.status === 'shipped') {
-                const saleDate = sale.createdAt.toDate();
+                const saleDate = toDate(sale.createdAt);
+                if (!saleDate) return;
                 const dayMatch = days.find(d => 
                     isWithinInterval(saleDate, { 
                         start: startOfDay(new Date(d.timestamp)), 
@@ -289,7 +291,7 @@ export default function SellerEarningsPage() {
                                         <div>
                                             <p className="font-bold text-sm">Sale #{sale.orderNumber}</p>
                                             <p className="text-xs text-muted-foreground">
-                                                {format(sale.createdAt.toDate(), 'PPP')}
+                                                {format(toDate(sale.createdAt) ?? new Date(), 'PPP')}
                                             </p>
                                         </div>
                                     </div>
