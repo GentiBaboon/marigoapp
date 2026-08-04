@@ -3,10 +3,12 @@ import { cn } from '@/lib/utils';
 
 type LogoSize = 'sm' | 'md' | 'lg';
 
+// Widths are derived from logo.png's intrinsic 2000x535. Declaring a different
+// ratio makes Next warn that only one of width/height was modified.
 const SIZES: Record<LogoSize, { className: string; width: number; height: number }> = {
-  sm: { className: 'h-6 w-auto', width: 86, height: 24 },
-  md: { className: 'h-7 w-auto', width: 100, height: 28 },
-  lg: { className: 'h-10 w-auto', width: 140, height: 40 },
+  sm: { className: 'h-6 w-auto', width: 90, height: 24 },
+  md: { className: 'h-7 w-auto', width: 105, height: 28 },
+  lg: { className: 'h-10 w-auto', width: 150, height: 40 },
 };
 
 interface LogoProps extends Omit<ImageProps, 'src' | 'alt' | 'width' | 'height'> {

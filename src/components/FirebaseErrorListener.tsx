@@ -1,53 +1,34 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * An invisible component that listens for globally emitted 'permission-error' events.
- * It throws any received error to be caught by Next.js's global-error.tsx.
+ * An invisible component that listens for globally emitted 'permission-error'
+ * events and logs them together with the simulated request payload, so a denied
+ * read can be diffed against firestore.rules.
  *
- * On admin pages, permission errors are expected (the admin dashboard fires
- * multiple Firestore queries that rely on security rules). These are logged
- * but NOT thrown so they don't crash the entire page via the error boundary.
+ * It deliberately does not throw. Every caller of useDoc/useCollection also
+ * receives the error locally and renders its own empty state (e.g. "Sale Not
+ * Found"), so re-throwing here only replaced that state with a dead-end
+ * "Something went wrong!" screen — and forced a suppression list that had to
+ * grow a new entry for every collection a page read opportunistically.
  */
 export function FirebaseErrorListener() {
-  const [error, setError] = useState<FirestorePermissionError | null>(null);
-  const pathname = usePathname();
-
   useEffect(() => {
     const handleError = (err: FirestorePermissionError) => {
-      // On admin pages, log but don't throw — admin queries handle their own errors
-      if (pathname?.startsWith('/admin')) {
-        console.warn('[Firestore] Permission error on admin page (non-fatal):', err.message);
-        return;
-      }
-      // Settings docs are public reads — suppress until rules are deployed
-      if (err.message?.includes('/settings/')) {
-        console.warn('[Firestore] Settings read permission error (non-fatal):', err.message);
-        return;
-      }
-      // Deliveries are queried opportunistically by the order detail pages.
-      // A buyer/seller without explicit access just means "no tracking yet" —
-      // never crash the page over it.
-      if (err.message?.includes('/deliveries')) {
-        console.warn('[Firestore] Deliveries read permission error (non-fatal):', err.message);
-        return;
-      }
-      setError(err);
+      console.error(
+        `[Firestore] Permission denied: ${err.request.method} ${err.request.path}`,
+        err
+      );
     };
 
     errorEmitter.on('permission-error', handleError);
     return () => {
       errorEmitter.off('permission-error', handleError);
     };
-  }, [pathname]);
-
-  if (error) {
-    throw error;
-  }
+  }, []);
 
   return null;
 }

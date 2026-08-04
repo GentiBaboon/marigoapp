@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -219,6 +219,9 @@ export function ChatbotWidget() {
               <Bot className="h-5 w-5" />
               MarigoAI
             </SheetTitle>
+            <SheetDescription className="sr-only">
+              Chat with MarigoAI for help with orders, sizing, and finding items.
+            </SheetDescription>
             <Button
               variant="ghost"
               size="icon"

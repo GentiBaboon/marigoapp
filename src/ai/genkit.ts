@@ -5,4 +5,7 @@ export const ai = genkit({
   plugins: [
     googleAI(),
   ],
+  // Default model for definePrompt/defineFlow calls that don't name one.
+  // Without this, every generate() call fails with INVALID_ARGUMENT.
+  model: 'googleai/gemini-2.0-flash',
 });
