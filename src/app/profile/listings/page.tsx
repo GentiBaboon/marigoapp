@@ -56,7 +56,7 @@ function EmptyState({ title, description }: { title: string, description: string
 const VALID_TABS = ['active', 'sold', 'inactive'] as const;
 type TabValue = (typeof VALID_TABS)[number];
 
-export default function ListingsPage() {
+function ListingsPageContent() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
@@ -180,5 +180,15 @@ export default function ListingsPage() {
           </Tabs>
         </div>
     </div>
+  );
+}
+
+// useSearchParams() opts the tree into client-side rendering, which fails the
+// prerender pass unless it sits under a Suspense boundary.
+export default function ListingsPage() {
+  return (
+    <React.Suspense fallback={<ListingsSkeleton />}>
+      <ListingsPageContent />
+    </React.Suspense>
   );
 }
