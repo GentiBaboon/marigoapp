@@ -1,12 +1,4 @@
 
-// Derive the Supabase hostname from the env var so next.config.js stays in sync
-// with whatever Supabase project is configured in .env.local.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-let supabaseHostname = null;
-try {
-  if (supabaseUrl) supabaseHostname = new URL(supabaseUrl).hostname;
-} catch {}
-
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
@@ -51,25 +43,17 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      // Any Supabase storage project, current or legacy. next/image THROWS on an
+      // unlisted host, which crashes the whole page rather than just failing the
+      // image — so listing projects individually meant that rotating
+      // NEXT_PUBLIC_SUPABASE_URL took down every page still showing an image
+      // from the previous project.
       {
         protocol: 'https',
-        hostname: 'degobqannokhholahyif.supabase.co',
+        hostname: '**.supabase.co',
         port: '',
         pathname: '/storage/v1/object/public/**',
       },
-      {
-        protocol: 'https',
-        hostname: 'gzehidqkvqnwzwrkvist.supabase.co',
-        port: '',
-        pathname: '/storage/v1/object/public/**',
-      },
-      // Dynamic: picks up whatever Supabase project is in NEXT_PUBLIC_SUPABASE_URL
-      ...(supabaseHostname ? [{
-        protocol: 'https',
-        hostname: supabaseHostname,
-        port: '',
-        pathname: '/storage/v1/object/public/**',
-      }] : []),
     ],
   },
   async headers() {

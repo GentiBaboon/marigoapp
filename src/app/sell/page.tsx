@@ -1,4 +1,10 @@
 'use client';
+import * as React from 'react';
+import Link from 'next/link';
+import { collection, query, where, orderBy } from 'firebase/firestore';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import type { FirestoreProduct } from '@/lib/types';
+import { ListingItem } from '@/components/profile/listing-item';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { SellProgressHeader } from '@/components/sell/SellProgressHeader';
 import { PhotosStep } from '@/components/sell/steps/PhotosStep';
@@ -10,11 +16,31 @@ import { ReviewStep } from '@/components/sell/steps/ReviewStep';
 import { SuccessStep } from '@/components/sell/steps/SuccessStep';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Tag, History, Trash2, ChevronRight } from 'lucide-react';
+import { Plus, Tag, History, Trash2, ChevronRight, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function SellPage() {
   const { activeDraft, drafts, startNewDraft, selectDraft, deleteDraft, currentStep, totalSteps } = useSellForm();
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  // Listings already saved to Firestore. These are distinct from `drafts`
+  // above, which is unfinished wizard state kept in localStorage on this
+  // device only — a submitted listing never appears there.
+  const listingsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(
+      collection(firestore, 'products'),
+      where('sellerId', '==', user.uid),
+      orderBy('listingCreated', 'desc')
+    );
+  }, [user, firestore]);
+  const { data: listings } = useCollection<FirestoreProduct>(listingsQuery);
+
+  const unpublished = React.useMemo(
+    () => (listings || []).filter(l => l.status === 'draft' || l.status === 'pending_review'),
+    [listings]
+  );
 
   if (!activeDraft) {
     return (
@@ -33,7 +59,7 @@ export default function SellPage() {
           <div className="space-y-4 pt-4">
             <h3 className="font-bold flex items-center gap-2 text-muted-foreground uppercase text-xs tracking-widest">
               <History className="h-4 w-4" />
-              Pending Drafts
+              Unfinished on this device
             </h3>
             <div className="grid gap-3">
               {drafts.map(draft => (
@@ -74,6 +100,28 @@ export default function SellPage() {
                         <Trash2 className="h-5 w-5" />
                     </Button>
                 </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {unpublished.length > 0 && (
+          <div className="space-y-4 pt-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold flex items-center gap-2 text-muted-foreground uppercase text-xs tracking-widest">
+                <Clock className="h-4 w-4" />
+                Submitted — not yet live ({unpublished.length})
+              </h3>
+              <Link
+                href="/profile/listings?tab=inactive"
+                className="text-xs text-primary hover:underline"
+              >
+                View all
+              </Link>
+            </div>
+            <div className="space-y-4">
+              {unpublished.map(product => (
+                <ListingItem key={product.id} product={product} />
               ))}
             </div>
           </div>

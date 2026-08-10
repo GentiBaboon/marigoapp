@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyIdToken, firestoreGet } from '@/lib/firebase-admin';
-
-const BUCKET = 'MARIGO_BUCKED';
+import { PRODUCT_IMAGES_BUCKET as BUCKET } from '@/lib/supabase';
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

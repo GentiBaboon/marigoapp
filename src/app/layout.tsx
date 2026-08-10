@@ -2,6 +2,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Header } from '@/components/header';
+import { AnnouncementBar } from '@/components/AnnouncementBar';
 import { MobileNav } from '@/components/mobile-nav';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
@@ -83,6 +84,7 @@ export default function RootLayout({
                   <CartProvider>
                     <WishlistProvider>
                       <div className="relative flex min-h-screen flex-col">
+                        <AnnouncementBar />
                         <Header />
                         <main className="flex-1 pb-16 md:pb-0">{children}</main>
                         <ChatbotWidget />

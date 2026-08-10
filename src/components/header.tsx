@@ -41,7 +41,7 @@ function HeaderContent() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background">
-      <div className="container flex h-16 items-center justify-between px-4">
+      <div className="container flex h-16 md:h-20 items-center justify-between px-4">
         <div className="flex items-center gap-4">
           {showBackArrow ? (
             <Button variant="ghost" size="icon" aria-label="Go back" onClick={() => router.back()} className="md:hidden">
@@ -55,11 +55,13 @@ function HeaderContent() {
             </Button>
           )}
           <Link href="/home">
-            <Logo size="md" priority />
+            {/* h-7 from size="md" holds on mobile; md:h-9 scales it up on
+                desktop without a second <Logo> for each breakpoint. */}
+            <Logo size="md" priority className="md:h-9" />
           </Link>
-          <nav className="hidden md:flex items-center gap-6 ml-6">
+          <nav className="hidden md:flex items-center gap-6 lg:gap-8 ml-6 lg:ml-10">
             {navLinks.map(link => (
-                <Link key={link.href} href={link.href} className="text-sm font-medium text-muted-foreground hover:text-primary">
+                <Link key={link.href} href={link.href} className="text-sm lg:text-base font-medium text-muted-foreground hover:text-primary transition-colors">
                     {link.label}
                 </Link>
             ))}
@@ -82,13 +84,13 @@ function HeaderContent() {
 function HeaderSkeleton() {
     return (
         <header className="sticky top-0 z-40 w-full border-b bg-background">
-            <div className="container grid h-16 grid-cols-3 items-center px-4">
+            <div className="container grid h-16 md:h-20 grid-cols-3 items-center px-4">
                 <div className="flex justify-start">
                     <Skeleton className="h-10 w-10" />
                 </div>
                 <div className="flex justify-center">
                     <Link href="/home">
-                        <Logo size="md" />
+                        <Logo size="md" className="md:h-9" />
                     </Link>
                 </div>
                 <div className="flex items-center justify-end gap-2">

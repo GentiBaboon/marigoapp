@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyIdToken } from '@/lib/firebase-admin';
 import { uploadLimiter, applyRateLimit } from '@/lib/rate-limit';
-
-const BUCKET = 'MARIGO_BUCKED';
+import { PRODUCT_IMAGES_BUCKET as BUCKET } from '@/lib/supabase';
 
 /**
  * Server-side upload endpoint.
