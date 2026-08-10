@@ -122,7 +122,7 @@ export function AddressStep({ onNextStep }: AddressStepProps) {
                                     <p className="text-xs font-medium text-muted-foreground mt-2">{addr.phone}</p>
                                 </div>
                                 {selectedAddressId === addr.id && (
-                                    <div className="absolute top-4 right-4 bg-primary text-white rounded-full p-0.5">
+                                    <div className="absolute top-4 right-4 bg-primary text-primary-foreground rounded-full p-0.5">
                                         <Check className="h-3 w-3" />
                                     </div>
                                 )}

@@ -7,11 +7,13 @@ import { getCookie, setCookie } from '@/lib/cookies';
 
 import en from '@/lib/translations/en.json';
 import sq from '@/lib/translations/sq.json';
-import it from '@/lib/translations/it.json';
 
-export type Locale = 'en' | 'sq' | 'it';
+// Italian was removed from the language picker. it.json is left in place in
+// case it comes back; a saved 'it' cookie simply fails the allow-list below
+// and falls through to the English default.
+export type Locale = 'en' | 'sq';
 
-const translations = { en, sq, it };
+const translations = { en, sq };
 
 interface LanguageContextType {
   locale: Locale;
@@ -29,11 +31,11 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   useEffect(() => {
     const savedLocale = getCookie('marigo_locale') as Locale | undefined;
-    if (savedLocale && ['en', 'sq', 'it'].includes(savedLocale)) {
+    if (savedLocale && ['en', 'sq'].includes(savedLocale)) {
       setLocaleState(savedLocale);
     } else {
       const browserLang = navigator.language.split('-')[0];
-      if (['en', 'sq', 'it'].includes(browserLang)) {
+      if (['en', 'sq'].includes(browserLang)) {
         setLocaleState(browserLang as Locale);
       }
     }

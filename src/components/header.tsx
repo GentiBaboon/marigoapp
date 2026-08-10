@@ -11,10 +11,17 @@ import { useCart } from '@/context/CartContext';
 import { Skeleton } from './ui/skeleton';
 import { UserNav } from './user-nav';
 
+// /browse/{slug} resolves a single segment against top-level CATEGORY slugs,
+// so gender links there ("/browse/women") hit "Category not found" — a gender
+// landing needs /browse/{gender}/{category}. Genders go to search instead,
+// which filters on the schema's gender values and lists everything.
 const navLinks = [
-    { href: '/browse/women', label: 'Womenswear' },
-    { href: '/browse/men', label: 'Menswear' },
+    { href: '/search?gender=women', label: 'Women' },
+    { href: '/search?gender=men', label: 'Men' },
+    { href: '/search?gender=children', label: 'Children' },
+    { href: '/browse/clothing', label: 'Clothing' },
     { href: '/browse/bags', label: 'Bags' },
+    { href: '/browse/accessories', label: 'Accessories' },
     { href: '/browse/shoes', label: 'Shoes' },
 ];
 
@@ -69,6 +76,13 @@ function HeaderContent() {
         </div>
 
         <div className="flex items-center justify-end gap-2">
+            {/* Desktop only — the bottom MobileNav already carries a Sell entry. */}
+            <Button
+              asChild
+              className="hidden md:inline-flex bg-primary text-white hover:bg-primary/90 rounded-md px-5 font-medium"
+            >
+              <Link href="/sell">Sell</Link>
+            </Button>
             <Button asChild variant="ghost" size="icon" aria-label="Search" className="hidden md:inline-flex">
               <Link href="/search">
                 <Search className="h-6 w-6" />

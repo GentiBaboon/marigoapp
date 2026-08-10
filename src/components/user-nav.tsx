@@ -128,7 +128,6 @@ export function UserNav() {
   if (!user) {
     return (
       <div className="flex items-center gap-2">
-        <LanguageSwitcher />
         <Button asChild variant="outline" size="sm">
             <Link href="/auth">{t('auth.signIn')}</Link>
         </Button>
@@ -141,10 +140,8 @@ export function UserNav() {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="hidden sm:block">
-        <LanguageSwitcher />
-      </div>
-      
+      {/* The language picker now lives in the footer. It is kept in the mobile
+          dropdown below because the footer is hidden under md. */}
       <NotificationsPopover />
       <MessagesPopover totalUnread={totalUnread} />
       <CartPopover />

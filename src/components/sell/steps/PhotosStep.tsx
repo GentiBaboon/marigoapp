@@ -202,7 +202,7 @@ export function PhotosStep() {
               </div>
               
               {index === 0 && (
-                <div className="absolute top-2 left-2 bg-primary text-white text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-tighter shadow-sm">Main</div>
+                <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-tighter shadow-sm">Main</div>
               )}
 
               {isProcessing === `bg-${index}` && (

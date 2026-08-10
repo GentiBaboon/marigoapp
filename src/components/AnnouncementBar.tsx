@@ -9,12 +9,12 @@ import Link from 'next/link';
  */
 export function AnnouncementBar() {
   return (
-    <div className="w-full bg-muted text-foreground">
+    <div className="w-full bg-primary text-white">
       <p className="px-6 py-1.5 text-center text-[13px] leading-normal">
-        <span className="font-medium">First Time?</span>{' '}
+        <span className="font-semibold">First Time?</span>{' '}
         Shop: 15% off with code{' '}
-        <span className="font-semibold">WELCOME15</span>. Sell: No fees on your first sale.{' '}
-        <Link href="/auth/signup" className="underline underline-offset-2 hover:no-underline">
+        <span className="font-bold">WELCOME15</span>. Sell: No fees on your first sale.{' '}
+        <Link href="/auth/signup" className="font-semibold underline underline-offset-2 hover:no-underline">
           Get Started!
         </Link>
       </p>

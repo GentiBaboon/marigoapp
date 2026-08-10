@@ -111,7 +111,7 @@ export interface FirestoreUser {
   /** Alias for `profileImage` — used by Firebase Auth-derived shapes. */
   photoURL?: string | null;
   bio?: string | null;
-  language: "sq" | "en" | "it";
+  language: "sq" | "en";
   currency: "EUR" | "ALL" | "USD";
   stripeCustomerId?: string | null;
   stripeAccountId?: string | null;

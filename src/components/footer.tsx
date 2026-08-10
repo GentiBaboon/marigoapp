@@ -4,6 +4,7 @@ import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export function Footer() {
   return (
@@ -12,7 +13,10 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <Logo size="md" className="mb-4" />
-            <p className="text-muted-foreground">The luxury fashion marketplace.</p>
+            <p className="text-muted-foreground">More than a fashion marketplace.</p>
+            <div className="mt-4">
+              <LanguageSwitcher />
+            </div>
           </div>
           <div>
             <h3 className="font-semibold mb-4">Shop</h3>

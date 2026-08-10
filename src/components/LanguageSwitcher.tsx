@@ -15,7 +15,6 @@ import { Globe } from 'lucide-react';
 const languages: { code: Locale; label: string; flag: string }[] = [
   { code: 'sq', label: 'Shqip', flag: '🇦🇱' },
   { code: 'en', label: 'English', flag: '🇬🇧' },
-  { code: 'it', label: 'Italiano', flag: '🇮🇹' },
 ];
 
 export function LanguageSwitcher() {
@@ -31,7 +30,9 @@ export function LanguageSwitcher() {
           <span className="hidden sm:inline uppercase text-xs font-bold">{locale}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
+      {/* align="start" — the trigger now sits at the left edge of the footer
+          column, so the menu should open rightward, not off-screen. */}
+      <DropdownMenuContent align="start" className="w-40">
         {languages.map((lang) => (
           <DropdownMenuItem
             key={lang.code}

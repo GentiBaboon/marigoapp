@@ -85,7 +85,7 @@ function BlockCard({ block, full }: { block: HomepageBlock; full: boolean }) {
         multi
           ? 'aspect-[4/5] sm:aspect-auto sm:flex sm:gap-4 md:gap-6'
           : cn(
-              'overflow-hidden bg-muted rounded-xl md:rounded-2xl',
+              'overflow-hidden bg-muted',
               full
                 ? 'aspect-[3/2] sm:aspect-[2/1] lg:aspect-[21/9]'
                 : 'aspect-[3/2] sm:aspect-video',
@@ -98,7 +98,7 @@ function BlockCard({ block, full }: { block: HomepageBlock; full: boolean }) {
         <div
           key={i}
           className={cn(
-            'overflow-hidden bg-muted rounded-xl md:rounded-2xl',
+            'overflow-hidden bg-muted',
             multi
               ? cn(
                   // Phone: every poster stacked in the same frame, only the
