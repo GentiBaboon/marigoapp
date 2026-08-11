@@ -1,6 +1,8 @@
 /** @type {import('next-sitemap').IConfig} */
 module.exports = {
-  siteUrl: process.env.SITE_URL || 'https://www.marigo.app',
+  // www.marigo.app does not resolve; the live site is www.marigoapp.com.
+  // Keep this in step with SITE_URL in src/lib/site.ts.
+  siteUrl: process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.marigoapp.com',
   generateRobotsTxt: true,
   robotsTxtOptions: {
     policies: [

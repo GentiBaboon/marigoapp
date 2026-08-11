@@ -38,7 +38,6 @@ import { collection, query, where, limit, doc, getDocs, addDoc, serverTimestamp,
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrency } from '@/context/CurrencyContext';
 import { AuthenticityBadge } from '@/components/product/AuthenticityBadge';
-import { ProductJsonLd } from '@/components/product/ProductJsonLd';
 import { RelatedProducts } from '@/components/product/RelatedProducts';
 import { SellerBadge } from '@/components/SellerBadge';
 import { SizeGuide } from '@/components/product/SizeGuide';
@@ -184,7 +183,6 @@ export default function ProductDetailPage() {
 
     return (
       <div className="container mx-auto max-w-4xl px-0 md:px-4 py-6 md:py-10 pb-32 md:pb-10">
-        <ProductJsonLd product={product} seller={seller} />
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
           <div className="flex flex-col items-center">
              <Carousel setApi={setApi} className="w-full relative">

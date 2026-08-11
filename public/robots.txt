@@ -39,7 +39,7 @@ User-agent: *
 Disallow: /delivery-partner
 
 # Host
-Host: https://www.marigo.app
+Host: https://www.marigoapp.com
 
 # Sitemaps
-Sitemap: https://www.marigo.app/sitemap.xml
+Sitemap: https://www.marigoapp.com/sitemap.xml

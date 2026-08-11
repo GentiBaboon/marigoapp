@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Header } from '@/components/header';
 import { AnnouncementBar } from '@/components/AnnouncementBar';
+import { SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/site';
 import { MobileNav } from '@/components/mobile-nav';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
@@ -23,23 +24,38 @@ const ChatbotWidget = dynamic(() => import('@/components/ai/ChatbotWidget').then
 
 
 export const metadata: Metadata = {
-  title: 'MarigoApp | Luxury Fashion Marketplace for Albania & EU',
+  // metadataBase lets every page emit absolute canonical/OG URLs from relative
+  // paths, and stops Next warning about relative URLs in social metadata.
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'MarigoApp | Luxury Fashion Marketplace for Albania & EU',
+    // Product and category pages supply their own full title.
+    template: '%s',
+  },
   description: 'Buy and sell authentic luxury fashion. MarigoApp connects style enthusiasts across Albania, Italy, and Europe with a curated selection of pre-loved treasures.',
   keywords: 'luxury fashion, albania, marketplace, second hand, designer brands, chanel, hermes, gucci',
+  alternates: { canonical: '/' },
+  robots: { index: true, follow: true },
   openGraph: {
     title: 'MarigoApp | Discover Luxury Fashion',
     description: 'The trusted marketplace for authentic pre-owned luxury.',
-    url: 'https://www.marigo.app',
-    siteName: 'MarigoApp',
+    url: SITE_URL,
+    siteName: SITE_NAME,
     images: [
       {
-        url: 'https://www.marigo.app/og-image.jpg',
+        url: absoluteUrl('/og-image.jpg'),
         width: 1200,
         height: 630,
       },
     ],
     locale: 'en_US',
     type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'MarigoApp | Discover Luxury Fashion',
+    description: 'The trusted marketplace for authentic pre-owned luxury.',
+    images: [absoluteUrl('/og-image.jpg')],
   },
 };
 
@@ -51,13 +67,29 @@ export default function RootLayout({
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "MarigoApp",
-    "url": "https://www.marigo.app",
-    "logo": "https://www.marigo.app/icons/icon-512x512.png",
+    "name": SITE_NAME,
+    "url": SITE_URL,
+    "logo": absoluteUrl('/icons/icon-512x512.png'),
     "sameAs": [
       "https://www.instagram.com/marigoapp",
       "https://www.facebook.com/marigoapp"
     ]
+  };
+
+  // Enables the sitelinks search box in Google results.
+  const searchLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": SITE_NAME,
+    "url": SITE_URL,
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": absoluteUrl('/search?q={search_term_string}'),
+      },
+      "query-input": "required name=search_term_string",
+    },
   };
 
   return (
@@ -75,6 +107,10 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(searchLd) }}
         />
       </head>
       <body className={cn('font-body antialiased')}>
