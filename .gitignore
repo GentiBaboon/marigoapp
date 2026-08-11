@@ -42,6 +42,10 @@ next-env.d.ts
 
 # firebase
 firebase-debug.log
+
+# Local product photography used for seeding listings — ~465MB of source
+# images that belong in storage, not in git history.
+/Marigo App Products/
 firestore-debug.log
 functions/node_modules
 functions/lib
