@@ -52,7 +52,8 @@ export default function ChatPage({ params }: { params: { conversationId: string 
   const { conversationId } = params;
   const { user } = useUser();
   const firestore = useFirestore();
-  const bottomRef = React.useRef<HTMLDivElement>(null);
+  const listRef = React.useRef<HTMLDivElement>(null);
+  const hasScrolledOnce = React.useRef(false);
   const hasMarkedRead = React.useRef(false);
 
   const conversationRef = useMemoFirebase(() => {
@@ -113,20 +114,32 @@ export default function ChatPage({ params }: { params: { conversationId: string 
     }
   }, [messages, user, firestore, conversationId, conversationRef, conversation]);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages. Driving the list's own scrollTop rather
+  // than scrollIntoView: the latter walks up the ancestor chain and would drag
+  // the whole page on mobile, where the thread is meant to be the only thing
+  // that scrolls.
   React.useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    const list = listRef.current;
+    if (!list) return;
+    list.scrollTo({ top: list.scrollHeight, behavior: hasScrolledOnce.current ? 'smooth' : 'auto' });
+    hasScrolledOnce.current = true;
+  }, [messages, otherUserTyping]);
 
   if (isConversationLoading) {
-    return <Card className="h-full flex flex-col"><ChatSkeleton /></Card>;
+    return (
+      <Card className="h-full flex flex-col rounded-none border-x-0 border-y-0 md:rounded-lg md:border">
+        <ChatSkeleton />
+      </Card>
+    );
   }
 
   const isDispute = conversation?.source === 'dispute';
   const isClosed = !!conversation?.caseClosed;
 
   return (
-    <Card className="h-full flex flex-col overflow-hidden">
+    // Edge-to-edge on a phone: rounded corners and side borders only make
+    // sense once the card is inset from the viewport at md.
+    <Card className="h-full flex flex-col overflow-hidden rounded-none border-x-0 border-y-0 md:rounded-lg md:border">
       {otherUser && conversation && (
         <ChatHeader
           user={otherUser}
@@ -156,7 +169,13 @@ export default function ChatPage({ params }: { params: { conversationId: string 
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      {/* min-h-0 lets this flex child actually shrink so it — not the page —
+          is what scrolls; overscroll-contain stops a swipe past the top from
+          scroll-chaining to the document behind it. */}
+      <div
+        ref={listRef}
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 md:px-4 space-y-2"
+      >
         {messages?.map(message => (
           <ChatBubble key={message.id} message={message} />
         ))}
@@ -164,8 +183,6 @@ export default function ChatPage({ params }: { params: { conversationId: string 
         <AnimatePresence>
           {otherUserTyping && <TypingIndicator key="typing" />}
         </AnimatePresence>
-
-        <div ref={bottomRef} />
       </div>
 
       {isClosed ? (

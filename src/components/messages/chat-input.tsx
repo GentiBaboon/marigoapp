@@ -100,24 +100,40 @@ export function ChatInput({ conversationId, otherUserId }: ChatInputProps) {
     }
   };
 
+  const content = form.watch('content');
+  const canSend = !!content?.trim() && !form.formState.isSubmitting;
+
   return (
-    <div className="p-3 border-t bg-background">
+    // The extra bottom padding clears the iPhone home indicator; it collapses
+    // to the base p-3 on devices that report no inset.
+    <div className="border-t bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" type="button" className="text-muted-foreground flex-shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          type="button"
+          aria-label="Attach an image"
+          className="h-11 w-11 flex-shrink-0 text-muted-foreground md:h-10 md:w-10"
+        >
           <ImageIcon className="h-5 w-5" />
         </Button>
         <Input
           {...form.register('content')}
           placeholder="Type a message..."
           autoComplete="off"
+          // Turns the phone keyboard's return key into "Send", and stops the
+          // aggressive auto-capitalising/correcting some keyboards default to.
+          enterKeyHint="send"
+          autoCapitalize="sentences"
           onKeyDown={handleKeyDown}
-          className="rounded-full bg-muted border-0 focus-visible:ring-1"
+          className="h-11 rounded-full border-0 bg-muted focus-visible:ring-1 md:h-10"
         />
         <Button
           type="submit"
           size="icon"
-          disabled={form.formState.isSubmitting}
-          className="rounded-full flex-shrink-0"
+          aria-label="Send message"
+          disabled={!canSend}
+          className="h-11 w-11 flex-shrink-0 rounded-full md:h-10 md:w-10"
         >
           <SendHorizonal className="h-5 w-5" />
         </Button>

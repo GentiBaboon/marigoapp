@@ -44,8 +44,11 @@ export function MacroFilters() {
     // overflow-x-auto keeps the row swipeable on narrow screens; the inner
     // w-max + mx-auto centres it once the buttons fit, without making the
     // first button unreachable when they don't.
-    <div className="overflow-x-auto pb-2 scrollbar-hide">
-      <div className="flex w-max mx-auto gap-3 px-1 py-1">
+    // `scrollbar-hide` was a no-op — no plugin defines it — so the row showed a
+    // real scrollbar once the padding under it was removed. These two arbitrary
+    // variants are what the rest of the app uses to hide one.
+    <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex w-max mx-auto gap-2 px-1 py-1">
         {visible.map((filter) => {
           const isActive = activeFilter === filter.id;
           return (
@@ -53,20 +56,24 @@ export function MacroFilters() {
               key={filter.id}
               onClick={() => handleSelect(filter.id)}
               className={cn(
-                'group relative flex-shrink-0 w-36 h-14 rounded-2xl overflow-hidden',
+                // w-24 keeps all three on one line at 375px rather than
+                // spilling into a scroll.
+                'group relative flex-shrink-0 w-24 h-9 rounded-full overflow-hidden',
                 // Matches the "Shop by Category" heading: serif, sentence case.
-                'font-serif text-lg capitalize',
+                'font-serif text-sm capitalize',
                 // No fill — the glass reads from backdrop-blur, the lit top
                 // edge and the soft neumorphic shadows alone.
                 'bg-transparent backdrop-blur-md border transition-all duration-200',
+                // Shadow spreads scale with the pill: the old 5–7px offsets
+                // read as a halo at this height, and would clip the row.
                 isActive
                   ? // Pressed in: shadows move inside, purple text and border.
-                    'border-primary text-primary shadow-[inset_4px_4px_10px_rgba(0,0,0,0.12),inset_-4px_-4px_10px_rgba(255,255,255,0.95)]'
+                    'border-primary text-primary shadow-[inset_2px_2px_6px_rgba(0,0,0,0.12),inset_-2px_-2px_6px_rgba(255,255,255,0.95)]'
                   : // Raised: dark shadow low-right, white glow high-left.
                     'border-primary/45 text-foreground hover:border-primary hover:-translate-y-0.5 ' +
-                      'shadow-[5px_5px_12px_rgba(0,0,0,0.10),-5px_-5px_12px_rgba(255,255,255,0.95),inset_0_1px_0_rgba(255,255,255,0.75)] ' +
-                      'hover:shadow-[7px_7px_18px_rgba(0,0,0,0.13),-7px_-7px_18px_rgba(255,255,255,1),inset_0_1px_0_rgba(255,255,255,0.9)] ' +
-                      'active:translate-y-0 active:shadow-[inset_4px_4px_10px_rgba(0,0,0,0.12),inset_-4px_-4px_10px_rgba(255,255,255,0.95)]'
+                      'shadow-[3px_3px_7px_rgba(0,0,0,0.09),-3px_-3px_7px_rgba(255,255,255,0.95),inset_0_1px_0_rgba(255,255,255,0.75)] ' +
+                      'hover:shadow-[4px_4px_10px_rgba(0,0,0,0.12),-4px_-4px_10px_rgba(255,255,255,1),inset_0_1px_0_rgba(255,255,255,0.9)] ' +
+                      'active:translate-y-0 active:shadow-[inset_2px_2px_6px_rgba(0,0,0,0.12),inset_-2px_-2px_6px_rgba(255,255,255,0.95)]'
               )}
             >
               {/* Faint sheen along the top edge — the glass highlight. */}

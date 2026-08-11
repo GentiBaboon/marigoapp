@@ -11,18 +11,18 @@ export default function SignupPage({ searchParams }: { searchParams?: { next?: s
   const next = searchParams?.next;
   const loginHref = next ? `/auth/login?next=${encodeURIComponent(next)}` : '/auth/login';
   return (
-     <div className="relative min-h-screen bg-background p-8 flex flex-col justify-center">
+     <div className="relative min-h-viewport-content bg-background px-6 py-8 flex flex-col justify-center">
         <Button asChild variant="ghost" size="icon" className="absolute top-4 right-4 z-10">
             <Link href="/auth">
                 <X className="h-6 w-6" />
             </Link>
         </Button>
         <div className="w-full max-w-md mx-auto">
-            <div className="text-center mb-8">
+            <div className="text-center mb-6">
               <h1 className="font-headline text-3xl">Create an Account</h1>
               <p className="text-muted-foreground mt-2">Join our community of fashion lovers.</p>
             </div>
-            <div className="space-y-6">
+            <div className="space-y-5">
                 <SignupForm />
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
@@ -35,7 +35,7 @@ export default function SignupPage({ searchParams }: { searchParams?: { next?: s
                   </div>
                 </div>
                 <SocialButtons />
-                <div className="mt-4 text-center text-sm">
+                <div className="text-center text-sm">
                   Already have an account?{' '}
                   <Link href={loginHref} className="underline">
                     Sign In

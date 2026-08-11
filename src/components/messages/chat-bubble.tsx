@@ -37,7 +37,9 @@ export function ChatBubble({ message }: { message: FirestoreMessage }) {
     <div className={cn('flex items-end gap-2', isCurrentUser ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'max-w-xs md:max-w-md rounded-2xl px-4 py-2 border',
+          // Proportional, not a fixed 20rem: max-w-xs is 85% of a 375px screen,
+          // so incoming and outgoing bubbles were nearly indistinguishable.
+          'max-w-[80%] md:max-w-md rounded-2xl px-4 py-2 border',
           isAdmin
             ? 'bg-amber-50 border-amber-300 text-amber-950 rounded-bl-none dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-100'
             : isCurrentUser
@@ -51,7 +53,9 @@ export function ChatBubble({ message }: { message: FirestoreMessage }) {
             <span>Marigo Support</span>
           </div>
         )}
-        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        {/* break-words so a pasted URL or unbroken string can't widen the
+            bubble past the screen. */}
+        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
         <div className={cn('flex items-center justify-end gap-1 mt-1')}>
           <p
             className={cn(

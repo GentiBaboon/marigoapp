@@ -65,6 +65,38 @@
 }
 
 @layer components {
+  /*
+   * Full-height pages sit inside the site chrome, so `min-h-screen` overflows by
+   * the height of everything around them (announcement bar + header, plus the
+   * 4rem bottom padding `main` reserves for the fixed mobile nav). This fills
+   * exactly the space that's left, so those pages never introduce a scrollbar.
+   */
+  .min-h-viewport-content {
+    min-height: calc(100svh - 11.5rem);
+  }
+
+  @media (min-width: 768px) {
+    .min-h-viewport-content {
+      min-height: calc(100svh - 6.5rem);
+    }
+  }
+
+  /*
+   * Fixed-height sibling of the above, for screens that must not scroll the
+   * page at all because they scroll internally (the chat thread). Uses dvh, not
+   * svh: when the phone keyboard opens the viewport shrinks, and the composer
+   * has to ride up with it instead of being pushed out of sight.
+   */
+  .h-viewport-content {
+    height: calc(100dvh - 11.5rem);
+  }
+
+  @media (min-width: 768px) {
+    .h-viewport-content {
+      height: calc(100dvh - 6.5rem);
+    }
+  }
+
   .dot-flashing {
     @apply relative w-2.5 h-2.5 rounded-full bg-primary;
     animation: dot-flashing 1s infinite linear alternate;

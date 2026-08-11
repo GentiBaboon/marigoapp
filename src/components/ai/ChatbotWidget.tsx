@@ -1,10 +1,10 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, Loader2, SendHorizonal, User, X } from 'lucide-react';
+import { Loader2, SendHorizonal, User, X } from 'lucide-react';
 import { useUser, useFirestore, errorEmitter } from '@/firebase';
 import { chatWithAI } from '@/ai/flows/ai-chat';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
@@ -25,6 +25,23 @@ interface ChatMessage {
   products?: ChatProductCard[];
   type?: 'text' | 'product_card';
   productData?: ChatProductCard;
+}
+
+/**
+ * The Marigo app icon, standing in for the generic robot glyph everywhere the
+ * assistant identifies itself. Decorative by default — every placement sits
+ * next to the "MarigoAI" label or a message that already names the sender.
+ */
+function MarigoMark({ className }: { className?: string }) {
+  return (
+    <Image
+      src="/app-icon.png"
+      alt=""
+      width={64}
+      height={64}
+      className={cn('rounded-full object-cover', className)}
+    />
+  );
 }
 
 function ProductCardInChat({ product }: { product: ChatProductCard }) {
@@ -66,11 +83,7 @@ const ChatBubble = ({ message }: { message: ChatMessage }) => {
   const isUser = message.role === 'user';
   return (
     <div className={cn("flex items-start gap-3", isUser ? "justify-end" : "justify-start")}>
-      {!isUser && (
-        <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-          <Bot className="h-5 w-5 text-primary-foreground" />
-        </div>
-      )}
+      {!isUser && <MarigoMark className="h-8 w-8 flex-shrink-0" />}
       <div className={cn(
         "max-w-xs md:max-w-md rounded-2xl px-4 py-2 text-sm",
         isUser
@@ -206,31 +219,38 @@ export function ChatbotWidget() {
   return (
     <>
       <Button
-        className="fixed bottom-4 right-4 h-16 w-16 rounded-full shadow-lg hidden md:inline-flex"
+        aria-label="Open MarigoAI"
+        className="fixed bottom-4 right-4 h-16 w-16 overflow-hidden rounded-full p-0 shadow-lg hidden md:inline-flex"
         size="icon"
         onClick={() => setIsOpen(true)}
       >
-        <Bot className="h-8 w-8" />
+        {/* The mark fills the button rather than sitting inside it — the icon's
+            own purple would otherwise disappear against the primary fill. */}
+        <MarigoMark className="h-full w-full" />
       </Button>
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
+        {/* hideClose: SheetContent renders its own X at right-4 top-4, which
+            collided with the one below at right-3 top-3 and read as a doubled
+            icon. Keep one, wrapped in SheetClose so Radix still owns closing. */}
+        <SheetContent side="right" hideClose className="w-full sm:max-w-md p-0 flex flex-col">
           <SheetHeader className="p-4 border-b text-left">
             <SheetTitle className="flex items-center gap-2">
-              <Bot className="h-5 w-5" />
+              <MarigoMark className="h-6 w-6" />
               MarigoAI
             </SheetTitle>
             <SheetDescription className="sr-only">
               Chat with MarigoAI for help with orders, sizing, and finding items.
             </SheetDescription>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-3 right-3 h-7 w-7"
-              onClick={() => setIsOpen(false)}
-            >
-              <X className="h-5 w-5 text-muted-foreground" />
-              <span className="sr-only">Close</span>
-            </Button>
+            <SheetClose asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2.5 right-2.5 h-9 w-9"
+              >
+                <X className="h-5 w-5 text-muted-foreground" />
+                <span className="sr-only">Close</span>
+              </Button>
+            </SheetClose>
           </SheetHeader>
           <ScrollArea className="flex-1" ref={scrollAreaRef}>
             <div className="p-4 space-y-4">
@@ -238,9 +258,7 @@ export function ChatbotWidget() {
               {messages.map((msg) => <ChatBubble key={msg.id} message={msg} />)}
               {isLoading && (
                 <div className="flex items-start gap-3">
-                  <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                    <Bot className="h-5 w-5 text-primary-foreground" />
-                  </div>
+                  <MarigoMark className="h-8 w-8 flex-shrink-0" />
                   <div className="bg-muted rounded-2xl rounded-bl-none px-4 py-3">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>

@@ -9,18 +9,18 @@ export default function LoginPage({ searchParams }: { searchParams?: { next?: st
   const next = searchParams?.next;
   const signupHref = next ? `/auth/signup?next=${encodeURIComponent(next)}` : '/auth/signup';
   return (
-    <div className="relative min-h-screen bg-background p-8 flex flex-col justify-center">
+    <div className="relative min-h-viewport-content bg-background px-6 py-8 flex flex-col justify-center">
         <Button asChild variant="ghost" size="icon" className="absolute top-4 right-4 z-10">
             <Link href="/auth">
                 <X className="h-6 w-6" />
             </Link>
         </Button>
         <div className="w-full max-w-md mx-auto">
-            <div className="text-center mb-8">
+            <div className="text-center mb-6">
               <h1 className="font-headline text-3xl">Sign In</h1>
               <p className="text-muted-foreground mt-2">Welcome back! Enter your details to sign in.</p>
             </div>
-            <div className="space-y-6">
+            <div className="space-y-5">
                 <LoginForm />
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
@@ -33,7 +33,7 @@ export default function LoginPage({ searchParams }: { searchParams?: { next?: st
                   </div>
                 </div>
                 <SocialButtons />
-                <div className="mt-4 text-center text-sm">
+                <div className="text-center text-sm">
                   Don&apos;t have an account?{' '}
                   <Link href={signupHref} className="underline">
                     Sign Up

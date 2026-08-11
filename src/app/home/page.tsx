@@ -35,7 +35,7 @@ function HomePageContent() {
 
   return (
     <div className="flex flex-col bg-background">
-      <div className="container mx-auto px-4 pt-4">
+      <div className="container mx-auto px-4 pt-2">
         <Suspense fallback={null}>
           <MacroFilters />
         </Suspense>
@@ -51,7 +51,7 @@ function HomePageContent() {
         <>
           {/* The "First Time?" promo now lives in <AnnouncementBar /> above the
               header, so it is not repeated here. */}
-          <div className="container mx-auto px-4 pt-4 pb-8 md:py-12 space-y-6 md:space-y-12">
+          <div className="container mx-auto px-4 pt-2 pb-8 md:pt-4 md:pb-12 space-y-6 md:space-y-12">
             <Suspense fallback={null}>
               <HomepageBlocks />
             </Suspense>

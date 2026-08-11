@@ -107,11 +107,15 @@ export default function MessagesPage() {
                     isAccepting={isAccepting}
                 />
             )}
-            <Card className="h-full">
-                <CardHeader>
-                    <CardTitle className="text-2xl font-bold">Messages</CardTitle>
+            <Card className="h-full flex flex-col rounded-none border-x-0 border-y-0 md:rounded-lg md:border">
+                <CardHeader className="flex-shrink-0 px-4 py-4 md:p-6">
+                    <CardTitle className="text-xl font-bold md:text-2xl">Messages</CardTitle>
                 </CardHeader>
-                <CardContent className="p-0 h-[calc(100%-4rem)] overflow-y-auto">
+                {/* Was h-[calc(100%-4rem)], which assumed a 4rem header — the
+                    real one is ~5.5rem, so the list ran past the card and the
+                    last conversation sat under the bottom nav. flex-1 + min-h-0
+                    measures whatever the header actually is. */}
+                <CardContent className="p-0 flex-1 min-h-0 overflow-y-auto overscroll-contain">
                     {isLoading ? (
                         <div className="space-y-2 p-4">
                             <ConversationSkeleton />
