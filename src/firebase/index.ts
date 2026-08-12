@@ -1,6 +1,6 @@
 'use client';
 
-import { firebaseConfig } from '@/firebase/config';
+import { assertFirebaseConfig, firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, initializeAuth, indexedDBLocalPersistence, type Auth } from 'firebase/auth';
 import { getFirestore, initializeFirestore, type Firestore } from 'firebase/firestore'
@@ -24,6 +24,12 @@ export function initializeFirebase() {
       if (process.env.NODE_ENV === "production") {
         console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
       }
+      // The no-arg path above only works on Firebase App Hosting, so every other
+      // host (Vercel, local dev) lands here and the config object has to be
+      // complete. Check before handing it to the SDK: an undefined value would
+      // otherwise fail much later as auth/invalid-api-key, repeated once per
+      // prerendered page with no indication of which variable is unset.
+      assertFirebaseConfig();
       firebaseApp = initializeApp(firebaseConfig);
     }
 
