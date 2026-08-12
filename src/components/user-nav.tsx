@@ -219,11 +219,16 @@ export function UserNav() {
             <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1.5">
               Support
             </DropdownMenuLabel>
-            <DropdownMenuItem asChild>
-              <Link href="/messages" className="flex items-center">
-                <MessageSquare className="mr-2 h-4 w-4" />
-                <span>Chat with us</span>
-              </Link>
+            {/* Opens the Marigo Support chat panel. It used to link to
+                /messages, which is the buyer↔seller inbox — nothing to do with
+                contacting support. The widget writes to `support_chats`, which
+                is what /admin/support reads. */}
+            <DropdownMenuItem
+              className="flex items-center"
+              onSelect={() => window.dispatchEvent(new Event('open-chatbot'))}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              <span>Chat with us</span>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/help" className="flex items-center">

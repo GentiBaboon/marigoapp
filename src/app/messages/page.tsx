@@ -107,7 +107,7 @@ export default function MessagesPage() {
                     isAccepting={isAccepting}
                 />
             )}
-            <Card className="h-full flex flex-col rounded-none border-x-0 border-y-0 md:rounded-lg md:border">
+            <Card className="flex min-h-0 flex-1 flex-col rounded-none border-x-0 border-y-0 md:rounded-lg md:border">
                 <CardHeader className="flex-shrink-0 px-4 py-4 md:p-6">
                     <CardTitle className="text-xl font-bold md:text-2xl">Messages</CardTitle>
                 </CardHeader>

@@ -1,5 +1,5 @@
 'use client';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -16,6 +16,12 @@ interface ChatHeaderProps {
 export function ChatHeader({ user, product, isTyping }: ChatHeaderProps) {
   const productImage = PlaceHolderImages.find(p => p.id === product.image);
   const imageUrl = productImage?.imageUrl || product.image;
+  // `product.image` is a placeholder *id* on older conversations. When it
+  // doesn't resolve to a real entry, the raw id falls through as the src —
+  // next/image can't use a bare token like "product-1", so it renders an <img>
+  // with an empty src and a broken-image tile. Only pass a real URL or an
+  // app-absolute path.
+  const hasUsableImage = /^(https?:\/\/|\/)/.test(imageUrl ?? '');
 
   return (
     <div className="flex items-center p-3 border-b bg-background/95 backdrop-blur sticky top-0 z-10 gap-1">
@@ -41,7 +47,11 @@ export function ChatHeader({ user, product, isTyping }: ChatHeaderProps) {
 
       <Link href={`/products/${product.id}`} className="ml-2 flex-shrink-0">
         <div className="relative h-10 w-10 bg-muted rounded-lg overflow-hidden border">
-          <Image src={imageUrl} alt={product.title} fill className="object-cover" sizes="40px" />
+          {hasUsableImage ? (
+            <Image src={imageUrl} alt={product.title} fill className="object-cover" sizes="40px" />
+          ) : (
+            <ImageIcon className="absolute inset-0 m-auto h-4 w-4 text-muted-foreground" />
+          )}
         </div>
       </Link>
     </div>

@@ -119,10 +119,16 @@ export default function RootLayout({
                 <CurrencyProvider>
                   <CartProvider>
                     <WishlistProvider>
-                      <div className="relative flex min-h-screen flex-col">
+                      {/* dvh, not vh: on iOS the visible viewport grows when
+                          Safari's toolbars collapse, and vh keeps reporting the
+                          expanded-toolbar height. */}
+                      <div className="relative flex min-h-[100dvh] flex-col">
                         <AnnouncementBar />
                         <Header />
-                        <main className="flex-1 pb-16 md:pb-0">{children}</main>
+                        {/* flex column so full-height pages can claim the
+                            leftover space with `flex-1` instead of subtracting
+                            a hardcoded guess at the chrome above them. */}
+                        <main className="flex flex-1 flex-col pb-16 md:pb-0">{children}</main>
                         <ChatbotWidget />
                         <MobileNav />
                         <ShoppingPreferenceModal />

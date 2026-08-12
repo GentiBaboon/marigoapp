@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/firebase';
+import { usePostAuthRedirect } from '@/hooks/use-post-auth-redirect';
 import { signInWithGoogle, signInWithApple } from '@/firebase/auth/actions';
 import { useToast } from '@/hooks/use-toast';
 import { Button, type ButtonProps } from '@/components/ui/button';
@@ -36,9 +37,7 @@ const AppleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 export function SocialButtons({ variant = 'outline', className }: { variant?: ButtonProps['variant'], className?: string}) {
   const [loading, setLoading] = useState<null | 'google' | 'apple'>(null);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const nextParam = searchParams.get('next');
-  const nextPath = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/home';
+  const nextPath = usePostAuthRedirect();
   const auth = useAuth();
   const { toast } = useToast();
 

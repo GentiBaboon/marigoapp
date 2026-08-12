@@ -23,14 +23,14 @@ export default function AuthGatePage() {
 
     if (isUserLoading || user) {
         return (
-            <div className="flex min-h-viewport-content w-full items-center justify-center bg-background">
+            <div className="flex flex-1 w-full items-center justify-center bg-background">
                 <div className="dot-flashing"></div>
             </div>
         );
     }
 
     return (
-        <div className="relative flex min-h-viewport-content w-full flex-col justify-end overflow-hidden text-white bg-black">
+        <div className="relative flex flex-1 w-full flex-col justify-end overflow-hidden text-white bg-black">
             {bgImage && (
                  <Image
                     src={bgImage.imageUrl}

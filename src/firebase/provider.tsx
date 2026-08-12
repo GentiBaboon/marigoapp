@@ -111,7 +111,13 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         // protected routes server-side (before JS loads). The cookie holds
         // no secrets — it's just a presence flag.
         if (firebaseUser) {
-          document.cookie = `marigo_auth=1; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict${location.protocol === 'https:' ? '; Secure' : ''}`;
+          // SameSite=Lax, not Strict: a Strict cookie is withheld on every
+          // cross-site arrival (an emailed link, a search result, a redirect
+          // from another domain), so the middleware saw no session and bounced
+          // a signed-in user to /auth/login. Lax still travels on top-level GET
+          // navigations — exactly what the route gate needs — while staying
+          // absent from cross-site POSTs, which is the CSRF case that matters.
+          document.cookie = `marigo_auth=1; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
         } else {
           document.cookie = 'marigo_auth=; path=/; max-age=0';
         }

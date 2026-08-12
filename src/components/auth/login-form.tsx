@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 import { loginSchema, type LoginValues } from '@/lib/types';
 import { useAuth } from '@/firebase';
+import { usePostAuthRedirect, useRedirectIfSignedIn } from '@/hooks/use-post-auth-redirect';
 import { signInWithEmail } from '@/firebase/auth/actions';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -25,9 +26,9 @@ import { Input } from '@/components/ui/input';
 export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const nextParam = searchParams.get('next');
-  const nextPath = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/home';
+  const nextPath = usePostAuthRedirect();
+  // Someone who is already signed in should never be shown this form.
+  useRedirectIfSignedIn();
   const auth = useAuth();
   const { toast } = useToast();
 

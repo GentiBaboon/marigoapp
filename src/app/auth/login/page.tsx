@@ -9,7 +9,7 @@ export default function LoginPage({ searchParams }: { searchParams?: { next?: st
   const next = searchParams?.next;
   const signupHref = next ? `/auth/signup?next=${encodeURIComponent(next)}` : '/auth/signup';
   return (
-    <div className="relative min-h-viewport-content bg-background px-6 py-8 flex flex-col justify-center">
+    <div className="relative flex flex-1 flex-col justify-center bg-background px-6 py-8">
         <Button asChild variant="ghost" size="icon" className="absolute top-4 right-4 z-10">
             <Link href="/auth">
                 <X className="h-6 w-6" />

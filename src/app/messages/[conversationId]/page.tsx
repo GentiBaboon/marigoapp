@@ -127,7 +127,7 @@ export default function ChatPage({ params }: { params: { conversationId: string 
 
   if (isConversationLoading) {
     return (
-      <Card className="h-full flex flex-col rounded-none border-x-0 border-y-0 md:rounded-lg md:border">
+      <Card className="flex min-h-0 flex-1 flex-col rounded-none border-x-0 border-y-0 md:rounded-lg md:border">
         <ChatSkeleton />
       </Card>
     );
@@ -139,7 +139,7 @@ export default function ChatPage({ params }: { params: { conversationId: string 
   return (
     // Edge-to-edge on a phone: rounded corners and side borders only make
     // sense once the card is inset from the viewport at md.
-    <Card className="h-full flex flex-col overflow-hidden rounded-none border-x-0 border-y-0 md:rounded-lg md:border">
+    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-x-0 border-y-0 md:rounded-lg md:border">
       {otherUser && conversation && (
         <ChatHeader
           user={otherUser}
