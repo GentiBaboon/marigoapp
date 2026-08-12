@@ -12,6 +12,12 @@
 
 # testing
 /coverage
+# Playwright output — only populated when a run fails, so it stays invisible
+# until the day someone `git add -A`s a red run.
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
 
 # next.js
 /.next/

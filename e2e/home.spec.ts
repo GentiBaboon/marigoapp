@@ -5,10 +5,14 @@ test.describe('Home Page', () => {
     await page.goto('/');
   });
 
-  test('page loads with "marigo" header text', async ({ page }) => {
+  test('page loads with the marigo logo in the header', async ({ page }) => {
     const header = page.locator('header');
     await expect(header).toBeVisible();
-    await expect(header.getByText('marigo')).toBeVisible();
+    // The wordmark is an <Image>, not text. Matched by attribute rather than
+    // getByRole: the shopping-preference modal opens on a first visit and
+    // Radix marks the rest of the page aria-hidden, so role-based locators
+    // find nothing behind it.
+    await expect(header.locator('img[alt="Marigo"]')).toBeVisible();
   });
 
   test('"Shop by Category" section is visible', async ({ page }) => {
@@ -34,7 +38,9 @@ test.describe('Home Page', () => {
   test('footer is visible', async ({ page }) => {
     const footer = page.locator('footer');
     await expect(footer).toBeVisible();
-    // Use exact text match to avoid strict mode violation
-    await expect(footer.locator('h3', { hasText: 'marigo' })).toBeVisible();
+    // Same as the header: the brand is the logo image, and the column
+    // headings are Shop / About / Newsletter.
+    await expect(footer.locator('img[alt="Marigo"]')).toBeVisible();
+    await expect(footer.locator('h3').filter({ hasText: 'Shop' })).toBeVisible();
   });
 });
