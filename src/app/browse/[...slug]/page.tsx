@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useCatalog } from '@/hooks/use-catalog';
 import { collection } from 'firebase/firestore';
 import type { FirestoreCategory, FirestoreBrand } from '@/lib/types';
 
@@ -52,11 +53,7 @@ export default function CategoryDetailPage() {
   );
   const { data: allCategories, isLoading: catsLoading } = useCollection<FirestoreCategory>(categoriesQ);
 
-  const brandsQ = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'brands') : null),
-    [firestore],
-  );
-  const { data: brands } = useCollection<FirestoreBrand>(brandsQ);
+  const { data: brands } = useCatalog<FirestoreBrand>('brands');
 
   const parentCategory = React.useMemo(
     () => allCategories?.find((c) => !c.parentId && c.slug === categorySlug),

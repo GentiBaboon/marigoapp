@@ -22,6 +22,50 @@ function ProductCardSkeleton() {
     )
 }
 
+/**
+ * Cache for the AI recommendation call, keyed by the taste profile that
+ * produced it.
+ *
+ * This is the only AI call on the highest-traffic page in the app, and the
+ * Google free tier allows 20 generations *per day* for the whole project — so
+ * without this, a handful of homepage visits by one signed-in shopper exhausts
+ * the quota for every other feature, chat included.
+ *
+ * sessionStorage rather than a module variable so it survives navigation and
+ * reloads, and rather than localStorage so a long-lived browser still refreshes
+ * its picks eventually.
+ */
+const RECS_CACHE_KEY = 'marigo_reco_cache_v1';
+
+type CachedRecommendation = { key: string; query: unknown; reasoning?: string };
+
+function tasteKey(input: RecommendationInput, gender: string | null): string {
+    return JSON.stringify({
+        b: [...(input.wishlistedBrands ?? [])].sort(),
+        c: [...(input.wishlistedCategories ?? [])].sort(),
+        g: gender ?? '',
+    });
+}
+
+function readCachedRecommendation(key: string): CachedRecommendation | null {
+    try {
+        const raw = sessionStorage.getItem(RECS_CACHE_KEY);
+        if (!raw) return null;
+        const cached = JSON.parse(raw) as CachedRecommendation;
+        return cached?.key === key ? cached : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeCachedRecommendation(entry: CachedRecommendation): void {
+    try {
+        sessionStorage.setItem(RECS_CACHE_KEY, JSON.stringify(entry));
+    } catch {
+        // Private mode or a full quota — losing the cache only costs a retry.
+    }
+}
+
 export function PersonalizedPicks() {
     const { user } = useUser();
     const firestore = useFirestore();
@@ -70,19 +114,37 @@ export function PersonalizedPicks() {
                     return;
                 }
 
-                // 2. Get AI recommendations — this is the slowest call, so fire it now
-                //    and fetch products in parallel once we have the query back.
-                const recommendationQuery = await getRecommendations(tasteProfile);
+                // 2. Get AI recommendations. Reuse the cached answer when the
+                //    taste profile has not changed — the same wishlist always
+                //    produces the same query, and generations are the scarcest
+                //    resource in the app (20/day for the whole project).
+                const key = tasteKey(tasteProfile, gender);
+                const cached = readCachedRecommendation(key);
+                const recommendationQuery = cached
+                    ? { query: cached.query as Awaited<ReturnType<typeof getRecommendations>>['query'], reasoning: cached.reasoning }
+                    : await getRecommendations(tasteProfile);
+
+                if (!cached) {
+                    writeCachedRecommendation({
+                        key,
+                        query: recommendationQuery.query,
+                        reasoning: recommendationQuery.reasoning,
+                    });
+                }
 
                 // 3. Build and fetch recommended products
                 const queryConstraints: QueryConstraint[] = [
                   where('status', 'in', ['active', 'reserved', 'sold']),
                 ];
 
+                // `brandId` / `categoryId` — NOT `brand` / `category`. Product
+                // documents have never carried the short names, so the old
+                // filters matched nothing and this section silently rendered
+                // empty while still paying for the AI call above.
                 if (recommendationQuery.query.brands && recommendationQuery.query.brands.length > 0) {
-                    queryConstraints.push(where('brand', 'in', recommendationQuery.query.brands.slice(0, 10)));
+                    queryConstraints.push(where('brandId', 'in', recommendationQuery.query.brands.slice(0, 10)));
                 } else if (recommendationQuery.query.categories && recommendationQuery.query.categories.length > 0) {
-                    queryConstraints.push(where('category', 'in', recommendationQuery.query.categories.slice(0, 10)));
+                    queryConstraints.push(where('categoryId', 'in', recommendationQuery.query.categories.slice(0, 10)));
                 }
 
                 if (queryConstraints.length <= 1) {

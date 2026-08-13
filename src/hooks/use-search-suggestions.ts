@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 
+import { loadCatalogCollection, type CatalogCollection } from '@/lib/catalog-cache';
 import { useFirestore } from '@/firebase';
 import type {
   FirestoreAttribute,
@@ -91,20 +92,21 @@ function loadSearchIndex(firestore: NonNullable<ReturnType<typeof useFirestore>>
   // Concurrent mounts (mobile + desktop headers) share one round-trip.
   if (indexInFlight) return indexInFlight;
 
-  const read = async <T,>(name: string): Promise<T[]> => {
-    const snap = await getDocs(collection(firestore, name));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as T);
-  };
+  // Catalog collections come from the shared session cache, so the overlay
+  // reuses whatever the page already loaded instead of pulling its own copy of
+  // the same ~560 documents. Only the product pool is fetched here.
+  const read = <T extends { id: string }>(name: CatalogCollection): Promise<T[]> =>
+    loadCatalogCollection<T>(firestore, name);
 
   indexInFlight = (async () => {
     const [brands, categories, colors, materials, conditions, patterns, productsSnap] =
       await Promise.all([
         read<FirestoreBrand>('brands'),
         read<FirestoreCategory>('categories'),
-        read<CatalogAttribute>('colors'),
-        read<CatalogAttribute>('materials'),
-        read<CatalogAttribute>('conditions'),
-        read<CatalogAttribute>('patterns'),
+        read<CatalogAttribute & { id: string }>('colors'),
+        read<CatalogAttribute & { id: string }>('materials'),
+        read<CatalogAttribute & { id: string }>('conditions'),
+        read<CatalogAttribute & { id: string }>('patterns'),
         getDocs(
           query(
             collection(firestore, 'products'),

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useCatalog } from '@/hooks/use-catalog';
 import type { FirestoreProduct, FirestoreCategory } from '@/lib/types';
 import { useShoppingPreference } from '@/hooks/use-shopping-preference';
 import { ProductCard } from '@/components/product-card';
@@ -25,11 +26,9 @@ export function CategoriesSection() {
   const firestore = useFirestore();
   const gender = useShoppingPreference();
 
-  const categoriesQuery = useMemoFirebase(
-    () => collection(firestore, 'categories'),
-    [firestore]
-  );
-  const { data: categories, isLoading: categoriesLoading } = useCollection<FirestoreCategory>(categoriesQuery);
+  // Cached catalog read — this ran on every homepage visit for 127 docs of
+  // data that changes when an admin edits it, not while you shop.
+  const { data: categories, isLoading: categoriesLoading } = useCatalog<FirestoreCategory>('categories');
 
   // Top 100 by views. Include reserved alongside active so shoppers see them
   // labelled "Reserved" instead of vanishing from category tabs.

@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { Slider } from '@/components/ui/slider';
+import { useCatalog } from '@/hooks/use-catalog';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import {
   collection, query, where, orderBy,
@@ -50,11 +51,11 @@ function Skeleton4() {
   );
 }
 
-function useAttributeData(firestore: ReturnType<typeof useFirestore>) {
-  const brandsQ = useMemoFirebase(() => (firestore ? collection(firestore, 'brands') : null), [firestore]);
-  const { data: brands } = useCollection<FirestoreBrand>(brandsQ);
-  const categoriesQ = useMemoFirebase(() => (firestore ? collection(firestore, 'categories') : null), [firestore]);
-  const { data: categories } = useCollection<FirestoreCategory>(categoriesQ);
+function useAttributeData(_firestore: ReturnType<typeof useFirestore>) {
+  // Shares the same cached copy the filter sidebar uses — this used to be a
+  // second pair of live listeners on brands and categories in the same page.
+  const { data: brands } = useCatalog<FirestoreBrand>('brands');
+  const { data: categories } = useCatalog<FirestoreCategory>('categories');
   return { brands: brands ?? [], categories: categories ?? [] };
 }
 
@@ -241,25 +242,20 @@ function FilterSheet({
   const searchParams = useSearchParams();
   const firestore = useFirestore();
 
-  // Load attribute collections from Firestore
-  const categoriesQ = useMemoFirebase(() => (firestore ? collection(firestore, 'categories') : null), [firestore]);
-  const { data: allCategories } = useCollection<FirestoreCategory>(categoriesQ);
-  const brandsQ = useMemoFirebase(() => (firestore ? collection(firestore, 'brands') : null), [firestore]);
-  const { data: brands } = useCollection<FirestoreBrand>(brandsQ);
-  const conditionsQ = useMemoFirebase(() => (firestore ? collection(firestore, 'conditions') : null), [firestore]);
-  const { data: conditions } = useCollection<FirestoreAttribute>(conditionsQ);
-  const colorsQ = useMemoFirebase(() => (firestore ? collection(firestore, 'colors') : null), [firestore]);
-  const { data: colors } = useCollection<FirestoreAttribute>(colorsQ);
-  const materialsQ = useMemoFirebase(() => (firestore ? collection(firestore, 'materials') : null), [firestore]);
-  const { data: materials } = useCollection<FirestoreAttribute>(materialsQ);
-  const patternsQ = useMemoFirebase(() => (firestore ? collection(firestore, 'patterns') : null), [firestore]);
-  const { data: patterns } = useCollection<FirestoreAttribute>(patternsQ);
+  // Catalog reference data, from the shared session cache rather than seven
+  // live listeners. See src/lib/catalog-cache.ts — this page alone was reading
+  // ~600 documents of slow-moving data on every visit.
+  const { data: allCategories } = useCatalog<FirestoreCategory>('categories');
+  const { data: brands } = useCatalog<FirestoreBrand>('brands');
+  const { data: conditions } = useCatalog<FirestoreAttribute>('conditions');
+  const { data: colors } = useCatalog<FirestoreAttribute>('colors');
+  const { data: materials } = useCatalog<FirestoreAttribute>('materials');
+  const { data: patterns } = useCatalog<FirestoreAttribute>('patterns');
 
   // Size charts feed the Size facet — sizes shown depend on the selected
   // parent category (and size system if any), so the buyer only sees the
   // values that actually apply.
-  const sizeChartsQ = useMemoFirebase(() => (firestore ? collection(firestore, 'size_charts') : null), [firestore]);
-  const { data: sizeChartsRaw } = useCollection<{ id: string; categoryType: string; sizeSystem: string; sizes: string[]; isActive?: boolean }>(sizeChartsQ);
+  const { data: sizeChartsRaw } = useCatalog<{ id: string; categoryType: string; sizeSystem: string; sizes: string[]; isActive?: boolean }>('size_charts');
 
   // Local draft state
   const buildDraftFromParams = React.useCallback(

@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Plus, Edit, Trash2, Loader2, Save } from 'lucide-react';
 import { useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
+import { invalidateCatalog } from '@/lib/catalog-cache';
 import { doc, collection, query, orderBy, updateDoc, addDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import type { FirestoreSettings, FirestoreCategory, FirestoreBrand, FirestoreAttribute } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -450,6 +451,13 @@ const GeneralSettingsTab = ({
 export default function AdminSettingsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
+
+  // This page edits the catalog (categories, brands, colours, materials,
+  // patterns, size charts), which the storefront reads from a session cache.
+  // Drop that cache on the way out so the admin sees their own edits when they
+  // go and look at the shop, instead of a copy up to 30 minutes stale.
+  // The editing UI itself still uses live listeners, so it is always current.
+  React.useEffect(() => () => invalidateCatalog(), []);
 
   // Data fetching
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'global') : null, [firestore]);

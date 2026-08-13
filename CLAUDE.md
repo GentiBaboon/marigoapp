@@ -69,16 +69,17 @@ Locale: `<html lang="sq">`, but `LanguageContext` **defaults to `en`** and the p
 ├── e2e/                         # admin, auth, home, search specs
 ├── functions/                   # Firebase Cloud Functions — one 900-line src/index.ts
 ├── scripts/                     # set-admin-role.ts, set-super-admin.mjs, seed-brands.mjs, delete-no-photo-products.*
-├── public/                      # manifest, icons, logo, sitemap, sw assets
+├── public/                      # manifest, icons, logo, favicon.ico, marigo-ai-avatar.png, sitemap, sw
 └── src/
     ├── middleware.ts            # Edge middleware — auth gate + CSRF
-    ├── app/                     # Next App Router tree
-    ├── ai/                      # Genkit config + flows
+    ├── app/                     # Next App Router tree (+ icon.png / apple-icon.png conventions)
+    ├── ai/                      # Genkit config, models.ts (failover), flows
     ├── components/              # Feature + UI components
     ├── context/                 # Cart / Wishlist / Currency / Language providers
     ├── firebase/                # Client SDK init + hooks + provider + error emitter
-    ├── hooks/                   # admin/courier auth, search suggestions, preferences, …
-    ├── lib/                     # Types, order lifecycle, permissions, rate-limit, env, i18n JSON
+    ├── hooks/                   # admin/courier auth, search suggestions, preferences, visual viewport
+    ├── lib/                     # Types, order lifecycle, permissions, rate-limit, env, i18n JSON,
+    │                            #   chat-{knowledge,lexicon,retrieval}, listing-taxonomy, firestore-rest
     ├── services/                # ProductService / OrderService / UserService / image upload
     └── __tests__/               # Vitest setup + tests
 ```
@@ -88,7 +89,10 @@ Locale: `<html lang="sq">`, but `LanguageContext` **defaults to `en`** and the p
 **`/` is a splash screen that `router.replace('/home')`** — `/home` is the real homepage (client component, reads `?macroFilter=`). Don't add homepage content to `src/app/page.tsx`.
 
 Public:
-- `/` (splash) → `/home` (New Arrivals, Recently Viewed, Personalized Picks, Categories, MacroFilters, HomepageBlocks)
+- `/` (splash) → `/home`. Section order is deliberate and lives in `src/app/home/page.tsx`: MacroFilters → HomepageBlocks → Personalized Picks → **Shop by Category** → **New In** → **50% OFF Preowned** → **Last Viewed**. Last Viewed is pinned last — it is a way back to something already seen, so it sits below everything still being discovered. Every section returns `null` when it has nothing to show, so the page has no empty headings.
+  - Component names lag the headings: `NewArrivalsSection` renders "New In" and `RecentlyViewedSection` renders "Last Viewed".
+  - `DiscountedSection` ("50% OFF Preowned") filters on a **computed** discount, which Firestore cannot query — it pulls a 100-row pool and works out `(originalPrice − price) / originalPrice` per item, deepest markdown first. Threshold is **≥49%**, not 50, so an item at 35 ← 69 (49.3%) still qualifies. Sold listings are excluded here, unlike other rails: a half-price item you cannot buy is worse than one fewer card.
+  - Passing `?macroFilter=<id>` replaces the whole stack with `MacroFilteredProducts`.
 - `/about`, `/help`, `/privacy`, `/terms`
 - `/browse` and `/browse/[...slug]` — filtered browsing (category/price/etc. via URL segments + params)
 - `/search` — search results, backed by the smart-search AI flow; overlay lives in `components/search/search-overlay.tsx`
@@ -216,7 +220,18 @@ The seller picks **List with AI Assistant** at the top of `/sell`, adds up to 9 
 
 Firestore REST plumbing shared by the chatbot and the taxonomy loader lives in `src/lib/firestore-rest.ts`.
 
-### The chatbot (`/api/chat` + `components/ai/ChatbotWidget`)
+### Marigo, the AI shopping assistant (`/api/chat` + `components/ai/ChatbotWidget`)
+
+Presented as **"Marigo — AI Shopping Assistant"** with a character avatar
+(`public/marigo-ai-avatar.png`), not a support bot. She greets signed-in
+visitors by their Marigo profile name ("Hi Gigis Closet!") in Albanian or
+English per the site locale, and that name is passed to the model so she can
+use it mid-conversation.
+
+The avatar is used **uncropped** — the artwork already fills its square, so the
+round mask takes only the bottom corners of her suit. Cropping it first (even
+centred) sliced the top off her hair; padding it to clear the circle entirely
+left her floating in white. Don't "fix" the framing.
 
 A turn is **retrieve → generate → sanitize**:
 
@@ -225,8 +240,12 @@ A turn is **retrieve → generate → sanitize**:
    - Matching runs over `title`, brand, category, sub-category, colour, material, condition, size, pattern **and `description`** — so a term that only appears in the seller's prose still finds the listing.
    - Matching prefers listings answering *every* term, then falls back to the best partial ones flagged `isApproximate`, so the assistant offers similar items instead of "we have nothing". Product-type terms (`GARMENT_TERMS`) are decisive in that fallback — "fustan te zi" with no black dress in stock must offer other dresses, never a black belt.
    - `parsePriceFilter()` handles "nën 50 euro" / "under 20" / "mbi 100" / "diçka e lirë". It parses the **normalised** message: JS `\b` is ASCII-only, so `/\blire\b/` never matches "lirë" in raw text. Listings priced `0` are excluded from price queries — offering a €0 item as "cheapest" is worse than omitting it.
+   - **Tokens shorter than 4 characters must match a whole word.** Substring matching on them is nearly always a false positive: "Si je?" ("how are you?") was returning Calvin Klein **Je**ans. Small-talk vocabulary is also in `STOP_WORDS`, so greetings never reach retrieval at all.
    - **Extend the lexicon whenever the catalog gains vocabulary**, or Albanian searches for it will silently return nothing.
-2. One grounded generation. The prompt carries `src/lib/chat-knowledge.ts` (platform facts + persona), the retrieved listings, and whether the visitor is signed in — so it answers "how do I sell?" with a sign-up link first when signed out. It replies in the language the visitor wrote in.
+2. One grounded generation. The prompt carries `src/lib/chat-knowledge.ts` — platform facts plus `CHAT_PERSONA` — the retrieved listings, the visitor's name, and whether they are signed in, so it answers "how do I sell?" with a sign-up link first when signed out.
+   - **Tone is taught with worked examples, not adjectives.** `CHAT_PERSONA` carries four sample exchanges (both languages); models copy demonstrated voice far more reliably than described voice.
+   - A **"Hard rules" block explicitly outranks the personality**. An enthusiastic assistant is precisely the kind that invents stock to be helpful, so "never describe a listing outside the retrieved results" has to beat "be warm and confident".
+   - The **answer language is decided in code**, by `detectChatLanguage()`, and handed to the model as `REPLY LANGUAGE`. Asking the model to mirror the visitor was unreliable — English questions came back in Albanian, because the surrounding prompt is full of Albanian. The site locale only breaks ties on messages with no language signal ("Gucci?").
 3. `sanitizeChatLinks()` allow-lists every link before it reaches the browser. The model chooses links, so they are untrusted: absolute URLs, `//host`, `javascript:` and backslash bypasses are dropped. Covered by `src/__tests__/lib/chat-knowledge.test.ts`, including a guard that the knowledge prose only cites allow-listed routes.
 
 Degradation is deliberate: if generation fails but retrieval succeeded, the route still returns the products with a bilingual lead-in rather than an error.
@@ -263,6 +282,9 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 - Path alias `@/*` → `src/*`.
 - Forms: React Hook Form + `zodResolver`; schemas colocated with types in `src/lib/types.ts`.
 - Data fetching: `src/firebase/firestore/use-collection.tsx` / `use-doc.tsx` (+ `useMemoFirebase` for stable refs); auth actions in `src/firebase/auth/actions.ts`; `FirebaseClientProvider` wraps the tree.
+- **`useCollection` opens a live `onSnapshot` listener.** Every component that mounts one pays a full read of its result set, and two components reading the same collection pay twice. Use it for data that genuinely changes under the user — products, orders, messages, notifications.
+- **Catalog reference data goes through `useCatalog()`** (`src/hooks/use-catalog.ts`, backed by `src/lib/catalog-cache.ts`), never `useCollection`. `brands` (141), `categories` (127), `colors` (97), `materials` (107), `patterns` (92), `conditions` (4) and `size_charts` (20) total ~588 documents — twenty-plus times the product collection — and change only when an admin edits them. They are now fetched once per session with `getDocs`, shared by every consumer and persisted to `sessionStorage`. `/search` alone was reading ~836 documents per visit, including `brands` and `categories` **twice** in the same render.
+  - Trade-off: catalog edits are not live in an open shopper tab; they land on the next session or after the 30-minute TTL. `/admin/settings` calls `invalidateCatalog()` on unmount so an admin sees their own edits, and admin screens keep live listeners.
 - Provider order in `src/app/layout.tsx`: Firebase → Language → Currency → Cart → Wishlist.
 - Layout: root uses `min-h-[100dvh]` (not `vh` — iOS reports the expanded-toolbar height) with `<main className="flex flex-1 flex-col">` so full-height pages claim leftover space via `flex-1` instead of subtracting a hardcoded chrome height.
 - Order status is modelled audience-aware in `src/lib/order-status.ts`: `STATUS_RANK`, `statusLabel(status, 'buyer'|'seller'|'admin')`, `TIMELINE_STEPS` / `TIMELINE_STEPS_SELLER`, `nextSellerTransition` / `nextAdminTransition`.
@@ -271,7 +293,8 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 - Admin tables are a repeated shadcn + `@tanstack/react-table` pattern: `data-table.tsx` + `columns.tsx` + `data-table-toolbar.tsx` + `data-table-pagination.tsx` (+ `row-actions`) per domain (`products`, `orders`, `users`, `finance`, `logs`, `logistics/courier-table`). Copy an existing folder rather than inventing a new shape. CSV export via `src/lib/csv-export.ts`.
 - Admin charts in `components/admin/charts/` use `recharts` + `components/ui/chart.tsx`.
 - i18n: `src/lib/translations/{en,sq}.json` via `LanguageContext` (`it.json` is dormant); preference persisted to a cookie and to the user doc.
-- Currency: `CurrencyContext` + `config/exchangeRates` (EUR base; ALL / USD), persisted to `marigo_currency` cookie + user doc. Prices are stored in EUR — always format via `formatPrice`.
+- Currency: `CurrencyContext` + `config/exchangeRates` (EUR base; ALL / USD), persisted to `marigo_currency` cookie + user doc. Prices are stored in EUR — always format via `formatPrice`. **`DEFAULT_CURRENCY` is `ALL`** (the primary market is Albania); a saved cookie or user preference still wins. This is display only — storage, payouts, Stripe amounts and the admin/finance dashboards stay in EUR.
+- Favicons follow the **App Router icon convention**: `src/app/icon.png` and `src/app/apple-icon.png`, with `public/favicon.ico` for clients that probe that path directly. Do not add a `src/app/favicon.ico` — it is served at `/favicon.ico` and beats any `<link rel="icon">` in `layout.tsx`, which is what kept the old orange mark on screen. Both icon routes are excluded in `next-sitemap.config.js`, or they get listed as pages.
 - Mobile-first: bottom `MobileNav` (Home/Search/Cart/Favorites/Profile), hidden ≥ md; header popovers for cart/messages/notifications.
 - Error reporting: `src/lib/error-reporter.ts` (`reportError`, `reportWarning`) + `FirebaseErrorListener` mounted globally, fed by `src/firebase/error-emitter.ts`.
 
@@ -294,7 +317,9 @@ Functions (inside `functions/`): `npm run build` (tsc), `npm run serve` (build +
 
 Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`.
 
-Current tests: unit/component — `admin-permissions`, `cookies`, `csv-export`, `error-reporter`, `rate-limit`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (136 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `rate-limit`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
+
+The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
 ## 11. CI (`.github/workflows/ci.yml`)
 
@@ -331,6 +356,13 @@ SITE_URL                      # optional; overrides the marigoapp.com default
 - The commission/hold defaults exist twice (`src/lib/types.ts` and `functions/src/index.ts`). Changing one without the other silently diverges the UI from the payout math.
 - Cloud Functions requiring public invocation (`handleStripeWebhook`) are currently blocked by org policy — see §8 before assuming a webhook fires.
 - `src/lib/mock-data.ts` (~326 lines of sample products, brands, sizes) is still imported in places; check whether a value is real Firestore data or mock before relying on it.
+- **Product documents carry `brandId` / `categoryId`, never `brand` / `category`.** `PersonalizedPicks` filtered on the short names for a long time, so it matched nothing and rendered empty — while still spending a Gemini generation on every signed-in homepage load. Check the field name against `FirestoreProduct` before writing a `where()`.
+- Any AI call on a high-traffic page needs a cache. `PersonalizedPicks` keys its recommendation on the taste profile in `sessionStorage`; without that, a few homepage visits by one shopper exhaust the project's daily generation quota for chat and listing too.
 - **Gemini models get retired without notice** and then 404. Never hardcode a model id in a route — use `TEXT_MODEL`/`generateText()` from `src/ai/models.ts`, or set `GENAI_TEXT_MODEL` to recover without a deploy.
 - **The Google AI free tier caps generation at ~20 requests before 429ing** (`generate_content_free_tier_requests`). That is well below real chat traffic, so production needs billing enabled on the GCP project. The chat route degrades to retrieval-only results rather than erroring, which makes the ceiling easy to miss — check the server log for `RESOURCE_EXHAUSTED` if replies suddenly read like canned copy.
 - Radix `Sheet` panels are `inset-y-0 h-full`, i.e. sized to the **layout** viewport, which iOS does not shrink for the on-screen keyboard — Safari scrolls the panel instead and the header disappears. `useVisualViewport()` (`src/hooks/use-visual-viewport.ts`) pins a panel to the visual viewport; the chatbot uses it. Any other full-height sheet with a text input needs the same treatment.
+- Implicit form submission on Enter does **not** survive inside a Radix dialog — it handles keydown at the root. Chat-style inputs there need an explicit `onKeyDown` (guarding `shiftKey` and `isComposing`), or the send button becomes the only way to submit.
+- Text inputs inside a sheet should be **≥16px**: below that, iOS Safari zooms the page on focus and shoves the panel sideways.
+- **Never run `npm run build` while `npm run dev` is running.** The production build overwrites `.next`, and the dev server then 404s every `_next/static/*` chunk — the page renders as unstyled HTML with no error in the terminal. Fix: stop dev, `rm -rf .next`, restart.
+- `AuthenticityBadge` returns `null` for products without a completed check. Don't wrap it in a padded container — the wrapper still renders and leaves phantom space. Prefer a flex `gap` so an absent child contributes nothing.
+- `next/image` will not serve larger than the `width`/`height` props, whatever the source file holds. A 320px source declared as `width={128}` renders soft on a 64px retina button.
