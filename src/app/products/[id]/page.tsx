@@ -28,6 +28,7 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProductCard } from '@/components/product-card';
 import { cn } from '@/lib/utils';
+import { useRecordProductView } from '@/hooks/use-recently-viewed';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { MakeOfferSheet } from '@/components/product/make-offer-sheet';
@@ -41,6 +42,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrency } from '@/context/CurrencyContext';
 import { AuthenticityBadge } from '@/components/product/AuthenticityBadge';
 import { RelatedProducts } from '@/components/product/RelatedProducts';
+import { RecentlyViewedSection } from '@/components/home/RecentlyViewedSection';
 import { SellerBadge } from '@/components/SellerBadge';
 import { SizeGuide } from '@/components/product/SizeGuide';
 
@@ -116,6 +118,11 @@ export default function ProductDetailPage() {
         setCurrent(api.selectedScrollSnap() + 1);
         api.on('select', () => setCurrent(api.selectedScrollSnap() + 1));
     }, [api]);
+
+    // Remember this product for the shopper's own "Last Viewed" rail. Separate
+    // from the counter below: that one is the listing's public view count, this
+    // one is personal history, and until now nothing recorded it at all.
+    useRecordProductView(product?.id);
 
     // Bump the product's view count once per browser session. Sellers don't
     // inflate their own views, and a session-storage key per product means
@@ -270,7 +277,8 @@ export default function ProductDetailPage() {
                           <p className="text-base text-muted-foreground line-through">
                             {formatPrice(product.originalPrice!)}
                           </p>
-                          <span className="text-xs font-bold text-green-700 bg-green-50 rounded px-2 py-0.5">
+                          {/* Matched to the price beside it, as on the cards. */}
+                          <span className="text-2xl font-bold text-green-700 bg-green-50 rounded px-2 py-0.5">
                             −{pct}%
                           </span>
                         </>
@@ -412,6 +420,12 @@ export default function ProductDetailPage() {
         </div>
   
         <RelatedProducts product={product} />
+
+        {/* Matches RelatedProducts' own padding — the page body is edge-to-edge
+            on mobile, so a section without it would sit flush to the screen. */}
+        <div className="px-4 md:px-0 mt-12">
+          <RecentlyViewedSection excludeId={product.id} />
+        </div>
 
         <MakeOfferSheet
           isOpen={isOfferSheetOpen}

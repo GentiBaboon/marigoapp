@@ -7,6 +7,7 @@ import { RecentlyViewedSection } from '@/components/home/RecentlyViewedSection';
 import { PersonalizedPicks } from '@/components/home/PersonalizedPicks';
 import { CategoriesSection } from '@/components/home/CategoriesSection';
 import { DiscountedSection } from '@/components/home/DiscountedSection';
+import { FavoritesSection } from '@/components/home/FavoritesSection';
 import { MacroFilters } from '@/components/home/MacroFilters';
 import { HomepageBlocks } from '@/components/home/HomepageBlocks';
 import { MacroFilteredProducts } from '@/components/home/MacroFilteredProducts';
@@ -69,9 +70,13 @@ function HomePageContent() {
             <Suspense fallback={<SectionSkeleton />}>
               <DiscountedSection />
             </Suspense>
-            {/* Last Viewed stays last on purpose: it is a way back to
-                something you already saw, so it should sit below everything
-                still being discovered. */}
+            {/* The two personal rails close the page: both are ways back to
+                something the shopper already chose, so they sit below
+                everything still being discovered. Each renders nothing when
+                empty, so a new visitor never sees a bare heading. */}
+            <Suspense fallback={<SectionSkeleton />}>
+              <FavoritesSection />
+            </Suspense>
             <Suspense fallback={<SectionSkeleton />}>
               <RecentlyViewedSection />
             </Suspense>
