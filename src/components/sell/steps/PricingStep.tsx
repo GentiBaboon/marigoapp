@@ -147,8 +147,10 @@ export function PricingStep() {
         <div className="space-y-2">
           <div className="flex items-baseline justify-between">
             <Label htmlFor="originalPrice" className="text-sm font-semibold">Original price <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            {/* Sized with the label opposite it, not a price — this row of the
+                sell form has no price figure to match. */}
             {hasDiscount && (
-              <span className="text-xs font-bold text-green-700">−{discountPercent}% off</span>
+              <span className="text-sm font-bold text-green-700">−{discountPercent}% off</span>
             )}
           </div>
           <div className="relative">

@@ -110,7 +110,10 @@ export const ProductCard = React.memo(function ProductCard({ product, className 
                     <p className="text-[10px] text-muted-foreground line-through">
                       {formatPrice(product.originalPrice!)}
                     </p>
-                    <span className="text-[9px] font-bold text-green-700">
+                    {/* Same size as the price it sits beside — at 9px the
+                        saving was the least readable number on the card, which
+                        is backwards for the one figure meant to sell the item. */}
+                    <span className="text-sm font-bold text-green-700">
                       −{pct}%
                     </span>
                   </>
