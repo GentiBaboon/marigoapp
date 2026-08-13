@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, SendHorizonal, User, X, ArrowRight } from 'lucide-react';
-import { useUser, useFirestore, errorEmitter } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase, errorEmitter } from '@/firebase';
 import { chatWithAI } from '@/ai/flows/ai-chat';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
+import type { FirestoreUser } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { z } from 'zod';
 import { MessageSchema, type ChatLink } from '@/ai/flows/ai-chat';
@@ -33,17 +34,27 @@ interface ChatMessage {
 }
 
 /**
- * The Marigo app icon, standing in for the generic robot glyph everywhere the
- * assistant identifies itself. Decorative by default — every placement sits
- * next to the "MarigoAI" label or a message that already names the sender.
+ * Marigo's face — the assistant has a character rather than a robot glyph, so
+ * she reads as someone helping you shop.
+ *
+ * Decorative by default: every placement sits next to the "Marigo" label or a
+ * message that already names the sender, so an alt text would just be noise
+ * repeated on each bubble.
  */
 function MarigoMark({ className }: { className?: string }) {
   return (
     <Image
-      src="/app-icon.png"
+      src="/marigo-ai-avatar.png"
       alt=""
-      width={64}
-      height={64}
+      // 320, not 128: the floating button renders her at 80px, so a 128px
+      // source was being upscaled on retina and looked soft.
+      width={320}
+      height={320}
+      // The artwork uncropped. It is already framed for this — she fills the
+      // square, so the round mask takes only the bottom corners of her suit
+      // and her head stays whole. Every attempt to "improve" the framing made
+      // it worse: a centred crop cut 53px off the top of her hair, and padding
+      // her to clear the circle entirely left her floating in white.
       className={cn('rounded-full object-cover', className)}
     />
   );
@@ -114,9 +125,9 @@ const ChatBubble = ({ message, onNavigate }: { message: ChatMessage; onNavigate:
   const isUser = message.role === 'user';
   return (
     <div className={cn("flex items-start gap-3", isUser ? "justify-end" : "justify-start")}>
-      {!isUser && <MarigoMark className="h-8 w-8 flex-shrink-0" />}
+      {!isUser && <MarigoMark className="h-16 w-16 flex-shrink-0" />}
       <div className={cn(
-        "max-w-xs md:max-w-md rounded-2xl px-4 py-2 text-sm",
+        "max-w-xs md:max-w-md rounded-2xl px-4 py-2.5 text-base leading-relaxed",
         isUser
           ? "bg-primary text-primary-foreground rounded-br-none"
           : "bg-muted rounded-bl-none"
@@ -137,8 +148,8 @@ const ChatBubble = ({ message, onNavigate }: { message: ChatMessage; onNavigate:
         )}
       </div>
       {isUser && (
-        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-          <User className="h-5 w-5 text-muted-foreground" />
+        <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+          <User className="h-7 w-7 text-muted-foreground" />
         </div>
       )}
     </div>
@@ -156,6 +167,14 @@ export function ChatbotWidget() {
   const firestore = useFirestore();
   const { locale } = useTranslation();
   const shoppingPreference = useShoppingPreference();
+
+  // The Marigo profile name ("Gigis Closet") beats the raw Auth displayName,
+  // matching what the header avatar shows.
+  const userRef = useMemoFirebase(
+    () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
+    [user, firestore],
+  );
+  const { data: firestoreUser } = useDoc<FirestoreUser>(userRef);
 
   // Only measured while the panel is open — see the hook for why the CSS
   // height alone leaves the header stranded off-screen on iOS.
@@ -239,6 +258,7 @@ export function ChatbotWidget() {
         isSignedIn: !!user,
         gender: shoppingPreference,
         locale,
+        userName: firstName || undefined,
       });
       const aiMessage: ChatMessage = {
         id: `ai-${Date.now()}`,
@@ -275,17 +295,26 @@ export function ChatbotWidget() {
     return () => window.removeEventListener('open-chatbot', handler);
   }, []);
 
+  // Whatever the seller/buyer calls themselves on Marigo — "Gigis Closet"
+  // reads far warmer than "there". Falls back cleanly when signed out.
+  const displayName = firestoreUser?.name || user?.displayName || '';
+  const firstName = displayName.trim().split(/\s+/)[0] || '';
+
   // The opening line sets the language expectation; after that the assistant
   // mirrors whatever the visitor writes, regardless of the site locale.
   const greeting = locale === 'sq'
-    ? 'Përshëndetje! Si mund t’ju ndihmoj sot?'
-    : 'Hi! How can I help you today?';
+    ? `${displayName ? `Hi ${displayName}` : 'Përshëndetje'}! 👋\n` +
+      'Unë jam Marigo AI, asistentja juaj personale për të bërë shopping në Marigo App. ' +
+      'Më kërko çfarë produkte të duhen sot dhe unë për pak sekonda do t’i gjej për ty. 💜'
+    : `${displayName ? `Hi ${displayName}` : 'Hi there'}! 👋\n` +
+      'I’m Marigo AI, your personal shopping assistant on Marigo App. ' +
+      'Tell me what you’re after today and I’ll find it for you in seconds. 💜';
 
   return (
     <>
       <Button
-        aria-label="Open MarigoAI"
-        className="fixed bottom-4 right-4 h-16 w-16 overflow-hidden rounded-full p-0 shadow-lg hidden md:inline-flex"
+        aria-label="Open Marigo - AI Shopping Assistant"
+        className="fixed bottom-4 right-4 h-20 w-20 overflow-hidden rounded-full p-0 shadow-lg hidden md:inline-flex"
         size="icon"
         onClick={() => setIsOpen(true)}
       >
@@ -315,11 +344,11 @@ export function ChatbotWidget() {
         >
           <SheetHeader className="p-4 border-b text-left shrink-0">
             <SheetTitle className="flex items-center gap-2">
-              <MarigoMark className="h-6 w-6" />
-              MarigoAI
+              <MarigoMark className="h-16 w-16" />
+              Marigo &mdash; AI Shopping Assistant
             </SheetTitle>
             <SheetDescription className="sr-only">
-              Chat with MarigoAI for help with orders, sizing, and finding items.
+              Chat with Marigo, your AI shopping assistant, to find items and get help.
             </SheetDescription>
             <SheetClose asChild>
               <Button
@@ -343,7 +372,7 @@ export function ChatbotWidget() {
               ))}
               {isLoading && (
                 <div className="flex items-start gap-3">
-                  <MarigoMark className="h-8 w-8 flex-shrink-0" />
+                  <MarigoMark className="h-16 w-16 flex-shrink-0" />
                   <div className="bg-muted rounded-2xl rounded-bl-none px-4 py-3">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
@@ -355,6 +384,10 @@ export function ChatbotWidget() {
             <form onSubmit={handleSend} className="flex items-center gap-2">
               <Input
                 type="text"
+                // Taller and 16px to sit with the larger message text. 16px is
+                // also the threshold below which iOS Safari zooms the page on
+                // focus, which used to shove the panel sideways.
+                className="h-12 text-base md:text-base"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 // Implicit form submission on Enter is unreliable inside a
@@ -374,7 +407,12 @@ export function ChatbotWidget() {
                 // twice per message and the view jumps.
                 aria-busy={isLoading}
               />
-              <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
+              <Button
+                type="submit"
+                size="icon"
+                className="h-12 w-12 flex-shrink-0"
+                disabled={isLoading || !input.trim()}
+              >
                 <SendHorizonal className="h-5 w-5" />
                 <span className="sr-only">{locale === 'sq' ? 'Dërgo' : 'Send'}</span>
               </Button>

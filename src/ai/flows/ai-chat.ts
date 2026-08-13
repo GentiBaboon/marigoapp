@@ -18,6 +18,8 @@ export const ChatInputSchema = z.object({
   gender: z.enum(['women', 'men', 'children']).nullable().optional(),
   /** UI language. Only breaks ties when the message itself gives no signal. */
   locale: z.enum(['en', 'sq']).optional(),
+  /** First name / shop name, so the assistant can address them personally. */
+  userName: z.string().max(60).optional(),
 });
 
 export type ChatInput = z.infer<typeof ChatInputSchema>;

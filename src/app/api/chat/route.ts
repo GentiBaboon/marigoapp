@@ -73,7 +73,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const { history, message, isSignedIn = false, gender = null, locale = 'en' } = parsed.data;
+    const {
+      history, message, isSignedIn = false, gender = null, locale = 'en', userName = '',
+    } = parsed.data;
     // Worked out here, not by the model: asking it to mirror the user's
     // language sent English questions back in Albanian.
     language = detectChatLanguage(message, locale);
@@ -120,7 +122,9 @@ ${language === 'sq' ? 'Albanian (shqip). Write the whole reply and all link labe
 
 ## This visitor
 - Signed in: ${isSignedIn ? 'YES' : 'NO — actions needing an account must start with signing up or signing in'}
+- Name: ${userName || 'unknown — do not invent one, just skip the name'}
 - Shopping department: ${gender ?? 'not set'}
+Use their name sparingly — a greeting or a warm moment, not every message.
 
 ## Live catalog results for this message
 ${productContext}

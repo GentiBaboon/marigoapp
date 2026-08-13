@@ -127,10 +127,28 @@ function normalize(value: string): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+/**
+ * Below this length, a token must match a *whole* word.
+ *
+ * Substring matching on very short tokens is almost always a false positive:
+ * "Si je?" ("how are you?") pulled up Calvin Klein **Je**ans, because "je" is a
+ * prefix of "jeans". Sizes ("38") and colours reached through the lexicon are
+ * unaffected — those do match whole words.
+ */
+const WHOLE_WORD_BELOW = 4;
+
 /** Match rank, lower is better: prefix < word-start < mid-word. Null = no match. */
 function rank(haystack: string | undefined | null, needle: string): number | null {
   if (!haystack) return null;
   const text = normalize(haystack);
+
+  if (needle.length < WHOLE_WORD_BELOW) {
+    // Word-boundary scan rather than \b, which is ASCII-only and would treat
+    // accented catalog text as a boundary mid-word.
+    const words = text.split(/[^a-z0-9]+/);
+    return words.includes(needle) ? 0 : null;
+  }
+
   const i = text.indexOf(needle);
   if (i < 0) return null;
   if (i === 0) return 0;
@@ -211,6 +229,12 @@ const STOP_WORDS = new Set([
   'kjo', 'ky', 'aty', 'ketu', 'ketu', 'produkte', 'produkt', 'artikull',
   'artikuj', 'disponueshme', 'ndodhet', 'gjendet', 'dicka', 'diçka', 'dicaj',
   'ndonjegje', 'sende', 'send',
+  // Small talk. The assistant answers these with personality, but they must
+  // never be treated as a product search — "Si je?" was returning jeans.
+  'si', 'je', 'jam', 'jeni', 'mire', 'mirë', 'faleminderit', 'pershendetje',
+  'përshëndetje', 'tung', 'ckemi', 'çkemi', 'naten', 'diten', 'miredita',
+  'hello', 'hey', 'thanks', 'thank', 'ok', 'okay', 'yes', 'no', 'po', 'jo',
+  'how', 'are', 'doing', 'today', 'name', 'who',
 ]);
 
 /** Verbs/nouns that signal the visitor is hunting for goods, not asking policy. */
