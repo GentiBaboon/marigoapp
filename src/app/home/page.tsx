@@ -6,6 +6,7 @@ import { NewArrivalsSection } from '@/components/home/NewArrivalsSection';
 import { RecentlyViewedSection } from '@/components/home/RecentlyViewedSection';
 import { PersonalizedPicks } from '@/components/home/PersonalizedPicks';
 import { CategoriesSection } from '@/components/home/CategoriesSection';
+import { DiscountedSection } from '@/components/home/DiscountedSection';
 import { MacroFilters } from '@/components/home/MacroFilters';
 import { HomepageBlocks } from '@/components/home/HomepageBlocks';
 import { MacroFilteredProducts } from '@/components/home/MacroFilteredProducts';
@@ -63,10 +64,16 @@ function HomePageContent() {
               <CategoriesSection />
             </Suspense>
             <Suspense fallback={<SectionSkeleton />}>
-              <RecentlyViewedSection />
+              <NewArrivalsSection />
             </Suspense>
             <Suspense fallback={<SectionSkeleton />}>
-              <NewArrivalsSection />
+              <DiscountedSection />
+            </Suspense>
+            {/* Last Viewed stays last on purpose: it is a way back to
+                something you already saw, so it should sit below everything
+                still being discovered. */}
+            <Suspense fallback={<SectionSkeleton />}>
+              <RecentlyViewedSection />
             </Suspense>
           </div>
         </>

@@ -58,7 +58,7 @@ export function NewArrivalsSection() {
   return (
     <section>
         <h2 className="text-xl md:text-2xl font-serif mb-6">
-            New Arrivals
+            New In
         </h2>
 
         {isLoading ? (

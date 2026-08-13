@@ -71,7 +71,7 @@ export function RecentlyViewedSection() {
     return (
         <section>
             <h2 className="text-xl md:text-2xl font-serif mb-6">
-              Recently Viewed
+              Last Viewed
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-8">
                 {[...Array(3)].map((_, i) => <ProductCardSkeleton key={i} />)}
@@ -87,7 +87,7 @@ export function RecentlyViewedSection() {
   return (
     <section>
         <h2 className="text-xl md:text-2xl font-serif mb-6">
-            Recently Viewed
+            Last Viewed
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-8">
             {products.map((p) => {
