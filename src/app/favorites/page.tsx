@@ -2,6 +2,8 @@
 
 import * as React from 'react';
 import { ProductCard } from '@/components/product-card';
+import { InfiniteScrollSentinel } from '@/components/InfiniteScrollSentinel';
+import { useInfiniteScroll, usePagedList } from '@/hooks/use-infinite-scroll';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HeartOff, Loader2 } from 'lucide-react';
@@ -96,6 +98,19 @@ export default function FavoritesPage() {
         return favoriteProducts.filter(p => p.categoryId?.toLowerCase() === activeTab.toLowerCase());
     }, [favoriteProducts, activeTab]);
 
+    // Favourites arrive in one fetch (bounded by what the user saved), so this
+    // reveals rows already in memory rather than issuing further reads. Must sit
+    // above the early returns below — hooks cannot run conditionally.
+    const {
+        visible: visibleFavorites,
+        hasMore: hasMoreFavorites,
+        loadMore: loadMoreFavorites,
+    } = usePagedList(filteredProducts);
+    const { sentinelRef } = useInfiniteScroll({
+        hasMore: hasMoreFavorites,
+        onLoadMore: loadMoreFavorites,
+    });
+
     const isLoading = isUserLoading || isProductsLoading;
     
     if (isLoading) {
@@ -130,11 +145,18 @@ export default function FavoritesPage() {
 
         <div className="mt-4">
           {filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
+                {visibleFavorites.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+              <InfiniteScrollSentinel
+                sentinelRef={sentinelRef}
+                hasMore={hasMoreFavorites}
+                onLoadMore={loadMoreFavorites}
+              />
+            </>
           ) : (activeTab === 'all' ? (
             <EmptyFavorites />
           ) : (

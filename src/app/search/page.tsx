@@ -14,6 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { Slider } from '@/components/ui/slider';
 import { useCatalog } from '@/hooks/use-catalog';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { InfiniteScrollSentinel } from '@/components/InfiniteScrollSentinel';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import {
   collection, query, where, orderBy,
@@ -25,7 +27,11 @@ import { cn } from '@/lib/utils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 40; // fetch more so client-side filtering has enough to show
+// Ten per scroll, per the product brief. Some filters (gender, size) are
+// applied client-side after the fetch, so a page can render fewer than ten —
+// the sentinel simply requests the next one, which is the behaviour you want
+// anyway when the visitor keeps scrolling.
+const PAGE_SIZE = 10;
 
 const GENDERS = [
   { value: 'women', label: 'Women' },
@@ -820,6 +826,10 @@ function ProductListPage() {
   const { products, isLoading, isLoadingMore, hasMore, loadMore, activeFilterCount } =
     useFilteredProducts(firestore, searchParams, brands, categories);
 
+  // Fetching is already cursor-paged against Firestore, so scrolling just
+  // asks for the next page rather than revealing rows already downloaded.
+  const { sentinelRef } = useInfiniteScroll({ hasMore, isLoading: isLoadingMore, onLoadMore: loadMore });
+
   // Actual price range across the currently-loaded products. Drives the
   // Price filter placeholders so users see real bounds instead of "Min/Max".
   const priceRange = React.useMemo(() => {
@@ -894,19 +904,13 @@ function ProductListPage() {
                 />
               ))}
             </div>
-            {hasMore && (
-              <div className="text-center mt-8">
-                <Button
-                  variant="outline"
-                  className="rounded-full px-12"
-                  onClick={loadMore}
-                  disabled={isLoadingMore}
-                >
-                  {isLoadingMore && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Load more
-                </Button>
-              </div>
-            )}
+            <InfiniteScrollSentinel
+              sentinelRef={sentinelRef}
+              hasMore={hasMore}
+              isLoading={isLoadingMore}
+              onLoadMore={loadMore}
+              endMessage="You've seen everything that matches."
+            />
           </>
         ) : (
           <div className="text-center py-20">

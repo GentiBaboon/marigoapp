@@ -7,6 +7,7 @@ import type { FirestoreProduct } from '@/lib/types';
 import type { MacroFiltersConfig } from '@/components/home/MacroFilters';
 import { useShoppingPreference } from '@/hooks/use-shopping-preference';
 import { ProductCard } from '@/components/product-card';
+import { PagedList } from '@/components/InfiniteScrollSentinel';
 import { Skeleton } from '@/components/ui/skeleton';
 
 function ProductCardSkeleton() {
@@ -104,8 +105,8 @@ export function MacroFilteredProducts({ filterId }: Props) {
           No active products in this filter yet.
         </p>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
-          {visibleProducts.map((p) => (
+        <PagedList items={visibleProducts} className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
+          {(p) => (
             <ProductCard
               key={p.id}
               product={{
@@ -123,8 +124,8 @@ export function MacroFilteredProducts({ filterId }: Props) {
                 status: p.status,
               }}
             />
-          ))}
-        </div>
+          )}
+        </PagedList>
       )}
     </section>
   );

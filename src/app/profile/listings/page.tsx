@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ListingItem } from '@/components/profile/listing-item';
+import { PagedList } from '@/components/InfiniteScrollSentinel';
 import { Tag } from 'lucide-react';
 
 function ListingsSkeleton() {
@@ -151,9 +152,9 @@ function ListingsPageContent() {
             <TabsContent value="active">
                 {isLoading ? <ListingsSkeleton /> : 
                     active.length > 0 ? (
-                        <div className="space-y-4">
-                            {active.map(product => <ListingItem key={product.id} product={product} />)}
-                        </div>
+                        <PagedList items={active} className="space-y-4">
+                            {product => <ListingItem key={product.id} product={product} />}
+                        </PagedList>
                     ) : <EmptyState title="No active items" description="You don't have any items for sale right now." />
                 }
             </TabsContent>
@@ -161,9 +162,9 @@ function ListingsPageContent() {
             <TabsContent value="sold">
                  {isLoading ? <ListingsSkeleton /> : 
                     sold.length > 0 ? (
-                        <div className="space-y-4">
-                            {sold.map(order => <ListingItem key={order.id} order={order} />)}
-                        </div>
+                        <PagedList items={sold} className="space-y-4">
+                            {order => <ListingItem key={order.id} order={order} />}
+                        </PagedList>
                     ) : <EmptyState title="No sales yet" description="Your sold items will appear here for fulfillment tracking." />
                 }
             </TabsContent>
@@ -171,9 +172,9 @@ function ListingsPageContent() {
             <TabsContent value="inactive">
                  {isLoading ? <ListingsSkeleton /> : 
                     inactive.length > 0 ? (
-                        <div className="space-y-4">
-                            {inactive.map(product => <ListingItem key={product.id} product={product} />)}
-                        </div>
+                        <PagedList items={inactive} className="space-y-4">
+                            {product => <ListingItem key={product.id} product={product} />}
+                        </PagedList>
                     ) : <EmptyState title="No inactive items" description="Drafts or expired listings would be shown here." />
                 }
             </TabsContent>
