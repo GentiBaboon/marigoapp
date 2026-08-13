@@ -7,7 +7,12 @@ import { useToast } from '@/hooks/use-toast';
 interface SellFormContextType {
   drafts: SellDraft[];
   activeDraft: SellDraft | undefined;
-  startNewDraft: () => void;
+  /**
+   * Begin a listing. Called with no arguments for the manual flow; the AI
+   * assistant passes the fields it inferred and the step to land on, so the
+   * seller opens straight into Review instead of re-walking a filled-in form.
+   */
+  startNewDraft: (seed?: { formData?: Partial<SellFormValues>; step?: number }) => void;
   selectDraft: (draftId: string) => void;
   deselectDraft: () => void;
   deleteDraft: (draftId: string) => void;
@@ -167,16 +172,17 @@ export const SellFormProvider: React.FC<{ children: ReactNode }> = ({ children }
     ));
   }, [activeDraftId]);
   
-  const startNewDraft = useCallback(() => {
+  const startNewDraft = useCallback((seed?: { formData?: Partial<SellFormValues>; step?: number }) => {
     const newDraftId = `draft_${Date.now()}`;
     const newDraft: SellDraft = {
         id: newDraftId,
         formData: {
           images: [],
           allowOffers: true,
-          listingType: 'fixed_price'
+          listingType: 'fixed_price',
+          ...seed?.formData,
         },
-        currentStep: 1,
+        currentStep: seed?.step ?? 1,
         lastModified: Date.now(),
     };
     setDrafts(prev => [...prev, newDraft]);

@@ -14,15 +14,23 @@ import { DetailsStep } from '@/components/sell/steps/DetailsStep';
 import { PricingStep } from '@/components/sell/steps/PricingStep';
 import { ReviewStep } from '@/components/sell/steps/ReviewStep';
 import { SuccessStep } from '@/components/sell/steps/SuccessStep';
+import { ListingModeStep } from '@/components/sell/steps/ListingModeStep';
+import { AiListingAssistant } from '@/components/sell/AiListingAssistant';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Tag, History, Trash2, ChevronRight, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useToast } from '@/hooks/use-toast';
+
+/** Where a listing is started from, before a draft exists. */
+type Entry = 'idle' | 'choosing' | 'assistant';
 
 export default function SellPage() {
   const { activeDraft, drafts, startNewDraft, selectDraft, deleteDraft, currentStep, totalSteps } = useSellForm();
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
+  const [entry, setEntry] = React.useState<Entry>('idle');
 
   // Listings already saved to Firestore. These are distinct from `drafts`
   // above, which is unfinished wizard state kept in localStorage on this
@@ -42,6 +50,41 @@ export default function SellPage() {
     [listings]
   );
 
+  // The assistant runs before any draft exists — it is what produces one.
+  if (!activeDraft && entry === 'assistant') {
+    return (
+      <div className="container mx-auto max-w-2xl px-4 py-8">
+        <AiListingAssistant
+          onBack={() => setEntry('choosing')}
+          onDrafted={(formData, note) => {
+            // Straight to Review (step 6): everything the assistant could infer
+            // is filled, and the seller's job now is to check it, not retype it.
+            startNewDraft({ formData, step: 6 });
+            setEntry('idle');
+            toast({
+              title: 'Draft ready to review',
+              description: note || 'Check the details and publish when you are happy.',
+            });
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (!activeDraft && entry === 'choosing') {
+    return (
+      <div className="container mx-auto max-w-2xl px-4 py-8">
+        <ListingModeStep
+          onManual={() => {
+            startNewDraft();
+            setEntry('idle');
+          }}
+          onAssisted={() => setEntry('assistant')}
+        />
+      </div>
+    );
+  }
+
   if (!activeDraft) {
     return (
       <div className="container mx-auto max-w-2xl py-12 px-4 space-y-8">
@@ -50,7 +93,10 @@ export default function SellPage() {
           <p className="text-muted-foreground text-sm">Give your luxury items a new life in just a few steps.</p>
         </div>
 
-        <Button className="w-full h-16 text-lg gap-3 bg-black text-white hover:bg-black/90 shadow-lg" onClick={startNewDraft}>
+        <Button
+          className="w-full h-16 text-lg gap-3 bg-black text-white hover:bg-black/90 shadow-lg"
+          onClick={() => setEntry('choosing')}
+        >
           <Plus className="h-6 w-6" />
           List a New Item
         </Button>
