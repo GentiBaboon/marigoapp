@@ -96,8 +96,11 @@ export default function RootLayout({
     <html lang="sq" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <link rel="icon" href="/app-icon.png" type="image/png" />
-        <link rel="apple-touch-icon" href="/app-icon.png" />
+        {/* No <link rel="icon"> here on purpose. `src/app/icon.png` and
+            `src/app/apple-icon.png` are App Router conventions — Next emits the
+            tags itself. A `src/app/favicon.ico` used to sit alongside them and
+            won at /favicon.ico, which is why browsers kept showing the old
+            orange mark no matter what this file said. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link

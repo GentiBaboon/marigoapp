@@ -9,6 +9,8 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
   type CarouselApi,
 } from '@/components/ui/carousel';
 import {
@@ -217,22 +219,44 @@ export default function ProductDetailPage() {
                     {current} / {count}
                 </div>
               )}
+              {/* Pointer-only affordance: touch users already swipe, and the
+                  arrows would sit on top of the photo they came to look at.
+                  Both are stacked on the right so one thumb/cursor position
+                  steps through the whole gallery. */}
+              {count > 1 && (
+                <div className="pointer-events-none absolute inset-y-0 right-2 hidden items-center md:flex">
+                  <div className="pointer-events-auto flex flex-col gap-2">
+                    <CarouselPrevious
+                      className="static h-9 w-9 translate-x-0 translate-y-0 border-none bg-black/50 text-white opacity-80 shadow-none transition hover:bg-black/70 hover:text-white hover:opacity-100 disabled:opacity-30"
+                    />
+                    <CarouselNext
+                      className="static h-9 w-9 translate-x-0 translate-y-0 border-none bg-black/50 text-white opacity-80 shadow-none transition hover:bg-black/70 hover:text-white hover:opacity-100 disabled:opacity-30"
+                    />
+                  </div>
+                </div>
+              )}
             </Carousel>
           </div>
   
-          <div className="flex flex-col gap-6 px-4 md:px-0">
-            <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                    <h1 className="text-4xl font-headline text-foreground">{product.brandId}</h1>
-                    <p className="text-lg text-muted-foreground">{product.title}</p>
-                    <div className="pt-2"><AuthenticityBadge authenticityCheck={product.authenticityCheck} /></div>
+          {/* Tighter rhythm on phones, where the serif brand line and the
+              stacked detail rows otherwise leave the price stranded well below
+              the fold. Desktop keeps its original, roomier spacing. */}
+          <div className="flex flex-col gap-4 px-4 md:gap-6 md:px-0">
+            <div className="flex justify-between items-start gap-3">
+                {/* gap, not space-y + a padded wrapper: AuthenticityBadge
+                    renders null for products without a completed check, and the
+                    old `<div className="pt-2">` around it still occupied 8px. */}
+                <div className="flex min-w-0 flex-col gap-1.5">
+                    <h1 className="text-3xl leading-tight font-headline text-foreground md:text-4xl">{product.brandId}</h1>
+                    <p className="text-base text-muted-foreground md:text-lg">{product.title}</p>
+                    <AuthenticityBadge authenticityCheck={product.authenticityCheck} />
                 </div>
                 <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-destructive" onClick={handleToggleFavorite}>
                     <Heart className={cn("h-6 w-6", isFavorite(product.id) && "fill-destructive text-destructive")} />
                 </Button>
             </div>
             
-            <div className="space-y-1 text-sm">
+            <div className="space-y-1.5 text-sm">
                 {(() => {
                   const hasDiscount = typeof product.originalPrice === 'number' && product.originalPrice > product.price;
                   const pct = hasDiscount

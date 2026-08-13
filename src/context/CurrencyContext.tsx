@@ -28,8 +28,18 @@ interface CurrencyContextType {
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
+/**
+ * What a visitor sees before they have chosen anything.
+ *
+ * Albanian lek, because the primary market is Albania. This is a *display*
+ * default only — every price is still stored in EUR on the product document
+ * and converted through `config/exchangeRates` by `formatPrice`, so changing
+ * this does not touch stored data, payouts or Stripe amounts.
+ */
+export const DEFAULT_CURRENCY: Currency = 'ALL';
+
 export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [currency, setCurrencyState] = useState<Currency>('EUR');
+    const [currency, setCurrencyState] = useState<Currency>(DEFAULT_CURRENCY);
     const { user } = useUser();
     const firestore = useFirestore();
 
