@@ -1,14 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { useUser } from '@/firebase';
 
 const preferences = [
   {
@@ -27,8 +25,6 @@ export function ShoppingPreferenceModal() {
   const [isOpen, setIsOpen] = useState(false);
   // Default to womenswear as requested
   const [selectedPreference, setSelectedPreference] = useState<string | null>('womenswear');
-  const router = useRouter();
-  const { user } = useUser();
 
   useEffect(() => {
     const preference = localStorage.getItem('marigo_shopping_preference');
@@ -47,11 +43,14 @@ export function ShoppingPreferenceModal() {
     // other tabs). The hook listens for both.
     window.dispatchEvent(new Event('marigo:preference-changed'));
     setIsOpen(false);
-    // Logged-out visitors are routed to sign-up; on success they land back on
-    // the now-personalized home. Logged-in users stay on the home page.
-    if (!user) {
-      router.push(`/auth/signup?next=${encodeURIComponent('/home')}`);
-    }
+    // Everyone stays on the home page, signed in or not.
+    //
+    // This used to push logged-out visitors to /auth/signup, which put a
+    // registration wall in front of the very first screen of the app — before
+    // they had seen a single product. Nothing here needs an account: the
+    // preference is saved to localStorage above and the home sections re-render
+    // through `useShoppingPreference`, so the personalization the modal promises
+    // has already happened by this point.
   };
   
   // Prevent closing by clicking outside or pressing Escape until a preference is set

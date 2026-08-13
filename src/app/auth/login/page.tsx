@@ -1,46 +1,15 @@
-import { LoginForm } from '@/components/auth/login-form';
-import { SocialButtons } from '@/components/auth/social-buttons';
-import { Separator } from '@/components/ui/separator';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { Suspense } from 'react';
+import { LoginContent } from './login-content';
 
-export default function LoginPage({ searchParams }: { searchParams?: { next?: string } }) {
-  const next = searchParams?.next;
-  const signupHref = next ? `/auth/signup?next=${encodeURIComponent(next)}` : '/auth/signup';
+/**
+ * The Suspense boundary is required, not decorative: the content below reads
+ * `useSearchParams()`, and a statically exported page may only do that beneath
+ * one — without it the native build fails to prerender this route.
+ */
+export default function LoginPage() {
   return (
-    <div className="relative flex flex-1 flex-col justify-center bg-background px-6 py-8">
-        <Button asChild variant="ghost" size="icon" className="absolute top-4 right-4 z-10">
-            <Link href="/auth">
-                <X className="h-6 w-6" />
-            </Link>
-        </Button>
-        <div className="w-full max-w-md mx-auto">
-            <div className="text-center mb-6">
-              <h1 className="font-headline text-3xl">Sign In</h1>
-              <p className="text-muted-foreground mt-2">Welcome back! Enter your details to sign in.</p>
-            </div>
-            <div className="space-y-5">
-                <LoginForm />
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <Separator />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      Or sign in with
-                    </span>
-                  </div>
-                </div>
-                <SocialButtons />
-                <div className="text-center text-sm">
-                  Don&apos;t have an account?{' '}
-                  <Link href={signupHref} className="underline">
-                    Sign Up
-                  </Link>
-                </div>
-            </div>
-        </div>
-    </div>
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   );
 }

@@ -13,6 +13,12 @@
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": ["-c", "export PATH=/Users/xhenimaloku/.nvm/versions/node/v20.20.2/bin:$PATH && cd '/Users/xhenimaloku/Desktop/Marigo App 10/functions' && npm run serve"],
       "port": 5001
+    },
+    {
+      "name": "Native Bundle Preview",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export PATH=/Users/xhenimaloku/.nvm/versions/node/v20.20.2/bin:$PATH && cd '/Users/xhenimaloku/Desktop/Marigo App 10' && node scripts/serve-native.mjs --port 3002 --simulate-native"],
+      "port": 3002
     }
   ]
 }

@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MapPin, CreditCard, Loader2, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
+import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/firebase';
 import type { FirestoreAddress } from '@/lib/types';

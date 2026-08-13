@@ -1,158 +1,32 @@
-'use client';
-import * as React from 'react';
-import Link from 'next/link';
-import { useDoc, useFirestore, useMemoFirebase, useCollection, useUser } from '@/firebase';
-import { doc, collection, query, where, limit } from 'firebase/firestore';
-import type { FirestoreOrder, FirestoreDelivery, FirestoreReturn } from '@/lib/types';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { HelpCircle, PackageCheck } from 'lucide-react';
-import Image from 'next/image';
-import { OrderTimeline } from '@/components/profile/order-timeline';
-import { ReturnTimeline } from '@/components/profile/return-timeline';
-import { useParams } from 'next/navigation';
-import { DeliveryTracking } from '@/components/tracking/DeliveryTracking';
-import { OrderCustomerActions } from '@/components/profile/order-actions';
+import { Suspense } from 'react';
+import ClientPage from './client-page';
+import { nativeOnlyStaticParams, NATIVE_PLACEHOLDER } from '@/lib/platform/static-params';
 
-function OrderDetailsSkeleton() {
-    return (
-        <div className="p-4 space-y-6 bg-muted/40 min-h-screen">
-            <div className="p-4 bg-background rounded-md">
-                <Skeleton className="h-6 w-32 mb-2" />
-                <div className="flex gap-4 items-center">
-                    <Skeleton className="h-16 w-16 rounded-md" />
-                    <div className="space-y-2">
-                        <Skeleton className="h-5 w-20" />
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-4 w-28" />
-                    </div>
-                </div>
-            </div>
-            <div className="p-4 bg-background rounded-md">
-                <div className="space-y-8 mt-4">
-                    <div className="flex gap-4">
-                        <Skeleton className="h-4 w-4 rounded-full mt-1" />
-                        <div className="space-y-1 flex-1">
-                            <Skeleton className="h-5 w-32" />
-                            <Skeleton className="h-4 w-48" />
-                        </div>
-                    </div>
-                    <div className="flex gap-4">
-                        <Skeleton className="h-4 w-4 rounded-full mt-1" />
-                        <div className="space-y-1 flex-1">
-                            <Skeleton className="h-24 w-full" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
+/**
+ * Server entry for this dynamic route.
+ *
+ * The screen itself is a client component in `client-page.tsx`. It lives there
+ * because `output: 'export'` requires every dynamic segment to export
+ * `generateStaticParams()`, and Next forbids a file from carrying both that
+ * export and the `'use client'` directive.
+ *
+ * Product, order and conversation ids are unbounded, so there is no real list
+ * to pre-render. The native build emits one unreachable placeholder purely to
+ * satisfy the export check and reaches the real screen through its flat `/view`
+ * sibling (see `lib/platform/routes.ts`); the web build returns nothing here and
+ * renders every id on demand, exactly as before.
+ */
+export function generateStaticParams() {
+  return nativeOnlyStaticParams({ orderId: NATIVE_PLACEHOLDER });
 }
 
-
-export default function OrderDetailsPage() {
-    const params = useParams();
-    const orderId = params.orderId as string;
-    const firestore = useFirestore();
-    const { user } = useUser();
-
-    const orderRef = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return doc(firestore, 'orders', orderId);
-    }, [firestore, orderId]);
-
-    const { data: order, isLoading: isOrderLoading } = useDoc<FirestoreOrder>(orderRef);
-    
-    const deliveryQuery = useMemoFirebase(() => {
-        if (!firestore || !orderId) return null;
-        return query(collection(firestore, 'deliveries'), where('orderId', '==', orderId), limit(1));
-    }, [firestore, orderId]);
-    const { data: deliveries, isLoading: isDeliveryLoading } = useCollection<FirestoreDelivery>(deliveryQuery);
-    const delivery = deliveries?.[0];
-
-    // Pull the active return tied to this order. The Firestore rule on
-    // /returns requires the query to constrain by `buyerId` (so the user can
-    // only list documents they own), and we also filter by orderId to find
-    // the right one. No orderBy → no composite index needed.
-    const returnsQuery = useMemoFirebase(() => {
-        if (!firestore || !orderId || !user?.uid) return null;
-        return query(
-            collection(firestore, 'returns'),
-            where('buyerId', '==', user.uid),
-            where('orderId', '==', orderId),
-            limit(1),
-        );
-    }, [firestore, orderId, user?.uid]);
-    const { data: returns } = useCollection<FirestoreReturn>(returnsQuery);
-    const activeReturn = returns?.[0];
-
-    const isLoading = isOrderLoading || isDeliveryLoading;
-    
-    if (isLoading) {
-        return <OrderDetailsSkeleton />;
-    }
-    
-    if (!order) {
-        return (
-             <div className="container mx-auto py-8 px-4 max-w-3xl text-center">
-                 <h1 className="text-xl font-bold">Order Not Found</h1>
-                 <p className="mt-2 text-muted-foreground">This order could not be found.</p>
-                 <Button asChild variant="link" className="mt-4">
-                    <Link href="/profile/orders">Back to Orders</Link>
-                </Button>
-            </div>
-        )
-    }
-
-    const item = order.items[0];
-    const displayTitle = item.title;
-
-    return (
-        <div className="bg-muted/40 min-h-screen">
-            <main className="p-4 space-y-4">
-                 <div className="bg-background p-4 rounded-lg">
-                    <h1 className="font-semibold text-lg mb-4">Ref #{order.orderNumber}</h1>
-                    <div className="flex gap-4 items-center">
-                        <div className="relative h-16 w-16 rounded-md bg-muted flex-shrink-0">
-                            <Image src={item.image} alt={displayTitle} fill className="object-cover rounded-md" sizes="64px" />
-                        </div>
-                        <div>
-                            <p className="font-bold text-lg uppercase">{item.brand}</p>
-                            <p>{displayTitle}</p>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                <PackageCheck className="h-4 w-4" />
-                                Direct Shipping
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Status timeline always renders so the buyer sees the
-                    current stage (incl. shipped / delivered banners) regardless
-                    of whether a courier delivery doc has been created. */}
-                <div className="bg-background p-4 rounded-lg">
-                    <OrderTimeline order={order} />
-                </div>
-
-                {activeReturn && (
-                    <ReturnTimeline returnDoc={activeReturn} audience="buyer" />
-                )}
-
-                {delivery && (
-                    <div className="bg-background p-4 rounded-lg">
-                        <DeliveryTracking order={order} delivery={delivery} />
-                    </div>
-                )}
-
-                <OrderCustomerActions order={order} />
-
-                <div className="pt-8">
-                     <Button variant="outline" className="w-full bg-background">
-                        <HelpCircle className="mr-2 h-4 w-4"/>
-                        Help center
-                    </Button>
-                </div>
-            </main>
-        </div>
-    );
+export default function Page() {
+  // Required, not decorative: the screen reads `useSearchParams()` through
+  // `useRouteParam()`, which a statically exported page may only do beneath a
+  // Suspense boundary.
+  return (
+    <Suspense fallback={null}>
+      <ClientPage />
+    </Suspense>
+  );
 }

@@ -40,6 +40,7 @@ Locale: `<html lang="sq">`, but `LanguageContext` **defaults to `en`** and the p
 | Testing | Vitest 4 + jsdom + Testing Library, Playwright (Chromium) |
 | PWA | `next-pwa` (disabled in dev) + `public/manifest.json` + workbox sw |
 | Hosting | Vercel (`vercel.json`, region `fra1`) is the app host; Firebase Hosting (`firebase-hosting/`) exists only to rewrite `/api/stripe/webhook` → `handleStripeWebhook`. `apphosting.yaml` is a leftover Firebase App Hosting stub. |
+| iOS / Android | Capacitor 6 (`capacitor.config.ts`, `ios/`, `android/`) wrapping a static export of this same `src/` — see §14 |
 
 ## 3. Top-level layout
 
@@ -309,7 +310,16 @@ npm run typecheck   # tsc --noEmit   (CI continue-on-error — pre-existing erro
 npm run test        # Vitest (jsdom) — src/**/*.{test,spec}.{ts,tsx}
 npm run test:watch  # Vitest watch
 npm run test:e2e    # Playwright against localhost:3001 (starts the dev server itself)
+
+npm run build:native  # Static export for the app shells → .next-native
+npm run sync:native   # build:native + npx cap sync (copies into ios/ and android/)
+npm run ios           # sync + open Xcode
+npm run android       # sync + open Android Studio
+node scripts/serve-native.mjs --port 3002 --simulate-native   # the app bundle in a browser
 ```
+
+`NEXT_DIST_DIR=.next-check npm run build` verifies a production build **without**
+overwriting `.next`, so it is safe to run while `npm run dev` is up.
 
 Functions (inside `functions/`): `npm run build` (tsc), `npm run serve` (build + functions emulator), `npm run deploy`, `npm run logs`.
 
@@ -366,3 +376,83 @@ SITE_URL                      # optional; overrides the marigoapp.com default
 - **Never run `npm run build` while `npm run dev` is running.** The production build overwrites `.next`, and the dev server then 404s every `_next/static/*` chunk — the page renders as unstyled HTML with no error in the terminal. Fix: stop dev, `rm -rf .next`, restart.
 - `AuthenticityBadge` returns `null` for products without a completed check. Don't wrap it in a padded container — the wrapper still renders and leaves phantom space. Prefer a flex `gap` so an absent child contributes nothing.
 - `next/image` will not serve larger than the `width`/`height` props, whatever the source file holds. A 320px source declared as `width={128}` renders soft on a 64px retina button.
+
+## 14. Native apps (iOS & Android)
+
+One `src/` builds all three platforms. Capacitor 6 wraps a **static export** of the
+same React tree; the app is not a remote-URL wrapper, because App Store guideline
+4.2 rejects those.
+
+```
+npm run dev          → web, SSR on Vercel      (.next)
+npm run build:native → static export           (.next-native) → ios/ + android/
+```
+
+`NEXT_PUBLIC_BUILD_TARGET=native` is the switch (`next.config.js`). The native
+target sets `output: 'export'`, `images.unoptimized`, `trailingSlash`, drops
+`headers()` and disables `next-pwa`. It writes to **`.next-native`**, never
+`.next`, so a native build can never take down a running dev server.
+
+**What the app carries vs. fetches.** The UI ships inside the binary. Firestore,
+Auth, Storage and Stripe are reached directly by the client SDKs exactly as on
+web. `/api/*` only exists on Vercel, so `installNativeFetch()`
+(`src/lib/platform/api.ts`) rewrites relative API calls to `API_BASE_URL`
+(`NEXT_PUBLIC_API_BASE_URL`, defaulting to `SITE_URL`). `src/middleware.ts`
+answers those cross-origin calls with CORS for `NATIVE_ORIGINS` only, and exempts
+them from CSRF — they carry a Bearer token and no cookies, so there is no ambient
+authority to forge.
+
+### Dynamic routes are the load-bearing part
+
+A static export cannot emit a page per product id, so **every dynamic route has a
+flat sibling** that takes the id in the query string:
+
+| web | native |
+|---|---|
+| `/products/abc` | `/products/view/?id=abc` |
+| `/messages/c1` | `/messages/view/?conversationId=c1` |
+| `/browse/womenswear/clothing` | `/browse/view/?slug=womenswear%2Fclothing` |
+
+Both resolve to the *same* component — the sibling is a 3-line re-export and must
+never hold logic. Three pieces make it work:
+
+- **`src/lib/platform/routes.ts`** — the rule table and `toNativeHref()`. Order
+  matters: `/products/[id]/edit` is tested before `/products/[id]`, or `edit`
+  becomes the id. Translation is idempotent on purpose.
+- **`NativeRouteBridge`** (root layout) — rewrites links in the **capture** phase
+  of a click, so the ~60 existing `<Link href={`/products/${id}`}>` call sites
+  work untouched. On web it attaches nothing.
+- **`useRouteParams` / `useRouteParam`** — pages import the plural one aliased as
+  `useParams`, so `params.id` bodies read from a path segment on web and a query
+  value on device with no change.
+
+For programmatic navigation to a dynamic route use **`useAppRouter()`** (imported
+aliased as `useRouter`), which the click bridge cannot see.
+
+**Adding a dynamic route? Three steps, and a test enforces the third:**
+1. `page.tsx` must be a *server* wrapper exporting
+   `generateStaticParams()` → `nativeOnlyStaticParams({ id: NATIVE_PLACEHOLDER })`,
+   rendering the `'use client'` body from `client-page.tsx` inside `<Suspense>`.
+   A file cannot carry both `'use client'` and `generateStaticParams`, and Next
+   checks `prerenderRoutes.length > 0` — an empty array fails the build, which is
+   why the native target emits one unreachable `__native__` placeholder page.
+2. Add the rule to `ROUTE_RULES`.
+3. Create the flat sibling. `src/__tests__/lib/platform-routes.test.ts` fails if a
+   rule has no page behind it — otherwise the mistake only shows up as a blank
+   screen on a device.
+
+### Native gotchas
+
+- Anything reading `useSearchParams()` needs a `<Suspense>` boundary or the
+  export fails to prerender. This is why `/auth/login` and `/auth/signup` read
+  `?next` on the client instead of from the server `searchParams` prop, which is
+  always empty in an export.
+- **Server Actions do not exist in a static export.** `src/app/sell/actions.ts`
+  was one and is now a plain module. New server-side work goes in `src/app/api/`,
+  which the app can reach; a Server Action it cannot.
+- `capacitor.config.ts` `appId` (`com.marigoapp.app`) is **permanent** once a
+  build reaches App Store Connect or the Play Console.
+- Next prefetches RSC payloads for untranslated hrefs and 404s on them. Harmless:
+  the WebView origin is local, so it costs no network.
+- Don't show web-install prompts in the app — `DownloadAppBanner` bails on
+  `isNativeApp()`.

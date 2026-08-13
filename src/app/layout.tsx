@@ -17,6 +17,7 @@ import { LanguageProvider } from '@/context/LanguageContext';
 import dynamic from 'next/dynamic';
 import { CookieBanner } from '@/components/CookieBanner';
 import { Footer } from '@/components/footer';
+import { NativeRouteBridge } from '@/components/platform/NativeRouteBridge';
 
 const ChatbotWidget = dynamic(() => import('@/components/ai/ChatbotWidget').then(mod => mod.ChatbotWidget), {
   ssr: false,
@@ -117,6 +118,10 @@ export default function RootLayout({
         />
       </head>
       <body className={cn('font-body antialiased')}>
+        {/* Rewrites /products/${id} style links to the flat routes the static
+            native bundle actually contains. Renders nothing, and attaches no
+            listener at all on web. */}
+        <NativeRouteBridge />
         <FirebaseClientProvider>
             <LanguageProvider>
                 <CurrencyProvider>

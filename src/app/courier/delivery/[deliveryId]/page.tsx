@@ -1,73 +1,32 @@
-'use client';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import type { FirestoreDelivery } from '@/lib/types';
-import { useParams, useRouter } from 'next/navigation';
-import { PickupStep } from '@/components/courier/steps/PickupStep';
-import { ConfirmPickupStep } from '@/components/courier/steps/ConfirmPickupStep';
-import DeliveryLoading from './loading';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { Suspense } from 'react';
+import ClientPage from './client-page';
+import { nativeOnlyStaticParams, NATIVE_PLACEHOLDER } from '@/lib/platform/static-params';
 
-export default function ActiveDeliveryPage() {
-  const params = useParams();
-  const router = useRouter();
-  const deliveryId = params.deliveryId as string;
-  const firestore = useFirestore();
+/**
+ * Server entry for this dynamic route.
+ *
+ * The screen itself is a client component in `client-page.tsx`. It lives there
+ * because `output: 'export'` requires every dynamic segment to export
+ * `generateStaticParams()`, and Next forbids a file from carrying both that
+ * export and the `'use client'` directive.
+ *
+ * Product, order and conversation ids are unbounded, so there is no real list
+ * to pre-render. The native build emits one unreachable placeholder purely to
+ * satisfy the export check and reaches the real screen through its flat `/view`
+ * sibling (see `lib/platform/routes.ts`); the web build returns nothing here and
+ * renders every id on demand, exactly as before.
+ */
+export function generateStaticParams() {
+  return nativeOnlyStaticParams({ deliveryId: NATIVE_PLACEHOLDER });
+}
 
-  const deliveryRef = useMemoFirebase(() => {
-    if (!firestore || !deliveryId) return null;
-    return doc(firestore, 'deliveries', deliveryId);
-  }, [firestore, deliveryId]);
-
-  const { data: delivery, isLoading } = useDoc<FirestoreDelivery>(deliveryRef);
-
-  if (isLoading) {
-    return <DeliveryLoading />;
-  }
-
-  if (!delivery) {
-    return <div>Delivery not found or you don't have access.</div>;
-  }
-
-  const renderStep = () => {
-    switch (delivery.status) {
-      case 'assigned':
-        return <PickupStep delivery={delivery} />;
-      case 'arrived_for_pickup':
-        return <ConfirmPickupStep delivery={delivery} />;
-      // TODO: Add other steps
-      // case 'picked_up':
-      //     return <NavigateToDeliveryStep delivery={delivery} />;
-      // case 'arrived_for_delivery':
-      //     return <ConfirmDeliveryStep delivery={delivery} />;
-      case 'delivered':
-        return <div>Delivery Completed!</div>;
-      case 'cancelled':
-        return <div>Delivery Cancelled.</div>;
-      default:
-        return <div>Unknown delivery status: {delivery.status}</div>;
-    }
-  };
-
+export default function Page() {
+  // Required, not decorative: the screen reads `useSearchParams()` through
+  // `useRouteParam()`, which a statically exported page may only do beneath a
+  // Suspense boundary.
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => router.push('/courier/dashboard')}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Active Delivery</h1>
-          <p className="text-muted-foreground">
-            Order #{delivery.orderId.slice(0, 8)}...
-          </p>
-        </div>
-      </div>
-      {renderStep()}
-    </div>
+    <Suspense fallback={null}>
+      <ClientPage />
+    </Suspense>
   );
 }

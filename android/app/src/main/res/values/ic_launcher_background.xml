@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sampled from the corner of public/icons/icon-512x512.png. Must stay
+         identical to the padColor used for ic_launcher_foreground.png, or the
+         adaptive icon shows a square edge where the two layers meet. -->
+    <color name="ic_launcher_background">#AF63FF</color>
+</resources>

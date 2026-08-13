@@ -15,6 +15,7 @@ const CONDITION_URLS: Record<string, string> = {
 
 type Props = { params: { id: string }; children: React.ReactNode };
 
+
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const product = await fetchProductForSeo(params.id);
   const canonical = absoluteUrl(`/products/${params.id}`);

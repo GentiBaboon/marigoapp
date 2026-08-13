@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Button } from '@/components/ui/button';
 import { Star, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { isNativeApp } from '@/lib/platform/native';
 
 const SESSION_STORAGE_KEY = 'marigo_app_banner_shown';
 
@@ -14,6 +15,11 @@ export function DownloadAppBanner() {
   const pathname = usePathname();
 
   const handleScroll = useCallback(() => {
+    // Never inside the iOS/Android app — this invites someone who already
+    // installed it to install it. App Store review reads a web-style install
+    // prompt as a sign the binary is just a wrapped website (guideline 4.2).
+    if (isNativeApp()) return;
+
     // Only show banner on scrollable pages, not on checkout, auth, etc.
     const forbiddenPaths = ['/cart', '/checkout', '/auth', '/sell', '/profile', '/messages'];
     if (forbiddenPaths.some(p => pathname.startsWith(p))) return;

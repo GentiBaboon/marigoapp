@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { ChevronLeft, ChevronRight, Search as SearchIcon, X } from 'lucide-react';
 

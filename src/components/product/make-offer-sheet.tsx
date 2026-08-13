@@ -17,7 +17,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useUser, useFirestore, errorEmitter } from '@/firebase';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
+import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { useCurrency } from '@/context/CurrencyContext';
 
 interface MakeOfferSheetProps {
