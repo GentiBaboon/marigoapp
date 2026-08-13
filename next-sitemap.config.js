@@ -20,7 +20,11 @@ module.exports = {
   },
   // Exclude all paths that are behind authentication or admin-only
   exclude: [
-      '/admin', '/admin/*', 
+      // App Router icon conventions (src/app/icon.png, apple-icon.png) are
+      // emitted as routes, so next-sitemap picks them up as if they were
+      // pages. They are assets — keep them out of the sitemap.
+      '/icon.png', '/apple-icon.png',
+      '/admin', '/admin/*',
       '/profile', '/profile/*', 
       '/cart', 
       '/checkout', '/checkout/*',
