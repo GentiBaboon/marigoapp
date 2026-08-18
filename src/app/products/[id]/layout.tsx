@@ -121,6 +121,11 @@ export default async function ProductLayout({ params, children }: Props) {
           : 'https://schema.org/OutOfStock',
       itemCondition:
         CONDITION_URLS[product.condition ?? ''] ?? 'https://schema.org/UsedCondition',
+      // Google warns on merchant offers with no validity window. Resale stock
+      // is one-of-a-kind and does not expire, so quote a rolling year out.
+      priceValidUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10),
       seller: { '@type': 'Organization', name: SITE_NAME },
     },
   };
@@ -129,7 +134,7 @@ export default async function ProductLayout({ params, children }: Props) {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: absoluteUrl('/home') },
+      { '@type': 'ListItem', position: 1, name: 'Home', item: absoluteUrl('/') },
       ...(product.categoryId
         ? [{
             '@type': 'ListItem',

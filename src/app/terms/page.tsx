@@ -1,3 +1,4 @@
+import { pageMetadata } from '@/lib/seo';
 import {
   Card,
   CardContent,
@@ -5,6 +6,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+
+
+export const metadata = pageMetadata({
+  title: 'Terms of Service | MarigoApp',
+  description: 'The terms that govern buying, selling and delivery on the MarigoApp luxury fashion marketplace.',
+  path: '/terms',
+});
 
 export default function TermsPage() {
   return (

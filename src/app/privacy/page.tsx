@@ -1,3 +1,4 @@
+import { pageMetadata } from '@/lib/seo';
 import {
   Card,
   CardContent,
@@ -5,6 +6,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+
+
+export const metadata = pageMetadata({
+  title: 'Privacy Policy | MarigoApp',
+  description: 'How MarigoApp collects, uses and protects your personal data across Albania, Italy and the EU, in line with GDPR.',
+  path: '/privacy',
+});
 
 export default function PrivacyPage() {
   return (

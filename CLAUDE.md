@@ -19,7 +19,7 @@ Branding (`src/app/globals.css` CSS vars → `tailwind.config.ts`):
 
 Fonts: `font-headline` Georgia serif, `font-body` Inter, `font-logo` Poppins 700. Design spec: `docs/blueprint.md`.
 
-Locale: `<html lang="sq">`, but `LanguageContext` **defaults to `en`** and the picker offers `en` / `sq` only — Italian was pulled from the UI, `it.json` is retained in case it returns.
+Locale: `<html lang="en">` — it must match the *server-rendered* content, and `LanguageContext` **defaults to `en`** (it said `sq` while serving English, which misfiles the site for both languages) and the picker offers `en` / `sq` only — Italian was pulled from the UI, `it.json` is retained in case it returns.
 
 ## 2. Tech stack
 
@@ -291,10 +291,48 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 - Order status is modelled audience-aware in `src/lib/order-status.ts`: `STATUS_RANK`, `statusLabel(status, 'buyer'|'seller'|'admin')`, `TIMELINE_STEPS` / `TIMELINE_STEPS_SELLER`, `nextSellerTransition` / `nextAdminTransition`.
 - Order side-effects live in `src/lib/order-lifecycle.ts` (`recordRefund`, `recordReturn`, `recordRefundForReturn`, `recordRefundForDispute`) and `src/lib/order-inventory.ts` (`releaseOrderItems`, `markOrderItemsSoldIfDepleted`).
 - Notifications: `src/lib/notifications.ts` (`notifyUser`, `notifyOrderStatus`, `humanReadableStatus`).
+- **Sizes come from `src/lib/size-options.ts`, never from a text input.** It
+  resolves options as **admin `size_charts` → `SIZE_PRESETS` → `UNIVERSAL_SIZES`**,
+  and `resolveSizeOptions()` is guaranteed non-empty for every category × system
+  (a test asserts it), which is what allows the sell wizard to have no free-text
+  fallback. One value per size: "Small" is not an option beside "S", it is the
+  *label* on `S` (`S — Small`), because the size facet on `/search` matches on a
+  single key. `normalizeSize()` folds legacy spellings ("Small", "EU 38", "38,5",
+  "12 months") onto that key, and `sizesMatch()` is what the facet compares with —
+  plain `===` left pre-migration listings unreachable from their own filter pill.
+  Entry points: `DetailsStep`, `PricingStep` (variants), `size-config-tab`
+  (admin), `/api/ai/draft-listing`, and the `/search` facet.
 - Admin tables are a repeated shadcn + `@tanstack/react-table` pattern: `data-table.tsx` + `columns.tsx` + `data-table-toolbar.tsx` + `data-table-pagination.tsx` (+ `row-actions`) per domain (`products`, `orders`, `users`, `finance`, `logs`, `logistics/courier-table`). Copy an existing folder rather than inventing a new shape. CSV export via `src/lib/csv-export.ts`.
 - Admin charts in `components/admin/charts/` use `recharts` + `components/ui/chart.tsx`.
 - i18n: `src/lib/translations/{en,sq}.json` via `LanguageContext` (`it.json` is dormant); preference persisted to a cookie and to the user doc.
 - Currency: `CurrencyContext` + `config/exchangeRates` (EUR base; ALL / USD), persisted to `marigo_currency` cookie + user doc. Prices are stored in EUR — always format via `formatPrice`. **`DEFAULT_CURRENCY` is `ALL`** (the primary market is Albania); a saved cookie or user preference still wins. This is display only — storage, payouts, Stripe amounts and the admin/finance dashboards stay in EUR.
+- **SEO: every indexable route declares its own canonical**, via `pageMetadata()`
+  in `src/lib/seo.ts`. The root layout's `alternates: { canonical: '/' }` is
+  inherited by any page that does not override it — that is how /about, /help,
+  /browse, /search, /terms and /privacy all came to declare themselves copies of
+  the homepage, which is what Search Console reported as "Duplicate without
+  user-selected canonical" and "Alternate page with proper canonical tag".
+  Client pages cannot export `metadata`, so each has a sibling `layout.tsx` that
+  does (the `products/[id]/layout.tsx` pattern). **Adding a public route means
+  adding its layout+canonical**, or it silently claims to be `/`.
+  - `/home` canonicals to `/` — they are the same page, since `/` is a splash
+    that redirects there. Only `/` is in the sitemap.
+  - The flat `/view` native siblings and `/welcome` carry `noindexMetadata()`
+    and are deliberately **left crawlable**: a URL blocked in robots.txt can
+    still be indexed from an inbound link, and `noindex` only works on a page
+    Google is allowed to fetch.
+  - `next-sitemap.config.js` derives robots.txt and the sitemap from one
+    `PRIVATE_PATHS` list so the two cannot contradict each other. They did:
+    `/delivery-partner` was disallowed in robots.txt while sitting in the
+    sitemap → "Blocked by robots.txt".
+  - Listings cannot be enumerated at build time, so they are served by
+    `src/app/server-sitemap.xml/route.ts` (active products only) and referenced
+    from robots.txt via `additionalSitemaps`. It must **not** declare
+    `export const dynamic` — that would break `output: 'export'` for Capacitor;
+    freshness comes from the hourly `revalidate` on the fetch.
+  - `public/llms.txt` is the answer-engine (GEO) entry point; robots.txt names
+    GPTBot / OAI-SearchBot / ClaudeBot / PerplexityBot / Google-Extended et al.
+    explicitly.
 - Favicons follow the **App Router icon convention**: `src/app/icon.png` and `src/app/apple-icon.png`, with `public/favicon.ico` for clients that probe that path directly. Do not add a `src/app/favicon.ico` — it is served at `/favicon.ico` and beats any `<link rel="icon">` in `layout.tsx`, which is what kept the old orange mark on screen. Both icon routes are excluded in `next-sitemap.config.js`, or they get listed as pages.
 - Mobile-first: bottom `MobileNav` (Home/Search/Cart/Favorites/Profile), hidden ≥ md; header popovers for cart/messages/notifications.
 - Error reporting: `src/lib/error-reporter.ts` (`reportError`, `reportWarning`) + `FirebaseErrorListener` mounted globally, fed by `src/firebase/error-emitter.ts`.
@@ -325,9 +363,15 @@ Functions (inside `functions/`): `npm run build` (tsc), `npm run serve` (build +
 
 `.claude/launch.json` defines two preview configs: **Next.js Dev Server** (port 3001) and **Firebase Functions Emulator** (port 5001). Emulator ports: functions 5001, firestore 8080, auth 9099, UI disabled.
 
-Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`.
+Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`, `normalize-sizes.mjs`.
 
-Current tests (136 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `rate-limit`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
+`normalize-sizes.mjs` folds `products.size`, `products.variants[].size` and
+`size_charts.sizes[]` onto the canonical vocabulary. **Dry run by default** —
+`--apply` writes, `--only=products|charts|all` scopes, `--backup=out.json`
+records the diff. It loads the rules from `src/lib/size-options.ts` through
+`jiti` rather than restating them, so the script cannot drift from the app.
+
+Current tests (183 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `platform-routes`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

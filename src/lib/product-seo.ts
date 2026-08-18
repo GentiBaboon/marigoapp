@@ -112,3 +112,64 @@ export async function fetchProductReviews(productId: string): Promise<SeoReview[
     return [];
   }
 }
+
+export interface SitemapProduct {
+  id: string;
+  updatedAt?: string;
+  hasImage: boolean;
+}
+
+/**
+ * Every listing that should appear in the sitemap.
+ *
+ * Product pages are the whole SEO surface of a marketplace, and none of them
+ * were being submitted: next-sitemap can only enumerate routes it can see at
+ * build time, and `/products/[id]` resolves out of Firestore. The generated
+ * sitemap listed 12 static pages and not a single listing.
+ *
+ * Only `active` products are included. `sold`, `removed`, `draft` and
+ * `pending_review` listings would be soft-404s or thin pages, and submitting
+ * them is what turns one crawl budget problem into a quality signal problem.
+ *
+ * Paginated over the REST API with the public web key — `/products` is
+ * `allow read: if true`, so this needs no service account.
+ */
+export async function fetchProductsForSitemap(limit = 5000): Promise<SitemapProduct[]> {
+  if (!PROJECT || !API_KEY) return [];
+  const out: SitemapProduct[] = [];
+  let pageToken: string | undefined;
+
+  try {
+    // 300 docs per page keeps each response small; loop until Firestore stops
+    // handing back a token or we hit the cap.
+    while (out.length < limit) {
+      const url = new URL(`${BASE}/products`);
+      url.searchParams.set('pageSize', '300');
+      url.searchParams.set('key', API_KEY);
+      if (pageToken) url.searchParams.set('pageToken', pageToken);
+
+      const res = await fetch(url.toString(), { next: { revalidate: 3600 } });
+      if (!res.ok) break;
+      const json = await res.json();
+
+      for (const doc of json.documents ?? []) {
+        const f = decodeFields(doc.fields ?? {});
+        if (f.status !== 'active') continue;
+        const images = Array.isArray(f.images) ? f.images : [];
+        out.push({
+          id: String(doc.name).split('/').pop() as string,
+          updatedAt: f.updatedAt || f.listingCreated || undefined,
+          hasImage: images.some((i: any) => typeof i?.url === 'string' && i.url.startsWith('http')),
+        });
+      }
+
+      pageToken = json.nextPageToken;
+      if (!pageToken) break;
+    }
+  } catch {
+    // A sitemap that 500s is worse than a short one — fall through with
+    // whatever was collected.
+  }
+
+  return out.slice(0, limit);
+}
