@@ -412,7 +412,7 @@ export default function ProductDetailPage() {
                     {product.categoryId && <DetailRow label="Category" value={product.categoryId} />}
                     {product.subcategoryId && <DetailRow label="Subcategory" value={product.subcategoryId} />}
                     {product.listingType && <DetailRow label="Listing Type" value={product.listingType === 'fixed_price' ? 'Fixed Price' : 'Auction'} />}
-                    {product.vintage && <DetailRow label="Vintage" value="Yes (15+ years)" />}
+                    {product.vintage && <DetailRow label="Vintage" value="Yes (5+ years)" />}
                     {product.originalPrice && <DetailRow label="Original Price" value={formatPrice(product.originalPrice)} />}
                   </div>
                 </AccordionContent>

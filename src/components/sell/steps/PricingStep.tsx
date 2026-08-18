@@ -10,8 +10,10 @@ import { useState, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import type { FirestoreAddress, FirestoreUser, ProductVariant } from '@/lib/types';
-import { canUseVariants } from '@/lib/types';
+import { canUseVariants, DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
+import { useCurrency } from '@/context/CurrencyContext';
 import { useBadgeSettings } from '@/hooks/use-badge-settings';
+import { resolveSizeOptions, resolveSizeSystems } from '@/lib/size-options';
 import { Trash2 } from 'lucide-react';
 import { AddressForm } from '@/components/profile/address-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -23,6 +25,7 @@ export function PricingStep() {
   const { formData, setFormData, nextStep } = useSellForm();
   const { user } = useUser();
   const firestore = useFirestore();
+  const { formatPrice } = useCurrency();
   
   const [price, setPrice] = useState(formData.price?.toString() || '');
   const [originalPrice, setOriginalPrice] = useState(formData.originalPrice?.toString() || '');
@@ -65,14 +68,15 @@ export function PricingStep() {
   // Size charts to drive variant-row size dropdowns.
   const sizeChartsQuery = useMemoFirebase(() => collection(firestore, 'size_charts'), [firestore]);
   const { data: sizeChartsRaw } = useCollection<{ id: string; categoryType: string; sizeSystem: string; sizes: string[]; isActive?: boolean }>(sizeChartsQuery);
-  const applicableCharts = (sizeChartsRaw ?? [])
-    .filter(c => c.isActive !== false)
-    .filter(c => !formData.categoryId || c.categoryType === formData.categoryId);
-  const fallbackCharts = (sizeChartsRaw ?? []).filter(c => c.isActive !== false);
-  const variantCharts = applicableCharts.length > 0 ? applicableCharts : fallbackCharts;
-  const variantSystems = Array.from(new Set(variantCharts.map(c => c.sizeSystem)));
-  const variantActiveChart = variantCharts.find(c => c.sizeSystem === variantSizeSystem);
-  const variantSizeOptions = variantActiveChart?.sizes ?? [];
+  // Same resolution as DetailsStep (admin chart → preset → universal), so a
+  // category with no configured chart still gets a dropdown here instead of a
+  // free-text box.
+  const variantSystems = resolveSizeSystems(formData.categoryId, sizeChartsRaw);
+  const variantSizeOptions = resolveSizeOptions({
+    categoryType: formData.categoryId,
+    sizeSystem: variantSizeSystem,
+    charts: sizeChartsRaw,
+  });
 
   // Fetch user addresses
   const addressesCollection = useMemoFirebase(() => {
@@ -195,11 +199,7 @@ export function PricingStep() {
                 <SelectValue placeholder="System" />
               </SelectTrigger>
               <SelectContent>
-                {variantSystems.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">No chart for this category.</div>
-                ) : (
-                  variantSystems.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)
-                )}
+                {variantSystems.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -211,28 +211,19 @@ export function PricingStep() {
             <div className="space-y-2">
               {variants.map((v, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  {variantSizeOptions.length > 0 ? (
-                    <Select
-                      value={v.size || ''}
-                      onValueChange={(val) => updateVariant(i, { size: val })}
-                    >
-                      <SelectTrigger className="h-11 flex-1">
-                        <SelectValue placeholder="Size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {variantSizeOptions
-                          .filter(s => s === v.size || !variants.some(other => other !== v && other.size === s))
-                          .map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      placeholder="Size (e.g. 38)"
-                      value={v.size}
-                      onChange={(e) => updateVariant(i, { size: e.target.value })}
-                      className="h-11 flex-1"
-                    />
-                  )}
+                  <Select
+                    value={v.size || ''}
+                    onValueChange={(val) => updateVariant(i, { size: val })}
+                  >
+                    <SelectTrigger className="h-11 flex-1">
+                      <SelectValue placeholder="Size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {variantSizeOptions
+                        .filter(o => o.value === v.size || !variants.some(other => other !== v && other.size === o.value))
+                        .map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                   <Input
                     type="number"
                     min={0}
@@ -338,21 +329,11 @@ export function PricingStep() {
             <Truck className="h-5 w-5" />
             Shipping details
           </Label>
-          <div className="grid gap-4">
-            <Select
-              value={formData.shippingMethod || 'baboon'}
-              onValueChange={(v) => setFormData({ shippingMethod: v as any })}
-            >
-              <SelectTrigger className="h-12 font-medium">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="baboon">Baboon Delivery (€5.00 - Recommended)</SelectItem>
-                <SelectItem value="other">Other courier</SelectItem>
-                <SelectItem value="free">Free shipping</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Delivery is a flat platform fee paid by the buyer — the seller
+              has no courier choice to make, so there is nothing to pick here. */}
+          <p className="text-sm text-muted-foreground">
+            Delivery is handled by Marigo. Buyers pay a flat {formatPrice(DEFAULT_SHIPPING_FEE_EUR)} delivery fee at checkout — it does not come out of your earnings.
+          </p>
 
           {/* Shipping From Address */}
           <div className="space-y-3 pt-2">

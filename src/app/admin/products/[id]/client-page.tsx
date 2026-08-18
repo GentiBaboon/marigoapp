@@ -61,6 +61,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { resolveSizeOptions, resolveSizeSystems, normalizeSize } from '@/lib/size-options';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -157,6 +158,7 @@ export default function AdminProductReviewPage() {
   const materialsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'materials') : null), [firestore]);
   const colorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'colors') : null), [firestore]);
   const patternsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'patterns') : null), [firestore]);
+  const sizeChartsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'size_charts') : null), [firestore]);
 
   const { data: categories } = useCollection<FirestoreCategory>(categoriesQuery);
   const { data: brands } = useCollection<FirestoreBrand>(brandsQuery);
@@ -164,6 +166,7 @@ export default function AdminProductReviewPage() {
   const { data: materials } = useCollection<FirestoreAttribute>(materialsQuery);
   const { data: colors } = useCollection<FirestoreAttribute>(colorsQuery);
   const { data: patterns } = useCollection<FirestoreAttribute>(patternsQuery);
+  const { data: sizeChartsRaw } = useCollection<{ id: string; categoryType: string; sizeSystem: string; sizes: string[]; isActive?: boolean }>(sizeChartsQuery);
 
   const macroFiltersRef = useMemoFirebase(
     () => (firestore ? doc(firestore, 'settings', 'macro_filters') : null),
@@ -213,6 +216,7 @@ export default function AdminProductReviewPage() {
   const colorItems = React.useMemo(() => toAttributeItems(colors), [colors, toAttributeItems]);
   const patternItems = React.useMemo(() => toAttributeItems(patterns), [patterns, toAttributeItems]);
 
+
   // ── Form state ──
   const [images, setImages] = React.useState<ProductImage[]>([]);
   const [isUploadingImage, setIsUploadingImage] = React.useState(false);
@@ -228,6 +232,7 @@ export default function AdminProductReviewPage() {
   const [material, setMaterial] = React.useState('');
   const [color, setColor] = React.useState('');
   const [size, setSize] = React.useState('');
+  const [sizeSystem, setSizeSystem] = React.useState('');
   const [pattern, setPattern] = React.useState('');
   const [vintage, setVintage] = React.useState(false);
   const [price, setPrice] = React.useState('');
@@ -238,6 +243,19 @@ export default function AdminProductReviewPage() {
   // Per-size variants — populated for Official Brand listings. Editable here
   // so admins can adjust stock per size.
   const [variants, setVariants] = React.useState<{ size: string; quantity: number }[]>([]);
+
+  // Same resolution the sell wizard uses (admin chart → preset → universal),
+  // so what an admin can set here is exactly what a seller could have picked.
+  // `categoryId` holds the parent category *name* on a product doc, which is
+  // what size charts key on.
+  const sizeSystemOptions = React.useMemo(
+    () => resolveSizeSystems(categoryId, sizeChartsRaw),
+    [categoryId, sizeChartsRaw],
+  );
+  const sizeItems = React.useMemo(
+    () => resolveSizeOptions({ categoryType: categoryId, sizeSystem, charts: sizeChartsRaw }),
+    [categoryId, sizeSystem, sizeChartsRaw],
+  );
 
   const [seeded, setSeeded] = React.useState(false);
 
@@ -252,7 +270,10 @@ export default function AdminProductReviewPage() {
       setTitle(product.title ?? '');
       setDescription(product.description ?? '');
       setCondition(product.condition ?? '');
-      setSize(product.size ?? '');
+      // Seed through normalizeSize so a legacy free-text value ("Small",
+      // "EU 38") lands on an option the picker can actually show as selected.
+      setSize(normalizeSize(product.size ?? ''));
+      setSizeSystem((product as any).sizeSystem ?? '');
       setColor(product.color ?? '');
       setMaterial(product.material ?? '');
       setPattern(product.pattern ?? '');
@@ -390,7 +411,7 @@ export default function AdminProductReviewPage() {
       // source of truth for stock — the top-level `quantity` field mirrors the
       // sum so legacy readers (search, cards) keep working.
       const cleanedVariants = variants
-        .map(v => ({ size: (v.size || '').trim(), quantity: Math.max(0, Math.floor(Number(v.quantity) || 0)) }))
+        .map(v => ({ size: normalizeSize(v.size), quantity: Math.max(0, Math.floor(Number(v.quantity) || 0)) }))
         .filter(v => v.size.length > 0);
       const variantTotal = cleanedVariants.reduce((s, v) => s + v.quantity, 0);
 
@@ -403,7 +424,8 @@ export default function AdminProductReviewPage() {
         title: title.trim(),
         description: description.trim(),
         condition,
-        size: size.trim(),
+        size: normalizeSize(size),
+        sizeSystem: sizeSystem || null,
         color,
         material,
         pattern,
@@ -741,12 +763,42 @@ export default function AdminProductReviewPage() {
               </div>
             </div>
 
-            {/* Size + Pattern */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="font-semibold text-sm">Size</Label>
-                <Input value={size} onChange={e => setSize(e.target.value)} placeholder="e.g. 42 / M" />
+            {/* Size — system + value, mirroring the sell wizard's Details step
+                rather than the free-text box this used to be. */}
+            <div className="space-y-1.5">
+              <Label className="font-semibold text-sm">Size</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <Select
+                  value={sizeSystem || ''}
+                  onValueChange={(v) => {
+                    setSizeSystem(v);
+                    // Switching systems invalidates the chosen value — clear it
+                    // so the admin picks one that exists in the new chart.
+                    setSize('');
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="System (EU, US, ...)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sizeSystemOptions.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Combobox
+                  value={size}
+                  onValueChange={setSize}
+                  items={sizeItems}
+                  placeholder="Size"
+                  searchPlaceholder="Search sizes..."
+                  emptyPlaceholder="No matching size."
+                />
               </div>
+            </div>
+
+            {/* Pattern */}
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="font-semibold text-sm">Pattern</Label>
                 <Combobox
@@ -764,7 +816,7 @@ export default function AdminProductReviewPage() {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
                 <p className="text-sm font-semibold">Vintage Item</p>
-                <p className="text-xs text-muted-foreground">15+ years old</p>
+                <p className="text-xs text-muted-foreground">5+ years old</p>
               </div>
               <Switch checked={vintage} onCheckedChange={setVintage} />
             </div>
@@ -839,7 +891,7 @@ export default function AdminProductReviewPage() {
             {variants.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-baseline justify-between">
-                  <Label className="font-semibold text-sm">Inventory by size{(product as any).sizeSystem ? ` · ${(product as any).sizeSystem}` : ''}</Label>
+                  <Label className="font-semibold text-sm">Inventory by size{sizeSystem ? ` · ${sizeSystem}` : ''}</Label>
                   <span className="text-xs text-muted-foreground">
                     {variants.reduce((s, v) => s + (Number(v.quantity) || 0), 0)} total
                   </span>
@@ -847,12 +899,16 @@ export default function AdminProductReviewPage() {
                 <div className="space-y-2">
                   {variants.map((v, i) => (
                     <div key={i} className="flex items-center gap-2">
-                      <Input
-                        value={v.size}
-                        onChange={e => setVariants(prev => prev.map((row, idx) => idx === i ? { ...row, size: e.target.value } : row))}
-                        className="h-9 flex-1"
-                        placeholder="Size"
-                      />
+                      <div className="flex-1">
+                        <Combobox
+                          value={v.size}
+                          onValueChange={val => setVariants(prev => prev.map((row, idx) => idx === i ? { ...row, size: val } : row))}
+                          items={sizeItems}
+                          placeholder="Size"
+                          searchPlaceholder="Search sizes..."
+                          emptyPlaceholder="No matching size."
+                        />
+                      </div>
                       <Input
                         type="number"
                         min={0}

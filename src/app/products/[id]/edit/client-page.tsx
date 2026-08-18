@@ -13,6 +13,8 @@ import type {
   FirestoreAddress,
   ProductImage,
 } from '@/lib/types';
+import { DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
+import { useCurrency } from '@/context/CurrencyContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,7 +33,6 @@ import {
   Check,
   X,
   ImagePlus,
-  Info,
 } from 'lucide-react';
 import Link from 'next/link';
 import NextImage from 'next/image';
@@ -55,7 +56,6 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { AddressForm } from '@/components/profile/address-form';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const GENDER_OPTIONS = [
   { value: 'women', label: 'Womenswear' },
@@ -64,10 +64,9 @@ const GENDER_OPTIONS = [
   { value: 'unisex', label: 'Unisex' },
 ] as const;
 
+// Kept in step with originOptions in components/sell/steps/DescriptionStep.tsx.
 const ORIGIN_OPTIONS = [
   { value: 'direct', label: 'Direct from brand' },
-  { value: 'private', label: 'Private sale or staff sale' },
-  { value: 'vestiaire', label: 'Bought on Vestiaire Collective' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -88,6 +87,7 @@ export default function EditListingPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
+  const { formatPrice } = useCurrency();
   const [isSaving, setIsSaving] = React.useState(false);
 
   // ── Product Data ──
@@ -185,7 +185,6 @@ export default function EditListingPage() {
 
   const [price, setPrice] = React.useState('');
   const [allowOffers, setAllowOffers] = React.useState(false);
-  const [shippingMethod, setShippingMethod] = React.useState('baboon');
   const [selectedAddressId, setSelectedAddressId] = React.useState<string | undefined>(undefined);
   const [isAddrDialogOpen, setIsAddrDialogOpen] = React.useState(false);
   const [isAddingNewAddress, setIsAddingNewAddress] = React.useState(false);
@@ -519,12 +518,6 @@ export default function EditListingPage() {
             <Label className="font-semibold">
               Origin <span className="font-normal text-muted-foreground">(optional)</span>
             </Label>
-            <Alert variant="default" className="bg-muted/50">
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                We can&apos;t accept items gifted at VIP or press events, sent complimentary, or offered in-store as part of a purchase.
-              </AlertDescription>
-            </Alert>
             <RadioGroup
               value={origin}
               onValueChange={setOrigin}
@@ -671,7 +664,7 @@ export default function EditListingPage() {
           <div className="flex flex-row items-center justify-between rounded-xl border p-4">
             <div className="space-y-0.5">
               <p className="text-base font-semibold">Vintage Item</p>
-              <p className="text-xs text-muted-foreground">Item is 15+ years old.</p>
+              <p className="text-xs text-muted-foreground">Item is 5+ years old.</p>
             </div>
             <Switch checked={vintage} onCheckedChange={setVintage} />
           </div>
@@ -727,16 +720,11 @@ export default function EditListingPage() {
               <Truck className="h-5 w-5" />
               Shipping details
             </Label>
-            <Select value={shippingMethod} onValueChange={setShippingMethod}>
-              <SelectTrigger className="h-12 font-medium">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="baboon">Baboon Delivery (€5.00 — Recommended)</SelectItem>
-                <SelectItem value="other">Other courier</SelectItem>
-                <SelectItem value="free">Free shipping</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Delivery is a flat platform fee paid by the buyer — see
+                DEFAULT_SHIPPING_FEE_ALL. Sellers pick no courier. */}
+            <p className="text-sm text-muted-foreground">
+              Delivery is handled by Marigo. Buyers pay a flat {formatPrice(DEFAULT_SHIPPING_FEE_EUR)} delivery fee at checkout — it does not come out of your earnings.
+            </p>
 
             {/* Shipping Address */}
             <div className="space-y-3 pt-2">

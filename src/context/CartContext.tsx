@@ -6,6 +6,7 @@ import { useUser, useFirestore, errorEmitter } from '@/firebase';
 import { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot, writeBatch, query, where, limit } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import type { FirestoreCoupon, FirestoreSettings } from '@/lib/types';
+import { DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
 
 export type ShippingMethod = 'direct' | 'authentication';
 
@@ -240,7 +241,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     selectedSize: size ?? null,
                     selectedColor: color ?? null,
                     shippingMethod: 'direct',
-                    directShippingFee: 10.90,
+                    directShippingFee: DEFAULT_SHIPPING_FEE_EUR,
                 };
 
             // Persist to Firestore (effects-in-render is fine here — same pattern
@@ -337,10 +338,15 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const totalItems = useMemo(() => items.reduce((acc, item) => acc + item.quantity, 0), [items]);
     
     const totalShipping = useMemo(() => {
+        if (items.length === 0) return 0;
         if (settings?.isFreeDeliveryActive && subtotal >= (settings?.freeDeliveryThreshold || 0)) {
             return 0;
         }
-        return items.reduce((acc, item) => acc + (item.directShippingFee * item.quantity), 0);
+        // One flat delivery fee per order, not per item — a second pair of shoes
+        // in the same basket does not double the courier cost. Must stay in step
+        // with calculateOrderTotal() in src/app/api/create-order/route.ts, which
+        // is the authoritative figure the buyer is actually charged.
+        return DEFAULT_SHIPPING_FEE_EUR;
     }, [items, settings, subtotal]);
 
     const grandTotal = useMemo(() => Math.max(0, subtotal + totalShipping - discountAmount), [subtotal, totalShipping, discountAmount]);

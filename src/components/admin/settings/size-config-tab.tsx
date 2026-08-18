@@ -12,6 +12,14 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { FirestoreCategory } from '@/lib/types';
+import {
+  SIZE_SYSTEMS as SHARED_SIZE_SYSTEMS,
+  SIZE_PRESETS,
+  UNIVERSAL_SIZES,
+  normalizeSize,
+  sizeLabel,
+  type SizeSystem,
+} from '@/lib/size-options';
 
 interface SizeChart {
   id: string;
@@ -21,31 +29,10 @@ interface SizeChart {
   isActive: boolean;
 }
 
-const SIZE_SYSTEMS = ['EU', 'US', 'UK', 'IT', 'FR', 'International'];
-
-const DEFAULT_SIZES: Record<string, Record<string, string[]>> = {
-  Shoes: {
-    EU: ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'],
-    US: ['5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '12', '13'],
-    UK: ['3', '3.5', '4', '4.5', '5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '10', '11'],
-  },
-  Clothing: {
-    EU: ['34', '36', '38', '40', '42', '44', '46', '48', '50'],
-    US: ['0', '2', '4', '6', '8', '10', '12', '14', '16'],
-    IT: ['38', '40', '42', '44', '46', '48'],
-    FR: ['34', '36', '38', '40', '42', '44'],
-    International: ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
-  },
-  Bags: {
-    International: ['Mini', 'Small', 'Medium', 'Large', 'Oversized', 'One Size'],
-  },
-  Accessories: {
-    International: ['One Size', 'XS', 'S', 'M', 'L', 'XL'],
-  },
-  Watches: {
-    International: ['One Size'],
-  },
-};
+// Systems, presets and the universal fallback all come from the shared
+// vocabulary so admin cannot configure a chart the sell wizard can't offer —
+// and so nobody re-introduces "Small" beside "S" by typing it here.
+const SIZE_SYSTEMS = [...SHARED_SIZE_SYSTEMS];
 
 export function SizeConfigTab() {
   const firestore = useFirestore();
@@ -91,18 +78,49 @@ export function SizeConfigTab() {
   };
 
   const handleLoadDefaults = () => {
-    const defaults = DEFAULT_SIZES[formData.categoryType]?.[formData.sizeSystem];
-    if (defaults) {
+    const defaults = SIZE_PRESETS[formData.categoryType]?.[formData.sizeSystem as SizeSystem];
+    if (defaults?.length) {
       setFormData(prev => ({ ...prev, sizes: [...defaults] }));
-      toast({ title: 'Default sizes loaded.' });
+      toast({ title: `Loaded ${defaults.length} sizes.` });
     } else {
-      toast({ variant: 'destructive', title: 'No defaults for this combination.' });
+      toast({ variant: 'destructive', title: 'No preset for this combination.' });
     }
   };
 
+  // Options offered for the current category + system, falling back to the
+  // universal list so every combination has something to tick.
+  const pickableSizes = React.useMemo(() => {
+    const preset = SIZE_PRESETS[formData.categoryType]?.[formData.sizeSystem as SizeSystem];
+    const base = preset?.length
+      ? preset
+      : Object.values(SIZE_PRESETS[formData.categoryType] ?? {}).flat().filter(Boolean) as string[];
+    const options = base.length > 0 ? base : UNIVERSAL_SIZES;
+    // Anything already on the chart stays visible even if it is off-preset,
+    // so editing an old chart never silently drops a size.
+    return Array.from(new Set([...options, ...formData.sizes]));
+  }, [formData.categoryType, formData.sizeSystem, formData.sizes]);
+
+  const toggleSize = (val: string) => {
+    setFormData(prev => ({
+      ...prev,
+      sizes: prev.sizes.includes(val)
+        ? prev.sizes.filter(s => s !== val)
+        : [...prev.sizes, val],
+    }));
+  };
+
+  const selectAllSizes = () => setFormData(prev => ({ ...prev, sizes: [...pickableSizes] }));
+  const clearSizes = () => setFormData(prev => ({ ...prev, sizes: [] }));
+
+  // Escape hatch for a size no preset covers. Normalised on the way in, so a
+  // typed "Small" is stored as "S" rather than becoming a second option that
+  // no listing and no filter pill will ever agree with.
   const addSize = () => {
-    const val = newSize.trim();
-    if (!val || formData.sizes.includes(val)) return;
+    const val = normalizeSize(newSize);
+    if (!val || formData.sizes.includes(val)) {
+      setNewSize('');
+      return;
+    }
     setFormData(prev => ({ ...prev, sizes: [...prev.sizes, val] }));
     setNewSize('');
   };
@@ -231,23 +249,54 @@ export function SizeConfigTab() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Sizes ({formData.sizes.length})</Label>
-                <Button type="button" variant="outline" size="sm" onClick={handleLoadDefaults}>
-                  Load Defaults
-                </Button>
+                <div className="flex gap-1">
+                  <Button type="button" variant="outline" size="sm" onClick={handleLoadDefaults}>
+                    Load Preset
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={selectAllSizes}>All</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={clearSizes}>None</Button>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2 border rounded-md bg-muted/20">
-                {formData.sizes.map((s, i) => (
-                  <Badge key={i} variant="secondary" className="gap-1 pr-1">
-                    {s}
-                    <button onClick={() => removeSize(i)} className="ml-0.5 hover:text-destructive"><X className="h-3 w-3" /></button>
-                  </Badge>
-                ))}
+
+              {/* Tick from the shared vocabulary instead of typing. Selected
+                  entries render first so a long numeric list stays scannable. */}
+              <div className="flex flex-wrap gap-1.5 max-h-[220px] overflow-y-auto p-2 border rounded-md bg-muted/20">
+                {pickableSizes.map(s => {
+                  const on = formData.sizes.includes(s);
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => toggleSize(s)}
+                      title={sizeLabel(s)}
+                      className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${
+                        on
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background hover:bg-muted border-input text-muted-foreground'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
               </div>
+
+              {formData.sizes.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {formData.sizes.map((s, i) => (
+                    <Badge key={`${s}-${i}`} variant="secondary" className="gap-1 pr-1">
+                      {s}
+                      <button type="button" onClick={() => removeSize(i)} className="ml-0.5 hover:text-destructive"><X className="h-3 w-3" /></button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <Input
                   value={newSize}
                   onChange={e => setNewSize(e.target.value)}
-                  placeholder="Add size..."
+                  placeholder="Custom size (rare — normalised on add)"
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSize(); } }}
                 />
                 <Button type="button" variant="outline" onClick={addSize}>Add</Button>

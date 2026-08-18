@@ -460,7 +460,8 @@ export interface SellFormValues {
   variants?: ProductVariant[];
   listingType: "fixed_price" | "auction";
   allowOffers: boolean;
-  shippingMethod: 'baboon' | 'other' | 'free';
+  // No `shippingMethod` — delivery is a flat platform fee (DEFAULT_SHIPPING_FEE_ALL),
+  // not a per-listing courier choice.
   shippingFromAddressId: string;
 }
 
@@ -595,6 +596,28 @@ export interface FirestoreSettings {
 export const DEFAULT_PAYOUT_HOLD_HOURS = 72;
 export const DEFAULT_REFUND_WINDOW_DAYS = 14;
 export const DEFAULT_COMMISSION_RATE = 0.15;
+
+/**
+ * Flat delivery fee charged on an order.
+ *
+ * The business figure is a round **200 ALL** — Albania is the primary market
+ * and `DEFAULT_CURRENCY` is ALL. It is stored in EUR because every persisted
+ * money value in the app is (Stripe amounts, payouts, the finance dashboards),
+ * and `formatPrice()` converts for display.
+ *
+ * `ALL_PER_EUR` mirrors the fallback table in `CurrencyContext` — which is the
+ * rate the app actually runs on today, since `config/exchangeRates` does not
+ * exist in Firestore. Dividing here rather than hardcoding 1.93 keeps the
+ * displayed figure exactly 200 ALL, and makes the intent legible if the rate
+ * ever moves. If a real `config/exchangeRates` doc is added with a different
+ * ALL rate, the *displayed* fee drifts off 200 — update this pair together.
+ *
+ * Replaces the two separate hardcoded `10.9` literals that used to live in
+ * CartContext and the create-order route, which could silently disagree.
+ */
+export const DEFAULT_SHIPPING_FEE_ALL = 200;
+const ALL_PER_EUR = 103.5;
+export const DEFAULT_SHIPPING_FEE_EUR = DEFAULT_SHIPPING_FEE_ALL / ALL_PER_EUR;
 
 export interface RelatedProductsConfig {
   enabled: boolean;
