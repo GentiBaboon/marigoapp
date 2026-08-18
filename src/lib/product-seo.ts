@@ -115,8 +115,10 @@ export async function fetchProductReviews(productId: string): Promise<SeoReview[
 
 export interface SitemapProduct {
   id: string;
+  title?: string;
   updatedAt?: string;
-  hasImage: boolean;
+  /** First usable image, emitted as a Google image-sitemap extension. */
+  image?: string;
 }
 
 /**
@@ -156,10 +158,15 @@ export async function fetchProductsForSitemap(limit = 5000): Promise<SitemapProd
         const f = decodeFields(doc.fields ?? {});
         if (f.status !== 'active') continue;
         const images = Array.isArray(f.images) ? f.images : [];
+        const image = images
+          .slice()
+          .sort((a: any, b: any) => (a?.position ?? 0) - (b?.position ?? 0))
+          .find((i: any) => typeof i?.url === 'string' && i.url.startsWith('http'))?.url;
         out.push({
           id: String(doc.name).split('/').pop() as string,
+          title: typeof f.title === 'string' ? f.title : undefined,
           updatedAt: f.updatedAt || f.listingCreated || undefined,
-          hasImage: images.some((i: any) => typeof i?.url === 'string' && i.url.startsWith('http')),
+          image,
         });
       }
 

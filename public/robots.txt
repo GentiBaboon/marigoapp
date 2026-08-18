@@ -153,4 +153,3 @@ Host: https://www.marigoapp.com
 
 # Sitemaps
 Sitemap: https://www.marigoapp.com/sitemap.xml
-Sitemap: https://www.marigoapp.com/server-sitemap.xml

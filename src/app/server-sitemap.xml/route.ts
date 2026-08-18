@@ -2,9 +2,16 @@ import { fetchProductsForSitemap } from '@/lib/product-seo';
 import { absoluteUrl } from '@/lib/site';
 
 /**
- * Sitemap for listings, which live in Firestore and so cannot be enumerated by
- * next-sitemap at build time. Referenced from robots.txt via
- * `additionalSitemaps` in next-sitemap.config.js.
+ * Always-fresh listings sitemap, read straight from Firestore.
+ *
+ * NOT the submitted one. What Search Console receives is the static
+ * `public/sitemap-products.xml`, written at build time by
+ * scripts/generate-sitemap.mjs and referenced from the sitemap index — served
+ * from the CDN, and immune to Firestore being slow when a crawler calls.
+ *
+ * This route is kept as the live alternative: it reflects listings published
+ * since the last deploy, which the static file cannot. Submit it as an extra
+ * sitemap only if deploys become infrequent enough for that gap to matter.
  *
  * No `export const dynamic` on purpose: that would break `output: 'export'`
  * for the Capacitor build. Freshness comes from the hourly `revalidate` on the

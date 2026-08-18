@@ -64,11 +64,10 @@ module.exports = {
       { userAgent: 'Applebot-Extended', allow: '/', disallow: PRIVATE_PATHS },
       { userAgent: 'CCBot', allow: '/', disallow: PRIVATE_PATHS },
     ],
-    additionalSitemaps: [
-      // Listings live in Firestore, so they cannot be enumerated at build time.
-      // Served fresh by src/app/server-sitemap.xml/route.ts.
-      `${process.env.SITE_URL || 'https://www.marigoapp.com'}/server-sitemap.xml`,
-    ],
+    // No additionalSitemaps: `/sitemap.xml` is the single entry point. Listings
+    // are added to that index by scripts/generate-sitemap.mjs, which runs in
+    // `postbuild` right after this. Submitting the products sitemap separately
+    // as well would report the same URLs under two sitemaps in Search Console.
   },
   exclude: [
     // App Router icon conventions (src/app/icon.png, apple-icon.png) are
@@ -79,10 +78,10 @@ module.exports = {
     // Never in the sitemap: private, or a duplicate of a canonical URL.
     ...PRIVATE_PATHS.flatMap((p) => [p, `${p}/*`]),
     ...NOINDEX_PATHS,
-    // The dynamic listing sitemap is referenced via additionalSitemaps; it must
-    // not also appear as a page URL.
+    // Sitemaps are not pages.
     '/server-sitemap.xml',
-    // Listings are submitted by /server-sitemap.xml, so nothing under /products
+    '/sitemap-products.xml',
+    // Listings are submitted by sitemap-products.xml, so nothing under /products
     // belongs in the static sitemap. Without this, next-sitemap collapses the
     // dynamic segments of `/products/[id]/edit` and `/products/[id]/offers/
     // [offerId]` into the literal URLs `/products/edit` and `/products/offer`,

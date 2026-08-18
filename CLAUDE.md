@@ -325,14 +325,22 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
     `PRIVATE_PATHS` list so the two cannot contradict each other. They did:
     `/delivery-partner` was disallowed in robots.txt while sitting in the
     sitemap → "Blocked by robots.txt".
-  - Listings cannot be enumerated at build time, so they are served by
-    `src/app/server-sitemap.xml/route.ts` (active products only) and referenced
-    from robots.txt via `additionalSitemaps`. It must **not** declare
-    `export const dynamic` — that would break `output: 'export'` for Capacitor;
-    freshness comes from the hourly `revalidate` on the fetch.
-  - `public/llms.txt` is the answer-engine (GEO) entry point; robots.txt names
-    GPTBot / OAI-SearchBot / ClaudeBot / PerplexityBot / Google-Extended et al.
-    explicitly.
+  - **`/sitemap.xml` is the single submitted entry point.** It is an index over
+    `sitemap-0.xml` (static pages, from next-sitemap) and `sitemap-products.xml`
+    (every active listing, with `<image:image>` extensions). The second file
+    cannot come from next-sitemap — listings resolve out of Firestore — so
+    `scripts/generate-sitemap.mjs` writes it and appends it to the index. It runs
+    in `postbuild`, after next-sitemap, and imports the listing query from
+    `src/lib/product-seo.ts` through `jiti` so the two cannot disagree. A
+    Firestore failure logs and exits 0: a build must not break over a sitemap.
+    New listings therefore enter the sitemap **on the next deploy**.
+  - `src/app/server-sitemap.xml/route.ts` still exists as the always-fresh
+    alternative but is **not submitted** — the static file is. If it is ever
+    submitted, it must **not** declare `export const dynamic`, which would break
+    `output: 'export'` for Capacitor.
+  - `public/llms.txt` and `public/llms-full.txt` are the answer-engine (GEO)
+    entry points; robots.txt names GPTBot / OAI-SearchBot / ClaudeBot /
+    PerplexityBot / Google-Extended et al. explicitly.
 - Favicons follow the **App Router icon convention**: `src/app/icon.png` and `src/app/apple-icon.png`, with `public/favicon.ico` for clients that probe that path directly. Do not add a `src/app/favicon.ico` — it is served at `/favicon.ico` and beats any `<link rel="icon">` in `layout.tsx`, which is what kept the old orange mark on screen. Both icon routes are excluded in `next-sitemap.config.js`, or they get listed as pages.
 - Mobile-first: bottom `MobileNav` (Home/Search/Cart/Favorites/Profile), hidden ≥ md; header popovers for cart/messages/notifications.
 - Error reporting: `src/lib/error-reporter.ts` (`reportError`, `reportWarning`) + `FirebaseErrorListener` mounted globally, fed by `src/firebase/error-emitter.ts`.
@@ -363,7 +371,7 @@ Functions (inside `functions/`): `npm run build` (tsc), `npm run serve` (build +
 
 `.claude/launch.json` defines two preview configs: **Next.js Dev Server** (port 3001) and **Firebase Functions Emulator** (port 5001). Emulator ports: functions 5001, firestore 8080, auth 9099, UI disabled.
 
-Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`, `normalize-sizes.mjs`.
+Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`, `normalize-sizes.mjs`, `generate-sitemap.mjs`.
 
 `normalize-sizes.mjs` folds `products.size`, `products.variants[].size` and
 `size_charts.sizes[]` onto the canonical vocabulary. **Dry run by default** —

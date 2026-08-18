@@ -43,7 +43,9 @@ Canonical site: https://www.marigoapp.com
 
 ## For crawlers
 
-- Listings sitemap: https://www.marigoapp.com/server-sitemap.xml
-- Site sitemap: https://www.marigoapp.com/sitemap.xml
+- Sitemap index (covers everything): https://www.marigoapp.com/sitemap.xml
+  - Pages: https://www.marigoapp.com/sitemap-0.xml
+  - Listings, with images: https://www.marigoapp.com/sitemap-products.xml
+- Extended version of this file: https://www.marigoapp.com/llms-full.txt
 - Individual listings live at https://www.marigoapp.com/products/{id} and carry
   schema.org Product, Offer, AggregateRating and BreadcrumbList JSON-LD.
