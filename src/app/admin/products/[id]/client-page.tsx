@@ -62,7 +62,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { resolveSizeOptions, resolveSizeSystems, normalizeSize } from '@/lib/size-options';
-import { buildProductPath, generateProductSlug, slugify, MAX_SLUG_LENGTH } from '@/lib/product-slug';
+import { buildProductPath, generateProductSlug, slugify, uniqueSlug, MAX_SLUG_LENGTH } from '@/lib/product-slug';
 import { SITE_URL } from '@/lib/site';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -435,6 +435,25 @@ export default function AdminProductReviewPage() {
   };
 
   // ── Save all edits ──
+  /**
+   * The slug to persist: the admin's value if they typed one, otherwise a
+   * generated one. Either way it is normalised and made unique — two listings
+   * sharing a slug would make one of them unreachable, since the product page
+   * resolves by querying this field.
+   */
+  const resolveSlugForSave = React.useCallback(async () => {
+    const typed = slugify(seoSlug).slice(0, MAX_SLUG_LENGTH);
+    const base = typed || generateProductSlug({ id, title, brandId, color, size });
+    if (!base) return null;
+    return uniqueSlug(base, async (candidate) => {
+      const snap = await getDocs(
+        query(collection(firestore, 'products'), where('seoSlug', '==', candidate), limit(1)),
+      );
+      // Its own slug is not a collision.
+      return !snap.empty && snap.docs[0].id !== id;
+    });
+  }, [seoSlug, id, title, brandId, color, size, firestore]);
+
   const handleSave = async () => {
     if (!productRef || !adminUser || !product) return;
     setIsSaving(true);
@@ -469,9 +488,11 @@ export default function AdminProductReviewPage() {
         quantity: cleanedVariants.length > 0 ? Math.max(0, variantTotal) : parsedQuantity,
         variants: cleanedVariants.length > 0 ? cleanedVariants : null,
         listingType,
-        // Slug is normalised on the way in so a hand-typed value can never
-        // produce a URL that does not round-trip through extractProductId.
-        seoSlug: slugify(seoSlug).slice(0, MAX_SLUG_LENGTH) || null,
+        // Auto-complete: a listing saved with the field blank still gets a
+        // correct slug, so an admin never has to think about it. Product URLs
+        // are resolved by querying this field, so a listing without one can
+        // only be reached by its raw id.
+        seoSlug: await resolveSlugForSave(),
         seoTitle: seoTitle.trim() || null,
         seoDescription: seoDescription.trim() || null,
         updatedAt: serverTimestamp(),
@@ -1005,7 +1026,7 @@ export default function AdminProductReviewPage() {
             />
             <p className="text-xs text-muted-foreground break-all">
               {SITE_URL}
-              {buildProductPath({ id, title, brandId, color, size, seoSlug: slugify(seoSlug) })}
+              {buildProductPath({ id, title, brandId, color, size, seoSlug: slugify(seoSlug) || generateProductSlug({ id, title, brandId, color, size }) })}
             </p>
             <p className="text-xs text-muted-foreground">
               {seoSlugLength}/{MAX_SLUG_LENGTH} characters. Changing this changes
@@ -1051,7 +1072,7 @@ export default function AdminProductReviewPage() {
             <div className="rounded-lg border p-3 bg-muted/20 space-y-1">
               <p className="text-xs text-muted-foreground break-all">
                 {SITE_URL.replace(/^https?:\/\//, '')}
-                {buildProductPath({ id, title, brandId, color, size, seoSlug: slugify(seoSlug) })}
+                {buildProductPath({ id, title, brandId, color, size, seoSlug: slugify(seoSlug) || generateProductSlug({ id, title, brandId, color, size }) })}
               </p>
               <p className="text-[#1a0dab] dark:text-[#8ab4f8] text-base leading-snug line-clamp-1">
                 {seoPreviewTitle}

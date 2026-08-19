@@ -5,6 +5,7 @@ import {
   buildProductPath,
   extractProductId,
   hasSlug,
+  uniqueSlug,
   MAX_SLUG_LENGTH,
 } from '@/lib/product-slug';
 
@@ -77,18 +78,43 @@ describe('generateProductSlug', () => {
 });
 
 describe('buildProductPath', () => {
-  it('uses the stored slug so URLs stay stable', () => {
+  it('is the slug alone — no id in the URL', () => {
     expect(buildProductPath({ id: 'abc', title: 'Renamed Later', seoSlug: 'original-slug' }))
-      .toBe('/products/original-slug--abc');
+      .toBe('/products/original-slug');
   });
 
-  it('derives a slug for listings saved before slugs existed', () => {
-    expect(buildProductPath({ id: 'abc', title: 'Gucci Heels' }))
-      .toBe('/products/gucci-heels--abc');
-  });
-
-  it('falls back to the bare id when no slug can be built', () => {
+  // Only a *stored* slug is resolvable: the page finds a listing by querying
+  // seoSlug, so linking to a derived-but-unsaved slug would 404.
+  it('falls back to the id when no slug is stored', () => {
+    expect(buildProductPath({ id: 'abc', title: 'Gucci Heels' })).toBe('/products/abc');
     expect(buildProductPath({ id: 'abc' })).toBe('/products/abc');
+  });
+});
+
+describe('uniqueSlug', () => {
+  it('returns the base when it is free', async () => {
+    expect(await uniqueSlug('gucci-heels', async () => false)).toBe('gucci-heels');
+  });
+
+  it('appends a counter until it finds a free slug', async () => {
+    const used = new Set(['gucci-heels', 'gucci-heels-2']);
+    expect(await uniqueSlug('gucci-heels', async (c) => used.has(c))).toBe('gucci-heels-3');
+  });
+
+  it('keeps the suffixed slug within the length cap', async () => {
+    const base = 'a'.repeat(MAX_SLUG_LENGTH);
+    const out = await uniqueSlug(base, async (c) => c === base);
+    expect(out.length).toBeLessThanOrEqual(MAX_SLUG_LENGTH);
+    expect(out.endsWith('-2')).toBe(true);
+  });
+
+  it('gives up gracefully rather than looping forever', async () => {
+    const out = await uniqueSlug('taken', async () => true, 3);
+    expect(out.startsWith('taken-')).toBe(true);
+  });
+
+  it('returns empty for an empty base', async () => {
+    expect(await uniqueSlug('', async () => false)).toBe('');
   });
 });
 
@@ -123,10 +149,10 @@ describe('extractProductId', () => {
     expect(extractProductId('slug--')).toBe('slug--');
   });
 
-  it('round-trips whatever buildProductPath produces', () => {
-    const product = { id: 'draft_123', title: 'Zara Bag', brandId: 'Zara' };
-    const path = buildProductPath(product);
-    expect(extractProductId(path.replace('/products/', ''))).toBe('draft_123');
+  // The interim /products/{slug}--{id} shape shipped to production and may be
+  // indexed, so it must keep resolving even though nothing emits it any more.
+  it('still resolves the interim slug--id shape', () => {
+    expect(extractProductId('zara-bag--draft_123')).toBe('draft_123');
   });
 });
 

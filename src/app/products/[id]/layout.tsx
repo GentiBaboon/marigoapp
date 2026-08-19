@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/site';
-import { fetchProductForSeo, fetchProductReviews } from '@/lib/product-seo';
+import { resolveSeoProduct, fetchProductReviews } from '@/lib/product-seo';
 import { buildProductPath, extractProductId } from '@/lib/product-slug';
 
 // Maps the stored condition slugs onto schema.org OfferItemCondition. The old
@@ -18,13 +18,14 @@ type Props = { params: { id: string }; children: React.ReactNode };
 
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const id = extractProductId(params.id);
-  const product = await fetchProductForSeo(id);
+  const product = await resolveSeoProduct(params.id);
 
-  // Canonical is always the slug form, whichever shape was requested. A legacy
-  // /products/{id} link therefore consolidates its ranking onto the readable
-  // URL instead of competing with it as a duplicate.
-  const canonical = absoluteUrl(product ? buildProductPath({ ...product, id }) : `/products/${id}`);
+  // Canonical is always the slug form, whichever shape was requested — a bare
+  // id or the interim slug--id. Legacy links therefore consolidate their
+  // ranking onto the readable URL instead of competing with it as duplicates.
+  const canonical = absoluteUrl(
+    product ? buildProductPath(product) : `/products/${extractProductId(params.id)}`,
+  );
 
   if (!product?.title) {
     return { alternates: { canonical } };
@@ -71,18 +72,14 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 }
 
 export default async function ProductLayout({ params, children }: Props) {
-  const id = extractProductId(params.id);
-  const [product, reviews] = await Promise.all([
-    fetchProductForSeo(id),
-    fetchProductReviews(id),
-  ]);
-
+  const product = await resolveSeoProduct(params.id);
   if (!product?.title) return <>{children}</>;
+  const reviews = await fetchProductReviews(product.id);
 
   // Canonical form, matching generateMetadata. Structured data that cites a
   // different URL than the canonical tag is a conflicting signal, and the
   // Offer url is what Google's merchant surfaces actually link to.
-  const url = absoluteUrl(buildProductPath({ ...product, id }));
+  const url = absoluteUrl(buildProductPath(product));
   const images = (product.images ?? []).map((i) => i.url).filter(Boolean);
 
   // aggregateRating and review are only emitted when real reviews exist.

@@ -40,7 +40,6 @@ vi.mock('@/lib/placeholder-images', () => ({
 }));
 
 import { ProductCard } from '@/components/product-card';
-import { extractProductId } from '@/lib/product-slug';
 
 describe('ProductCard', () => {
   const baseProduct = {
@@ -124,24 +123,18 @@ describe('ProductCard', () => {
     expect(screen.getByText('Contact for price')).toBeInTheDocument();
   });
 
-  it('links to the product detail page with a keyword-bearing slug', () => {
-    render(<ProductCard product={baseProduct} />);
+  it('links to the stored slug — the id never appears in the URL', () => {
+    render(<ProductCard product={{ ...baseProduct, seoSlug: 'gucci-silk-dress' }} />);
 
-    const link = screen.getByRole('link');
-    const href = link.getAttribute('href') ?? '';
-
-    expect(href.startsWith('/products/')).toBe(true);
-    // The slug is the point — a bare id URL carries no keyword at all.
-    expect(href).toContain('silk-dress');
-    // …and the id must still be recoverable, or the page cannot load.
-    expect(extractProductId(href.replace('/products/', ''))).toBe('prod-1');
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/products/gucci-silk-dress');
   });
 
-  it('still links usably when the product has no title to slug', () => {
-    render(<ProductCard product={{ id: 'prod-5' }} />);
+  // Only a stored slug is resolvable — the page finds a listing by querying
+  // seoSlug, so a listing awaiting backfill must keep its id URL rather than
+  // link to a slug that matches nothing.
+  it('falls back to the id URL for a listing with no stored slug', () => {
+    render(<ProductCard product={baseProduct} />);
 
-    const href = screen.getByRole('link').getAttribute('href') ?? '';
-    expect(href).toBe('/products/prod-5');
-    expect(extractProductId('prod-5')).toBe('prod-5');
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/products/prod-1');
   });
 });

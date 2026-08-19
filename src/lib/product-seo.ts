@@ -1,3 +1,4 @@
+import { extractProductId } from '@/lib/product-slug';
 /**
  * Server-side product lookup for SEO.
  *
@@ -60,6 +61,59 @@ export interface SeoReview {
   rating: number;
   content?: string;
   createdAt?: string;
+}
+
+/**
+ * Look a listing up by its stored `seoSlug`.
+ *
+ * Equality filters need no composite index in Firestore, so this works without
+ * any index configuration. Returns null when nothing matches, which is the
+ * signal for callers to fall back to a document read.
+ */
+export async function fetchProductBySlug(slug: string): Promise<SeoProduct | null> {
+  if (!PROJECT || !API_KEY || !slug) return null;
+  try {
+    const res = await fetch(`${BASE}:runQuery?key=${API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'products' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'seoSlug' },
+              op: 'EQUAL',
+              value: { stringValue: slug },
+            },
+          },
+          limit: 1,
+        },
+      }),
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    const doc = (Array.isArray(rows) ? rows : []).find((r: any) => r?.document?.fields)?.document;
+    if (!doc) return null;
+    return { id: String(doc.name).split('/').pop() as string, ...decodeFields(doc.fields) } as SeoProduct;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve whatever is in the `[id]` segment to a listing.
+ *
+ * Order matters and mirrors how the URLs came to exist: the canonical slug
+ * first, then the interim `slug--id` shape, then a bare document id. All three
+ * are live in the wild.
+ */
+export async function resolveSeoProduct(param: string): Promise<SeoProduct | null> {
+  if (!param) return null;
+  const bySlug = await fetchProductBySlug(param);
+  if (bySlug) return bySlug;
+  const id = extractProductId(param);
+  return fetchProductForSeo(id);
 }
 
 export async function fetchProductForSeo(id: string): Promise<SeoProduct | null> {
