@@ -40,6 +40,7 @@ vi.mock('@/lib/placeholder-images', () => ({
 }));
 
 import { ProductCard } from '@/components/product-card';
+import { extractProductId } from '@/lib/product-slug';
 
 describe('ProductCard', () => {
   const baseProduct = {
@@ -123,10 +124,24 @@ describe('ProductCard', () => {
     expect(screen.getByText('Contact for price')).toBeInTheDocument();
   });
 
-  it('links to the product detail page', () => {
+  it('links to the product detail page with a keyword-bearing slug', () => {
     render(<ProductCard product={baseProduct} />);
 
     const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/products/prod-1');
+    const href = link.getAttribute('href') ?? '';
+
+    expect(href.startsWith('/products/')).toBe(true);
+    // The slug is the point — a bare id URL carries no keyword at all.
+    expect(href).toContain('silk-dress');
+    // …and the id must still be recoverable, or the page cannot load.
+    expect(extractProductId(href.replace('/products/', ''))).toBe('prod-1');
+  });
+
+  it('still links usably when the product has no title to slug', () => {
+    render(<ProductCard product={{ id: 'prod-5' }} />);
+
+    const href = screen.getByRole('link').getAttribute('href') ?? '';
+    expect(href).toBe('/products/prod-5');
+    expect(extractProductId('prod-5')).toBe('prod-5');
   });
 });

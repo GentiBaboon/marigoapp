@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { generateText } from '@/ai/models';
 import { verifyIdToken } from '@/lib/firebase-admin';
 import { loadListingTaxonomy, matchOption } from '@/lib/listing-taxonomy';
+import { normalizeSize, SIZE_SYSTEMS } from '@/lib/size-options';
 
 /** Mirrors the AI-fillable subset of SellFormValues. */
 const DraftSchema = z.object({
@@ -139,8 +140,14 @@ ${hint?.trim() || '(none given — rely on the photos)'}`;
         color: matchOption(out.color, taxonomy.colors) ?? '',
         material: matchOption(out.material, taxonomy.materials) ?? '',
         pattern: matchOption(out.pattern, taxonomy.patterns) ?? '',
-        sizeValue: out.size?.trim() || '',
-        sizeSystem: out.sizeSystem?.trim() || '',
+        // Size is snapped like every sibling field above. The model reads a
+        // label off a photo and writes what it sees ("Small", "38,5"), which
+        // used to reach Firestore verbatim and land outside the picker's
+        // vocabulary — the one field that bypassed the taxonomy.
+        sizeValue: normalizeSize(out.size),
+        sizeSystem: SIZE_SYSTEMS.find(
+          s => s.toLowerCase() === out.sizeSystem?.trim().toLowerCase(),
+        ) ?? '',
         price: Number.isFinite(out.suggestedPrice) ? Math.max(0, Math.round(out.suggestedPrice)) : 0,
         originalPrice:
           typeof out.originalPrice === 'number' && out.originalPrice > out.suggestedPrice

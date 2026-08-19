@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { sellStep4Schema, canUseVariants, type FirestoreCategory, type FirestoreAttribute, type FirestoreUser } from '@/lib/types';
@@ -27,6 +26,7 @@ import { StepActions } from '@/components/sell/StepActions';
 import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, doc, query } from 'firebase/firestore';
 import { Combobox } from '@/components/ui/combobox';
+import { resolveSizeOptions, resolveSizeSystems } from '@/lib/size-options';
 
 type Step4Values = z.infer<typeof sellStep4Schema>;
 
@@ -115,25 +115,25 @@ export function DetailsStep() {
   const colorItems = React.useMemo(() => toAttributeItems(colors), [colors, toAttributeItems]);
   const patternItems = React.useMemo(() => toAttributeItems(patterns), [patterns, toAttributeItems]);
 
-  // Charts whose categoryType matches the product's parent category (e.g.
-  // "Shoes" for a sandals listing). If none match we fall back to all
-  // active charts so the seller still has something to choose from.
-  const applicableCharts = React.useMemo(() => {
-    if (!sizeChartsRaw) return [];
-    const all = sizeChartsRaw.filter(c => c.isActive !== false);
-    const match = all.filter(c => c.categoryType === formData.categoryId);
-    return match.length > 0 ? match : all;
-  }, [sizeChartsRaw, formData.categoryId]);
+  // Systems and sizes both resolve through src/lib/size-options.ts, which
+  // walks admin chart → built-in preset → universal list. That is what lets
+  // every category offer a dropdown: there is no combination that comes back
+  // empty, so the seller is never dropped into a free-text box (which is how
+  // "Small" and "S" ended up as separate, mutually invisible sizes).
+  const watchedSizeSystem = form.watch('sizeSystem');
 
   const availableSystems = React.useMemo(
-    () => Array.from(new Set(applicableCharts.map(c => c.sizeSystem))),
-    [applicableCharts],
+    () => resolveSizeSystems(formData.categoryId, sizeChartsRaw),
+    [formData.categoryId, sizeChartsRaw],
   );
 
-  const watchedSizeSystem = form.watch('sizeSystem');
-  const activeChart = React.useMemo(
-    () => applicableCharts.find(c => c.sizeSystem === watchedSizeSystem),
-    [applicableCharts, watchedSizeSystem],
+  const sizeOptions = React.useMemo(
+    () => resolveSizeOptions({
+      categoryType: formData.categoryId,
+      sizeSystem: watchedSizeSystem,
+      charts: sizeChartsRaw,
+    }),
+    [formData.categoryId, watchedSizeSystem, sizeChartsRaw],
   );
 
   const onSubmit = (data: Step4Values) => {
@@ -243,13 +243,9 @@ export function DetailsStep() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {availableSystems.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">No size chart for this category.</div>
-                      ) : (
-                        availableSystems.map(s => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))
-                      )}
+                      {availableSystems.map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -261,28 +257,18 @@ export function DetailsStep() {
               name="sizeValue"
               render={({ field }) => (
                 <FormItem>
-                  {activeChart && activeChart.sizes.length > 0 ? (
-                    <Select value={field.value || ''} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="h-12">
-                          <SelectValue placeholder="Size" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {activeChart.sizes.map(s => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <FormControl>
-                      <Input
-                        placeholder={watchedSizeSystem ? 'Size' : 'e.g. 42 / M'}
-                        className="h-12"
-                        {...field}
-                      />
-                    </FormControl>
-                  )}
+                  {/* Combobox rather than Select: the numeric charts run to
+                      30-odd entries, and its label search means typing
+                      "medium" still lands on the canonical value `M`. */}
+                  <Combobox
+                    items={sizeOptions}
+                    value={field.value || ''}
+                    onValueChange={field.onChange}
+                    placeholder="Size"
+                    searchPlaceholder="Search sizes..."
+                    emptyPlaceholder="No matching size."
+                    className="h-12"
+                  />
                   <FormMessage />
                 </FormItem>
               )}
@@ -319,7 +305,7 @@ export function DetailsStep() {
             <FormItem className="flex flex-row items-center justify-between rounded-xl border p-4">
               <div className="space-y-0.5">
                 <FormLabel className="text-base font-semibold">Vintage Item</FormLabel>
-                <p className="text-xs text-muted-foreground">Item is 15+ years old.</p>
+                <p className="text-xs text-muted-foreground">Item is 5+ years old.</p>
               </div>
               <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
             </FormItem>

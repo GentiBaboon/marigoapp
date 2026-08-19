@@ -19,7 +19,7 @@ import { useTranslation } from '@/context/LanguageContext';
 import { useShoppingPreference } from '@/hooks/use-shopping-preference';
 import { useVisualViewport } from '@/hooks/use-visual-viewport';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import Image from 'next/image';
 import type { ChatProductCard } from '@/lib/types';
 

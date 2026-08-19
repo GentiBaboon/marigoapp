@@ -210,7 +210,7 @@ export default function CartPage() {
                                         </div>
                                     )}
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Shipping (Direct)</span>
+                                        <span className="text-muted-foreground">Delivery</span>
                                         <span className="font-medium">
                                             {totalShipping === 0 ? (
                                                 <span className="text-green-600 font-bold uppercase tracking-tight">Free</span>

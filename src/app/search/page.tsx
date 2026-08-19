@@ -24,6 +24,7 @@ import {
 } from 'firebase/firestore';
 import type { FirestoreProduct, FirestoreCategory, FirestoreAttribute, FirestoreBrand } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { resolveSizeOptions, normalizeSize, sizesMatch } from '@/lib/size-options';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -191,11 +192,15 @@ function useFilteredProducts(
     if (size) {
       // Match either the legacy top-level `size` field or any in-stock variant
       // for products that use per-size inventory.
+      //
+      // Compared through sizesMatch, not `===`: listings published before the
+      // size picker landed hold free-text spellings ("Small", "38,5", "EU 38")
+      // that mean the same size as the canonical pill but never equalled it.
       list = list.filter((p) => {
-        if (p.size === size) return true;
+        if (sizesMatch(p.size, size)) return true;
         const variants = (p as any).variants;
         if (Array.isArray(variants)) {
-          return variants.some((v: any) => v?.size === size && (Number(v?.quantity) || 0) > 0);
+          return variants.some((v: any) => sizesMatch(v?.size, size) && (Number(v?.quantity) || 0) > 0);
         }
         return false;
       });
@@ -392,19 +397,19 @@ function FilterSheet({
   // systems (EU 38 + IT 38 would only render one "38" pill) since the buyer
   // is filtering by the raw size value stored on products.
   const sizeOptions = React.useMemo(() => {
-    if (!sizeChartsRaw) return [] as { value: string; label: string }[];
-    const active = sizeChartsRaw.filter(c => c.isActive !== false);
     const parent = parentCategories.find((p) => p.slug === draft.categoryId || p.id === draft.categoryId);
-    const scoped = parent ? active.filter(c => c.categoryType === parent.name) : active;
+    const options = resolveSizeOptions({ categoryType: parent?.name, charts: sizeChartsRaw });
+    // Dedupe on the canonical value, so a chart still holding "Small" beside
+    // another holding "S" contributes a single pill rather than two that split
+    // the same inventory between them.
     const seen = new Set<string>();
     const out: { value: string; label: string }[] = [];
-    scoped.forEach((c) => {
-      c.sizes.forEach((s) => {
-        if (!seen.has(s)) {
-          seen.add(s);
-          out.push({ value: s, label: s });
-        }
-      });
+    options.forEach((o) => {
+      const key = normalizeSize(o.value).toUpperCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        out.push(o);
+      }
     });
     return out;
   }, [sizeChartsRaw, parentCategories, draft.categoryId]);
@@ -893,6 +898,11 @@ function ProductListPage() {
                     brandId: p.brandId,
                     title: p.title,
                     price: p.price,
+                    // ProductCard derives the strike-through and the −% badge
+                    // from originalPrice; without it the card silently renders
+                    // as full price, which is how the homepage rails and these
+                    // results ended up disagreeing about the same listing.
+                    originalPrice: p.originalPrice,
                     images: p.images,
                     sellerId: p.sellerId,
                     size: p.size,

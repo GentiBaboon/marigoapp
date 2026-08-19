@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/site';
 import { fetchProductForSeo, fetchProductReviews } from '@/lib/product-seo';
+import { buildProductPath, extractProductId } from '@/lib/product-slug';
 
 // Maps the stored condition slugs onto schema.org OfferItemCondition. The old
 // JSON-LD compared against 'new', which is not a value this app ever stores
@@ -15,9 +16,15 @@ const CONDITION_URLS: Record<string, string> = {
 
 type Props = { params: { id: string }; children: React.ReactNode };
 
+
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const product = await fetchProductForSeo(params.id);
-  const canonical = absoluteUrl(`/products/${params.id}`);
+  const id = extractProductId(params.id);
+  const product = await fetchProductForSeo(id);
+
+  // Canonical is always the slug form, whichever shape was requested. A legacy
+  // /products/{id} link therefore consolidates its ranking onto the readable
+  // URL instead of competing with it as a duplicate.
+  const canonical = absoluteUrl(product ? buildProductPath({ ...product, id }) : `/products/${id}`);
 
   if (!product?.title) {
     return { alternates: { canonical } };
@@ -30,12 +37,15 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     !!brandId && product.title.toLowerCase().startsWith(brandId.toLowerCase());
   const headline = titleStartsWithBrand || !brandId ? product.title : `${brandId} ${product.title}`;
 
-  const title = `${headline} | ${SITE_NAME}`;
-  const description =
+  // An admin override, set on the listing's SEO panel, wins over the derived
+  // copy. Blank means "use the default", so clearing the field restores it.
+  const title = product.seoTitle?.trim() || `${headline} | ${SITE_NAME}`;
+  const description = (
+    product.seoDescription?.trim() ||
     (product.description && product.description.trim().length > 40
       ? product.description
-      : `${headline}${product.condition ? ` in ${product.condition.replace(/-/g, ' ')} condition` : ''}. Buy authentic pre-owned luxury fashion on ${SITE_NAME}.`
-    ).slice(0, 300);
+      : `${headline}${product.condition ? ` in ${product.condition.replace(/-/g, ' ')} condition` : ''}. Buy authentic pre-owned luxury fashion on ${SITE_NAME}.`)
+  ).slice(0, 300);
 
   const images = (product.images ?? []).map((i) => i.url).filter(Boolean).slice(0, 4);
 
@@ -61,14 +71,18 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 }
 
 export default async function ProductLayout({ params, children }: Props) {
+  const id = extractProductId(params.id);
   const [product, reviews] = await Promise.all([
-    fetchProductForSeo(params.id),
-    fetchProductReviews(params.id),
+    fetchProductForSeo(id),
+    fetchProductReviews(id),
   ]);
 
   if (!product?.title) return <>{children}</>;
 
-  const url = absoluteUrl(`/products/${params.id}`);
+  // Canonical form, matching generateMetadata. Structured data that cites a
+  // different URL than the canonical tag is a conflicting signal, and the
+  // Offer url is what Google's merchant surfaces actually link to.
+  const url = absoluteUrl(buildProductPath({ ...product, id }));
   const images = (product.images ?? []).map((i) => i.url).filter(Boolean);
 
   // aggregateRating and review are only emitted when real reviews exist.
@@ -120,6 +134,11 @@ export default async function ProductLayout({ params, children }: Props) {
           : 'https://schema.org/OutOfStock',
       itemCondition:
         CONDITION_URLS[product.condition ?? ''] ?? 'https://schema.org/UsedCondition',
+      // Google warns on merchant offers with no validity window. Resale stock
+      // is one-of-a-kind and does not expire, so quote a rolling year out.
+      priceValidUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10),
       seller: { '@type': 'Organization', name: SITE_NAME },
     },
   };
@@ -128,7 +147,7 @@ export default async function ProductLayout({ params, children }: Props) {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: absoluteUrl('/home') },
+      { '@type': 'ListItem', position: 1, name: 'Home', item: absoluteUrl('/') },
       ...(product.categoryId
         ? [{
             '@type': 'ListItem',

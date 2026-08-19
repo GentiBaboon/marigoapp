@@ -17,6 +17,7 @@ import { LanguageProvider } from '@/context/LanguageContext';
 import dynamic from 'next/dynamic';
 import { CookieBanner } from '@/components/CookieBanner';
 import { Footer } from '@/components/footer';
+import { NativeRouteBridge } from '@/components/platform/NativeRouteBridge';
 
 const ChatbotWidget = dynamic(() => import('@/components/ai/ChatbotWidget').then(mod => mod.ChatbotWidget), {
   ssr: false,
@@ -64,12 +65,34 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // OnlineStore rather than a bare Organization: it is the type answer engines
+  // and Google's merchant surfaces actually reason about, and it carries the
+  // trading details (currencies, area served, returns) that a plain
+  // Organization has nowhere to put.
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "Organization",
+    "@type": "OnlineStore",
+    "@id": `${SITE_URL}#organization`,
     "name": SITE_NAME,
+    "alternateName": "Marigo",
     "url": SITE_URL,
     "logo": absoluteUrl('/icons/icon-512x512.png'),
+    "image": absoluteUrl('/og-image.jpg'),
+    "description":
+      "A curated marketplace for authenticated pre-owned luxury fashion, serving Albania, Italy and the wider EU.",
+    "slogan": "Give your luxury items a new life.",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Tirana",
+      "addressCountry": "AL",
+    },
+    "areaServed": [
+      { "@type": "Country", "name": "Albania" },
+      { "@type": "Country", "name": "Italy" },
+      { "@type": "Place", "name": "European Union" },
+    ],
+    "currenciesAccepted": "EUR, ALL",
+    "paymentAccepted": "Credit Card, Debit Card",
     "sameAs": [
       "https://www.instagram.com/marigoapp",
       "https://www.facebook.com/marigoapp"
@@ -80,8 +103,11 @@ export default function RootLayout({
   const searchLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
+    "@id": `${SITE_URL}#website`,
     "name": SITE_NAME,
     "url": SITE_URL,
+    "publisher": { "@id": `${SITE_URL}#organization` },
+    "inLanguage": ["en", "sq"],
     "potentialAction": {
       "@type": "SearchAction",
       "target": {
@@ -92,8 +118,13 @@ export default function RootLayout({
     },
   };
 
+  // `en`, not `sq`: LanguageContext defaults to English, so the
+  // server-rendered HTML a crawler sees is English. Declaring Albanian told
+  // Google the page was in a language it demonstrably was not, which
+  // suppresses it for English queries and misfiles it for Albanian ones. The
+  // picker still switches the UI to Albanian client-side.
   return (
-    <html lang="sq" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
         {/* No <link rel="icon"> here on purpose. `src/app/icon.png` and
@@ -117,6 +148,10 @@ export default function RootLayout({
         />
       </head>
       <body className={cn('font-body antialiased')}>
+        {/* Rewrites /products/${id} style links to the flat routes the static
+            native bundle actually contains. Renders nothing, and attaches no
+            listener at all on web. */}
+        <NativeRouteBridge />
         <FirebaseClientProvider>
             <LanguageProvider>
                 <CurrencyProvider>

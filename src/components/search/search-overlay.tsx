@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { ChevronLeft, ChevronRight, Search as SearchIcon, X } from 'lucide-react';
 
@@ -20,6 +20,7 @@ import { useCurrency } from '@/context/CurrencyContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { FirestoreProduct } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { buildProductPath } from '@/lib/product-slug';
 
 type DepartmentValue = 'women' | 'men' | 'children';
 
@@ -84,7 +85,7 @@ function TrendingRail({ products, isLoading, onNavigate }: {
             : products.map(product => (
                 <Link
                   key={product.id}
-                  href={`/products/${product.id}`}
+                  href={buildProductPath(product)}
                   onClick={onNavigate}
                   className="group/tile w-32 flex-shrink-0 snap-start md:w-40"
                 >

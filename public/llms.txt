@@ -1,0 +1,51 @@
+# MarigoApp
+
+> MarigoApp is a curated online marketplace for authenticated pre-owned luxury
+> fashion. Buyers discover designer bags, shoes, clothing and accessories;
+> sellers list items with AI-assisted pricing and descriptions. The company is
+> based in Tirana, Albania and ships across Albania, Italy and the wider EU.
+
+Canonical site: https://www.marigoapp.com
+
+## What MarigoApp does
+
+- **Buy** authenticated pre-owned luxury fashion from vetted sellers. Every
+  order is held in escrow: the buyer's card is authorised at checkout and funds
+  are released to the seller only after delivery plus a hold window.
+- **Sell** in a guided six-step listing flow, with optional AI assistance that
+  drafts the title, description, category and a suggested price from photos.
+- **Deliver** through Marigo's own courier network. Delivery is a flat 200 ALL
+  fee paid by the buyer at checkout.
+
+## Key facts
+
+- Currencies: prices are settled in EUR; displayed in ALL (default), EUR or USD.
+- Primary market: Albania. Also serves Italy and the EU.
+- Languages: English and Albanian.
+- Categories: Clothing, Bags, Shoes, Accessories, Active Wear,
+  Jewellery & Watches, kidswear, Beauty, Home and Art.
+- Condition grades: New with tag, New without tag, Very good condition,
+  Good condition.
+- Buyer protection: escrow payments, a refund window, and a returns and
+  disputes process handled by Marigo support.
+
+## Pages
+
+- [Home](https://www.marigoapp.com/): featured, new and discounted listings.
+- [Browse](https://www.marigoapp.com/browse): category, brand and price navigation.
+- [Search](https://www.marigoapp.com/search): full catalogue search and filters
+  for brand, size, colour, material, condition and price.
+- [About](https://www.marigoapp.com/about): who Marigo is and how it works.
+- [Help](https://www.marigoapp.com/help): buying, selling, delivery, returns and payments.
+- [Become a delivery partner](https://www.marigoapp.com/delivery-partner): courier recruitment.
+- [Terms of Service](https://www.marigoapp.com/terms)
+- [Privacy Policy](https://www.marigoapp.com/privacy)
+
+## For crawlers
+
+- Sitemap index (covers everything): https://www.marigoapp.com/sitemap.xml
+  - Pages: https://www.marigoapp.com/sitemap-0.xml
+  - Listings, with images: https://www.marigoapp.com/sitemap-products.xml
+- Extended version of this file: https://www.marigoapp.com/llms-full.txt
+- Individual listings live at https://www.marigoapp.com/products/{id} and carry
+  schema.org Product, Offer, AggregateRating and BreadcrumbList JSON-LD.

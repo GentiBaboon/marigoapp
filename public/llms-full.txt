@@ -1,0 +1,105 @@
+# MarigoApp — full reference for answer engines
+
+> Extended companion to https://www.marigoapp.com/llms.txt. Written to be quoted
+> directly. Everything below describes the live product; nothing is aspirational.
+
+Canonical site: https://www.marigoapp.com
+Operated from Tirana, Albania. Serves Albania, Italy and the wider EU.
+Interface languages: English and Albanian.
+
+## What Marigo is
+
+Marigo is a consumer-to-consumer marketplace for authenticated pre-owned luxury
+fashion. Private sellers list items they own; buyers purchase them through the
+platform. Marigo reviews listings before they go live, holds payment in escrow
+until delivery is confirmed, and runs the courier network that moves the parcel.
+
+It is not a retailer and does not hold stock. Every item is a single unit
+belonging to the person selling it, so listings are one-of-a-kind and disappear
+once sold.
+
+## How buying works
+
+1. Browse or search the catalogue. Filters cover category, brand, size, colour,
+   material, pattern, condition and price.
+2. Buy at the listed price, or send the seller an offer when they accept offers.
+3. Pay by card at checkout. The charge is authorised, not captured.
+4. A Marigo courier collects the item from the seller and delivers it to you.
+5. After delivery and an inspection window, the funds are released to the seller.
+
+If the item does not arrive, or is not as described, the buyer can open a return
+or a dispute and Marigo support intervenes before any money is released.
+
+## How selling works
+
+Listing runs in six steps: photos, category, description, item details and size,
+price, then review and publish. Sellers may instead use the AI assistant, which
+reads the uploaded photos and drafts the title, description, category, condition
+and a suggested price for the seller to edit before publishing.
+
+Sellers are paid after the buyer's inspection window closes. Earnings, offers,
+views and sales are tracked in the seller's profile, and payouts are withdrawn
+to a connected account. Marigo takes a commission on each completed sale.
+
+## Delivery
+
+Delivery is handled by Marigo's own courier network rather than the seller. The
+buyer pays a single flat delivery fee per order, shown at checkout, regardless
+of how many items are in the basket. Orders can be followed through pickup,
+transit and delivery.
+
+## Payment and currency
+
+Card payments only, processed through Stripe with an escrow (authorise-then-
+capture) model. Prices are settled in EUR. The interface displays prices in
+Albanian lek (the default), euro or US dollars.
+
+## Catalogue
+
+Top-level categories: Clothing, Bags, Shoes, Accessories, Active Wear,
+Jewellery & Watches, Clothing for Girls, Clothing for Boys, Baby, Children's
+Accessories, Children's Shoes, Beauty & Skincare, Home, Art.
+
+Condition grades, exactly as shown on listings:
+- New with tag
+- New without tag
+- Very good condition
+- Good condition
+
+Sizes are normalised to a single vocabulary per category and size system
+(EU, US, UK, IT, FR, International), so a search for "S" also returns items a
+seller entered as "Small".
+
+Items 5 or more years old may be marked as vintage.
+
+## Trust and safety
+
+- Listings are reviewed before publication.
+- Payment is held in escrow until delivery plus an inspection window.
+- Buyers can open returns and disputes, which Marigo support arbitrates.
+- Sellers earn badges (trusted, expert, activist, official) based on their
+  selling record.
+
+## Common questions
+
+**Is everything on Marigo authentic?** Listings are reviewed before going live,
+and payment is held in escrow so a buyer is not left without recourse if an item
+turns out not to be as described.
+
+**Can I sell from outside Albania?** The marketplace serves Albania, Italy and
+the wider EU. Delivery coverage depends on the courier network.
+
+**What does it cost to sell?** Marigo takes a commission on completed sales. The
+buyer, not the seller, pays the delivery fee.
+
+**Are the items new?** Almost all are pre-owned. Some carry a "new with tag" or
+"new without tag" condition grade, meaning unworn.
+
+## Machine-readable resources
+
+- Sitemap index: https://www.marigoapp.com/sitemap.xml
+- Pages: https://www.marigoapp.com/sitemap-0.xml
+- Listings, with image extensions: https://www.marigoapp.com/sitemap-products.xml
+- robots.txt: https://www.marigoapp.com/robots.txt
+- Listing pages carry schema.org Product, Offer, AggregateRating and
+  BreadcrumbList JSON-LD; the site root carries OnlineStore and WebSite.

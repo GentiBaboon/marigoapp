@@ -19,7 +19,7 @@ Branding (`src/app/globals.css` CSS vars → `tailwind.config.ts`):
 
 Fonts: `font-headline` Georgia serif, `font-body` Inter, `font-logo` Poppins 700. Design spec: `docs/blueprint.md`.
 
-Locale: `<html lang="sq">`, but `LanguageContext` **defaults to `en`** and the picker offers `en` / `sq` only — Italian was pulled from the UI, `it.json` is retained in case it returns.
+Locale: `<html lang="en">` — it must match the *server-rendered* content, and `LanguageContext` **defaults to `en`** (it said `sq` while serving English, which misfiles the site for both languages) and the picker offers `en` / `sq` only — Italian was pulled from the UI, `it.json` is retained in case it returns.
 
 ## 2. Tech stack
 
@@ -40,6 +40,7 @@ Locale: `<html lang="sq">`, but `LanguageContext` **defaults to `en`** and the p
 | Testing | Vitest 4 + jsdom + Testing Library, Playwright (Chromium) |
 | PWA | `next-pwa` (disabled in dev) + `public/manifest.json` + workbox sw |
 | Hosting | Vercel (`vercel.json`, region `fra1`) is the app host; Firebase Hosting (`firebase-hosting/`) exists only to rewrite `/api/stripe/webhook` → `handleStripeWebhook`. `apphosting.yaml` is a leftover Firebase App Hosting stub. |
+| iOS / Android | Capacitor 6 (`capacitor.config.ts`, `ios/`, `android/`) wrapping a static export of this same `src/` — see §14 |
 
 ## 3. Top-level layout
 
@@ -290,10 +291,74 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 - Order status is modelled audience-aware in `src/lib/order-status.ts`: `STATUS_RANK`, `statusLabel(status, 'buyer'|'seller'|'admin')`, `TIMELINE_STEPS` / `TIMELINE_STEPS_SELLER`, `nextSellerTransition` / `nextAdminTransition`.
 - Order side-effects live in `src/lib/order-lifecycle.ts` (`recordRefund`, `recordReturn`, `recordRefundForReturn`, `recordRefundForDispute`) and `src/lib/order-inventory.ts` (`releaseOrderItems`, `markOrderItemsSoldIfDepleted`).
 - Notifications: `src/lib/notifications.ts` (`notifyUser`, `notifyOrderStatus`, `humanReadableStatus`).
+- **Sizes come from `src/lib/size-options.ts`, never from a text input.** It
+  resolves options as **admin `size_charts` → `SIZE_PRESETS` → `UNIVERSAL_SIZES`**,
+  and `resolveSizeOptions()` is guaranteed non-empty for every category × system
+  (a test asserts it), which is what allows the sell wizard to have no free-text
+  fallback. One value per size: "Small" is not an option beside "S", it is the
+  *label* on `S` (`S — Small`), because the size facet on `/search` matches on a
+  single key. `normalizeSize()` folds legacy spellings ("Small", "EU 38", "38,5",
+  "12 months") onto that key, and `sizesMatch()` is what the facet compares with —
+  plain `===` left pre-migration listings unreachable from their own filter pill.
+  Entry points: `DetailsStep`, `PricingStep` (variants), `size-config-tab`
+  (admin), `/api/ai/draft-listing`, and the `/search` facet.
 - Admin tables are a repeated shadcn + `@tanstack/react-table` pattern: `data-table.tsx` + `columns.tsx` + `data-table-toolbar.tsx` + `data-table-pagination.tsx` (+ `row-actions`) per domain (`products`, `orders`, `users`, `finance`, `logs`, `logistics/courier-table`). Copy an existing folder rather than inventing a new shape. CSV export via `src/lib/csv-export.ts`.
 - Admin charts in `components/admin/charts/` use `recharts` + `components/ui/chart.tsx`.
 - i18n: `src/lib/translations/{en,sq}.json` via `LanguageContext` (`it.json` is dormant); preference persisted to a cookie and to the user doc.
 - Currency: `CurrencyContext` + `config/exchangeRates` (EUR base; ALL / USD), persisted to `marigo_currency` cookie + user doc. Prices are stored in EUR — always format via `formatPrice`. **`DEFAULT_CURRENCY` is `ALL`** (the primary market is Albania); a saved cookie or user preference still wins. This is display only — storage, payouts, Stripe amounts and the admin/finance dashboards stay in EUR.
+- **SEO: every indexable route declares its own canonical**, via `pageMetadata()`
+  in `src/lib/seo.ts`. The root layout's `alternates: { canonical: '/' }` is
+  inherited by any page that does not override it — that is how /about, /help,
+  /browse, /search, /terms and /privacy all came to declare themselves copies of
+  the homepage, which is what Search Console reported as "Duplicate without
+  user-selected canonical" and "Alternate page with proper canonical tag".
+  Client pages cannot export `metadata`, so each has a sibling `layout.tsx` that
+  does (the `products/[id]/layout.tsx` pattern). **Adding a public route means
+  adding its layout+canonical**, or it silently claims to be `/`.
+  - `/home` canonicals to `/` — they are the same page, since `/` is a splash
+    that redirects there. Only `/` is in the sitemap.
+  - The flat `/view` native siblings and `/welcome` carry `noindexMetadata()`
+    and are deliberately **left crawlable**: a URL blocked in robots.txt can
+    still be indexed from an inbound link, and `noindex` only works on a page
+    Google is allowed to fetch.
+  - `next-sitemap.config.js` derives robots.txt and the sitemap from one
+    `PRIVATE_PATHS` list so the two cannot contradict each other. They did:
+    `/delivery-partner` was disallowed in robots.txt while sitting in the
+    sitemap → "Blocked by robots.txt".
+  - **`/sitemap.xml` is the single submitted entry point.** It is an index over
+    `sitemap-0.xml` (static pages, from next-sitemap) and `sitemap-products.xml`
+    (every active listing, with `<image:image>` extensions). The second file
+    cannot come from next-sitemap — listings resolve out of Firestore — so
+    `scripts/generate-sitemap.mjs` writes it and appends it to the index. It runs
+    in `postbuild`, after next-sitemap, and imports the listing query from
+    `src/lib/product-seo.ts` through `jiti` so the two cannot disagree. A
+    Firestore failure logs and exits 0: a build must not break over a sitemap.
+    New listings therefore enter the sitemap **on the next deploy**.
+  - `src/app/server-sitemap.xml/route.ts` still exists as the always-fresh
+    alternative but is **not submitted** — the static file is. If it is ever
+    submitted, it must **not** declare `export const dynamic`, which would break
+    `output: 'export'` for Capacitor.
+  - **Listing URLs are `/products/{slug}--{id}`** (`src/lib/product-slug.ts`).
+    The id stays in the path on purpose: resolving a listing is still a direct
+    document read, and **every existing `/products/{id}` link keeps working** —
+    `extractProductId()` treats a param with no `--` as a bare id. Both forms
+    emit the *same* canonical (the slug one), so legacy links consolidate rather
+    than compete. `--` is the delimiter because `slugify` collapses separator
+    runs, so a generated slug can never contain one.
+    - `seoSlug` is stamped once at publish (`ReviewStep`) and **stored**, not
+      derived on read: regenerating from the title would silently change a live
+      URL whenever a typo was fixed, discarding its ranking. Listings predating
+      slugs fall back to a derived one.
+    - Admins override the slug, meta title and meta description on the SEO card
+      in `/admin/products/[id]`. Blank means "use the derived default", and the
+      card's preview mirrors the exact fallback chain in
+      `products/[id]/layout.tsx` — keep the two in step or the preview lies.
+    - Changing `buildProductPath` changes every live URL. Anything emitting a
+      product link (ProductCard, search overlay, both sitemaps, the canonical
+      and the JSON-LD `offers.url`) must go through it.
+  - `public/llms.txt` and `public/llms-full.txt` are the answer-engine (GEO)
+    entry points; robots.txt names GPTBot / OAI-SearchBot / ClaudeBot /
+    PerplexityBot / Google-Extended et al. explicitly.
 - Favicons follow the **App Router icon convention**: `src/app/icon.png` and `src/app/apple-icon.png`, with `public/favicon.ico` for clients that probe that path directly. Do not add a `src/app/favicon.ico` — it is served at `/favicon.ico` and beats any `<link rel="icon">` in `layout.tsx`, which is what kept the old orange mark on screen. Both icon routes are excluded in `next-sitemap.config.js`, or they get listed as pages.
 - Mobile-first: bottom `MobileNav` (Home/Search/Cart/Favorites/Profile), hidden ≥ md; header popovers for cart/messages/notifications.
 - Error reporting: `src/lib/error-reporter.ts` (`reportError`, `reportWarning`) + `FirebaseErrorListener` mounted globally, fed by `src/firebase/error-emitter.ts`.
@@ -309,15 +374,30 @@ npm run typecheck   # tsc --noEmit   (CI continue-on-error — pre-existing erro
 npm run test        # Vitest (jsdom) — src/**/*.{test,spec}.{ts,tsx}
 npm run test:watch  # Vitest watch
 npm run test:e2e    # Playwright against localhost:3001 (starts the dev server itself)
+
+npm run build:native  # Static export for the app shells → .next-native
+npm run sync:native   # build:native + npx cap sync (copies into ios/ and android/)
+npm run ios           # sync + open Xcode
+npm run android       # sync + open Android Studio
+node scripts/serve-native.mjs --port 3002 --simulate-native   # the app bundle in a browser
 ```
+
+`NEXT_DIST_DIR=.next-check npm run build` verifies a production build **without**
+overwriting `.next`, so it is safe to run while `npm run dev` is up.
 
 Functions (inside `functions/`): `npm run build` (tsc), `npm run serve` (build + functions emulator), `npm run deploy`, `npm run logs`.
 
 `.claude/launch.json` defines two preview configs: **Next.js Dev Server** (port 3001) and **Firebase Functions Emulator** (port 5001). Emulator ports: functions 5001, firestore 8080, auth 9099, UI disabled.
 
-Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`.
+Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`, `normalize-sizes.mjs`, `generate-sitemap.mjs`.
 
-Current tests (136 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `rate-limit`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
+`normalize-sizes.mjs` folds `products.size`, `products.variants[].size` and
+`size_charts.sizes[]` onto the canonical vocabulary. **Dry run by default** —
+`--apply` writes, `--only=products|charts|all` scopes, `--backup=out.json`
+records the diff. It loads the rules from `src/lib/size-options.ts` through
+`jiti` rather than restating them, so the script cannot drift from the app.
+
+Current tests (207 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `platform-routes`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
@@ -366,3 +446,83 @@ SITE_URL                      # optional; overrides the marigoapp.com default
 - **Never run `npm run build` while `npm run dev` is running.** The production build overwrites `.next`, and the dev server then 404s every `_next/static/*` chunk — the page renders as unstyled HTML with no error in the terminal. Fix: stop dev, `rm -rf .next`, restart.
 - `AuthenticityBadge` returns `null` for products without a completed check. Don't wrap it in a padded container — the wrapper still renders and leaves phantom space. Prefer a flex `gap` so an absent child contributes nothing.
 - `next/image` will not serve larger than the `width`/`height` props, whatever the source file holds. A 320px source declared as `width={128}` renders soft on a 64px retina button.
+
+## 14. Native apps (iOS & Android)
+
+One `src/` builds all three platforms. Capacitor 6 wraps a **static export** of the
+same React tree; the app is not a remote-URL wrapper, because App Store guideline
+4.2 rejects those.
+
+```
+npm run dev          → web, SSR on Vercel      (.next)
+npm run build:native → static export           (.next-native) → ios/ + android/
+```
+
+`NEXT_PUBLIC_BUILD_TARGET=native` is the switch (`next.config.js`). The native
+target sets `output: 'export'`, `images.unoptimized`, `trailingSlash`, drops
+`headers()` and disables `next-pwa`. It writes to **`.next-native`**, never
+`.next`, so a native build can never take down a running dev server.
+
+**What the app carries vs. fetches.** The UI ships inside the binary. Firestore,
+Auth, Storage and Stripe are reached directly by the client SDKs exactly as on
+web. `/api/*` only exists on Vercel, so `installNativeFetch()`
+(`src/lib/platform/api.ts`) rewrites relative API calls to `API_BASE_URL`
+(`NEXT_PUBLIC_API_BASE_URL`, defaulting to `SITE_URL`). `src/middleware.ts`
+answers those cross-origin calls with CORS for `NATIVE_ORIGINS` only, and exempts
+them from CSRF — they carry a Bearer token and no cookies, so there is no ambient
+authority to forge.
+
+### Dynamic routes are the load-bearing part
+
+A static export cannot emit a page per product id, so **every dynamic route has a
+flat sibling** that takes the id in the query string:
+
+| web | native |
+|---|---|
+| `/products/abc` | `/products/view/?id=abc` |
+| `/messages/c1` | `/messages/view/?conversationId=c1` |
+| `/browse/womenswear/clothing` | `/browse/view/?slug=womenswear%2Fclothing` |
+
+Both resolve to the *same* component — the sibling is a 3-line re-export and must
+never hold logic. Three pieces make it work:
+
+- **`src/lib/platform/routes.ts`** — the rule table and `toNativeHref()`. Order
+  matters: `/products/[id]/edit` is tested before `/products/[id]`, or `edit`
+  becomes the id. Translation is idempotent on purpose.
+- **`NativeRouteBridge`** (root layout) — rewrites links in the **capture** phase
+  of a click, so the ~60 existing `<Link href={`/products/${id}`}>` call sites
+  work untouched. On web it attaches nothing.
+- **`useRouteParams` / `useRouteParam`** — pages import the plural one aliased as
+  `useParams`, so `params.id` bodies read from a path segment on web and a query
+  value on device with no change.
+
+For programmatic navigation to a dynamic route use **`useAppRouter()`** (imported
+aliased as `useRouter`), which the click bridge cannot see.
+
+**Adding a dynamic route? Three steps, and a test enforces the third:**
+1. `page.tsx` must be a *server* wrapper exporting
+   `generateStaticParams()` → `nativeOnlyStaticParams({ id: NATIVE_PLACEHOLDER })`,
+   rendering the `'use client'` body from `client-page.tsx` inside `<Suspense>`.
+   A file cannot carry both `'use client'` and `generateStaticParams`, and Next
+   checks `prerenderRoutes.length > 0` — an empty array fails the build, which is
+   why the native target emits one unreachable `__native__` placeholder page.
+2. Add the rule to `ROUTE_RULES`.
+3. Create the flat sibling. `src/__tests__/lib/platform-routes.test.ts` fails if a
+   rule has no page behind it — otherwise the mistake only shows up as a blank
+   screen on a device.
+
+### Native gotchas
+
+- Anything reading `useSearchParams()` needs a `<Suspense>` boundary or the
+  export fails to prerender. This is why `/auth/login` and `/auth/signup` read
+  `?next` on the client instead of from the server `searchParams` prop, which is
+  always empty in an export.
+- **Server Actions do not exist in a static export.** `src/app/sell/actions.ts`
+  was one and is now a plain module. New server-side work goes in `src/app/api/`,
+  which the app can reach; a Server Action it cannot.
+- `capacitor.config.ts` `appId` (`com.marigoapp.app`) is **permanent** once a
+  build reaches App Store Connect or the Play Console.
+- Next prefetches RSC payloads for untranslated hrefs and 404s on them. Harmless:
+  the WebView origin is local, so it costs no network.
+- Don't show web-install prompts in the app — `DownloadAppBanner` bails on
+  `isNativeApp()`.

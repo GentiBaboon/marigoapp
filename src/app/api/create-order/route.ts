@@ -6,6 +6,7 @@ import {
   firestoreUpdate,
   firestoreCreate,
 } from '@/lib/firebase-admin';
+import { DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
 import { sendOrderConfirmation, sendSellerOrderNotification } from '@/lib/mailtrap';
 import { createOrderLimiter, applyRateLimit } from '@/lib/rate-limit';
 
@@ -38,7 +39,9 @@ async function calculateOrderTotal(
   }
 
   const settings = await firestoreGet('settings', 'global', idToken);
-  let shippingFee = items.length * 10.9;
+  // Flat fee per order — mirrored by totalShipping in src/context/CartContext.tsx.
+  // This side is authoritative: it is what the buyer is charged.
+  let shippingFee = items.length > 0 ? DEFAULT_SHIPPING_FEE_EUR : 0;
   if (settings?.isFreeDeliveryActive && subtotal >= (settings?.freeDeliveryThreshold || 0)) {
     shippingFee = 0;
   }

@@ -3,8 +3,9 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'
+import { getFirestore, initializeFirestore, type Firestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage';
+import { isNativeApp } from '@/lib/platform/native';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -33,11 +34,36 @@ export function initializeFirebase() {
   return getSdks(getApp());
 }
 
+/**
+ * Firestore, with a transport the platform can actually use.
+ *
+ * By default the SDK talks over WebChannel, a long-lived streaming connection.
+ * That works in a browser and fails silently inside the iOS/Android WebView —
+ * the connection never establishes, no query ever resolves, no error is thrown,
+ * and every list in the app sits on its loading skeleton forever. It looks like
+ * a slow network rather than a broken one, which is what makes it expensive to
+ * diagnose.
+ *
+ * Long polling trades streaming efficiency for plain HTTP requests that survive
+ * the WebView. It is applied only on device; the web build keeps WebChannel.
+ */
+function getPlatformFirestore(firebaseApp: FirebaseApp): Firestore {
+  if (!isNativeApp()) return getFirestore(firebaseApp);
+
+  try {
+    return initializeFirestore(firebaseApp, { experimentalForceLongPolling: true });
+  } catch {
+    // Firestore was already initialized on an earlier call — its settings are
+    // locked in at that point, so just hand back the existing instance.
+    return getFirestore(firebaseApp);
+  }
+}
+
 export function getSdks(firebaseApp: FirebaseApp) {
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
-    firestore: getFirestore(firebaseApp),
+    firestore: getPlatformFirestore(firebaseApp),
     storage: getStorage(firebaseApp)
   };
 }

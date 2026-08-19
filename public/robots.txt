@@ -1,42 +1,152 @@
 # *
 User-agent: *
 Allow: /
-
-# *
-User-agent: *
 Disallow: /admin
-
-# *
-User-agent: *
 Disallow: /profile
-
-# *
-User-agent: *
 Disallow: /cart
-
-# *
-User-agent: *
 Disallow: /checkout
-
-# *
-User-agent: *
 Disallow: /messages
-
-# *
-User-agent: *
 Disallow: /sell
-
-# *
-User-agent: *
 Disallow: /auth
-
-# *
-User-agent: *
 Disallow: /courier
+Disallow: /favorites
+Disallow: /notifications
+Disallow: /delivery-partner/apply
 
-# *
-User-agent: *
-Disallow: /delivery-partner
+# GPTBot
+User-agent: GPTBot
+Allow: /
+Disallow: /admin
+Disallow: /profile
+Disallow: /cart
+Disallow: /checkout
+Disallow: /messages
+Disallow: /sell
+Disallow: /auth
+Disallow: /courier
+Disallow: /favorites
+Disallow: /notifications
+Disallow: /delivery-partner/apply
+
+# OAI-SearchBot
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /admin
+Disallow: /profile
+Disallow: /cart
+Disallow: /checkout
+Disallow: /messages
+Disallow: /sell
+Disallow: /auth
+Disallow: /courier
+Disallow: /favorites
+Disallow: /notifications
+Disallow: /delivery-partner/apply
+
+# ChatGPT-User
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /admin
+Disallow: /profile
+Disallow: /cart
+Disallow: /checkout
+Disallow: /messages
+Disallow: /sell
+Disallow: /auth
+Disallow: /courier
+Disallow: /favorites
+Disallow: /notifications
+Disallow: /delivery-partner/apply
+
+# ClaudeBot
+User-agent: ClaudeBot
+Allow: /
+Disallow: /admin
+Disallow: /profile
+Disallow: /cart
+Disallow: /checkout
+Disallow: /messages
+Disallow: /sell
+Disallow: /auth
+Disallow: /courier
+Disallow: /favorites
+Disallow: /notifications
+Disallow: /delivery-partner/apply
+
+# Claude-User
+User-agent: Claude-User
+Allow: /
+Disallow: /admin
+Disallow: /profile
+Disallow: /cart
+Disallow: /checkout
+Disallow: /messages
+Disallow: /sell
+Disallow: /auth
+Disallow: /courier
+Disallow: /favorites
+Disallow: /notifications
+Disallow: /delivery-partner/apply
+
+# PerplexityBot
+User-agent: PerplexityBot
+Allow: /
+Disallow: /admin
+Disallow: /profile
+Disallow: /cart
+Disallow: /checkout
+Disallow: /messages
+Disallow: /sell
+Disallow: /auth
+Disallow: /courier
+Disallow: /favorites
+Disallow: /notifications
+Disallow: /delivery-partner/apply
+
+# Google-Extended
+User-agent: Google-Extended
+Allow: /
+Disallow: /admin
+Disallow: /profile
+Disallow: /cart
+Disallow: /checkout
+Disallow: /messages
+Disallow: /sell
+Disallow: /auth
+Disallow: /courier
+Disallow: /favorites
+Disallow: /notifications
+Disallow: /delivery-partner/apply
+
+# Applebot-Extended
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /admin
+Disallow: /profile
+Disallow: /cart
+Disallow: /checkout
+Disallow: /messages
+Disallow: /sell
+Disallow: /auth
+Disallow: /courier
+Disallow: /favorites
+Disallow: /notifications
+Disallow: /delivery-partner/apply
+
+# CCBot
+User-agent: CCBot
+Allow: /
+Disallow: /admin
+Disallow: /profile
+Disallow: /cart
+Disallow: /checkout
+Disallow: /messages
+Disallow: /sell
+Disallow: /auth
+Disallow: /courier
+Disallow: /favorites
+Disallow: /notifications
+Disallow: /delivery-partner/apply
 
 # Host
 Host: https://www.marigoapp.com

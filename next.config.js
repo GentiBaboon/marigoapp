@@ -1,13 +1,44 @@
 
+// One source tree, two build targets.
+//
+//   web    (default)  → SSR on Vercel. API routes, middleware, server metadata,
+//                       next/image optimization, PWA service worker. Unchanged.
+//   native            → `output: 'export'` static bundle for the Capacitor iOS
+//                       and Android shells. No server exists inside the app, so
+//                       API routes/middleware are not emitted and the app calls
+//                       the deployed Vercel origin over the network instead.
+//
+// The native build writes to its own distDir. Sharing `.next` with the web build
+// is what makes `npm run dev` start 404-ing every _next/static chunk, so the two
+// targets are kept strictly apart on disk.
+const isNative = process.env.NEXT_PUBLIC_BUILD_TARGET === 'native';
+
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
   skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
+  // Capacitor ships its own bundled assets and offline story; a second service
+  // worker inside the WebView only fights it for control of the cache.
+  disable: process.env.NODE_ENV === 'development' || isNative,
 });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Escape hatch for building while `npm run dev` is running. A production build
+  // normally overwrites `.next`, after which the dev server 404s every
+  // `_next/static/*` chunk and the page renders as unstyled HTML with nothing in
+  // the terminal to explain it. `NEXT_DIST_DIR=.next-check npm run build`
+  // verifies a build without touching the running server.
+  ...(!isNative && process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
+  ...(isNative
+    ? {
+        output: 'export',
+        distDir: '.next-native',
+        // Capacitor serves from a local origin where directory-style URLs
+        // resolve far more predictably than extensionless files.
+        trailingSlash: true,
+      }
+    : {}),
   typescript: {
     // TODO: Set to false once all pre-existing TS errors are fixed.
     // Known issues: FirestoreTimestamp.toDate() type mismatch, displayName field.
@@ -18,6 +49,10 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
+    // A static export ships no image optimizer, so every next/image must fall
+    // back to the raw source URL. remotePatterns stays declared for the web
+    // build, which does optimize.
+    unoptimized: isNative,
     remotePatterns: [
       {
         protocol: 'https',
@@ -113,4 +148,12 @@ const nextConfig = {
   },
 };
 
-module.exports = withPWA(nextConfig);
+// Security headers are served by the host, so they mean nothing to a static
+// export — Next warns about them rather than emitting anything. The Capacitor
+// shells get their equivalent protection from the native config and the CSP
+// meta tag in the app shell.
+if (isNative) {
+  delete nextConfig.headers;
+}
+
+module.exports = isNative ? nextConfig : withPWA(nextConfig);

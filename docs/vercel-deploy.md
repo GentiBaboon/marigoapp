@@ -36,7 +36,7 @@ Set all of these in **Project → Settings → Environment Variables** for the P
 | `GOOGLE_GENAI_API_KEY` | runtime | |
 | `MAILTRAP_TOKEN` | runtime | |
 | `RESET_SERVICE_SECRET` | runtime | |
-| `SITE_URL` | build | e.g. `https://www.marigo.app`; drives `sitemap.xml` + `robots.txt` |
+| `SITE_URL` | build | **`https://www.marigoapp.com`** — or leave unset, the code falls back to it. Drives every canonical, the sitemaps and `robots.txt`. Do **not** set `https://www.marigo.app`: that domain does not resolve, and pointing this at it makes every canonical URL reference a dead host. |
 
 > **`NEXT_PUBLIC_SUPABASE_URL` must be present at build time.** `next.config.js` parses
 > its hostname to build `images.remotePatterns`. If it is missing during the build,
