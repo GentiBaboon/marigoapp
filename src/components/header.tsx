@@ -18,9 +18,9 @@ import { cn } from '@/lib/utils';
 // landing needs /browse/{gender}/{category}. Genders go to search instead,
 // which filters on the schema's gender values and lists everything.
 const navLinks = [
-    { href: '/search?gender=women', label: 'Women' },
-    { href: '/search?gender=men', label: 'Men' },
-    { href: '/search?gender=children', label: 'Children' },
+    { href: '/women', label: 'Women' },
+    { href: '/men', label: 'Men' },
+    { href: '/children', label: 'Children' },
     { href: '/browse/clothing', label: 'Clothing' },
     { href: '/browse/bags', label: 'Bags' },
     { href: '/browse/accessories', label: 'Accessories' },

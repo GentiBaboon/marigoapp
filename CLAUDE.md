@@ -96,7 +96,21 @@ Public:
   - Passing `?macroFilter=<id>` replaces the whole stack with `MacroFilteredProducts`.
 - `/about`, `/help`, `/privacy`, `/terms`
 - `/browse` and `/browse/[...slug]` — filtered browsing (category/price/etc. via URL segments + params)
-- `/search` — search results, backed by the smart-search AI flow; overlay lives in `components/search/search-overlay.tsx`
+- `/search` — search results, backed by the smart-search AI flow; overlay lives in `components/search/search-overlay.tsx`. The results grid itself is `search/client-page.tsx`, exported as `SearchResults` so the category routes can reuse it.
+- **`/{gender}` and `/{gender}/{category}`** (`/women`, `/women/shirts`) — the
+  indexable form of `/search?gender=…&category=…`. Query strings make one URL
+  with parameters; these are real pages with their own title and canonical.
+  - Filters are injected by `FilterOverrideContext` in `search/client-page.tsx`
+    and merged *underneath* the query string, so `/women/shirts?color=black`
+    still narrows and the filter sheet keeps writing query params.
+  - These sit at the **root**, so an unmatched top-level path lands here.
+    `isGenderSegment()` gates it and anything else `notFound()`s — without that
+    the catch-all would answer 200 for every typo. `src/lib/category-url.ts`
+    owns the vocabulary; `buildCategoryPath()` falls back to the `/search?` form
+    for a gender that is not routed, so a link never points at a 404.
+  - The native rules are anchored to the four literal genders for the same
+    reason: `/^\/([^/]+)\/([^/]+)$/` would rewrite `/admin/orders` into a
+    category page.
 - `/products/[id]` (+ `layout.tsx` supplying server-rendered metadata and JSON-LD via `src/lib/product-seo.ts`)
 - `/delivery-partner` and `/delivery-partner/apply` — courier recruitment funnel
 - `/(onboarding)/welcome` — first-run flow
@@ -403,7 +417,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (211 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `platform-routes`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (220 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `category-url`, `platform-routes`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

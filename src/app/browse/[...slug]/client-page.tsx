@@ -11,6 +11,7 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useCatalog } from '@/hooks/use-catalog';
 import { collection } from 'firebase/firestore';
 import type { FirestoreCategory, FirestoreBrand } from '@/lib/types';
+import { buildCategoryPath } from '@/lib/category-url';
 
 function ListItem({ href, children }: { href: string; children: React.ReactNode }) {
   return (
@@ -100,7 +101,7 @@ export default function CategoryDetailPage() {
           <ListItem
             href={
               gender
-                ? `/search?gender=${gender}&categoryId=${parentCategory.slug}`
+                ? buildCategoryPath(gender, parentCategory.slug)
                 : `/search?categoryId=${parentCategory.slug}`
             }
           >
@@ -116,7 +117,7 @@ export default function CategoryDetailPage() {
               <ListItem
                 href={
                   gender
-                    ? `/search?gender=${gender}&category=${sub.slug}`
+                    ? buildCategoryPath(gender, sub.slug)
                     : `/search?category=${sub.slug}`
                 }
               >

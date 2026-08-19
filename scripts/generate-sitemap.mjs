@@ -54,6 +54,7 @@ const SITE_URL = (
 const jiti = require('jiti')(ROOT, { alias: { '@': join(ROOT, 'src') } });
 const { fetchProductsForSitemap } = jiti('./src/lib/product-seo.ts');
 const { buildProductPath } = jiti('./src/lib/product-slug.ts');
+const { buildCategoryPath, GENDER_SEGMENTS } = jiti('./src/lib/category-url.ts');
 
 const esc = (v) =>
   String(v)
@@ -80,6 +81,37 @@ function productUrl(p) {
   return `  <url>\n${parts.join('\n')}\n  </url>`;
 }
 
+/**
+ * Category landing pages (/women, /women/shirts). Built from the gender
+ * segments crossed with the sub-categories that actually have listings — a
+ * sitemap full of empty category pages is a quality problem, not a coverage
+ * win.
+ */
+function categoryUrls(products) {
+  const seen = new Set();
+  const out = [];
+  const push = (path, priority) => {
+    if (seen.has(path)) return;
+    seen.add(path);
+    out.push(
+      `  <url>\n    <loc>${esc(`${SITE_URL}${path}`)}</loc>\n` +
+        `    <changefreq>daily</changefreq>\n    <priority>${priority}</priority>\n  </url>`,
+    );
+  };
+
+  GENDER_SEGMENTS.forEach((g) => push(buildCategoryPath(g), '0.7'));
+
+  products.forEach((p) => {
+    if (!p.gender || !p.subcategoryId) return;
+    const path = buildCategoryPath(p.gender, p.subcategoryId);
+    // Unroutable genders fall back to a /search? URL — never submit those.
+    if (path.startsWith('/search')) return;
+    push(path, '0.6');
+  });
+
+  return out;
+}
+
 async function main() {
   const products = await fetchProductsForSitemap();
 
@@ -87,12 +119,14 @@ async function main() {
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n' +
     '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n' +
-    products.map(productUrl).join('\n') +
+    [...categoryUrls(products), ...products.map(productUrl)].join('\n') +
     (products.length ? '\n' : '') +
     '</urlset>\n';
 
   writeFileSync(join(ROOT, 'public/sitemap-products.xml'), xml);
-  console.log(`[sitemap] public/sitemap-products.xml — ${products.length} listings`);
+  console.log(
+    `[sitemap] public/sitemap-products.xml — ${products.length} listings, ${categoryUrls(products).length} category pages`,
+  );
 
   // Fold the new file into next-sitemap's index so one submitted URL covers
   // the whole site.
