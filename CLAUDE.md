@@ -364,6 +364,11 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
     deliberately does *not* fall back to a derived slug: a derived slug is not
     in Firestore, so linking to it would 404. Run the backfill after importing
     listings, or they stay on ugly URLs.
+    - **Backfill has two front doors**: `scripts/backfill-slugs.mjs` (needs
+      service-account credentials) and the **SEO tab in `/admin/settings`**,
+      which does the same work from the browser using the admin's own session —
+      Firestore rules let an admin update products, so no credentials are
+      needed. Both scan first and never overwrite an existing slug.
     - `seoSlug` is stamped once at publish (`ReviewStep`, de-duplicated against
       existing slugs) and **stored**, not derived on read: regenerating from the
       title would silently change a live URL whenever a typo was fixed,
