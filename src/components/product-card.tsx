@@ -5,6 +5,7 @@ import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
+import { buildProductPath } from '@/lib/product-slug';
 import { Badge } from '@/components/ui/badge';
 import { useWishlist } from '@/context/WishlistContext';
 import React from 'react';
@@ -44,7 +45,7 @@ export const ProductCard = React.memo(function ProductCard({ product, className 
 
   return (
     <div className={cn('group', className)}>
-      <Link href={`/products/${product.id}`} className="block mb-2">
+      <Link href={buildProductPath(product)} className="block mb-2">
         <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted rounded-lg">
           {imageUrl ? (
             <Image

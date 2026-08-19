@@ -1,5 +1,6 @@
 import { fetchProductsForSitemap } from '@/lib/product-seo';
 import { absoluteUrl } from '@/lib/site';
+import { buildProductPath } from '@/lib/product-slug';
 
 /**
  * Always-fresh listings sitemap, read straight from Firestore.
@@ -34,7 +35,7 @@ export async function GET() {
 
   const urls = products
     .map((p) => {
-      const loc = escapeXml(absoluteUrl(`/products/${p.id}`));
+      const loc = escapeXml(absoluteUrl(buildProductPath(p)));
       const lastmod = p.updatedAt ? `\n    <lastmod>${escapeXml(p.updatedAt)}</lastmod>` : '';
       return `  <url>\n    <loc>${loc}</loc>${lastmod}\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>`;
     })

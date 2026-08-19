@@ -338,6 +338,24 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
     alternative but is **not submitted** — the static file is. If it is ever
     submitted, it must **not** declare `export const dynamic`, which would break
     `output: 'export'` for Capacitor.
+  - **Listing URLs are `/products/{slug}--{id}`** (`src/lib/product-slug.ts`).
+    The id stays in the path on purpose: resolving a listing is still a direct
+    document read, and **every existing `/products/{id}` link keeps working** —
+    `extractProductId()` treats a param with no `--` as a bare id. Both forms
+    emit the *same* canonical (the slug one), so legacy links consolidate rather
+    than compete. `--` is the delimiter because `slugify` collapses separator
+    runs, so a generated slug can never contain one.
+    - `seoSlug` is stamped once at publish (`ReviewStep`) and **stored**, not
+      derived on read: regenerating from the title would silently change a live
+      URL whenever a typo was fixed, discarding its ranking. Listings predating
+      slugs fall back to a derived one.
+    - Admins override the slug, meta title and meta description on the SEO card
+      in `/admin/products/[id]`. Blank means "use the derived default", and the
+      card's preview mirrors the exact fallback chain in
+      `products/[id]/layout.tsx` — keep the two in step or the preview lies.
+    - Changing `buildProductPath` changes every live URL. Anything emitting a
+      product link (ProductCard, search overlay, both sitemaps, the canonical
+      and the JSON-LD `offers.url`) must go through it.
   - `public/llms.txt` and `public/llms-full.txt` are the answer-engine (GEO)
     entry points; robots.txt names GPTBot / OAI-SearchBot / ClaudeBot /
     PerplexityBot / Google-Extended et al. explicitly.
@@ -379,7 +397,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (183 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `platform-routes`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (207 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `platform-routes`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

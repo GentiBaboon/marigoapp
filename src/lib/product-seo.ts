@@ -50,6 +50,10 @@ export interface SeoProduct {
   size?: string;
   images?: { url: string; position?: number }[];
   sellerId?: string;
+  /** Admin SEO overrides, set on the listing's SEO panel. See product-slug.ts. */
+  seoSlug?: string;
+  seoTitle?: string;
+  seoDescription?: string;
 }
 
 export interface SeoReview {
@@ -116,6 +120,10 @@ export async function fetchProductReviews(productId: string): Promise<SeoReview[
 export interface SitemapProduct {
   id: string;
   title?: string;
+  brandId?: string;
+  color?: string;
+  size?: string;
+  seoSlug?: string;
   updatedAt?: string;
   /** First usable image, emitted as a Google image-sitemap extension. */
   image?: string;
@@ -165,6 +173,10 @@ export async function fetchProductsForSitemap(limit = 5000): Promise<SitemapProd
         out.push({
           id: String(doc.name).split('/').pop() as string,
           title: typeof f.title === 'string' ? f.title : undefined,
+          brandId: f.brandId,
+          color: f.color,
+          size: f.size,
+          seoSlug: f.seoSlug,
           updatedAt: f.updatedAt || f.listingCreated || undefined,
           image,
         });

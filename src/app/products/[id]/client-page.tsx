@@ -6,6 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { useRouteParams as useParams } from '@/lib/platform/use-route-param';
+import { extractProductId } from '@/lib/product-slug';
 import {
   Carousel,
   CarouselContent,
@@ -72,7 +73,9 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
 export default function ProductDetailPage() {
     const params = useParams();
     const router = useRouter();
-    const productId = params.id as string;
+    // The segment may be `slug--id` (canonical) or a bare id (legacy links,
+    // and the native `?id=` param). Both resolve to the same document.
+    const productId = extractProductId(params.id as string);
     const firestore = useFirestore();
     const { user, isUserLoading } = useUser();
     const { formatPrice } = useCurrency();

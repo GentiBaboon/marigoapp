@@ -27,6 +27,7 @@ import { validateListingData, notifyNewListing } from '@/app/sell/actions';
 import { collection } from 'firebase/firestore';
 import { useCollection } from '@/firebase';
 import type { FirestoreAddress, FirestoreProduct } from '@/lib/types';
+import { generateProductSlug } from '@/lib/product-slug';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/context/CurrencyContext';
 
@@ -207,6 +208,17 @@ export function ReviewStep() {
         vintage: formData.vintage,
         pattern: formData.pattern,
         shippingFromAddressId: formData.shippingFromAddressId,
+        // Stamped once, here, so the listing has a keyword-bearing URL from the
+        // moment it is published. Stored rather than derived on read: the URL
+        // must not change later when a title typo is corrected. An admin can
+        // still edit it on the listing's SEO panel.
+        seoSlug: generateProductSlug({
+          id: '',
+          title: formData.title,
+          brandId: formData.brandId,
+          color: formData.color,
+          size: formData.sizeValue,
+        }),
       };
 
       await ProductService.publishProduct(firestore, productData);

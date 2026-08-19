@@ -62,6 +62,8 @@ import { useToast } from '@/hooks/use-toast';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { resolveSizeOptions, resolveSizeSystems, normalizeSize } from '@/lib/size-options';
+import { buildProductPath, generateProductSlug, slugify, MAX_SLUG_LENGTH } from '@/lib/product-slug';
+import { SITE_URL } from '@/lib/site';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -234,6 +236,11 @@ export default function AdminProductReviewPage() {
   const [size, setSize] = React.useState('');
   const [sizeSystem, setSizeSystem] = React.useState('');
   const [pattern, setPattern] = React.useState('');
+  // SEO overrides. Empty means "use the derived default", so clearing a field
+  // restores automatic behaviour rather than blanking the tag.
+  const [seoSlug, setSeoSlug] = React.useState('');
+  const [seoTitle, setSeoTitle] = React.useState('');
+  const [seoDescription, setSeoDescription] = React.useState('');
   const [vintage, setVintage] = React.useState(false);
   const [price, setPrice] = React.useState('');
   const [originalPrice, setOriginalPrice] = React.useState('');
@@ -257,6 +264,31 @@ export default function AdminProductReviewPage() {
     [categoryId, sizeSystem, sizeChartsRaw],
   );
 
+  // What the listing page will actually emit, mirroring the fallback chain in
+  // src/app/products/[id]/layout.tsx so the preview cannot claim one thing
+  // while the page renders another.
+  const seoPreviewTitle = React.useMemo(() => {
+    if (seoTitle.trim()) return seoTitle.trim();
+    const brand = brandId?.trim() ?? '';
+    const startsWithBrand = !!brand && title.toLowerCase().startsWith(brand.toLowerCase());
+    const headline = startsWithBrand || !brand ? title : `${brand} ${title}`;
+    return headline ? `${headline} | MarigoApp` : 'MarigoApp';
+  }, [seoTitle, title, brandId]);
+
+  const seoPreviewDescription = React.useMemo(() => {
+    if (seoDescription.trim()) return seoDescription.trim();
+    if (description.trim().length > 40) return description.trim().slice(0, 300);
+    const brand = brandId?.trim() ?? '';
+    const startsWithBrand = !!brand && title.toLowerCase().startsWith(brand.toLowerCase());
+    const headline = startsWithBrand || !brand ? title : `${brand} ${title}`;
+    const cond = condition ? ` in ${condition.replace(/-/g, ' ')} condition` : '';
+    return `${headline}${cond}. Buy authentic pre-owned luxury fashion on MarigoApp.`;
+  }, [seoDescription, description, title, brandId, condition]);
+
+  const seoSlugLength = slugify(seoSlug).length;
+  const seoTitleLength = seoPreviewTitle.length;
+  const seoDescriptionLength = seoPreviewDescription.length;
+
   const [seeded, setSeeded] = React.useState(false);
 
   // ── Seed form from Firestore ──
@@ -277,6 +309,9 @@ export default function AdminProductReviewPage() {
       setColor(product.color ?? '');
       setMaterial(product.material ?? '');
       setPattern(product.pattern ?? '');
+      setSeoSlug((product as any).seoSlug ?? '');
+      setSeoTitle((product as any).seoTitle ?? '');
+      setSeoDescription((product as any).seoDescription ?? '');
       setVintage(product.vintage ?? false);
       setPrice(product.price?.toString() ?? '');
       setOriginalPrice(product.originalPrice?.toString() ?? '');
@@ -434,6 +469,11 @@ export default function AdminProductReviewPage() {
         quantity: cleanedVariants.length > 0 ? Math.max(0, variantTotal) : parsedQuantity,
         variants: cleanedVariants.length > 0 ? cleanedVariants : null,
         listingType,
+        // Slug is normalised on the way in so a hand-typed value can never
+        // produce a URL that does not round-trip through extractProductId.
+        seoSlug: slugify(seoSlug).slice(0, MAX_SLUG_LENGTH) || null,
+        seoTitle: seoTitle.trim() || null,
+        seoDescription: seoDescription.trim() || null,
         updatedAt: serverTimestamp(),
       };
       if (parsedOriginalPrice !== null) updates.originalPrice = parsedOriginalPrice;
@@ -934,6 +974,95 @@ export default function AdminProductReviewPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ══ SEO ══ */}
+      <Card>
+        <CardHeader>
+          <CardTitle>SEO</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            How this listing appears in Google. Leave a field empty to use the
+            generated default.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* URL slug */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label className="font-semibold text-sm">URL slug</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSeoSlug(generateProductSlug({ id, title, brandId, color, size }))}
+              >
+                Generate from title
+              </Button>
+            </div>
+            <Input
+              value={seoSlug}
+              onChange={e => setSeoSlug(e.target.value)}
+              placeholder={generateProductSlug({ id, title, brandId, color, size }) || 'auto'}
+            />
+            <p className="text-xs text-muted-foreground break-all">
+              {SITE_URL}
+              {buildProductPath({ id, title, brandId, color, size, seoSlug: slugify(seoSlug) })}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {seoSlugLength}/{MAX_SLUG_LENGTH} characters. Changing this changes
+              the live URL — the old one keeps working, but its ranking starts
+              over. Avoid editing a listing that already gets traffic.
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* Meta title */}
+          <div className="space-y-1.5">
+            <Label className="font-semibold text-sm">Meta title</Label>
+            <Input
+              value={seoTitle}
+              onChange={e => setSeoTitle(e.target.value)}
+              placeholder={seoPreviewTitle}
+            />
+            <p className={cn('text-xs', seoTitleLength > 60 ? 'text-destructive' : 'text-muted-foreground')}>
+              {seoTitleLength}/60 — Google truncates past about 60 characters.
+            </p>
+          </div>
+
+          {/* Meta description */}
+          <div className="space-y-1.5">
+            <Label className="font-semibold text-sm">Meta description</Label>
+            <Textarea
+              value={seoDescription}
+              onChange={e => setSeoDescription(e.target.value)}
+              placeholder={seoPreviewDescription}
+              className="resize-y min-h-[80px]"
+            />
+            <p className={cn('text-xs', seoDescriptionLength > 155 ? 'text-destructive' : 'text-muted-foreground')}>
+              {seoDescriptionLength}/155 — Google truncates past about 155 characters.
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* Result preview — the same strings the page will actually emit. */}
+          <div className="space-y-1.5">
+            <Label className="font-semibold text-sm">Search result preview</Label>
+            <div className="rounded-lg border p-3 bg-muted/20 space-y-1">
+              <p className="text-xs text-muted-foreground break-all">
+                {SITE_URL.replace(/^https?:\/\//, '')}
+                {buildProductPath({ id, title, brandId, color, size, seoSlug: slugify(seoSlug) })}
+              </p>
+              <p className="text-[#1a0dab] dark:text-[#8ab4f8] text-base leading-snug line-clamp-1">
+                {seoPreviewTitle}
+              </p>
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {seoPreviewDescription}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ══ MacroFilters ══ */}
       <Card>

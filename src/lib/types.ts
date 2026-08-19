@@ -292,6 +292,16 @@ export interface FirestoreProduct {
   vintage?: boolean;
   pattern?: string;
   shippingFromAddressId?: string;
+  /** URL slug, set once at publish and only changed deliberately by an admin.
+   *  Regenerating it from the title would silently change a listing's live URL
+   *  whenever a typo was fixed, discarding whatever ranking it had.
+   *  See src/lib/product-slug.ts. */
+  seoSlug?: string;
+  /** Overrides the <title> and og:title on the listing page. Falls back to
+   *  "{title} | {brand} | MarigoApp" when blank. */
+  seoTitle?: string;
+  /** Overrides the meta description. Falls back to the listing description. */
+  seoDescription?: string;
   authenticityCheck?: {
     status: 'pending' | 'completed';
     confidence: 'high' | 'medium' | 'low';

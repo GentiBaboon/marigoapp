@@ -49,6 +49,7 @@ const SITE_URL = (
 
 const jiti = require('jiti')(ROOT);
 const { fetchProductsForSitemap } = jiti('./src/lib/product-seo.ts');
+const { buildProductPath } = jiti('./src/lib/product-slug.ts');
 
 const esc = (v) =>
   String(v)
@@ -60,7 +61,7 @@ const esc = (v) =>
 
 function productUrl(p) {
   const parts = [
-    `    <loc>${esc(`${SITE_URL}/products/${p.id}`)}</loc>`,
+    `    <loc>${esc(`${SITE_URL}${buildProductPath(p)}`)}</loc>`,
     p.updatedAt ? `    <lastmod>${esc(p.updatedAt)}</lastmod>` : null,
     '    <changefreq>daily</changefreq>',
     '    <priority>0.8</priority>',
