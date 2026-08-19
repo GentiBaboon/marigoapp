@@ -28,7 +28,8 @@ import { dirname, join } from 'path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(join(ROOT, 'package.json'));
-const jiti = require('jiti')(ROOT);
+// See scripts/generate-sitemap.mjs — jiti needs the tsconfig `@/*` alias.
+const jiti = require('jiti')(ROOT, { alias: { '@': join(ROOT, 'src') } });
 const { generateProductSlug, uniqueSlug } = jiti('./src/lib/product-slug.ts');
 
 const PROJECT_ID = 'marigoappcom-v10-6377709-d8775';

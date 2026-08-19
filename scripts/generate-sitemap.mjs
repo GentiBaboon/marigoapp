@@ -47,7 +47,11 @@ const SITE_URL = (
   'https://www.marigoapp.com'
 ).replace(/\/$/, '');
 
-const jiti = require('jiti')(ROOT);
+// `alias` mirrors the `@/*` path in tsconfig.json. Without it jiti resolves
+// imports as plain Node would and any `@/…` inside a loaded TS module throws
+// MODULE_NOT_FOUND — which only shows up here, never in `tsc` or `next build`,
+// because those go through the bundler's resolver instead.
+const jiti = require('jiti')(ROOT, { alias: { '@': join(ROOT, 'src') } });
 const { fetchProductsForSitemap } = jiti('./src/lib/product-seo.ts');
 const { buildProductPath } = jiti('./src/lib/product-slug.ts');
 
