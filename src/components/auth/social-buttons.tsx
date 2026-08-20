@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/firebase';
 import { usePostAuthRedirect } from '@/hooks/use-post-auth-redirect';

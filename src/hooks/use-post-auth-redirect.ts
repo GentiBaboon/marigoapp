@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 
 import { useUser } from '@/firebase';
 
@@ -14,6 +15,12 @@ import { useUser } from '@/firebase';
  *
  * Only same-origin paths are honoured — a bare "/" prefix check would still let
  * "//evil.com" through as a protocol-relative URL.
+ *
+ * The destination is frequently a dynamic route — someone bounced off
+ * /products/abc lands back on it after signing in — so every consumer must push
+ * it through `useAppRouter`, which rewrites the path for the native bundle. A
+ * plain `next/navigation` router sends the untranslated path and the app opens
+ * on a blank screen, because a static export has no page at /products/abc.
  */
 export function usePostAuthRedirect(): string {
   const searchParams = useSearchParams();
