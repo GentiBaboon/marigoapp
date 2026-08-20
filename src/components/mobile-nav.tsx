@@ -18,8 +18,11 @@ export function MobileNav() {
         { href: '/profile', label: "Me", icon: User, requiresAuth: true },
     ];
   
+  // h-16 is the tappable row; the safe-area padding sits *below* it (box-content
+  // keeps it additive) so the icons clear the home indicator instead of being
+  // crossed by it, while the bar's background still fills to the bottom edge.
   return (
-    <div className="fixed bottom-0 left-0 z-50 w-full h-16 bg-background border-t md:hidden">
+    <div className="fixed bottom-0 left-0 z-50 w-full h-16 box-content pb-safe-bottom pl-safe-left pr-safe-right bg-background border-t md:hidden">
       <div className="grid h-full max-w-lg grid-cols-5 mx-auto">
         {navItems.map(item => {
             const isActive = (item.href === '/home' && pathname === '/home') || (item.href !== '/home' && pathname.startsWith(item.href));

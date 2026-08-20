@@ -24,7 +24,12 @@ const config: CapacitorConfig = {
     // Lets the WebView background match the app background so there is no white
     // flash between the splash screen and the first paint.
     backgroundColor: '#ffffff',
-    contentInset: 'always',
+    // 'never', not 'always'. 'always' let UIKit inset the whole WebView, which
+    // is safe but paints a flat band above and below the app — and it also
+    // means the page never sees the notch, so every `env(safe-area-inset-*)`
+    // reports 0 and the CSS insets are dead. Full-bleed hands the layout real
+    // numbers and lets the brand colour run under the status bar.
+    contentInset: 'never',
   },
 
   android: {
@@ -42,9 +47,16 @@ const config: CapacitorConfig = {
       androidScaleType: 'CENTER_CROP',
     },
     StatusBar: {
-      // Dark glyphs on the light brand background.
+      // Dark glyphs, which is what reads on the light brand purple behind them.
       style: 'LIGHT',
-      backgroundColor: '#ffffff',
+      backgroundColor: '#B884F5',
+      // Android only, and false on purpose. iOS goes genuinely edge to edge
+      // (contentInset: 'never') because WKWebView reports real safe-area insets
+      // to CSS. Android WebView is not dependable about reporting the system
+      // bar insets, so letting it overlay risks the tab bar sitting under the
+      // gesture bar with nothing compensating. Android keeps the conventional
+      // inset layout; the CSS insets there simply resolve to 0.
+      overlaysWebView: false,
     },
     Keyboard: {
       // The app already handles its own layout for the on-screen keyboard via

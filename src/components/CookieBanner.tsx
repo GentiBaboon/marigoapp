@@ -36,7 +36,7 @@ export function CookieBanner() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-4">
+    <div className="fixed bottom-0 left-0 right-0 z-50 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <Card className="container mx-auto max-w-4xl p-4 shadow-lg">
             <CardContent className="p-2 flex flex-col md:flex-row items-center gap-4">
                 <Cookie className="h-8 w-8 text-primary flex-shrink-0" />

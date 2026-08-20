@@ -56,7 +56,16 @@ function HeaderContent() {
     // of this stacking context, so it can't out-rank the nav on its own.
     <header
       className={cn(
-        'sticky top-0 w-full border-b bg-background relative',
+        // Pins below the status-bar band, not at the viewport edge: the
+        // page paints edge to edge, so `top-0` would slide the header under
+        // the clock as soon as the announcement bar scrolled away.
+        // No `relative` here: it sets `position` too, and coming last it beat
+        // `sticky` — so this header has never actually stuck. It went unnoticed
+        // while `top` was 0, because an offset of 0 looks identical either way;
+        // offsetting by the status-bar inset made it push the header down the
+        // page instead. `sticky` is a positioned ancestor in its own right, so
+        // the desktop search dropdown still anchors correctly.
+        'sticky top-safe-top w-full border-b bg-background',
         isSearchOpen ? 'z-[60]' : 'z-40',
       )}
     >
@@ -126,7 +135,7 @@ function HeaderContent() {
 
 function HeaderSkeleton() {
     return (
-        <header className="sticky top-0 z-40 w-full border-b bg-background">
+        <header className="sticky top-safe-top z-40 w-full border-b bg-background">
             <div className="container grid h-16 md:h-20 grid-cols-3 items-center px-4">
                 <div className="flex justify-start">
                     <Skeleton className="h-10 w-10" />
