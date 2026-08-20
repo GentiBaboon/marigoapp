@@ -56,8 +56,35 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Chromium is a ~150MB download from Microsoft's CDN, repeated on every
+      # run because the runner starts empty. That download has hung outright
+      # more than once — one job sat on it until GitHub's 6-hour ceiling killed
+      # it, without ever reaching a test. Caching it keyed on the resolved
+      # Playwright version means it is fetched once per version bump instead of
+      # once per push, which removes the failure mode and saves ~4 minutes a run.
+      - name: Resolve Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.pw.outputs.version }}
+
       - name: Install Playwright browsers
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+        timeout-minutes: 10
+
+      # The browser binary is cached but its shared libraries are not — they
+      # live in system paths outside the cache, so they must be installed even
+      # on a hit. This is cheap; the download is what was expensive.
+      - name: Install Playwright system dependencies
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        timeout-minutes: 5
 
       - name: Run E2E tests
         run: npx playwright test
