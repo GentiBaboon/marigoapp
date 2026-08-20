@@ -109,3 +109,6 @@ android/keystore.properties
 
 # Release artifacts for store upload (never commit binaries)
 dist/
+
+# Rendered email previews (scripts/preview-emails.mjs) — generated, not source
+email-previews/

@@ -24,7 +24,15 @@ const clientEnvSchema = z.object({
 const serverEnvSchema = z.object({
   STRIPE_SECRET_KEY: z.string().min(1, 'Missing STRIPE_SECRET_KEY'),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'Missing SUPABASE_SERVICE_ROLE_KEY'),
-  MAILTRAP_TOKEN: z.string().min(1, 'Missing MAILTRAP_TOKEN'),
+  // Transactional email. Optional so a build without it still succeeds — the
+  // transport skips sends rather than throwing, which is what lets CI and
+  // preview deploys run with no mail credentials at all.
+  SENDGRID_API_KEY: z.string().optional(),
+  SENDGRID_FROM_EMAIL: z.string().email().optional(),
+  SENDGRID_FROM_NAME: z.string().optional(),
+  // Legacy Mailtrap sandbox — superseded by SendGrid, kept optional so an
+  // existing deployment does not fail validation before it is removed.
+  MAILTRAP_TOKEN: z.string().optional(),
   RESET_SERVICE_SECRET: z.string().min(1, 'Missing RESET_SERVICE_SECRET'),
   GOOGLE_GENAI_API_KEY: z.string().optional(),
 });
@@ -60,6 +68,9 @@ export function getServerEnv() {
   const result = serverEnvSchema.safeParse({
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
+    SENDGRID_FROM_EMAIL: process.env.SENDGRID_FROM_EMAIL,
+    SENDGRID_FROM_NAME: process.env.SENDGRID_FROM_NAME,
     MAILTRAP_TOKEN: process.env.MAILTRAP_TOKEN,
     RESET_SERVICE_SECRET: process.env.RESET_SERVICE_SECRET,
     GOOGLE_GENAI_API_KEY: process.env.GOOGLE_GENAI_API_KEY,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendPasswordResetMail } from '@/lib/mailtrap';
+import { sendPasswordResetMail } from '@/lib/email';
 import { forgotPasswordLimiter, applyRateLimit } from '@/lib/rate-limit';
 
 const FUNCTIONS_BASE = `https://europe-west1-${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net`;

@@ -7,7 +7,7 @@ import {
   firestoreUpdate,
   firestoreCreate,
 } from '@/lib/firebase-admin';
-import { sendOrderConfirmation, sendSellerOrderNotification } from '@/lib/mailtrap';
+import { sendOrderConfirmation, sendSellerOrderNotification } from '@/lib/email';
 import { paymentIntentLimiter, applyRateLimit } from '@/lib/rate-limit';
 
 function getStripe() {
@@ -215,6 +215,7 @@ export async function POST(req: NextRequest) {
           sellerEmail: sellerData.email,
           sellerName: sellerData.name || 'Seller',
           orderNumber,
+          orderId,
           items: validatedItems.filter((i: any) => i.sellerId === sellerId),
           totalAmount: total,
         }).catch(console.error);
