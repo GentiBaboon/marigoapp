@@ -73,10 +73,36 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
 export default function ProductDetailPage() {
     const params = useParams();
     const router = useRouter();
-    // The segment may be `slug--id` (canonical) or a bare id (legacy links,
-    // and the native `?id=` param). Both resolve to the same document.
-    const productId = extractProductId(params.id as string);
     const firestore = useFirestore();
+    const routeParam = (params.id as string) ?? '';
+
+    // The segment is a slug (canonical), a bare id (legacy), or the interim
+    // `slug--id`. Slugs cannot be read as a document id, so try the query
+    // first and fall back to the direct read — see resolveSeoProduct() for the
+    // server-side twin of this.
+    const [slugMatchId, setSlugMatchId] = React.useState<string | null>(null);
+    const [slugLookupDone, setSlugLookupDone] = React.useState(false);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        if (!firestore || !routeParam) { setSlugLookupDone(true); return; }
+        (async () => {
+            try {
+                const snap = await getDocs(
+                    query(collection(firestore, 'products'), where('seoSlug', '==', routeParam), limit(1)),
+                );
+                if (!cancelled) setSlugMatchId(snap.empty ? null : snap.docs[0].id);
+            } catch {
+                if (!cancelled) setSlugMatchId(null);
+            } finally {
+                if (!cancelled) setSlugLookupDone(true);
+            }
+        })();
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [firestore, routeParam]);
+
+    const productId = slugMatchId ?? extractProductId(routeParam);
     const { user, isUserLoading } = useUser();
     const { formatPrice } = useCurrency();
 
@@ -141,7 +167,7 @@ export default function ProductDetailPage() {
           .catch((err) => console.warn('views bump failed:', err));
     }, [firestore, product?.id, product?.sellerId, user]);
 
-    if (isProductLoading || isUserLoading) return <ProductPageSkeleton />;
+    if (!slugLookupDone || isProductLoading || isUserLoading) return <ProductPageSkeleton />;
     if (!product) return (
         <div className="container mx-auto max-w-4xl px-4 py-8 text-center">
             <h1 className="text-xl font-bold">Product not found</h1>

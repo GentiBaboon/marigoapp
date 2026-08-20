@@ -24,10 +24,10 @@ import { useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { ProductService } from '@/services/product.service';
 import { uploadProductImage } from '@/services/image-upload.service';
 import { validateListingData, notifyNewListing } from '@/app/sell/actions';
-import { collection } from 'firebase/firestore';
+import { collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { useCollection } from '@/firebase';
 import type { FirestoreAddress, FirestoreProduct } from '@/lib/types';
-import { generateProductSlug } from '@/lib/product-slug';
+import { generateProductSlug, uniqueSlug } from '@/lib/product-slug';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/context/CurrencyContext';
 
@@ -212,13 +212,21 @@ export function ReviewStep() {
         // moment it is published. Stored rather than derived on read: the URL
         // must not change later when a title typo is corrected. An admin can
         // still edit it on the listing's SEO panel.
-        seoSlug: generateProductSlug({
-          id: '',
-          title: formData.title,
-          brandId: formData.brandId,
-          color: formData.color,
-          size: formData.sizeValue,
-        }),
+        seoSlug: await uniqueSlug(
+          generateProductSlug({
+            id: '',
+            title: formData.title,
+            brandId: formData.brandId,
+            color: formData.color,
+            size: formData.sizeValue,
+          }),
+          async (candidate) => {
+            const snap = await getDocs(
+              query(collection(firestore, 'products'), where('seoSlug', '==', candidate), limit(1)),
+            );
+            return !snap.empty;
+          },
+        ),
       };
 
       await ProductService.publishProduct(firestore, productData);

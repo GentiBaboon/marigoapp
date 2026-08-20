@@ -30,7 +30,10 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const jiti = require('jiti')(process.cwd());
+// See scripts/generate-sitemap.mjs — jiti needs the tsconfig `@/*` alias.
+const jiti = require('jiti')(process.cwd(), {
+  alias: { '@': `${process.cwd()}/src` },
+});
 const { normalizeSize, SIZE_PRESETS } = jiti('./src/lib/size-options.ts');
 
 const PROJECT_ID = 'marigoappcom-v10-6377709-d8775';

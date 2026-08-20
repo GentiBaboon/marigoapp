@@ -338,17 +338,23 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
     alternative but is **not submitted** — the static file is. If it is ever
     submitted, it must **not** declare `export const dynamic`, which would break
     `output: 'export'` for Capacitor.
-  - **Listing URLs are `/products/{slug}--{id}`** (`src/lib/product-slug.ts`).
-    The id stays in the path on purpose: resolving a listing is still a direct
-    document read, and **every existing `/products/{id}` link keeps working** —
-    `extractProductId()` treats a param with no `--` as a bare id. Both forms
-    emit the *same* canonical (the slug one), so legacy links consolidate rather
-    than compete. `--` is the delimiter because `slugify` collapses separator
-    runs, so a generated slug can never contain one.
-    - `seoSlug` is stamped once at publish (`ReviewStep`) and **stored**, not
-      derived on read: regenerating from the title would silently change a live
-      URL whenever a typo was fixed, discarding its ranking. Listings predating
-      slugs fall back to a derived one.
+  - **Listing URLs are `/products/{slug}`** (`src/lib/product-slug.ts`) — no id.
+    That makes resolution a **query on `seoSlug`**, not a document read, with
+    three consequences: slugs must be unique (`uniqueSlug()`), every listing
+    needs a *stored* slug (`scripts/backfill-slugs.mjs`), and the two older
+    shapes must still resolve because they are indexed — the bare
+    `/products/{id}` and the interim `/products/{slug}--{id}`.
+    `resolveSeoProduct()` (server) and the slug effect in
+    `products/[id]/client-page.tsx` (client) both try slug → `slug--id` → id.
+  - **A listing with no stored slug keeps its id URL.** `buildProductPath`
+    deliberately does *not* fall back to a derived slug: a derived slug is not
+    in Firestore, so linking to it would 404. Run the backfill after importing
+    listings, or they stay on ugly URLs.
+    - `seoSlug` is stamped once at publish (`ReviewStep`, de-duplicated against
+      existing slugs) and **stored**, not derived on read: regenerating from the
+      title would silently change a live URL whenever a typo was fixed,
+      discarding its ranking. Saving a listing in admin with the slug field
+      blank auto-completes it, so an admin never has to think about it.
     - Admins override the slug, meta title and meta description on the SEO card
       in `/admin/products/[id]`. Blank means "use the derived default", and the
       card's preview mirrors the exact fallback chain in
@@ -389,7 +395,7 @@ Functions (inside `functions/`): `npm run build` (tsc), `npm run serve` (build +
 
 `.claude/launch.json` defines two preview configs: **Next.js Dev Server** (port 3001) and **Firebase Functions Emulator** (port 5001). Emulator ports: functions 5001, firestore 8080, auth 9099, UI disabled.
 
-Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`, `normalize-sizes.mjs`, `generate-sitemap.mjs`.
+Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`, `normalize-sizes.mjs`, `generate-sitemap.mjs`, `backfill-slugs.mjs`.
 
 `normalize-sizes.mjs` folds `products.size`, `products.variants[].size` and
 `size_charts.sizes[]` onto the canonical vocabulary. **Dry run by default** —
@@ -397,7 +403,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (207 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `platform-routes`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (211 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `platform-routes`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

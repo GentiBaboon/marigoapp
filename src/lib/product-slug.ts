@@ -6,19 +6,24 @@
  * Google weights the path, and a shopper deciding whether to click a result
  * reads it, so every listing was throwing away its single best on-page signal.
  *
- * The scheme is `/products/{slug}--{id}`:
+ * The canonical form is the slug alone:
  *
- *     /products/vintage-gucci-heels-38--draft_1786018074973357
+ *     /products/vintage-gucci-heels-dark-brown-38
  *
- * The id is kept in the URL on purpose. Resolving a listing stays a direct
- * document read — no slug index, no uniqueness constraint, no second query —
- * and **every existing `/products/{id}` link keeps working**, because a param
- * with no `--` is treated as a bare id. That matters: those URLs are already
- * indexed and shared.
+ * Which means a listing is resolved by **querying** `seoSlug`, not by reading a
+ * document id. Three consequences, all handled here:
  *
- * `--` is the delimiter because `slugify` collapses runs of separators, so a
- * generated slug can never contain one. Splitting on the *last* `--` means an
- * id containing the sequence would still resolve.
+ *   1. Slugs must be unique. `uniqueSlug()` appends `-2`, `-3`, … when a base
+ *      slug is already taken.
+ *   2. Every listing needs a *stored* slug. Products published before slugs
+ *      existed are backfilled by `scripts/backfill-slugs.mjs`; until one has a
+ *      slug, `buildProductPath` falls back to `/products/{id}` so it keeps
+ *      working rather than 404ing.
+ *   3. Two older URL shapes must still resolve, because they are already
+ *      indexed and shared: the bare `/products/{id}`, and the interim
+ *      `/products/{slug}--{id}`. `extractProductId()` recovers the id from the
+ *      second; callers try the slug query first and fall back to a document
+ *      read.
  */
 
 /** Product fields this module needs. Structural, so both `FirestoreProduct` and
@@ -104,8 +109,31 @@ export function generateProductSlug(product: SluggableProduct): string {
  * before slugs existed fall back to a derived one rather than a bare id.
  */
 export function buildProductPath(product: SluggableProduct): string {
-  const slug = product.seoSlug?.trim() || generateProductSlug(product);
-  return slug ? `/products/${slug}${SEPARATOR}${product.id}` : `/products/${product.id}`;
+  // Only a *stored* slug can be resolved — a derived one is not in Firestore,
+  // so linking to it would 404. Products awaiting backfill keep their id URL.
+  const slug = product.seoSlug?.trim();
+  return slug ? `/products/${slug}` : `/products/${product.id}`;
+}
+
+/**
+ * Append a numeric suffix until the slug is free.
+ *
+ * `isTaken` is injected so this stays a pure function testable without
+ * Firestore, and usable from both the client SDK and a REST script.
+ */
+export async function uniqueSlug(
+  base: string,
+  isTaken: (candidate: string) => Promise<boolean>,
+  limit = 50,
+): Promise<string> {
+  if (!base) return '';
+  if (!(await isTaken(base))) return base;
+  for (let n = 2; n <= limit; n += 1) {
+    const candidate = truncateOnWord(base, MAX_SLUG_LENGTH - String(n).length - 1) + `-${n}`;
+    if (!(await isTaken(candidate))) return candidate;
+  }
+  // Pathological case — fall back to something guaranteed free.
+  return `${base}-${Date.now().toString(36)}`;
 }
 
 /**
