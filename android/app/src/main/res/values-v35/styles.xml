@@ -25,11 +25,22 @@
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
         <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+        <!-- Repeated from values/styles.xml: a qualified resource replaces the
+             whole style rather than merging with it, so anything omitted here
+             reverts to the platform default on API 35+. -->
+        <item name="android:statusBarColor">@color/brandPurple</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/appBackground</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
         <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+        <item name="android:statusBarColor">@color/brandPurple</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/appBackground</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 
 </resources>

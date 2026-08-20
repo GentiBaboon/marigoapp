@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Brand colours for the Android shell.
+
+  `styles.xml` referenced @color/colorPrimary, colorPrimaryDark and colorAccent
+  without any of them being defined in the project — they only resolved because
+  the theme that uses them, plain `AppTheme`, is never applied. Defining them
+  properly makes that theme mean something and keeps the two shells in step.
+
+  brandPurple is the CSS primary token from src/app/globals.css
+  (267.6 85% 73.9%), the same value as the announcement bar, the theme-color
+  meta and the iOS status-bar band. Change one, change all four.
+-->
+<resources>
+    <color name="brandPurple">#B884F5</color>
+    <color name="brandGold">#F59E0B</color>
+    <color name="appBackground">#FFFFFF</color>
+
+    <color name="colorPrimary">#B884F5</color>
+    <color name="colorPrimaryDark">#B884F5</color>
+    <color name="colorAccent">#F59E0B</color>
+</resources>
