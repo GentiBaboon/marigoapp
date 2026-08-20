@@ -117,7 +117,7 @@ export default function CartPage() {
                 </Card>
             </div>
 
-            <div className="fixed bottom-16 md:bottom-0 left-0 w-full bg-background/95 backdrop-blur-sm border-t p-4 z-40">
+            <div className="fixed bottom-nav-safe md:bottom-0 left-0 w-full bg-background/95 backdrop-blur-sm border-t p-4 z-40">
                 <div className="container max-w-2xl mx-auto px-0">
                     <Button asChild size="lg" className="w-full">
                         <Link href="/checkout">Continue to checkout</Link>

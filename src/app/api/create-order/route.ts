@@ -7,7 +7,7 @@ import {
   firestoreCreate,
 } from '@/lib/firebase-admin';
 import { DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
-import { sendOrderConfirmation, sendSellerOrderNotification } from '@/lib/mailtrap';
+import { sendOrderConfirmation, sendSellerOrderNotification } from '@/lib/email';
 import { createOrderLimiter, applyRateLimit } from '@/lib/rate-limit';
 
 async function calculateOrderTotal(
@@ -215,6 +215,7 @@ export async function POST(req: NextRequest) {
           sellerEmail: sellerData.email,
           sellerName: sellerData.name || 'Seller',
           orderNumber,
+          orderId,
           items: validatedItems.filter((i: any) => i.sellerId === sellerId),
           totalAmount: total,
         }).catch(console.error);

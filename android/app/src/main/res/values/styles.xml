@@ -13,10 +13,29 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+
+        <!-- Without these the status bar falls back to the platform default,
+             which renders a flat grey strip above the purple announcement bar.
+             Setting it in the theme rather than only through the StatusBar
+             plugin means it is correct from the first frame, with no coloured
+             flash once JavaScript boots.
+
+             windowLightStatusBar = true asks for *dark* icons, which is what
+             reads against a light purple; the same choice as the iOS band. -->
+        <item name="android:statusBarColor">@color/brandPurple</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/appBackground</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <!-- Same treatment on the launch theme, or the bar changes colour the
+             moment the splash hands over to the WebView. -->
+        <item name="android:statusBarColor">@color/brandPurple</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/appBackground</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>

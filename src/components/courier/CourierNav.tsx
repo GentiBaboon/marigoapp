@@ -20,7 +20,7 @@ export function CourierNav() {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 z-50 w-full h-16 bg-background border-t md:hidden">
+    <div className="fixed bottom-0 left-0 z-50 w-full h-16 box-content pb-safe-bottom pl-safe-left pr-safe-right bg-background border-t md:hidden">
       <div className="grid h-full max-w-lg grid-cols-4 mx-auto">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);

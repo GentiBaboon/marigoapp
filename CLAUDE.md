@@ -33,7 +33,7 @@ Locale: `<html lang="en">` — it must match the *server-rendered* content, and 
 | Payments | Stripe (`@stripe/react-stripe-js` client, `stripe` v21 in Next routes, v16 in functions) + Stripe Connect Express |
 | Image storage | Supabase Storage, single bucket `product-images` (`PRODUCT_IMAGES_BUCKET`) + Firebase Storage for user/delivery assets |
 | AI | Genkit 1.x + `@genkit-ai/google-genai` (default model `googleai/gemini-2.0-flash`); functions also depend on `@google-cloud/vertexai` |
-| Email | Mailtrap (`src/lib/mailtrap.ts`) |
+| Email | SendGrid v3 REST (`src/lib/email/`) — see `docs/email.md`. `src/lib/mailtrap.ts` is the superseded predecessor |
 | Tables / charts | `@tanstack/react-table`, `recharts` |
 | Forms | react-hook-form + Zod (schemas live in `src/lib/types.ts`) |
 | State | React Context (`Cart`, `Wishlist`, `Currency`, `Language`) |
@@ -414,7 +414,7 @@ Functions (inside `functions/`): `npm run build` (tsc), `npm run serve` (build +
 
 `.claude/launch.json` defines two preview configs: **Next.js Dev Server** (port 3001) and **Firebase Functions Emulator** (port 5001). Emulator ports: functions 5001, firestore 8080, auth 9099, UI disabled.
 
-Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`, `normalize-sizes.mjs`, `generate-sitemap.mjs`, `backfill-slugs.mjs`.
+Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`, `normalize-sizes.mjs`, `generate-sitemap.mjs`, `backfill-slugs.mjs`, `preview-emails.mjs`.
 
 `normalize-sizes.mjs` folds `products.size`, `products.variants[].size` and
 `size_charts.sizes[]` onto the canonical vocabulary. **Dry run by default** —
@@ -422,7 +422,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (220 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `category-url`, `platform-routes`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (283 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `category-url`, `email`, `platform-routes`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
@@ -441,7 +441,8 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID / APP_ID / FUNCTIONS_REGION=europe-west
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY  + STRIPE_SECRET_KEY
 NEXT_PUBLIC_SUPABASE_URL / ANON_KEY + SUPABASE_SERVICE_ROLE_KEY
 GOOGLE_GENAI_API_KEY
-MAILTRAP_TOKEN
+SENDGRID_API_KEY / SENDGRID_FROM_EMAIL / SENDGRID_FROM_NAME
+MAILTRAP_TOKEN                 # legacy, superseded
 RESET_SERVICE_SECRET
 SITE_URL                      # optional; overrides the marigoapp.com default
 ```

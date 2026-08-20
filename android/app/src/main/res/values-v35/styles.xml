@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 15 (API 35) overrides.
+
+  Targeting API 35 makes the system draw the app edge to edge whether it asks
+  to or not, putting content under the status and navigation bars. iOS handles
+  that well: WKWebView reports the notch and home indicator to CSS through
+  env(safe-area-inset-*), and the layout pads against them.
+
+  Android WebView is not dependable about reporting the *system bar* insets the
+  same way — display cutouts, yes; the gesture bar, not reliably. Rather than
+  ship a Play build where the bottom tab bar may sit under the gesture bar with
+  nothing compensating, this opts out and keeps the conventional inset layout.
+  The safe-area CSS is still present and simply resolves to 0 here.
+
+  This attribute is a transitional escape hatch: Google has said it goes away in
+  a later platform release. Before raising targetSdk past 35, run the app on an
+  API 35+ emulator, confirm the WebView reports insets, delete this file, and
+  let the CSS take over.
+-->
+<resources>
+
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+        <!-- Repeated from values/styles.xml: a qualified resource replaces the
+             whole style rather than merging with it, so anything omitted here
+             reverts to the platform default on API 35+. -->
+        <item name="android:statusBarColor">@color/brandPurple</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/appBackground</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="android:background">@drawable/splash</item>
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+        <item name="android:statusBarColor">@color/brandPurple</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/appBackground</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+</resources>

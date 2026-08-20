@@ -1,5 +1,5 @@
 
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Header } from '@/components/header';
 import { AnnouncementBar } from '@/components/AnnouncementBar';
@@ -23,6 +23,26 @@ const ChatbotWidget = dynamic(() => import('@/components/ai/ChatbotWidget').then
   ssr: false,
 });
 
+
+/**
+ * `viewportFit: 'cover'` is the switch that makes safe areas exist at all.
+ *
+ * Without it the WebView lays out inside the safe area and every
+ * `env(safe-area-inset-*)` resolves to 0 — so safe-area CSS silently does
+ * nothing, which is exactly what was happening here. With it the page paints
+ * edge to edge, behind the notch/Dynamic Island and the home indicator, and the
+ * insets report real values for the layout to pad against.
+ *
+ * The theme colour drives the Android status bar and the PWA title bar. It is
+ * the announcement bar's purple, because that strip is what sits under the
+ * status bar at the top of every screen.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#B884F5',
+};
 
 export const metadata: Metadata = {
   // metadataBase lets every page emit absolute canonical/OG URLs from relative
@@ -160,13 +180,28 @@ export default function RootLayout({
                       {/* dvh, not vh: on iOS the visible viewport grows when
                           Safari's toolbars collapse, and vh keeps reporting the
                           expanded-toolbar height. */}
-                      <div className="relative flex min-h-[100dvh] flex-col">
+                      {/* The status-bar strip. The page paints edge to edge
+                          under `viewportFit: 'cover'`, so without an opaque
+                          band here the content scrolls visibly behind the
+                          clock and battery. Brand purple, so at the top of the
+                          page it is continuous with the announcement bar and
+                          reads as one strip. Collapses to zero height on
+                          desktop and on devices with no inset. */}
+                      <div
+                        aria-hidden
+                        className="fixed inset-x-0 top-0 z-50 h-safe-top bg-primary"
+                      />
+                      {/* pt-safe-top keeps content clear of the notch; the
+                          left/right insets matter in landscape, where the
+                          cutout moves to one side. min-h is border-box, so the
+                          padding does not push the page past one screen. */}
+                      <div className="relative flex min-h-[100dvh] flex-col pt-safe-top pl-safe-left pr-safe-right">
                         <AnnouncementBar />
                         <Header />
                         {/* flex column so full-height pages can claim the
                             leftover space with `flex-1` instead of subtracting
                             a hardcoded guess at the chrome above them. */}
-                        <main className="flex flex-1 flex-col pb-16 md:pb-0">{children}</main>
+                        <main className="flex flex-1 flex-col pb-nav-safe md:pb-0">{children}</main>
                         <ChatbotWidget />
                         <MobileNav />
                         <ShoppingPreferenceModal />

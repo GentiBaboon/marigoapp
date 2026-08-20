@@ -16,6 +16,28 @@ export default {
       },
     },
     extend: {
+      /**
+       * Safe-area insets as first-class spacing, so screens read
+       * `pb-safe-bottom` instead of repeating an env() arbitrary value.
+       *
+       * These resolve to 0 on every desktop browser and on any device without
+       * a notch or gesture bar, so the same class is correct on web and device
+       * — there is no platform branch to keep in sync.
+       *
+       * They only report real values because the root layout sets
+       * `viewportFit: 'cover'`. Remove that and every one of these silently
+       * becomes 0 again.
+       */
+      spacing: {
+        'safe-top': 'env(safe-area-inset-top)',
+        'safe-bottom': 'env(safe-area-inset-bottom)',
+        'safe-left': 'env(safe-area-inset-left)',
+        'safe-right': 'env(safe-area-inset-right)',
+        // The bottom tab bar plus the gesture bar beneath it. Any scrolling
+        // page needs this much bottom padding or its last row hides behind the
+        // nav — `pb-16` was already doing half the job and predates the insets.
+        'nav-safe': 'calc(4rem + env(safe-area-inset-bottom))',
+      },
       fontFamily: {
         body: ['Inter', 'sans-serif'],
         headline: ['Georgia', 'serif'],
