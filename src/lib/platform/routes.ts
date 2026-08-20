@@ -35,6 +35,20 @@ type RouteRule = {
  * `/products/[id]`, or the bare rule swallows it and `edit` becomes the id.
  */
 const ROUTE_RULES: RouteRule[] = [
+  // Clean category URLs. Anchored to the four real gender segments rather than
+  // `[^/]+`, because these sit at the root — a loose pattern would rewrite
+  // every two-segment path in the app (/admin/orders, /profile/wallet …) into
+  // a category page.
+  {
+    pattern: /^\/(women|men|children|unisex)\/([^/]+)$/,
+    nativePath: '/category/view',
+    params: ['gender', 'category'],
+  },
+  {
+    pattern: /^\/(women|men|children|unisex)$/,
+    nativePath: '/category/view',
+    params: ['gender'],
+  },
   {
     pattern: /^\/products\/([^/]+)\/offers\/([^/]+)$/,
     nativePath: '/products/offer',

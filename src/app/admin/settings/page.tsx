@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import SettingsLoading from './loading';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SeoSlugsTab } from '@/components/admin/settings/seo-slugs-tab';
 import { SizeConfigTab } from '@/components/admin/settings/size-config-tab';
 import { MenuConfigTab } from '@/components/admin/settings/menu-config-tab';
 import { BannerConfigTab } from '@/components/admin/settings/banner-config-tab';
@@ -537,6 +538,7 @@ export default function AdminSettingsPage() {
             <TabsTrigger value="homepageblocks">Homepage Blocks</TabsTrigger>
             <TabsTrigger value="related">Related Products</TabsTrigger>
             <TabsTrigger value="badges">Badges</TabsTrigger>
+            <TabsTrigger value="seo">SEO</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
@@ -625,6 +627,14 @@ export default function AdminSettingsPage() {
 
         <TabsContent value="badges">
             <BadgeConfigTab firestore={firestore} toast={toast} />
+        </TabsContent>
+
+        <TabsContent value="seo" className="space-y-4">
+
+
+          <SeoSlugsTab />
+
+
         </TabsContent>
       </Tabs>
 

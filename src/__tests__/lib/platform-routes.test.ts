@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { toNativeHref, NATIVE_ROUTE_PATHS } from '@/lib/platform/routes';
+import { toNativeHref, NATIVE_ROUTE_PATHS, __ROUTE_RULES_FOR_TEST } from '@/lib/platform/routes';
 
 /**
  * These cover the one piece of the native port with no runtime safety net: if a
@@ -73,8 +73,29 @@ describe('toNativeHref', () => {
     expect(toNativeHref(once)).toBe(once);
   });
 
-  it('routes every rule at a distinct flat path', () => {
-    expect(new Set(NATIVE_ROUTE_PATHS).size).toBe(NATIVE_ROUTE_PATHS.length);
+  /**
+   * Two rules may share a flat page, but only when they are the same route with
+   * an optional segment — `/women/shirts` and `/women` both land on
+   * `/category/view`, which reads `category` when present. Anything else
+   * sharing a path is a copy-paste slip that would send one route to the wrong
+   * screen, so the param lists must nest.
+   */
+  it('shares a flat path only between rules whose params nest', () => {
+    const byPath = new Map<string, string[][]>();
+    __ROUTE_RULES_FOR_TEST.forEach((rule) => {
+      byPath.set(rule.nativePath, [...(byPath.get(rule.nativePath) ?? []), rule.params]);
+    });
+
+    for (const [nativePath, paramSets] of byPath) {
+      if (paramSets.length === 1) continue;
+      const sorted = [...paramSets].sort((a, b) => a.length - b.length);
+      for (let i = 1; i < sorted.length; i += 1) {
+        expect(
+          sorted[i - 1].every((p, idx) => sorted[i][idx] === p),
+          `${nativePath} is shared by rules with unrelated params: ${JSON.stringify(paramSets)}`,
+        ).toBe(true);
+      }
+    }
   });
 
   /**

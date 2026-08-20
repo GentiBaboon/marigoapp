@@ -177,6 +177,8 @@ export interface SitemapProduct {
   brandId?: string;
   color?: string;
   size?: string;
+  gender?: string;
+  subcategoryId?: string;
   seoSlug?: string;
   updatedAt?: string;
   /** First usable image, emitted as a Google image-sitemap extension. */
@@ -230,6 +232,8 @@ export async function fetchProductsForSitemap(limit = 5000): Promise<SitemapProd
           brandId: f.brandId,
           color: f.color,
           size: f.size,
+          gender: f.gender,
+          subcategoryId: f.subcategoryId,
           seoSlug: f.seoSlug,
           updatedAt: f.updatedAt || f.listingCreated || undefined,
           image,
