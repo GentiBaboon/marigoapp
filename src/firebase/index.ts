@@ -2,7 +2,7 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, initializeAuth, indexedDBLocalPersistence, type Auth } from 'firebase/auth';
 import { getFirestore, initializeFirestore, type Firestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage';
 import { isNativeApp } from '@/lib/platform/native';
@@ -35,17 +35,50 @@ export function initializeFirebase() {
 }
 
 /**
+ * Auth, initialised in a way the WebView can actually complete.
+ *
+ * `getAuth()` wires up `browserPopupRedirectResolver` by default. Resolving it
+ * loads a hidden iframe against the project's authDomain to look for a pending
+ * signInWithRedirect result — and under the `capacitor://` scheme that iframe
+ * never finishes loading, so Auth never reaches a ready state.
+ *
+ * That alone would be survivable, except Firestore asks its app's auth provider
+ * for a token *before* it sends anything. A promise that never settles means the
+ * query is never issued: no request, no error, no timeout. Every list in the app
+ * sat on its loading skeleton because of this, while Firestore itself was
+ * healthy — a REST read of the same collection from the same origin returned in
+ * well under a second, and the same query against an app with no Auth attached
+ * returned 26 documents in 722ms.
+ *
+ * Naming the persistence explicitly skips the resolver entirely. The cost is
+ * that `signInWithPopup` / `signInWithRedirect` cannot work on device, which was
+ * already true — a WebView has no popup to return to. Native Google sign-in
+ * needs @capacitor-firebase/authentication regardless; email and password,
+ * password reset and session persistence are all unaffected.
+ */
+function getPlatformAuth(firebaseApp: FirebaseApp): Auth {
+  if (!isNativeApp()) return getAuth(firebaseApp);
+
+  try {
+    return initializeAuth(firebaseApp, { persistence: indexedDBLocalPersistence });
+  } catch {
+    // Already initialised on an earlier call — settings are fixed by now.
+    return getAuth(firebaseApp);
+  }
+}
+
+/**
  * Firestore, with a transport the platform can actually use.
  *
- * By default the SDK talks over WebChannel, a long-lived streaming connection.
- * That works in a browser and fails silently inside the iOS/Android WebView —
- * the connection never establishes, no query ever resolves, no error is thrown,
- * and every list in the app sits on its loading skeleton forever. It looks like
- * a slow network rather than a broken one, which is what makes it expensive to
- * diagnose.
+ * By default the SDK talks over WebChannel, a long-lived streaming connection,
+ * which WKWebView handles poorly. Long polling trades streaming efficiency for
+ * plain HTTP requests that survive the WebView. Applied only on device; the web
+ * build keeps WebChannel.
  *
- * Long polling trades streaming efficiency for plain HTTP requests that survive
- * the WebView. It is applied only on device; the web build keeps WebChannel.
+ * This is belt-and-braces, not the cure for the loading-skeleton bug that was
+ * once blamed on it — that was Auth, see `getPlatformAuth` above. Measured on
+ * device, a query over long polling returns in ~700ms, so the cost is small
+ * enough to keep for the reliability.
  */
 function getPlatformFirestore(firebaseApp: FirebaseApp): Firestore {
   if (!isNativeApp()) return getFirestore(firebaseApp);
@@ -62,7 +95,7 @@ function getPlatformFirestore(firebaseApp: FirebaseApp): Firestore {
 export function getSdks(firebaseApp: FirebaseApp) {
   return {
     firebaseApp,
-    auth: getAuth(firebaseApp),
+    auth: getPlatformAuth(firebaseApp),
     firestore: getPlatformFirestore(firebaseApp),
     storage: getStorage(firebaseApp)
   };
