@@ -6,18 +6,22 @@ import {
   firestoreUpdate,
   firestoreCreate,
 } from '@/lib/firebase-admin';
-import { DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
+import { calculateShipping, type ShippableLine } from '@/lib/shipping';
 import { sendOrderConfirmation, sendSellerOrderNotification } from '@/lib/email';
 import { createOrderLimiter, applyRateLimit } from '@/lib/rate-limit';
 
 async function calculateOrderTotal(
   items: any[],
   couponCode: string | undefined,
-  idToken: string
+  idToken: string,
+  /** Delivery country, from the address being shipped to. Decides whether each
+   *  parcel pays the domestic or the cross-border rate. */
+  destinationCountry?: string | null,
 ) {
   let subtotal = 0;
   const sellerIds = new Set<string>();
   const validatedItems: any[] = [];
+  const shippableLines: ShippableLine[] = [];
 
   for (const item of items) {
     const lookupId = item.productId || item.id;
@@ -35,16 +39,28 @@ async function calculateOrderTotal(
     }
     subtotal += pData.price || 0;
     if (pData.sellerId) sellerIds.add(pData.sellerId);
+    // Origin city is read off the stored product, never trusted from the
+    // request — otherwise a caller could collapse a multi-city order into one
+    // delivery fee by editing its own basket payload.
+    shippableLines.push({
+      sellerId: pData.sellerId || '',
+      shippingFromCity: pData.shippingFromCity ?? null,
+      shippingFromCountry: pData.shippingFromCountry ?? null,
+    });
     validatedItems.push({ ...item, price: pData.price || item.price });
   }
 
   const settings = await firestoreGet('settings', 'global', idToken);
-  // Flat fee per order — mirrored by totalShipping in src/context/CartContext.tsx.
-  // This side is authoritative: it is what the buyer is charged.
-  let shippingFee = items.length > 0 ? DEFAULT_SHIPPING_FEE_EUR : 0;
-  if (settings?.isFreeDeliveryActive && subtotal >= (settings?.freeDeliveryThreshold || 0)) {
-    shippingFee = 0;
-  }
+  // One fee per distinct origin city — mirrored by CartContext for display.
+  // This side is authoritative: it is what the buyer is charged. Both call the
+  // same helper so the quote and the charge cannot disagree.
+  const isFreeDelivery = Boolean(
+    settings?.isFreeDeliveryActive && subtotal >= (settings?.freeDeliveryThreshold || 0),
+  );
+  const { totalEur: shippingFee, groups: shippingGroups } = calculateShipping(
+    shippableLines,
+    { isFree: isFreeDelivery, destinationCountry },
+  );
 
   let discount = 0;
   if (couponCode) {
@@ -65,7 +81,7 @@ async function calculateOrderTotal(
   }
 
   const total = Math.max(0, subtotal + shippingFee - discount);
-  return { subtotal, shippingFee, discount, total, sellerIds: Array.from(sellerIds), validatedItems };
+  return { subtotal, shippingFee, discount, total, sellerIds: Array.from(sellerIds), validatedItems, shippingGroups };
 }
 
 export async function POST(req: NextRequest) {
@@ -99,7 +115,8 @@ export async function POST(req: NextRequest) {
     const { total, sellerIds, discount, validatedItems } = await calculateOrderTotal(
       items,
       couponCode,
-      idToken
+      idToken,
+      shippingAddress?.country,
     );
 
     const orderNumber = `MG-COD-${Date.now()}`;
