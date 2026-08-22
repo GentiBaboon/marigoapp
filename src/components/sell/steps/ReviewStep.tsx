@@ -208,6 +208,10 @@ export function ReviewStep() {
         vintage: formData.vintage,
         pattern: formData.pattern,
         shippingFromAddressId: formData.shippingFromAddressId,
+        // Stamped alongside the address id so checkout can group a basket by
+        // origin city without reading this seller's private address book.
+        shippingFromCity: selectedAddress?.city ?? '',
+        shippingFromCountry: selectedAddress?.country ?? '',
         // Stamped once, here, so the listing has a keyword-bearing URL from the
         // moment it is published. Stored rather than derived on read: the URL
         // must not change later when a title typo is corrected. An admin can

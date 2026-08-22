@@ -292,6 +292,16 @@ export interface FirestoreProduct {
   vintage?: boolean;
   pattern?: string;
   shippingFromAddressId?: string;
+  /**
+   * City the listing ships from, copied from the seller's pickup address when
+   * the listing is published. Denormalised on purpose: a buyer cannot read
+   * `users/{sellerId}/addresses`, so the basket has no other way to know how
+   * many separate courier runs an order needs. Absent on listings published
+   * before this existed — those are treated as one shared origin.
+   */
+  shippingFromCity?: string;
+  /** Country the listing ships from; decides the domestic vs cross-border rate. */
+  shippingFromCountry?: string;
   /** URL slug, set once at publish and only changed deliberately by an admin.
    *  Regenerating it from the title would silently change a listing's live URL
    *  whenever a typo was fixed, discarding whatever ranking it had.
@@ -473,6 +483,9 @@ export interface SellFormValues {
   // No `shippingMethod` — delivery is a flat platform fee (DEFAULT_SHIPPING_FEE_ALL),
   // not a per-listing courier choice.
   shippingFromAddressId: string;
+  /** Copied from the chosen pickup address at publish; see FirestoreProduct. */
+  shippingFromCity?: string;
+  shippingFromCountry?: string;
 }
 
 export interface SellDraft {
@@ -626,8 +639,16 @@ export const DEFAULT_COMMISSION_RATE = 0.15;
  * CartContext and the create-order route, which could silently disagree.
  */
 export const DEFAULT_SHIPPING_FEE_ALL = 200;
-const ALL_PER_EUR = 103.5;
+/**
+ * Crossing the Albania–Kosovo border costs more than a domestic run, so a
+ * parcel whose origin country differs from the delivery country is charged at
+ * this rate instead. Still per origin city: two Kosovan cities delivering into
+ * Albania are two crossings, not one.
+ */
+export const CROSS_BORDER_SHIPPING_FEE_ALL = 500;
+const ALL_PER_EUR = 93;
 export const DEFAULT_SHIPPING_FEE_EUR = DEFAULT_SHIPPING_FEE_ALL / ALL_PER_EUR;
+export const CROSS_BORDER_SHIPPING_FEE_EUR = CROSS_BORDER_SHIPPING_FEE_ALL / ALL_PER_EUR;
 
 export interface RelatedProductsConfig {
   enabled: boolean;

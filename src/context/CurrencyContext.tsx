@@ -67,7 +67,10 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const formatPrice = useCallback((priceInEur: number, targetCurrency?: Currency) => {
         const c = targetCurrency || currency;
-        const rates = exchangeRates?.rates || { EUR: 1, ALL: 103.5, USD: 1.08 }; // Fallback rates
+        // Fallback table. `config/exchangeRates` does not exist in Firestore,
+        // so in practice this IS the rate the app runs on. Keep ALL in step
+        // with ALL_PER_EUR in src/lib/types.ts, which derives the shipping fee.
+        const rates = exchangeRates?.rates || { EUR: 1, ALL: 93, USD: 1.08 };
         const rate = rates[c] || 1;
         const convertedPrice = priceInEur * rate;
         

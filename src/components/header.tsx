@@ -42,10 +42,19 @@ function HeaderContent() {
     '/sell',
   ];
 
-  const isSearchBasePage = pathname === '/search' && searchParams.toString().length === 0;
-  const isRootPage = pathname === '/';
-  
-  const isTopLevelPage = topLevelNavPaths.includes(pathname) || isSearchBasePage || isRootPage;
+  // The native build sets `trailingSlash: true`, so on device the path arrives
+  // as "/home/" and matched none of the entries above — which is why the back
+  // arrow showed on every top-level screen in the app while behaving correctly
+  // on web. Compare without the trailing slash so one list covers all three
+  // platforms. "/" is left alone; stripping it would leave an empty string.
+  const normalizedPath = pathname === '/' ? '/' : pathname.replace(/\/+$/, '');
+
+  const isSearchBasePage =
+    normalizedPath === '/search' && searchParams.toString().length === 0;
+  const isRootPage = normalizedPath === '/';
+
+  const isTopLevelPage =
+    topLevelNavPaths.includes(normalizedPath) || isSearchBasePage || isRootPage;
 
   const showBackArrow = !isTopLevelPage;
 

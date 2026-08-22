@@ -18,7 +18,8 @@ import {
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { Skeleton } from './ui/skeleton';
 import {
   Info,

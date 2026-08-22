@@ -7,6 +7,7 @@ import { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot, writeBatch, qu
 import { FirestorePermissionError } from '@/firebase/errors';
 import type { FirestoreCoupon, FirestoreSettings } from '@/lib/types';
 import { DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
+import { calculateShipping, type ShippingGroup } from '@/lib/shipping';
 
 export type ShippingMethod = 'direct' | 'authentication';
 
@@ -35,6 +36,14 @@ export type CartItem = {
     selectedColor?: string | null;
     shippingMethod: ShippingMethod;
     directShippingFee: number;
+    /**
+     * City this line ships from, copied off the product. Drives the per-city
+     * delivery fee. Optional: listings published before the field existed have
+     * none, and are pooled into a single shared origin.
+     */
+    shippingFromCity?: string | null;
+    /** Origin country, for the domestic vs cross-border rate. */
+    shippingFromCountry?: string | null;
 };
 
 // Build a stable cart-line id from a product id + size. Items without a size
@@ -55,6 +64,8 @@ interface CartContextType {
     subtotal: number;
     totalItems: number;
     totalShipping: number;
+    /** Per-origin-city delivery breakdown, for the order summary. */
+    shippingGroups: ShippingGroup[];
     grandTotal: number;
     isLoading: boolean;
 }
@@ -70,6 +81,34 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { user } = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
+
+    /**
+     * Where the order is going. Crossing the Albania–Kosovo border costs more,
+     * so the quote needs the destination as well as the origins.
+     *
+     * Taken from the buyer's default address, and only fetched once there is
+     * something in the basket — CartProvider wraps every page, and a shopper
+     * with an empty cart should not be paying for an address read.
+     *
+     * `create-order` recomputes this from the address actually submitted, so a
+     * buyer who picks a different address at checkout is charged correctly even
+     * if this quote was based on their default.
+     */
+    const [destinationCountry, setDestinationCountry] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!user || !firestore || items.length === 0) return;
+        let cancelled = false;
+        getDocs(collection(firestore, 'users', user.uid, 'addresses'))
+            .then(snap => {
+                if (cancelled) return;
+                const docs = snap.docs.map(d => d.data() as { country?: string; isDefault?: boolean });
+                const chosen = docs.find(a => a.isDefault) ?? docs[0];
+                setDestinationCountry(chosen?.country ?? null);
+            })
+            .catch(() => { /* Quote falls back to the domestic rate. */ });
+        return () => { cancelled = true; };
+    }, [user, firestore, items.length]);
 
     // Load global settings (for free delivery thresholds)
     useEffect(() => {
@@ -242,6 +281,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     selectedColor: color ?? null,
                     shippingMethod: 'direct',
                     directShippingFee: DEFAULT_SHIPPING_FEE_EUR,
+                    shippingFromCity: product.shippingFromCity ?? null,
+                    shippingFromCountry: product.shippingFromCountry ?? null,
                 };
 
             // Persist to Firestore (effects-in-render is fine here — same pattern
@@ -337,17 +378,19 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const totalItems = useMemo(() => items.reduce((acc, item) => acc + item.quantity, 0), [items]);
     
-    const totalShipping = useMemo(() => {
-        if (items.length === 0) return 0;
-        if (settings?.isFreeDeliveryActive && subtotal >= (settings?.freeDeliveryThreshold || 0)) {
-            return 0;
-        }
-        // One flat delivery fee per order, not per item — a second pair of shoes
-        // in the same basket does not double the courier cost. Must stay in step
-        // with calculateOrderTotal() in src/app/api/create-order/route.ts, which
-        // is the authoritative figure the buyer is actually charged.
-        return DEFAULT_SHIPPING_FEE_EUR;
-    }, [items, settings, subtotal]);
+    // One flat fee per city shipped from — not per item, and not per seller.
+    // Two sellers in Tirana share a courier run and one fee; Tirana plus Berat
+    // is two runs and two fees. The maths lives in src/lib/shipping.ts so this
+    // and calculateOrderTotal() in create-order cannot drift apart.
+    const shipping = useMemo(() => {
+        const isFree = Boolean(
+            settings?.isFreeDeliveryActive && subtotal >= (settings?.freeDeliveryThreshold || 0),
+        );
+        return calculateShipping(items, { isFree, destinationCountry });
+    }, [items, settings, subtotal, destinationCountry]);
+
+    const totalShipping = shipping.totalEur;
+    const shippingGroups = shipping.groups;
 
     const grandTotal = useMemo(() => Math.max(0, subtotal + totalShipping - discountAmount), [subtotal, totalShipping, discountAmount]);
 
@@ -364,7 +407,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             discountAmount,
             subtotal, 
             totalItems, 
-            totalShipping, 
+            totalShipping,
+            shippingGroups, 
             grandTotal, 
             isLoading 
         }}>
