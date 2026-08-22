@@ -93,6 +93,22 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
     }
   }, [countryValue]);
 
+  // Cities offered for the chosen country. Delivery is priced per origin city,
+  // so a picked value beats typed spelling: "Tirane" and "Tirana" would
+  // otherwise be billed as two separate courier runs.
+  const citiesForCountry = React.useMemo(() => {
+    const match = countries.find(c => c.name.toLowerCase() === (countryValue || '').toLowerCase());
+    return match?.cities ?? [];
+  }, [countryValue]);
+
+  // A stored country outside the current list — see the note in the picker.
+  const legacyCountry = React.useMemo(() => {
+    const value = (countryValue || '').trim();
+    if (!value) return '';
+    const known = countries.some(c => c.name.toLowerCase() === value.toLowerCase());
+    return known ? '' : value;
+  }, [countryValue]);
+
   async function onSubmit(data: AddressFormValues) {
     if (!firestore) return;
     setIsLoading(true);
@@ -131,7 +147,7 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
             <FormItem>
               <FormLabel>Full Name</FormLabel>
               <FormControl>
-                <Input placeholder="e.g. Genti Selenica" {...field} />
+                <Input placeholder="e.g. Sara Lekaj" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -154,7 +170,7 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
                 </Select>
                 <div className="w-full">
                     <Input 
-                        placeholder="e.g. 67700900" 
+                        placeholder="e.g. 692345678" 
                         value={phoneNumber} 
                         onChange={(e) => setPhoneNumber(e.target.value)}
                     />
@@ -170,7 +186,7 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
             <FormItem>
               <FormLabel>Street Address</FormLabel>
               <FormControl>
-                <Input placeholder="e.g. 123 Main St" {...field} />
+                <Input placeholder="e.g. Rruga Sami Frashëri" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -182,9 +198,34 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
             render={({ field }) => (
             <FormItem>
                 <FormLabel>Country</FormLabel>
-                <FormControl>
-                    <Input placeholder="e.g. Albania" {...field} />
-                </FormControl>
+                <Select
+                  value={field.value || ''}
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    // The city list is per country, so a previously chosen city
+                    // would otherwise linger and no longer be selectable.
+                    form.setValue('city', '');
+                  }}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a country" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {countries.map((country) => (
+                      <SelectItem key={country.code} value={country.name}>
+                        {country.flag} {country.name}
+                      </SelectItem>
+                    ))}
+                    {/* An address saved before the list was narrowed to Albania
+                        and Kosovo keeps its own country as an option, so
+                        editing one does not silently blank a real value. */}
+                    {legacyCountry && (
+                      <SelectItem value={legacyCountry}>{legacyCountry}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
             </FormItem>
             )}
@@ -196,9 +237,28 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
             render={({ field }) => (
                 <FormItem>
                   <FormLabel>City</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Tirana" {...field} />
-                  </FormControl>
+                  {citiesForCountry.length > 0 ? (
+                    <Select value={field.value || ''} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a city" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {citiesForCountry.map((city) => (
+                          <SelectItem key={city.name} value={city.name}>
+                            {city.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    // No list for this country — keep it typeable rather than
+                    // blocking the address entirely.
+                    <FormControl>
+                      <Input placeholder="e.g. Tirana" {...field} />
+                    </FormControl>
+                  )}
                   <FormMessage />
                 </FormItem>
             )}
@@ -210,7 +270,7 @@ export function AddressForm({ userId, addressToEdit, onSave }: AddressFormProps)
               <FormItem>
                 <FormLabel>Postal Code</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. 10001" {...field} />
+                  <Input placeholder="e.g. 1001" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
