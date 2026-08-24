@@ -63,6 +63,17 @@ export function highlight(inner: string): string {
   </table>`;
 }
 
+/**
+ * Stand-in for the recipient's unsubscribe URL.
+ *
+ * The real link is per-recipient, but a template does not know who it is being
+ * sent to — it renders once and the transport addresses it. So the shell emits
+ * this placeholder and `sendEmail` swaps in a signed link for the actual
+ * recipient. That keeps the footer identical across all 21 templates without
+ * threading a URL through every one of their signatures.
+ */
+export const UNSUBSCRIBE_PLACEHOLDER = '%%UNSUBSCRIBE_URL%%';
+
 export interface LayoutArgs {
   /** Shown large at the top of the card. */
   heading: string;
@@ -121,7 +132,11 @@ export function renderEmail({ heading, body, preheader }: LayoutArgs): string {
                 <a href="${absoluteUrl('/terms')}" style="color:${MUTED};">Terms</a> &nbsp;·&nbsp;
                 <a href="${absoluteUrl('/privacy')}" style="color:${MUTED};">Privacy</a>
               </p>
-              <p style="margin:0;">© ${year} ${escapeHtml(SITE_NAME)} · Tirana, Albania</p>
+              <p style="margin:0 0 6px;">© ${year} ${escapeHtml(SITE_NAME)} · Tirana, Albania</p>
+              <p style="margin:0;">
+                <a href="${UNSUBSCRIBE_PLACEHOLDER}" style="color:${MUTED};text-decoration:underline;">Unsubscribe</a>
+                from non-essential emails.
+              </p>
             </td>
           </tr>
 

@@ -131,3 +131,43 @@ export const sendReturnRequested = (a: {
 export const sendReturnResolved = (a: {
   to: string; name?: string; orderNumber: string; orderId: string; outcome: string;
 }) => deliver(a.to, T.returnResolvedEmail(a));
+
+// ─── Admin alerts ─────────────────────────────────────────────────────────────
+
+/**
+ * Where operational mail goes. Overridable per deployment so a staging
+ * environment does not page the live inbox, but it must never fall back to
+ * `SENDGRID_FROM_EMAIL` — that is a no-reply mailbox nobody reads.
+ */
+export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'hello@marigoapp.com';
+
+/** Every admin alert is fire-and-forget, exactly like the customer senders:
+ *  an order must never fail because the platform inbox was unreachable. */
+export const sendAdminNewUser = (a: {
+  name?: string; email?: string; userId: string; provider?: string; role?: string; totalUsers?: number;
+}) => deliver(ADMIN_EMAIL, T.adminNewUserEmail(a));
+
+export const sendAdminNewOrder = (a: {
+  orderNumber: string;
+  orderId: string;
+  buyerName?: string;
+  buyerEmail?: string;
+  items: T.OrderItem[];
+  subtotal?: number;
+  shipping?: number;
+  totalAmount: number;
+  paymentMethod?: 'cod' | 'card';
+  sellerCount?: number;
+  shippingAddress?: { fullName: string; address: string; city: string; postal: string; country: string };
+}) => deliver(ADMIN_EMAIL, T.adminNewOrderEmail(a));
+
+export const sendAdminOrderCancelled = (a: {
+  orderNumber: string;
+  orderId: string;
+  buyerName?: string;
+  buyerEmail?: string;
+  totalAmount?: number;
+  reason?: string;
+  cancelledBy?: string;
+  previousStatus?: string;
+}) => deliver(ADMIN_EMAIL, T.adminOrderCancelledEmail(a));

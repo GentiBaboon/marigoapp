@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { notifyAdmin } from '@/lib/admin-notify';
 import { useRouter } from 'next/navigation';
 import { useRouteParams as useParams } from '@/lib/platform/use-route-param';
 import Link from 'next/link';
@@ -148,6 +149,15 @@ export default function AdminOrderDetailPage() {
       const wasTerminal = order.status === 'cancelled' || order.status === 'refunded';
       if ((newStatus === 'cancelled' || newStatus === 'refunded') && !wasTerminal) {
         await releaseOrderItems(firestore, order.items as any);
+        // Alert the platform inbox, but only on the transition — re-saving an
+        // already-cancelled order must not mail it again.
+        if (newStatus === 'cancelled') {
+          void notifyAdmin(adminUser, {
+            event: 'order_cancelled',
+            orderId: order.id,
+            previousStatus: order.status,
+          });
+        }
       } else if (newStatus === 'completed' && order.status !== 'completed') {
         await markOrderItemsSoldIfDepleted(firestore, order.items as any);
         // Bump the seller-badge counter — one increment per unique seller in

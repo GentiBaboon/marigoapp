@@ -9,7 +9,9 @@
  * Never throws. A failed email must not fail the checkout that triggered it —
  * every caller is fire-and-forget, and losing a receipt is not losing an order.
  */
-import { SITE_NAME, absoluteUrl } from '@/lib/site';
+import { absoluteUrl } from '@/lib/site';
+import { UNSUBSCRIBE_PLACEHOLDER } from './layout';
+import { unsubscribeUrl, isEssentialCategory } from './unsubscribe';
 
 const API = 'https://api.sendgrid.com/v3/mail/send';
 
@@ -17,9 +19,16 @@ const API = 'https://api.sendgrid.com/v3/mail/send';
  *  SendGrid, or every send returns 403. */
 function sender() {
   return {
-    email: process.env.SENDGRID_FROM_EMAIL || 'hello@marigoapp.com',
-    name: process.env.SENDGRID_FROM_NAME || SITE_NAME,
+    email: process.env.SENDGRID_FROM_EMAIL || 'no-reply@marigoapp.com',
+    name: process.env.SENDGRID_FROM_NAME || 'Marigo Fashion Marketplace',
   };
+}
+
+/** Where a reply actually goes. The From address is a no-reply mailbox, so
+ *  without this a customer hitting Reply writes into a void — and a From with
+ *  no reachable Reply-To also reads as spam to some filters. */
+function defaultReplyTo(): string | undefined {
+  return process.env.SENDGRID_REPLY_TO || 'hello@marigoapp.com';
 }
 
 export interface EmailPayload {
@@ -65,6 +74,17 @@ export function htmlToText(html: string): string {
     .trim();
 }
 
+/**
+ * Swap the shell's placeholder for a link signed for this recipient.
+ *
+ * Done here rather than in the templates because only the transport knows who
+ * the mail is addressed to. Previews and tests render the placeholder as a
+ * plain `/unsubscribe` link, which is inert but not broken.
+ */
+function withUnsubscribeLink(html: string, to: string): string {
+  return html.split(UNSUBSCRIBE_PLACEHOLDER).join(unsubscribeUrl(to));
+}
+
 export async function sendEmail(payload: EmailPayload): Promise<SendResult> {
   const key = process.env.SENDGRID_API_KEY;
 
@@ -79,17 +99,48 @@ export async function sendEmail(payload: EmailPayload): Promise<SendResult> {
   }
   if (!payload.to) return { ok: false, skipped: true, error: 'no recipient' };
 
+  // Substituted before the text part is derived, so the plain-text
+  // alternative carries a working link too rather than the raw placeholder.
+  const html = withUnsubscribeLink(payload.html, payload.to);
+  const unsubUrl = unsubscribeUrl(payload.to);
+
+  /**
+   * Suppression group, when one is configured.
+   *
+   * This is what makes "unsubscribe" mean *non-essential mail only*: mail sent
+   * with a group id is suppressed for anyone who opted out of that group,
+   * while receipts and password resets — sent with no group — are unaffected.
+   * Doing it the other way round (a global unsubscribe plus
+   * `bypass_list_management` on the important mail) would also bypass bounce
+   * and spam-report suppression, which is how a sending domain gets blocked.
+   */
+  const groupId = Number(process.env.SENDGRID_UNSUBSCRIBE_GROUP_ID || '');
+  const useGroup = Number.isFinite(groupId) && groupId > 0 && !isEssentialCategory(payload.category);
+
   const body = {
     personalizations: [{ to: [{ email: payload.to }] }],
     from: sender(),
-    ...(payload.replyTo ? { reply_to: { email: payload.replyTo } } : {}),
+    ...((payload.replyTo ?? defaultReplyTo())
+      ? { reply_to: { email: (payload.replyTo ?? defaultReplyTo()) as string } }
+      : {}),
     subject: payload.subject,
     content: [
       // Order matters to the RFC: the plain-text part must come first, or
       // some clients render the wrong alternative.
-      { type: 'text/plain', value: payload.text || htmlToText(payload.html) },
-      { type: 'text/html', value: payload.html },
+      { type: 'text/plain', value: payload.text || htmlToText(html) },
+      { type: 'text/html', value: html },
     ],
+    /**
+     * RFC 2369 + RFC 8058. Gmail and Outlook surface their own "Unsubscribe"
+     * control beside the sender name when these are present, and a one-click
+     * header is now effectively required by the bulk-sender rules at Gmail and
+     * Yahoo. The mailto: is the fallback for clients that ignore the HTTPS one.
+     */
+    headers: {
+      'List-Unsubscribe': `<${unsubUrl}>, <mailto:${defaultReplyTo()}?subject=unsubscribe>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    },
+    ...(useGroup ? { asm: { group_id: groupId } } : {}),
     ...(payload.category ? { categories: [payload.category] } : {}),
     tracking_settings: {
       click_tracking: { enable: false },

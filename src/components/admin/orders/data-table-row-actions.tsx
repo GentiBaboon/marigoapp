@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { notifyAdmin } from '@/lib/admin-notify';
 import { Row } from '@tanstack/react-table';
 import Link from 'next/link';
 import { MoreHorizontal, View, Truck, Undo, MessageSquare, Loader2 } from 'lucide-react';
@@ -68,6 +69,15 @@ export function DataTableRowActions<TData>({
       const wasTerminal = order.status === 'cancelled' || order.status === 'refunded';
       if ((newStatus === 'cancelled' || newStatus === 'refunded') && !wasTerminal) {
         await releaseOrderItems(firestore, order.items as any);
+        // Same alert as the order detail screen — an order can be cancelled
+        // from either surface, so both have to raise it.
+        if (newStatus === 'cancelled') {
+          void notifyAdmin(adminUser, {
+            event: 'order_cancelled',
+            orderId: order.id,
+            previousStatus: order.status,
+          });
+        }
       } else if (newStatus === 'completed' && order.status !== 'completed') {
         await markOrderItemsSoldIfDepleted(firestore, order.items as any);
       }

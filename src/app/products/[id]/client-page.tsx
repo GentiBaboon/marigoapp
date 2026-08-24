@@ -389,7 +389,11 @@ export default function ProductDetailPage() {
                                   ? 'Out of stock'
                                   : 'Add to bag'}
                         </Button>
-                        {!isSoldOrReserved && (
+                        {/* `allowOffers` is the seller's switch in the sell
+                            wizard and the edit page. It was written on every
+                            listing and then never read, so sellers who turned
+                            haggling off still received offers. */}
+                        {!isSoldOrReserved && !isSeller && product.allowOffers !== false && (
                             <Button
                                 size="lg"
                                 variant="outline"
@@ -460,7 +464,7 @@ export default function ProductDetailPage() {
         <MakeOfferSheet
           isOpen={isOfferSheetOpen}
           onOpenChange={setIsOfferSheetOpen}
-          product={{ id: product.id, price: product.price, brand: product.brandId, sellerId: product.sellerId }}
+          product={{ id: product.id, price: product.price, brand: product.brandId, sellerId: product.sellerId, title: product.title }}
         />
       </div>
     );

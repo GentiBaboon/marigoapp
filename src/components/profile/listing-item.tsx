@@ -8,6 +8,7 @@ import { MoreVertical, Edit, Trash2, CheckCircle, Eye, ArrowRight, Package } fro
 import { collection, query, where } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreProduct, FirestoreOffer, FirestoreOrder } from '@/lib/types';
+import { OPEN_STATUSES } from '@/lib/offers';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -51,7 +52,12 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
   
   const offersQuery = useMemoFirebase(() => {
     if (isSale || !firestore || !product) return null;
-    return query(collection(firestore, 'products', product.id, 'offers'), where('status', '==', 'pending'));
+    // Both live statuses, not just 'pending' — a negotiation the seller has
+    // already countered is still open and still theirs to finish.
+    return query(
+      collection(firestore, 'products', product.id, 'offers'),
+      where('status', 'in', OPEN_STATUSES),
+    );
   }, [firestore, product, isSale]);
 
   const { data: offers } = useCollection<FirestoreOffer>(offersQuery);
@@ -89,8 +95,15 @@ export function ListingItem({ product, order }: { product?: FirestoreProduct, or
           <div className="flex items-center justify-between pt-1">
               <div>
                    <p className="font-bold text-base">{formatPrice(itemData.price)}</p>
+                   {/* This used to be inert text. A seller who is told they
+                       have offers needs somewhere to go and read them. */}
                    {!isSale && activeOfferCount > 0 && (
-                       <p className="text-[10px] font-bold text-primary uppercase tracking-wider">{activeOfferCount} offer(s) pending</p>
+                       <Link
+                         href="/profile/offers"
+                         className="text-[10px] font-bold text-primary uppercase tracking-wider underline underline-offset-2"
+                       >
+                         {activeOfferCount} open offer{activeOfferCount === 1 ? '' : 's'}
+                       </Link>
                    )}
               </div>
               

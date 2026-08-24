@@ -267,6 +267,59 @@ Degradation is deliberate: if generation fails but retrieval succeeded, the rout
 
 The widget is lazy (`ssr: false`) in `src/app/layout.tsx`, opens on a global `open-chatbot` event (fired from `/help`), and its FAB is desktop-only (`hidden md:inline-flex`). Transcripts persist to `support_chats` **only for signed-in users** and strictly fire-and-forget — answering must never depend on the write. It used to, which meant signed-out visitors got no reply at all.
 
+## 7b. Offers (buyer↔seller negotiation)
+
+Stored at `products/{productId}/offers/{offerId}`. **All behaviour lives in
+`src/lib/offers.ts`** — statuses, the transition table, which amount is
+operative, validation, expiry, role resolution. The UI only renders it. That
+module exists because the logic had been inlined in three screens and drifted:
+three status vocabularies, two spellings of the actor field, and no agreement on
+what "the offer amount" meant once a counter existed.
+
+**The bug that made every offer fail:** `serverTimestamp()` was used inside the
+`history` array. Firestore rejects sentinel field values inside arrays —
+*"serverTimestamp() is not currently supported inside arrays"* — thrown by the
+SDK before any network call, so creating an offer *and* every accept / decline /
+counter / withdraw threw `invalid-argument`. Use `historyEntry()`, which stamps
+`Timestamp.now()`; the document's own `createdAt` / `updatedAt` stay
+server-stamped. The old catch block then reported every failure on the
+`permission-error` channel, which disguised it as a rules problem — only emit
+that for `code === 'permission-denied'`.
+
+- **Turn-taking, not a flat status.** `pending` waits on the seller, `countered`
+  waits on the buyer, and a counter *alternates* the turn — a buyer counter-back
+  returns it to `pending`. `allowedActions(status, actor)` is the only thing that
+  should decide which buttons render.
+- **`TRANSITIONS` in `src/lib/offers.ts` and the `update` rule in
+  `firestore.rules` are the same table written twice.** Change one, change both,
+  or the UI offers a button the database rejects.
+- **Amounts are EUR**, like every stored price. The preset buttons compute in
+  EUR and merely display converted; the **custom input is the other direction** —
+  a number typed beside a "3.092 ALL" button is lekë and must be divided by the
+  rate before storing, or a 5% haggle is saved as ~93× the asking price.
+- **`sellerId` and `productId` are denormalised onto the offer.** A
+  `collectionGroup('offers')` query cannot reach the parent product, and the
+  seller's inbox needs to filter on the seller.
+- **Collection-group queries need their own rule.** A rule nested under
+  `/products/{productId}` does *not* apply to a collection-group query —
+  Firestore only matches those against `match /{path=**}/offers/{offerId}`.
+  Without it both offer lists are permission-denied whatever the nested rule
+  says. They also need the COLLECTION_GROUP indexes in
+  `firestore.indexes.json`.
+- **Expiry is evaluated on read** (`effectiveStatus`), not by a scheduled job:
+  an offer past `expiresAt` renders as expired and offers no actions, with no
+  infrastructure and no write.
+- **An accepted offer is honoured server-side.** Checkout deliberately re-reads
+  every price from Firestore and ignores the cart, so the agreed price is
+  resolved by `acceptedOfferPrice()` (`src/lib/offer-pricing.ts`) inside
+  `calculateOrderTotal` in both `/api/create-order` and
+  `/api/create-payment-intent`. Never let the client send the discounted price.
+- `allowOffers` on the product is the seller's switch. It was written by the
+  sell wizard and read by nothing for a long time; treat `undefined` as
+  "allowed" so the back catalogue keeps its button.
+- Email goes through `/api/offers/notify`, which mails **the party who did not
+  act** — see `docs/email.md`.
+
 ## 8. Payments & escrow
 
 **Model: manual-capture escrow.** The buyer's card is *authorized* at checkout (`capture_method: 'manual'`), funds are captured only after delivery + a hold window, then split to sellers over Stripe Connect.

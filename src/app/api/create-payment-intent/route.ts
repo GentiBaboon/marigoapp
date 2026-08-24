@@ -7,8 +7,9 @@ import {
   firestoreUpdate,
   firestoreCreate,
 } from '@/lib/firebase-admin';
-import { sendOrderConfirmation, sendSellerOrderNotification } from '@/lib/email';
+import { sendOrderConfirmation, sendSellerOrderNotification, sendAdminNewOrder } from '@/lib/email';
 import { paymentIntentLimiter, applyRateLimit } from '@/lib/rate-limit';
+import { acceptedOfferPrice } from '@/lib/offer-pricing';
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY || '';
@@ -19,20 +20,28 @@ function getStripe() {
 async function calculateOrderTotal(
   items: any[],
   couponCode: string | undefined,
-  idToken: string
+  idToken: string,
+  /** The buyer, so an accepted offer on a line can be honoured. */
+  buyerId?: string,
 ) {
   let subtotal = 0;
   const sellerIds = new Set<string>();
   const validatedItems: any[] = [];
 
   for (const item of items) {
-    const pData = await firestoreGet('products', item.productId || item.id, idToken);
+    const lookupId = item.productId || item.id;
+    const pData = await firestoreGet('products', lookupId, idToken);
     if (!pData || !['active', 'reserved'].includes(pData.status)) {
       throw new Error(`Item "${item.title}" is no longer available.`);
     }
-    subtotal += pData.price || 0;
+    // An accepted offer overrides the asking price — resolved from the offer
+    // document, never taken from the basket, so the discount is one the seller
+    // actually agreed to rather than one the client asked for.
+    const agreed = buyerId ? await acceptedOfferPrice(lookupId, buyerId, idToken) : null;
+    const linePrice = agreed ?? pData.price ?? 0;
+    subtotal += linePrice;
     if (pData.sellerId) sellerIds.add(pData.sellerId);
-    validatedItems.push({ ...item, price: pData.price || item.price });
+    validatedItems.push({ ...item, price: linePrice, offerApplied: agreed != null });
   }
 
   const settings = await firestoreGet('settings', 'global', idToken);
@@ -102,7 +111,8 @@ export async function POST(req: NextRequest) {
     const { total, sellerIds, discount, validatedItems } = await calculateOrderTotal(
       items,
       couponCode,
-      idToken
+      idToken,
+      buyerId,
     );
 
     const totalInCents = Math.round(total * 100);
@@ -261,6 +271,21 @@ export async function POST(req: NextRequest) {
         idToken,
       ).catch((e) => console.warn('buyer notification failed', e));
     }
+
+    // Operational alert. The card is authorised, not captured, at this point —
+    // the template says so, because an admin reading this must not assume the
+    // money has moved.
+    sendAdminNewOrder({
+      orderNumber,
+      orderId,
+      buyerName: buyerData?.displayName || buyerData?.name,
+      buyerEmail: buyerData?.email,
+      items: validatedItems,
+      totalAmount: total,
+      paymentMethod: 'card',
+      sellerCount: sellerIds.length,
+      shippingAddress,
+    }).catch(console.error);
 
     return NextResponse.json({ clientSecret: pi.client_secret, orderId });
   } catch (err: any) {

@@ -99,6 +99,13 @@ export const conversationLimiter = createRateLimiter('conversation', {
   windowSeconds: 60,
 });
 
+/** Offer notifications: 30 per minute per IP. A negotiation is a handful of
+ *  actions, so this only ever catches a loop or an abuser. */
+export const offerLimiter = createRateLimiter('offer', {
+  limit: 30,
+  windowSeconds: 60,
+});
+
 // ── Helper to extract client IP ─────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from 'next/server';

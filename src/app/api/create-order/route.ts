@@ -7,8 +7,9 @@ import {
   firestoreCreate,
 } from '@/lib/firebase-admin';
 import { calculateShipping, type ShippableLine } from '@/lib/shipping';
-import { sendOrderConfirmation, sendSellerOrderNotification } from '@/lib/email';
+import { sendOrderConfirmation, sendSellerOrderNotification, sendAdminNewOrder } from '@/lib/email';
 import { createOrderLimiter, applyRateLimit } from '@/lib/rate-limit';
+import { acceptedOfferPrice } from '@/lib/offer-pricing';
 
 async function calculateOrderTotal(
   items: any[],
@@ -17,6 +18,8 @@ async function calculateOrderTotal(
   /** Delivery country, from the address being shipped to. Decides whether each
    *  parcel pays the domestic or the cross-border rate. */
   destinationCountry?: string | null,
+  /** The buyer, so an accepted offer on a line can be honoured. */
+  buyerId?: string,
 ) {
   let subtotal = 0;
   const sellerIds = new Set<string>();
@@ -37,7 +40,12 @@ async function calculateOrderTotal(
       });
       throw new Error(`Item "${item.title}" is no longer available.`);
     }
-    subtotal += pData.price || 0;
+    // An accepted offer overrides the asking price — resolved here from the
+    // offer document rather than taken from the basket, so the discount is
+    // real and cannot be invented by the client.
+    const agreed = buyerId ? await acceptedOfferPrice(lookupId, buyerId, idToken) : null;
+    const linePrice = agreed ?? pData.price ?? 0;
+    subtotal += linePrice;
     if (pData.sellerId) sellerIds.add(pData.sellerId);
     // Origin city is read off the stored product, never trusted from the
     // request — otherwise a caller could collapse a multi-city order into one
@@ -47,7 +55,7 @@ async function calculateOrderTotal(
       shippingFromCity: pData.shippingFromCity ?? null,
       shippingFromCountry: pData.shippingFromCountry ?? null,
     });
-    validatedItems.push({ ...item, price: pData.price || item.price });
+    validatedItems.push({ ...item, price: linePrice, offerApplied: agreed != null });
   }
 
   const settings = await firestoreGet('settings', 'global', idToken);
@@ -117,6 +125,7 @@ export async function POST(req: NextRequest) {
       couponCode,
       idToken,
       shippingAddress?.country,
+      buyerId,
     );
 
     const orderNumber = `MG-COD-${Date.now()}`;
@@ -238,6 +247,21 @@ export async function POST(req: NextRequest) {
         }).catch(console.error);
       }
     }
+
+    // Operational alert. Sent from here rather than from the browser because
+    // the totals were computed on this side — the platform inbox should see
+    // the figure the buyer was actually charged.
+    sendAdminNewOrder({
+      orderNumber,
+      orderId,
+      buyerName: buyerData?.displayName || buyerData?.name,
+      buyerEmail: buyerData?.email,
+      items: validatedItems,
+      totalAmount: total,
+      paymentMethod: 'cod',
+      sellerCount: sellerIds.length,
+      shippingAddress,
+    }).catch(console.error);
 
     return NextResponse.json({ success: true, orderId });
   } catch (err: any) {

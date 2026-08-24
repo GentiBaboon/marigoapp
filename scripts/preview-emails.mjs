@@ -61,6 +61,25 @@ const SAMPLES = {
   'new-message': T.newMessageEmail({ recipientName: 'Gigis Closet', senderName: 'Elira', productTitle: 'Vintage Gucci Heels', preview: 'Hi! Are these still available in a 38?', conversationId: 'conv_1' }),
   'return-requested': T.returnRequestedEmail({ sellerName: 'Gigis Closet', orderNumber: 'MG-1042', orderId: 'ord_1042', reason: 'Item does not match the description' }),
   'return-resolved': T.returnResolvedEmail({ name: 'Elira', orderNumber: 'MG-1042', orderId: 'ord_1042', outcome: 'Refunded in full' }),
+
+  // Admin alerts — sent to the platform inbox, not to a customer.
+  'admin-new-user': T.adminNewUserEmail({
+    name: 'Elira Hoxha', email: 'elira@example.com', userId: 'uid_8f2c91',
+    provider: 'google.com', role: 'buyer', totalUsers: 1284,
+  }),
+  'admin-new-order': T.adminNewOrderEmail({
+    orderNumber: 'MG-1042', orderId: 'ord_1042',
+    buyerName: 'Elira Hoxha', buyerEmail: 'elira@example.com',
+    items: ORDER_ITEMS, subtotal: 95, shipping: 1.93, totalAmount: 96.93,
+    paymentMethod: 'card', sellerCount: 2,
+    shippingAddress: { fullName: 'Elira Hoxha', address: 'Rruga e Kavajës 12', city: 'Tiranë', postal: '1001', country: 'Albania' },
+  }),
+  'admin-order-cancelled': T.adminOrderCancelledEmail({
+    orderNumber: 'MG-1042', orderId: 'ord_1042',
+    buyerName: 'Elira Hoxha', buyerEmail: 'elira@example.com',
+    totalAmount: 96.93, previousStatus: 'processing', cancelledBy: 'Hello Marigo',
+    reason: 'Buyer asked to cancel — the seller could not ship within the window.',
+  }),
 };
 
 const sendTo = process.argv.includes('--send')
@@ -71,8 +90,16 @@ const OUT = join(ROOT, 'email-previews');
 mkdirSync(OUT, { recursive: true });
 
 const names = Object.keys(SAMPLES);
+
+// The shell emits a per-recipient placeholder that only the transport can
+// fill. A preview has no recipient, so point it at the bare page rather than
+// leaving `%%UNSUBSCRIBE_URL%%` sitting in an href.
+const { UNSUBSCRIBE_PLACEHOLDER } = jiti('./src/lib/email/layout.ts');
+const { SITE_URL } = jiti('./src/lib/site.ts');
+const forPreview = (html) => html.split(UNSUBSCRIBE_PLACEHOLDER).join(`${SITE_URL}/unsubscribe`);
+
 for (const name of names) {
-  writeFileSync(join(OUT, `${name}.html`), SAMPLES[name].html);
+  writeFileSync(join(OUT, `${name}.html`), forPreview(SAMPLES[name].html));
 }
 
 writeFileSync(
@@ -92,12 +119,37 @@ console.log('Open email-previews/index.html in a browser.\n');
 if (sendTo) {
   if (!process.env.SENDGRID_API_KEY) {
     console.error('--send needs SENDGRID_API_KEY in the environment.');
+    console.error('Add it to .env.local, then: node scripts/check-email-config.mjs');
     process.exit(1);
   }
-  console.log(`Sending ${names.length} test emails to ${sendTo}...`);
+
+  const from = `${process.env.SENDGRID_FROM_NAME || 'Marigo Fashion Marketplace'} <${
+    process.env.SENDGRID_FROM_EMAIL || 'no-reply@marigoapp.com'
+  }>`;
+  console.log(`Sending ${names.length} test emails`);
+  console.log(`  from: ${from}`);
+  console.log(`  to:   ${sendTo}\n`);
+
+  const failures = [];
   for (const name of names) {
     const s = SAMPLES[name];
     const res = await sendEmail({ to: sendTo, subject: `[test] ${s.subject}`, html: s.html, category: s.category });
-    console.log(`  ${res.ok ? 'sent  ' : 'FAILED'} ${name}${res.error ? ` — ${res.error}` : ''}`);
+    if (!res.ok) failures.push([name, res.error || `skipped: ${res.skipped}`]);
+    console.log(`  ${res.ok ? '\x1b[32msent  \x1b[0m' : '\x1b[31mFAILED\x1b[0m'} ${name}${res.error ? ` — ${res.error}` : ''}`);
   }
+
+  console.log('');
+  if (failures.length) {
+    // A 403 here is almost always the sender, not the key. Say so rather than
+    // leaving the reader to decode SendGrid's error body.
+    console.log(`\x1b[31m${failures.length} of ${names.length} failed.\x1b[0m`);
+    if (failures.some(([, e]) => String(e).includes('403') || String(e).toLowerCase().includes('verified'))) {
+      console.log('403 / "verified" means the From address is not a verified Single Sender');
+      console.log('and its domain is not authenticated. Run: node scripts/check-email-config.mjs');
+    }
+    process.exit(1);
+  }
+  console.log(`\x1b[32mAll ${names.length} accepted by SendGrid (202).\x1b[0m`);
+  console.log('Acceptance is not delivery — confirm they landed, and check the spam folder.');
+  console.log('Per-template status is in SendGrid → Activity Feed, filtered by category.');
 }
