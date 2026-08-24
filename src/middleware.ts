@@ -131,12 +131,20 @@ export function middleware(request: NextRequest) {
     // Exempt AI routes — they are stateless read-only queries, not user data mutations.
     const isAIRoute = pathname.startsWith('/api/chat') || pathname.startsWith('/api/ai/');
 
+    // Exempt one-click unsubscribe. RFC 8058 has Gmail and Yahoo POST to the
+    // List-Unsubscribe URL directly from their own infrastructure, which has no
+    // way to obtain a __csrf cookie — a CSRF check there simply breaks the
+    // control those providers now require. Safe to exempt: the endpoint takes
+    // no ambient authority at all, only a signed token that names the one
+    // address it may act on.
+    const isUnsubscribe = pathname.startsWith('/api/unsubscribe');
+
     // Exempt the native shells. CSRF defends against a browser silently
     // attaching this site's cookies to a request forged by another origin; the
     // iOS/Android WebViews are a separate origin that sends no cookies at all
     // (Allow-Credentials is off above), so there is no ambient authority to
     // forge. They also cannot read a __csrf cookie to echo one back.
-    if (!hasBearer && !isAIRoute && !isNativeOrigin) {
+    if (!hasBearer && !isAIRoute && !isUnsubscribe && !isNativeOrigin) {
       // For cookie-authenticated or unauthenticated POST requests (e.g. forgot-password),
       // require the CSRF token to match.
       if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {

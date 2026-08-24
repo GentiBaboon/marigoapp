@@ -398,3 +398,127 @@ export function returnResolvedEmail(a: {
     }),
   };
 }
+
+// ─── Admin alerts ─────────────────────────────────────────────────────────────
+//
+// Operational mail, sent to the platform inbox rather than to a customer, so
+// the tone is a report and not a greeting. They reuse the same table-based
+// shell — an admin reads mail in the same clients everyone else does — but the
+// subject is prefixed "[Admin]" so an inbox rule can file the lot, and every
+// button lands in /admin rather than on the storefront.
+
+/** Subjects share a prefix so they can be filtered as one stream. */
+function adminSubject(rest: string): string {
+  return `[Admin] ${rest}`;
+}
+
+export function adminNewUserEmail(a: {
+  name?: string;
+  email?: string;
+  userId: string;
+  provider?: string;
+  role?: string;
+  totalUsers?: number;
+}): RenderedEmail {
+  return {
+    subject: adminSubject(`New sign-up — ${a.name?.trim() || a.email || a.userId}`),
+    category: 'admin-new-user',
+    html: renderEmail({
+      heading: 'A new user registered',
+      preheader: `${a.name?.trim() || a.email || 'Someone'} just created an account.`,
+      body: `
+        <p style="margin:0 0 6px;">A new account has been created on Marigo.</p>
+        ${detailRows([
+          ['Name', a.name?.trim() || '—'],
+          ['Email', a.email || '—'],
+          ['Signed up with', a.provider || 'Email'],
+          ['Role', a.role || 'buyer'],
+          ...(a.totalUsers != null ? ([['Total users', String(a.totalUsers)]] as Array<[string, string]>) : []),
+          ['User ID', a.userId],
+        ])}
+        ${button('Open in admin', absoluteUrl('/admin/users'))}`,
+    }),
+  };
+}
+
+export function adminNewOrderEmail(a: {
+  orderNumber: string;
+  orderId: string;
+  buyerName?: string;
+  buyerEmail?: string;
+  items: OrderItem[];
+  subtotal?: number;
+  shipping?: number;
+  totalAmount: number;
+  paymentMethod?: 'cod' | 'card';
+  sellerCount?: number;
+  shippingAddress?: { fullName: string; address: string; city: string; postal: string; country: string };
+}): RenderedEmail {
+  const addr = a.shippingAddress;
+  return {
+    subject: adminSubject(`New order #${a.orderNumber} — ${money(a.totalAmount)}`),
+    category: 'admin-new-order',
+    html: renderEmail({
+      heading: `New order #${escapeHtml(a.orderNumber)}`,
+      preheader: `${money(a.totalAmount)} · ${a.items?.length ?? 0} item(s) · ${a.paymentMethod === 'cod' ? 'Cash on delivery' : 'Card'}`,
+      body: `
+        <p style="margin:0 0 6px;">An order has just been placed.</p>
+        ${itemList(a.items)}
+        ${detailRows([
+          ...(a.subtotal != null ? ([['Subtotal', money(a.subtotal)]] as Array<[string, string]>) : []),
+          ...(a.shipping != null ? ([['Delivery', a.shipping === 0 ? 'Free' : money(a.shipping)]] as Array<[string, string]>) : []),
+          ['Total', money(a.totalAmount)],
+          ['Payment', a.paymentMethod === 'cod' ? 'Cash on delivery' : 'Card'],
+          ...(a.sellerCount != null ? ([['Sellers involved', String(a.sellerCount)]] as Array<[string, string]>) : []),
+          ['Buyer', a.buyerName?.trim() || '—'],
+          ...(a.buyerEmail ? ([['Buyer email', a.buyerEmail]] as Array<[string, string]>) : []),
+        ])}
+        ${
+          addr
+            ? highlight(
+                `<strong>Delivering to</strong><br/>${escapeHtml(addr.fullName)}<br/>${escapeHtml(addr.address)}<br/>${escapeHtml(addr.city)} ${escapeHtml(addr.postal)}<br/>${escapeHtml(addr.country)}`,
+              )
+            : ''
+        }
+        ${button('Open in admin', absoluteUrl(`/admin/orders/${a.orderId}`))}
+        ${
+          a.paymentMethod === 'cod'
+            ? `<p style="margin:0;color:#6b7280;font-size:13px;">Cash on delivery — no card was authorised, so there is nothing to capture.</p>`
+            : `<p style="margin:0;color:#6b7280;font-size:13px;">The card is authorised only. Funds are captured after delivery plus the payout hold.</p>`
+        }`,
+    }),
+  };
+}
+
+export function adminOrderCancelledEmail(a: {
+  orderNumber: string;
+  orderId: string;
+  buyerName?: string;
+  buyerEmail?: string;
+  totalAmount?: number;
+  reason?: string;
+  cancelledBy?: string;
+  previousStatus?: string;
+}): RenderedEmail {
+  return {
+    subject: adminSubject(`Order #${a.orderNumber} cancelled`),
+    category: 'admin-order-cancelled',
+    html: renderEmail({
+      heading: `Order #${escapeHtml(a.orderNumber)} was cancelled`,
+      preheader: `${a.totalAmount != null ? `${money(a.totalAmount)} · ` : ''}cancelled by ${a.cancelledBy || 'an admin'}`,
+      body: `
+        <p style="margin:0 0 6px;">This order has been cancelled and its stock released back to the listings.</p>
+        ${detailRows([
+          ['Order', `#${a.orderNumber}`],
+          ...(a.totalAmount != null ? ([['Value', money(a.totalAmount)]] as Array<[string, string]>) : []),
+          ...(a.previousStatus ? ([['Previous status', a.previousStatus]] as Array<[string, string]>) : []),
+          ['Cancelled by', a.cancelledBy || 'Admin'],
+          ['Buyer', a.buyerName?.trim() || '—'],
+          ...(a.buyerEmail ? ([['Buyer email', a.buyerEmail]] as Array<[string, string]>) : []),
+        ])}
+        ${a.reason ? highlight(`<strong>Reason</strong><br/>${escapeHtml(a.reason)}`) : ''}
+        ${button('Open in admin', absoluteUrl(`/admin/orders/${a.orderId}`))}
+        <p style="margin:0;color:#6b7280;font-size:13px;">If the card was authorised, check that the authorisation has been released.</p>`,
+    }),
+  };
+}

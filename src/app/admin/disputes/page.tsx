@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { notifyAdmin } from '@/lib/admin-notify';
 import { collection, query, orderBy, doc, updateDoc, addDoc, getDoc, setDoc, increment, serverTimestamp, arrayUnion, Timestamp } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import type { FirestoreDispute, DisputeMessage, FirestoreOrder } from '@/lib/types';
@@ -207,6 +208,17 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
               // Cancelled/refunded → restore stock and flip listings active.
               if (nextStatus === 'cancelled' || nextStatus === 'refunded') {
                 await releaseOrderItems(firestore, orderData.items as any);
+              }
+              // A dispute resolution is the third way an order reaches
+              // 'cancelled'; the reason the admin typed is worth carrying into
+              // the alert, since it is the only record of *why*.
+              if (nextStatus === 'cancelled') {
+                void notifyAdmin(user, {
+                  event: 'order_cancelled',
+                  orderId: dispute.orderId,
+                  previousStatus: orderData.status,
+                  reason: resolution.trim() || dispute.reason,
+                });
               }
 
               const firstItem = orderData.items?.[0];

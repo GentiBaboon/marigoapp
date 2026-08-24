@@ -291,6 +291,11 @@ export interface FirestoreProduct {
   listingCreated: FirestoreTimestamp;
   vintage?: boolean;
   pattern?: string;
+  /** Seller's "accept offers" switch from the sell wizard and the edit page.
+   *  Absent on listings published before it was read anywhere, which is why
+   *  every consumer must treat `undefined` as "offers allowed" rather than
+   *  hiding the button on the entire back catalogue. */
+  allowOffers?: boolean;
   shippingFromAddressId?: string;
   /**
    * City the listing ships from, copied from the seller's pickup address when
@@ -767,23 +772,49 @@ export interface FirestorePaymentMethod {
   stripePaymentMethodId: string;
 }
 
+/**
+ * A buyer↔seller negotiation, stored at `products/{productId}/offers/{offerId}`.
+ *
+ * The behaviour — which statuses exist, whose turn it is, which amount is
+ * operative — lives in `src/lib/offers.ts`, not here. This interface is only
+ * the shape on disk.
+ */
 export interface FirestoreOffer {
   id: string;
+  /** Denormalised parent id, so a collection-group query can link back
+   *  without walking `ref.parent.parent`. */
+  productId?: string;
   buyerId: string;
-  buyerName: string;
+  buyerName?: string;
+  /** Denormalised from the product, so the seller's inbox can query offers
+   *  across all their listings in one collection-group read. */
+  sellerId?: string;
   amount: number;
-  /** Alias for `amount` (buyer's offer amount). */
+  /** Alias for `amount` (buyer's offer amount). Both are written. */
   offerAmount?: number;
   /** Seller's counter amount when status === 'countered'. */
   counterOfferAmount?: number;
+  /** The figure both sides settled on, stamped when the offer is accepted.
+   *  Checkout reads this — never a client-supplied price. */
+  agreedPrice?: number;
+  /** Asking price at the time the offer was made, for context later. */
+  originalListingPrice?: number;
+  offerType?: 'preset' | 'custom' | string;
   message?: string;
   status: 'pending' | 'accepted' | 'rejected' | 'expired' | 'countered' | 'withdrawn' | 'declined';
   createdAt: FirestoreTimestamp;
-  /** Append-only history of actions on this offer. */
+  updatedAt?: FirestoreTimestamp;
+  /** An unanswered offer should not sit open forever. Evaluated on read by
+   *  `effectiveStatus()`; there is no scheduled job. */
+  expiresAt?: FirestoreTimestamp;
+  /** Append-only history of actions on this offer. Entries carry a concrete
+   *  `Timestamp`, never `serverTimestamp()` — Firestore rejects sentinel
+   *  values inside arrays. */
   history?: Array<{
     action: string;
     amount?: number;
     by_user: string;
+    by_role?: 'buyer' | 'seller';
     timestamp: FirestoreTimestamp;
   }>;
 }

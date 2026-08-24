@@ -89,11 +89,79 @@ service cloud.firestore {
       );
       allow delete: if isAdmin() || (isSignedIn() && resource.data.sellerId == request.auth.uid);
 
+      // Offers. The transition table here mirrors TRANSITIONS in
+      // src/lib/offers.ts — if one changes, change both, or the UI will offer
+      // a button the database rejects.
+      //
+      // Previously `create` and `update` were both `isSignedIn()`, which let
+      // any signed-in user forge an offer in someone else's name and — worse —
+      // accept their own pending offer on someone else's listing.
       match /offers/{offerId} {
-        allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || get(/databases/$(database)/documents/products/$(productId)).data.sellerId == request.auth.uid || isAdmin());
-        allow create: if isSignedIn();
-        allow update: if isSignedIn();
+        function listingSeller() {
+          return get(/databases/$(database)/documents/products/$(productId)).data.sellerId;
+        }
+        function isBuyer() { return isSignedIn() && resource.data.buyerId == request.auth.uid; }
+        function isSeller() { return isSignedIn() && listingSeller() == request.auth.uid; }
+
+        allow read: if isBuyer() || isSeller() || isAdmin();
+
+        allow create: if isSignedIn()
+          && request.resource.data.buyerId == request.auth.uid
+          && request.resource.data.sellerId == listingSeller()
+          // A seller bidding on their own listing is either a mistake or an
+          // attempt to fake interest.
+          && request.auth.uid != listingSeller()
+          && request.resource.data.status == 'pending'
+          && request.resource.data.offerAmount is number
+          && request.resource.data.offerAmount > 0
+          && request.resource.data.offerAmount < get(/databases/$(database)/documents/products/$(productId)).data.price;
+
+        allow update: if isAdmin() || (
+          (isBuyer() || isSeller())
+          // Identities and the parent listing are immutable for the life of
+          // the negotiation.
+          && request.resource.data.buyerId == resource.data.buyerId
+          && request.resource.data.sellerId == resource.data.sellerId
+          && request.resource.data.offerAmount == resource.data.offerAmount
+          // Only a live offer can move at all.
+          && resource.data.status in ['pending', 'countered']
+          && (
+            // Seller answers the buyer's offer.
+            (isSeller() && resource.data.status == 'pending'
+              && request.resource.data.status in ['accepted', 'declined', 'countered'])
+            // Seller walks away from their own counter.
+            || (isSeller() && resource.data.status == 'countered'
+              && request.resource.data.status == 'declined')
+            // Buyer may only retract while the ball is in the seller's court.
+            || (isBuyer() && resource.data.status == 'pending'
+              && request.resource.data.status == 'withdrawn')
+            // Buyer answers a counter — including countering back, which
+            // returns the turn to the seller.
+            || (isBuyer() && resource.data.status == 'countered'
+              && request.resource.data.status in ['accepted', 'declined', 'withdrawn', 'pending'])
+          )
+        );
+
+        allow delete: if isAdmin();
       }
+    }
+
+    // Collection-group reads of offers, for "my offers" on both sides.
+    //
+    // A rule nested under /products/{productId} does **not** apply to a
+    // collectionGroup('offers') query — Firestore matches those against a
+    // `{path=**}` rule only — so without this the buyer's and seller's offer
+    // lists are denied no matter what the nested rule says.
+    //
+    // The query must therefore be constrained by buyerId or sellerId, which is
+    // exactly why both are denormalised onto the offer document: resolving the
+    // seller through the parent product is not possible here.
+    match /{path=**}/offers/{offerId} {
+      allow read: if isSignedIn() && (
+        resource.data.buyerId == request.auth.uid
+        || resource.data.sellerId == request.auth.uid
+        || isAdmin()
+      );
     }
 
     // Catalog metadata — public read is fine

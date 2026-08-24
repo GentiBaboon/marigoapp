@@ -4,6 +4,7 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { notifyAdmin } from '@/lib/admin-notify';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseStorage } from 'firebase/storage';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
@@ -92,13 +93,24 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
             if (!docSnap.exists()) {
               return setDoc(userDocRef, {
                 name: firebaseUser.displayName,
+                // Written under both names on purpose: this bootstrap has
+                // always used `name`, while the rest of the app reads
+                // `displayName` — which is why profiles rendered as "User".
+                displayName: firebaseUser.displayName,
                 email: firebaseUser.email,
                 profileImage: firebaseUser.photoURL,
                 role: 'buyer', // Default role
                 status: 'active',
                 createdAt: serverTimestamp(),
                 lastLoginAt: serverTimestamp()
-              }, { merge: true }); // use merge to be safe
+              }, { merge: true }).then(() => {
+                // This branch runs exactly once per account — it is the point
+                // every sign-up path converges on (email, Google, Apple), so it
+                // is the only place a "new user" alert cannot be missed or
+                // duplicated. Fire-and-forget: a failed alert must not break
+                // the sign-in that triggered it.
+                void notifyAdmin(firebaseUser, { event: 'user_registered' });
+              });
             } else {
               // Update last login
               return setDoc(userDocRef, { lastLoginAt: serverTimestamp() }, { merge: true });
