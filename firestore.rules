@@ -271,9 +271,40 @@ service cloud.firestore {
     }
 
     match /reviews/{id} {
+      function reviewedOrder() {
+        return get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data;
+      }
+
+      // Public: reviews feed the seller's rating and the aggregateRating in
+      // each listing's JSON-LD, so they are read by crawlers as well as buyers.
       allow read: if true;
-      allow create: if isSignedIn();
+
+      // That SEO path is exactly why `isSignedIn()` alone was not enough here.
+      // The client Firebase config ships in the browser bundle, so anyone could
+      // POST a review naming any reviewerId and any seller — and it would land
+      // in Google's rich results as stars on a product page. A review is now
+      // only accepted from the buyer of a real, delivered order, about a seller
+      // who was actually on it.
+      allow create: if isSignedIn()
+        && request.resource.data.reviewerId == request.auth.uid
+        // No reviewing yourself, however the order is shaped.
+        && request.resource.data.revieweeId != request.auth.uid
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && request.resource.data.content is string
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.orderId is string
+        // The order must be the caller's, far enough along that they have the
+        // item in hand, and the reviewee must be a seller on it.
+        && reviewedOrder().buyerId == request.auth.uid
+        && request.resource.data.revieweeId in reviewedOrder().sellerIds
+        && reviewedOrder().status in ['delivered', 'completed'];
+
+      // Edits are admin-only: a review the seller could talk you into changing
+      // is not a review. Removal is moderation, so it is admin-only too.
       allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /refunds/{refundId} {
