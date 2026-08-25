@@ -112,3 +112,8 @@ dist/
 
 # Rendered email previews (scripts/preview-emails.mjs) — generated, not source
 email-previews/
+
+# Original supporter-logo artwork, dropped in to be processed by hand.
+# The versions the site actually serves live in public/partners/ — these
+# sources were swept in by a stray `git add -A` and are not repo assets.
+Logo to place in website footer/
