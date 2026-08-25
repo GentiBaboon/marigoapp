@@ -10,6 +10,7 @@ import { signupSchema, type SignupValues } from '@/lib/types';
 import { useAuth } from '@/firebase';
 import { usePostAuthRedirect, useRedirectIfSignedIn } from '@/hooks/use-post-auth-redirect';
 import { signUpWithEmail } from '@/firebase/auth/actions';
+import { VerifyOtpStep } from './verify-otp-step';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,15 +26,39 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import Link from 'next/link';
 
-export function SignupForm() {
-  const [loading, setLoading] = useState(false);
+/**
+ * Sign-up is two screens behind one component.
+ *
+ *  `form`     collecting name / email / password
+ *  `creating` the Firebase account is being created
+ *  `verify`   the account exists but is not activated — enter the emailed code
+ *
+ * The stage is what keeps `useRedirectIfSignedIn` quiet: creating the account
+ * signs the user in, and the redirect that normally follows would carry them
+ * past the code entry box into the app. It is switched off *before* the call
+ * that creates the account, not after it resolves, so no auth state change can
+ * slip through the gap.
+ */
+export type Stage = 'form' | 'creating' | 'verify';
+
+export function SignupForm({ onStageChange }: { onStageChange?: (stage: Stage) => void } = {}) {
+  const [stage, setStageRaw] = useState<Stage>('form');
+  // The surrounding screen hides its social buttons and "already have an
+  // account?" link once verification starts — offering a third way in beside a
+  // half-created account is how someone ends up with two.
+  const setStage = (next: Stage) => {
+    setStageRaw(next);
+    onStageChange?.(next);
+  };
+  const [pending, setPending] = useState<{ email: string; name: string } | null>(null);
   const router = useRouter();
   // Post-auth destination, validated same-origin so an attacker can't
   // open-redirect a freshly-signed-up user to an external phishing URL.
   const nextPath = usePostAuthRedirect();
-  useRedirectIfSignedIn();
+  useRedirectIfSignedIn(stage === 'form');
   const auth = useAuth();
   const { toast } = useToast();
+  const loading = stage === 'creating';
 
   const form = useForm<SignupValues>({
     resolver: zodResolver(signupSchema),
@@ -46,18 +71,61 @@ export function SignupForm() {
   });
 
   async function onSubmit(data: SignupValues) {
-    setLoading(true);
+    setStage('creating');
     const result = await signUpWithEmail(auth, data.email, data.password, data.name);
     if (result.success && result.user) {
-      router.push(nextPath);
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'Sign up failed',
-        description: result.error,
-      });
+      // Signed in, but not yet activated. The code is requested by
+      // VerifyOtpStep on mount rather than here, so a resend and the first
+      // send go down exactly one path.
+      setPending({ email: data.email, name: data.name });
+      setStage('verify');
+      return;
     }
-    setLoading(false);
+    toast({
+      variant: 'destructive',
+      title: 'Sign up failed',
+      description: result.error,
+    });
+    setStage('form');
+  }
+
+  /**
+   * They mistyped the address.
+   *
+   * The Firebase account is deleted rather than abandoned, because an
+   * abandoned one still *holds* the typo'd address: the person can never
+   * correct it to that address later, and `auth/email-already-in-use` is what
+   * they would be told if the typo happened to be someone else's real inbox.
+   * `delete()` needs a recent sign-in, which is why it is offered here and not
+   * from some later screen; if it is refused anyway, signing out at least
+   * returns them to a form they can use.
+   *
+   * The `users/{uid}` document the provider bootstrapped is left behind —
+   * Firestore rules grant no delete on it. It is inert (nothing can
+   * authenticate as that uid again) and stays `emailVerified: false`, which is
+   * what makes such strays findable in admin.
+   */
+  async function handleUseAnotherEmail() {
+    const current = auth?.currentUser;
+    try {
+      if (current) await current.delete();
+    } catch {
+      await auth?.signOut().catch(() => undefined);
+    }
+    setPending(null);
+    setStage('form');
+    form.reset();
+  }
+
+  if (stage === 'verify' && pending) {
+    return (
+      <VerifyOtpStep
+        email={pending.email}
+        name={pending.name}
+        onVerified={() => router.push(nextPath)}
+        onUseAnotherEmail={handleUseAnotherEmail}
+      />
+    );
   }
 
   return (

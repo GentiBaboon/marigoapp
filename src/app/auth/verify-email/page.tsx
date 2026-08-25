@@ -1,68 +1,60 @@
 'use client';
 
-import { useState } from 'react';
-import { sendEmailVerification } from 'firebase/auth';
 import { useUser } from '@/firebase/provider';
-import { useToast } from '@/hooks/use-toast';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
+import { VerifyOtpStep } from '@/components/auth/verify-otp-step';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MailCheck, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
+/**
+ * The way back into an unfinished sign-up.
+ *
+ * The code entry box normally lives inside the sign-up form, but a browser
+ * gets closed between "create account" and "check your email". The account
+ * exists and is signed in at that point, so this screen mounts the same step
+ * and requests a fresh code — the old one has almost certainly expired anyway.
+ *
+ * It renders the shared component rather than reimplementing the calls, so the
+ * cooldown, attempt counter and resend behaviour cannot drift from the sign-up
+ * path.
+ */
 export default function VerifyEmailPage() {
-  const { user } = useUser();
-  const { toast } = useToast();
-  const [resending, setResending] = useState(false);
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
 
-  const handleResend = async () => {
-    if (!user) {
-      toast({ variant: 'destructive', title: 'Not signed in', description: 'Please sign in first.' });
-      return;
-    }
-    setResending(true);
-    try {
-      await sendEmailVerification(user);
-      toast({ title: 'Email sent', description: 'A new verification link has been sent to your email.' });
-    } catch {
-      toast({ variant: 'destructive', title: 'Failed to send', description: 'Please try again later.' });
-    } finally {
-      setResending(false);
-    }
-  };
+  if (isUserLoading) {
+    return (
+      <div className="flex flex-1 items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user?.email) {
+    return (
+      <Card className="w-full max-w-md mx-auto mt-20 text-center">
+        <CardContent className="pt-6 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Sign in first, and we&apos;ll send your activation code.
+          </p>
+          <Button asChild>
+            <Link href="/auth/login">Sign In</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="w-full max-w-md mx-auto mt-20 text-center">
-      <CardHeader>
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-          <MailCheck className="h-6 w-6 text-primary" />
-        </div>
-        <CardTitle className="font-headline text-3xl mt-4">
-          Verify Your Email
-        </CardTitle>
-        <CardDescription>
-          We've sent a verification link to your email address. Please check your
-          inbox and follow the link to complete your registration.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Didn't receive an email?{' '}
-          <Button variant="link" className="p-0 h-auto underline" onClick={handleResend} disabled={resending}>
-            {resending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-            Resend verification link
-          </Button>
-        </p>
-        <p className="text-sm text-muted-foreground">
-          <Link href="/auth/login" className="underline">
-            Back to Sign In
-          </Link>
-        </p>
+    <Card className="w-full max-w-md mx-auto mt-20">
+      <CardContent className="pt-6">
+        <VerifyOtpStep
+          email={user.email}
+          name={user.displayName ?? undefined}
+          onVerified={() => router.replace('/home')}
+        />
       </CardContent>
     </Card>
   );

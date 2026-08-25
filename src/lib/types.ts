@@ -94,6 +94,17 @@ export const signupSchema = z.object({
 });
 export type SignupValues = z.infer<typeof signupSchema>;
 
+/** The activation code entry box. Digits are stripped of spacing before the
+ *  check, so a pasted "123 456" validates — see `normalizeOtp` in
+ *  `src/lib/otp.ts`, which the server applies to the same input. */
+export const otpSchema = z.object({
+  code: z
+    .string()
+    .transform((v) => (v ?? '').replace(/\D+/g, ''))
+    .refine((v) => /^\d{6}$/.test(v), { message: 'Enter the 6-digit code from your email.' }),
+});
+export type OtpValues = z.infer<typeof otpSchema>;
+
 export const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
 });
@@ -121,6 +132,20 @@ export interface FirestoreUser {
   createdAt: FirestoreTimestamp;
   lastLoginAt: FirestoreTimestamp;
   status: 'active' | 'banned';
+  /**
+   * Email confirmed by the 6-digit code flow (`/api/auth/verify-otp`).
+   *
+   * A **UI hint only.** Firestore rules let an account owner write their own
+   * document, and the server reaches Firestore with the caller's token, so
+   * this boolean is within its own subject's reach. Server code that needs a
+   * guarantee must call `hasVerifiedEmail()` from `src/lib/otp.ts`, which
+   * recomputes `emailVerificationProof` instead of trusting this.
+   */
+  emailVerified?: boolean;
+  emailVerifiedAt?: FirestoreTimestamp;
+  /** HMAC over `uid|email` keyed with OTP_SECRET. The evidence behind
+   *  `emailVerified`; unforgeable without the server key. */
+  emailVerificationProof?: string;
   hasAcceptedChatRules?: boolean;
   emailPreferences?: {
     marketing: boolean;

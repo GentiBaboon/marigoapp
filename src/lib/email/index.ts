@@ -47,6 +47,17 @@ export const sendPasswordResetMail = ({
 export const sendEmailVerification = (to: string, a: { name?: string; verifyLink: string }) =>
   deliver(to, T.emailVerificationEmail(a));
 
+/**
+ * The 6-digit activation code.
+ *
+ * The one sender callers *should* await. Every other function in this file is
+ * fire-and-forget because losing a receipt is not losing an order — but the
+ * user is sitting in front of a code entry box waiting for this one, so
+ * `/api/auth/send-otp` reports the delivery result rather than assuming it.
+ */
+export const sendEmailOtp = (to: string, a: { name?: string; code: string; expiresMinutes: number }) =>
+  deliver(to, T.emailOtpEmail(a));
+
 // ─── Orders — buyer ───────────────────────────────────────────────────────────
 
 /**

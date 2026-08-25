@@ -89,7 +89,8 @@ sets) for what happened after.
 |---|---|---|
 | Signup | buyer/seller | `sendWelcomeEmail` |
 | Password reset | either | `sendPasswordResetMail` |
-| Email verification | either | `sendEmailVerification` |
+| Email verification (link) | either | `sendEmailVerification` |
+| **Activation code (6-digit OTP)** | **new account** | `sendEmailOtp` |
 | Order placed | buyer | `sendOrderConfirmation` |
 | Order placed | seller | `sendSellerOrderNotification` |
 | Order shipped | buyer | `sendOrderShipped` |
@@ -197,6 +198,7 @@ receipt and the finance dashboard.
 |---|---|
 | `sendOrderConfirmation`, `sendSellerOrderNotification` | `/api/create-order`, `/api/create-payment-intent` |
 | `sendPasswordResetMail` | `/api/forgot-password` |
+| `sendEmailOtp` | `/api/auth/send-otp` |
 | `sendOfferReceived`, `sendOfferAccepted`, `sendOfferDeclined` | `/api/offers/notify` |
 
 The offer route mails **the party who did not act**, which is not a fixed side:
@@ -205,6 +207,20 @@ the seller's counter reaches the seller. It is called fire-and-forget from the
 client because the SendGrid key cannot be in the browser bundle, and it re-reads
 the offer under the caller's own ID token rather than trusting the request body.
 
+`sendEmailOtp` is **the one sender a caller should await.** Every other
+function in `src/lib/email/index.ts` is fire-and-forget by contract — losing a
+receipt is not losing an order — but the user is sitting in front of a code
+entry box waiting for this one, so `/api/auth/send-otp` reports the delivery
+result instead of assuming it. It still resolves rather than throwing, like the
+rest.
+
+The code is written into the subject line as well as the body, so it is
+readable from the inbox list and a phone lock screen without opening anything,
+and it is spaced into two groups of three because nobody transcribes six
+unbroken digits reliably. The gap survives copy-paste: both the input and the
+server strip non-digits before checking.
+
 Still unwired: order shipped/delivered/cancelled, refund, payout, listing
-approved/rejected, new message, both returns, welcome and verify-email. They are
+approved/rejected, new message, both returns, welcome and the link-based
+verify-email (superseded on the sign-up path by the OTP above). They are
 implemented and tested — their trigger points just need the same treatment.

@@ -51,6 +51,28 @@ service cloud.firestore {
       match /paymentMethods/{methodId} { allow read, write: if isOwner(userId); }
     }
 
+    // Email activation codes (6-digit OTP), one document per account.
+    //
+    // Read and written by /api/auth/send-otp and /api/auth/verify-otp, which
+    // reach Firestore with the *caller's own* ID token — this app carries no
+    // service-account key (see CLAUDE.md §6) — so the server has exactly the
+    // owner's privileges and the owner must therefore hold both here.
+    //
+    // That costs nothing, because the stored `codeHash` is an HMAC keyed with
+    // OTP_SECRET, which never leaves the server (src/lib/otp.ts). Reading it
+    // reveals nothing about the six digits: unlike a plain hash of a code
+    // drawn from a million possibilities, an HMAC under an unknown key is not
+    // brute-forceable offline. Writing one is equally useless — a digest
+    // forged without the key can never match a submitted code.
+    //
+    // What the owner *can* do is reset their own `attempts` counter, which is
+    // why the real brute-force limit is the per-IP one in src/lib/rate-limit.ts
+    // rather than this document. No delete rule: a spent challenge is cleared
+    // in place, so nothing here is ever removed.
+    match /email_verifications/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
     match /products/{productId} {
       allow read: if true;
       allow create: if isSignedIn() && request.resource.data.sellerId == request.auth.uid;

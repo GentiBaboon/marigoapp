@@ -93,6 +93,39 @@ export function emailVerificationEmail(a: { name?: string; verifyLink: string })
   };
 }
 
+export function emailOtpEmail(a: {
+  name?: string;
+  code: string;
+  expiresMinutes: number;
+}): RenderedEmail {
+  // Spaced into two groups of three. Nobody transcribes six unbroken digits
+  // reliably, and the gap survives copy-paste because the input strips
+  // non-digits before checking (see `normalizeOtp`).
+  const spaced = `${a.code.slice(0, 3)} ${a.code.slice(3)}`;
+  return {
+    subject: `${a.code} is your Marigo verification code`,
+    category: 'verify-email',
+    html: renderEmail({
+      heading: 'Confirm your email',
+      // The code goes in the preheader too, so it is readable from the inbox
+      // list and the phone lock screen without opening anything.
+      preheader: `Your verification code is ${spaced}. It expires in ${a.expiresMinutes} minutes.`,
+      body: `
+        <p style="margin:0 0 14px;">${greeting(a.name)}</p>
+        <p style="margin:0 0 14px;">Enter this code on the sign-up screen to activate your account.</p>
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:22px 0;">
+          <tr>
+            <td align="center" style="padding:20px 12px;background:#faf7ff;border:1px solid #B884F5;border-radius:10px;">
+              <div style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:34px;font-weight:700;letter-spacing:10px;color:#1a1a1a;line-height:1.2;">${escapeHtml(spaced)}</div>
+              <div style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#6b7280;margin-top:8px;">Expires in ${a.expiresMinutes} minutes</div>
+            </td>
+          </tr>
+        </table>
+        <p style="margin:0;color:#6b7280;font-size:13px;">If you did not create a Marigo account, ignore this email — nobody can use the code without it. Never share it with anyone, including someone claiming to be Marigo support.</p>`,
+    }),
+  };
+}
+
 // ─── Orders — buyer ───────────────────────────────────────────────────────────
 
 export interface OrderItem { brand?: string; title: string; price: number }

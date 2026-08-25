@@ -42,6 +42,7 @@ const SAMPLES = {
   welcome: T.welcomeEmail({ name: 'Elira Hoxha' }),
   'password-reset': T.passwordResetEmail({ name: 'Elira', resetLink: 'https://www.marigoapp.com/auth/reset-password?oobCode=sample' }),
   'verify-email': T.emailVerificationEmail({ name: 'Elira', verifyLink: 'https://www.marigoapp.com/auth/verify-email?oobCode=sample' }),
+  'activation-code': T.emailOtpEmail({ name: 'Elira', code: '048213', expiresMinutes: 10 }),
   'order-confirmation': T.orderConfirmationEmail({
     buyerName: 'Elira Hoxha', orderNumber: 'MG-1042', orderId: 'ord_1042',
     items: ORDER_ITEMS, subtotal: 95, shipping: 1.93, totalAmount: 96.93, paymentMethod: 'card',

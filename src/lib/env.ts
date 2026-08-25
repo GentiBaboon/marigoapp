@@ -34,6 +34,17 @@ const serverEnvSchema = z.object({
   // existing deployment does not fail validation before it is removed.
   MAILTRAP_TOKEN: z.string().optional(),
   RESET_SERVICE_SECRET: z.string().min(1, 'Missing RESET_SERVICE_SECRET'),
+  /**
+   * Signing key for the 6-digit email activation codes.
+   *
+   * Optional here so a build without it still succeeds — CI and preview
+   * deploys run on placeholder env (CLAUDE.md §11). The routes fail closed at
+   * request time instead, via `getOtpSecret()` in src/lib/otp.ts, which also
+   * falls back to RESET_SERVICE_SECRET so an existing deployment keeps working
+   * before this variable is set. Set it properly in production: the two keys
+   * protect different things and should be rotatable independently.
+   */
+  OTP_SECRET: z.string().min(16, 'OTP_SECRET must be at least 16 characters').optional(),
   GOOGLE_GENAI_API_KEY: z.string().optional(),
 });
 
@@ -73,6 +84,7 @@ export function getServerEnv() {
     SENDGRID_FROM_NAME: process.env.SENDGRID_FROM_NAME,
     MAILTRAP_TOKEN: process.env.MAILTRAP_TOKEN,
     RESET_SERVICE_SECRET: process.env.RESET_SERVICE_SECRET,
+    OTP_SECRET: process.env.OTP_SECRET,
     GOOGLE_GENAI_API_KEY: process.env.GOOGLE_GENAI_API_KEY,
   });
 

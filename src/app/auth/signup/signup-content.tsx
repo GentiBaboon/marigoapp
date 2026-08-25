@@ -1,7 +1,8 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { SignupForm } from '@/components/auth/signup-form';
+import { useState } from 'react';
+import { SignupForm, type Stage } from '@/components/auth/signup-form';
 import { SocialButtons } from '@/components/auth/social-buttons';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
@@ -17,6 +18,10 @@ export function SignupContent() {
   // users who hit signup first don't lose their original destination.
   const next = useSearchParams().get('next') ?? undefined;
   const loginHref = next ? `/auth/login?next=${encodeURIComponent(next)}` : '/auth/login';
+  // Once the form hands over to the activation step there is a half-created
+  // account in play, so every other route into one is taken off the screen.
+  const [stage, setStage] = useState<Stage>('form');
+  const verifying = stage === 'verify';
 
   return (
      <div className="relative flex flex-1 flex-col justify-center bg-background px-6 py-8">
@@ -26,12 +31,16 @@ export function SignupContent() {
             </Link>
         </Button>
         <div className="w-full max-w-md mx-auto">
-            <div className="text-center mb-6">
-              <h1 className="font-headline text-3xl">Create an Account</h1>
-              <p className="text-muted-foreground mt-2">Join our community of fashion lovers.</p>
-            </div>
+            {!verifying && (
+              <div className="text-center mb-6">
+                <h1 className="font-headline text-3xl">Create an Account</h1>
+                <p className="text-muted-foreground mt-2">Join our community of fashion lovers.</p>
+              </div>
+            )}
             <div className="space-y-5">
-                <SignupForm />
+                <SignupForm onStageChange={setStage} />
+                {!verifying && (
+                <>
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <Separator />
@@ -49,6 +58,8 @@ export function SignupContent() {
                     Sign In
                   </Link>
                 </div>
+                </>
+                )}
             </div>
         </div>
     </div>

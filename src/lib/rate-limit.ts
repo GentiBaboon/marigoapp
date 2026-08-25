@@ -106,6 +106,29 @@ export const offerLimiter = createRateLimiter('offer', {
   windowSeconds: 60,
 });
 
+/** Send an activation code: 5 per 15 minutes per IP. Each one costs an email,
+ *  and a legitimate signup needs one. */
+export const otpSendLimiter = createRateLimiter('otp-send', {
+  limit: 5,
+  windowSeconds: 15 * 60,
+});
+
+/**
+ * Submit an activation code: 15 per 10 minutes per IP.
+ *
+ * This is the *primary* brute-force control, not the per-account attempt
+ * counter beside it. The counter lives in a document the account owner can
+ * write — the server reaches Firestore with the user's own token and has no
+ * privilege the user lacks (see `src/lib/otp.ts`) — so a determined owner can
+ * reset it. They cannot reset this: it is process memory, keyed by IP, and
+ * nothing user-controlled touches it. At 15 guesses per window against 10^6
+ * codes that expire in 10 minutes, guessing is not a strategy.
+ */
+export const otpVerifyLimiter = createRateLimiter('otp-verify', {
+  limit: 15,
+  windowSeconds: 10 * 60,
+});
+
 // ── Helper to extract client IP ─────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from 'next/server';

@@ -36,13 +36,20 @@ export function usePostAuthRedirect(): string {
  * cross-site arrivals, and it expires before the Firebase session does). Without
  * this, such a visitor is shown a sign-in form while the header displays their
  * avatar — logged in, but told to log in.
+ *
+ * `enabled` exists for the one screen where being signed in is *not* the end
+ * of the story: sign-up creates the Firebase account first and only then asks
+ * for the emailed activation code. Without a way to switch this off, the new
+ * account's auth state would bounce the user into the app the instant it
+ * appeared, and the code entry box would never be seen. Callers pass `false`
+ * from the moment they begin creating an account until verification finishes.
  */
-export function useRedirectIfSignedIn(): boolean {
+export function useRedirectIfSignedIn(enabled = true): boolean {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const target = usePostAuthRedirect();
 
-  const shouldRedirect = !isUserLoading && !!user;
+  const shouldRedirect = enabled && !isUserLoading && !!user;
 
   React.useEffect(() => {
     if (shouldRedirect) router.replace(target);

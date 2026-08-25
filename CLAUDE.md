@@ -159,6 +159,15 @@ Public:
 - `/(onboarding)/welcome` — first-run flow
 
 Auth (`/auth/*`): `login`, `signup`, `forgot-password`, `reset-password`, `verify-email`, plus an `/auth` index.
+- **Sign-up is two stages behind one component.** `SignupForm` creates the
+  Firebase account, then switches to `VerifyOtpStep` — a 6-digit code mailed to
+  the address — and only pushes to `nextPath` once it comes back verified. The
+  stage is what keeps `useRedirectIfSignedIn(enabled)` quiet: creating the
+  account signs the user in, and the redirect that normally follows would carry
+  them straight past the code box into the app. It is switched off *before* the
+  call that creates the account, not after it resolves.
+  `/auth/verify-email` mounts the same step for anyone who closed the tab
+  mid-flow. See §6b.
 
 Authenticated (gated by middleware §6):
 - `/profile`, `/profile/addresses`, `/profile/listings`, `/profile/listings/sales/[orderId]`, `/profile/orders`, `/profile/orders/[orderId]`, `/profile/offers`, `/profile/earnings`, `/profile/wallet`, `/profile/payments`, `/profile/settings`, `/profile/stripe-onboarding`
@@ -189,6 +198,8 @@ API routes (`src/app/api/`):
 | `admin/upload`, `admin/product-upload` | Bearer ID token + admin role check | Admin-side image ingest |
 | `start-conversation` | Bearer ID token | Rate-limited; writes via Firestore REST |
 | `forgot-password` | — | Rate-limited; proxies the `sendPasswordResetLink` function with `RESET_SERVICE_SECRET` |
+| `auth/send-otp` | Bearer ID token | Rate-limited; mails a 6-digit activation code. The address comes from the **token's `email` claim**, never the body — otherwise a signed-in user could aim Marigo's mail at anyone |
+| `auth/verify-otp` | Bearer ID token | Rate-limited; checks the code and activates the account. Idempotent |
 
 ## 5. Data model (Firestore)
 
@@ -198,6 +209,7 @@ Types in `src/lib/types.ts` (~855 lines — the single source of truth for both 
 |---|---|---|
 | `users/{uid}` | Profile, role, KYC, `stripeAccountId`, `salesCount`, badge tier, preferences | `active` / `banned` |
 | `users/{uid}/{wishlist,cart,addresses,paymentMethods}` | Owner-only subcollections | — |
+| `email_verifications/{uid}` | Live 6-digit activation challenge — HMAC'd code, expiry, attempt and send counters. Cleared in place when spent, never deleted | — |
 | ↳ `addresses/{id}` | `firstName` + `surname` are the inputs; **`fullName` is composed from them on save** and stays the stored value, because the delivery label, order confirmation, admin order view, courier pickup sheet and the order emails all read it. Plus optional `company` / `apartment`. Countries are Albania and Kosovo only (`src/lib/countries.ts`, Kosovo is `KS`) | — |
 | `products/{id}` | Listings (images, variants, quantity) | `draft`, `pending_review`, `active`, `sold`, `removed`, `expired`, `reserved` |
 | `products/{id}/offers/{offerId}` | Buyer→seller offers | `pending`, `accepted`, `rejected`, `expired` |
@@ -258,6 +270,48 @@ the caller, and status `delivered` or `completed`; rating 1–5; no self-review.
 Nothing in the app writes reviews yet — `ReviewForm` is rendered nowhere — so
 this closed the hole without changing a live flow. Rules changes need
 `firebase deploy --only firestore:rules`; a git push does **not** ship them.
+
+## 6b. Email activation (6-digit OTP)
+
+New accounts are created in Firebase Auth first and activated second, by a code
+mailed to the address. `src/lib/otp.ts` holds every decision that needs no I/O
+— generation, digests, expiry, the attempt and resend gates — so it is directly
+testable; the two routes own storage and mail.
+
+**The load-bearing constraint: the server has no privilege the user lacks.**
+There is no service-account key (§6), so `/api/*` reaches Firestore with the
+*caller's own* ID token and cannot write a field its owner could not write from
+the browser console. `users/{uid}.emailVerified` is therefore a **UI hint, not
+evidence** — its subject can set it.
+
+`emailVerificationProof` is the evidence: an HMAC over `uid|email` keyed with
+`OTP_SECRET`, which never leaves the server. Server code that needs a real
+guarantee calls **`hasVerifiedEmail()`**, which recomputes it, rather than
+reading the boolean beside it. Flipping `emailVerified` by hand buys an
+attacker a green tick in their own UI and nothing else. **Any new route that
+gates on a confirmed address must use `hasVerifiedEmail()`** or the gate is
+decoration.
+
+- **Codes are HMAC'd, not hashed.** A plain SHA-256 of one of a million
+  possibilities is reversed instantly, so `sha256(code)` in a document its
+  owner can read *is* the code. Under a key the client never sees there is
+  nothing to brute-force — which is what makes the owner-readable rule on
+  `email_verifications/{uid}` safe. It has to be owner-readable: the server
+  reads it with the user's token.
+- **The real brute-force limit is `otpVerifyLimiter`** (15 per 10 min per IP),
+  not the `attempts` counter on the document — the owner can reset that, for
+  the same reason. The counter is the second layer, not the first.
+- **`OTP_SECRET` falls back to `RESET_SERVICE_SECRET`** so an existing
+  deployment works before it is set; the HMAC inputs are domain-separated
+  (`otp|…` vs `verified|…`). Set it anyway — the two should rotate
+  independently. Rotating it invalidates every stored proof, and every account
+  re-verifies on next use.
+- With no `SENDGRID_API_KEY` (dev, CI, previews) the transport skips the send
+  and `send-otp` logs the code **to the server terminal**. Never to the HTTP
+  response: a response field is one config slip from handing every caller in
+  production a valid code.
+- Google and Apple sign-in do not pass through this — those providers verify
+  the address themselves.
 
 **Storage rules (`storage.rules`):** `users/{uid}/**` and `products/{uid}/{productId}/*` are owner-write / public-read; `deliveries/{id}/*` is signed-in read+write. All writes require an image content type under 10 MB. Note admin checks here use the custom claim **only** (no Firestore fallback).
 
@@ -588,7 +642,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (467 passing): unit — `admin-permissions`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `listing-taxonomy`, `offers`, `platform-routes`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `product-card`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (505 passing): unit — `admin-permissions`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `product-card`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
@@ -615,6 +669,7 @@ GOOGLE_GENAI_API_KEY
 SENDGRID_API_KEY / SENDGRID_FROM_EMAIL / SENDGRID_FROM_NAME
 MAILTRAP_TOKEN                 # legacy, superseded
 RESET_SERVICE_SECRET
+OTP_SECRET                    # signs the email activation codes; falls back to RESET_SERVICE_SECRET
 SITE_URL                      # optional; overrides the marigoapp.com default
 ```
 
