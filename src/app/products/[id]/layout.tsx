@@ -3,6 +3,8 @@ import { SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/site';
 import { resolveSeoProduct, fetchProductReviews } from '@/lib/product-seo';
 import { buildProductPath, extractProductId } from '@/lib/product-slug';
 import { buildMetaTitle, buildMetaDescription } from '@/lib/product-meta';
+import { isPubliclyViewable } from '@/lib/product-visibility';
+import { noindexMetadata } from '@/lib/seo';
 
 // Maps the stored condition slugs onto schema.org OfferItemCondition. The old
 // JSON-LD compared against 'new', which is not a value this app ever stores
@@ -30,6 +32,16 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
   if (!product?.title) {
     return { alternates: { canonical } };
+  }
+
+  // A listing that is not published must never be indexed. It used to emit
+  // `index, follow` plus full Product JSON-LD, so a draft or a listing removed
+  // for a policy reason was offered to Google as purchasable stock.
+  if (!isPubliclyViewable(product.status)) {
+    // Generic title, not the product's. The page itself says only "This listing
+    // isn't available", and a tab or link preview naming an item that was
+    // removed for a policy reason would undo that.
+    return { ...noindexMetadata('Listing unavailable | MarigoApp'), alternates: { canonical } };
   }
 
   // An admin override, set on the listing's SEO panel, wins over the derived
@@ -67,6 +79,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 export default async function ProductLayout({ params, children }: Props) {
   const product = await resolveSeoProduct(params.id);
   if (!product?.title) return <>{children}</>;
+  // No Product/Offer markup for a listing that is not published.
+  if (!isPubliclyViewable(product.status)) return <>{children}</>;
   const reviews = await fetchProductReviews(product.id);
 
   // Canonical form, matching generateMetadata. Structured data that cites a
