@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProductCard, toCardProduct } from '@/components/product-card';
 import type { FirestoreProduct } from '@/lib/types';
-import { Compass } from 'lucide-react';
 
 /**
  * The dead end, made useful.
@@ -113,16 +112,15 @@ export function NotFoundState({
         <p className="mt-3 text-muted-foreground">{body}</p>
 
         <div className="mt-7 flex justify-center">
-          {/* White on `--primary` is an explicit design choice, not the token
-              default: `--primary-foreground` is near-black because the brand
-              purple only reaches 2.74:1 against white, below the 4.5:1 WCAG AA
-              needs for text this size. Kept per request — raise the swatch to
-              a deeper purple if that ratio matters later. */}
-          <Button asChild className="text-white hover:text-white">
-            <Link href="/">
-              <Compass className="mr-2 h-4 w-4" />
-              Continue shopping
-            </Link>
+          {/* `--ring`, not `--primary`. White on the brand purple measures
+              2.74:1, under the 4.5:1 WCAG AA wants at this size; the deeper
+              purple already in the palette reaches 5.7:1 and keeps the white
+              label legible. */}
+          <Button
+            asChild
+            className="bg-[hsl(var(--ring))] text-white hover:bg-[hsl(var(--ring))]/90 hover:text-white"
+          >
+            <Link href="/">Continue shopping</Link>
           </Button>
         </div>
 
