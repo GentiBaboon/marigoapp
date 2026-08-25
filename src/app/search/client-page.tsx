@@ -236,6 +236,33 @@ function useFilteredProducts(
     return list;
   }, [raw, gender, brand, resolvedBrandName, category, categoryId, parentMatchSet, size, color, condition, material, pattern, minPrice, maxPrice, section, q]);
 
+  /**
+   * Keep pulling pages while the filtered list is empty.
+   *
+   * Only `subcategoryId` is filtered in Firestore; `categoryId`, brand, size,
+   * colour, condition, material, pattern, price and the text query are all
+   * applied here, in the client, to whatever page the server happened to
+   * return. So a filter whose matches all sit outside the newest PAGE_SIZE
+   * listings produced an empty grid — and because the infinite-scroll sentinel
+   * renders *inside* that grid, nothing was left on the page that could ever
+   * request page two. `/search?categoryId=shoes` was a permanent "No products
+   * found" even with shoes in stock, which is where the header's own category
+   * links land.
+   *
+   * Deliberately only while nothing is showing, rather than until the page is
+   * full: as soon as there is a single match the grid and its sentinel mount
+   * and the shopper drives the rest. Paging on to fill a quota would read the
+   * whole collection every time a narrow filter matched a handful of items.
+   *
+   * Terminates on its own — each pass advances `lastDoc`, and a short page
+   * clears `hasMore`.
+   */
+  React.useEffect(() => {
+    if (isLoading || isLoadingMore || !hasMore) return;
+    if (products.length > 0) return;
+    loadMore();
+  }, [products.length, isLoading, isLoadingMore, hasMore, loadMore]);
+
   const activeFilterCount = [gender, category, categoryId, brand, size, color, condition, material, pattern,
     minPrice !== null ? '1' : '', maxPrice !== null ? '1' : '']
     .filter(Boolean).length;
@@ -928,7 +955,10 @@ function ProductListPage() {
 
         <ActiveFilters />
 
-        {isLoading ? (
+        {/* Still searching while the auto-pager works through later pages —
+            without this the shopper reads "No products found" for a moment
+            before the matches appear. */}
+        {isLoading || (isLoadingMore && products.length === 0) ? (
           <Skeleton4 />
         ) : products.length > 0 ? (
           <>
