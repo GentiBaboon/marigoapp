@@ -87,7 +87,12 @@ async function main() {
     taken.add(slug);
 
     if (slug === existing) continue;
-    writes.push({ ref: doc.ref, slug });
+    // Renaming rewrites a live URL. Keep the old slug so it still resolves —
+    // it canonicals to the new one, which moves any ranking across instead of
+    // dropping it.
+    const history = Array.isArray(data.seoSlugHistory) ? data.seoSlugHistory : [];
+    const nextHistory = existing && !history.includes(existing) ? [...history, existing] : history;
+    writes.push({ ref: doc.ref, slug, history: nextHistory });
     console.log(`  · ${data.title ?? doc.id}`);
     console.log(`      ${existing || '(none)'}  ->  ${slug}`);
   }
@@ -104,7 +109,9 @@ async function main() {
   console.log(`\nWriting ${writes.length} slug(s)...`);
   for (let i = 0; i < writes.length; i += 450) {
     const batch = db.batch();
-    writes.slice(i, i + 450).forEach(({ ref, slug }) => batch.update(ref, { seoSlug: slug }));
+    writes.slice(i, i + 450).forEach(({ ref, slug, history }) =>
+      batch.update(ref, { seoSlug: slug, ...(history.length ? { seoSlugHistory: history } : {}) }),
+    );
     await batch.commit();
   }
   console.log('Done. Redeploy so the sitemap picks up the new URLs.\n');

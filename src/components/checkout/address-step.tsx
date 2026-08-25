@@ -76,9 +76,12 @@ export function AddressStep({ onNextStep }: AddressStepProps) {
                 </CardHeader>
                 <CardContent>
                     {user && (
-                        <AddressForm 
-                            userId={user.uid} 
-                            onSave={() => setIsAddingNew(false)} 
+                        <AddressForm
+                            userId={user.uid}
+                            onSave={() => setIsAddingNew(false)}
+                            // Inline on a scrolling page, not in a dialog: a
+                            // pinned button would sit behind the mobile nav.
+                            stickyFooter={false}
                         />
                     )}
                     <Button variant="ghost" className="mt-4 w-full" onClick={() => setIsAddingNew(false)}>

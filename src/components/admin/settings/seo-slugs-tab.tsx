@@ -17,6 +17,7 @@ interface Planned {
   title: string;
   from: string;
   to: string;
+  history: string[];
 }
 
 /**
@@ -37,6 +38,10 @@ export function SeoSlugsTab() {
   const [scanning, setScanning] = React.useState(false);
   const [writing, setWriting] = React.useState(false);
   const [scanned, setScanned] = React.useState<number | null>(null);
+  // Off by default: regenerating rewrites live URLs. On, it also rebuilds
+  // slugs that already exist, which is how a formatting change (a size
+  // rendered "small" rather than "s") reaches listings slugged earlier.
+  const [regenerate, setRegenerate] = React.useState(false);
   const [planned, setPlanned] = React.useState<Planned[] | null>(null);
   const [written, setWritten] = React.useState(0);
 
@@ -61,7 +66,7 @@ export function SeoSlugsTab() {
       for (const d of snap.docs) {
         const data = d.data() as any;
         const existing = typeof data.seoSlug === 'string' ? data.seoSlug.trim() : '';
-        if (existing) continue;
+        if (existing && !regenerate) continue;
 
         const base = generateProductSlug({
           id: d.id,
@@ -73,9 +78,17 @@ export function SeoSlugsTab() {
         // Nothing to build a slug from — leave it on its id URL.
         if (!base) continue;
 
+        // Its own slug is not a collision with itself.
+        if (existing) taken.delete(existing);
         const slug = await uniqueSlug(base, async (c) => taken.has(c));
         taken.add(slug);
-        out.push({ id: d.id, title: data.title ?? d.id, from: existing || '(none)', to: slug });
+        if (slug === existing) continue;
+
+        // Keep the old slug resolving — renaming must not 404 a URL that is
+        // already indexed or shared.
+        const prior: string[] = Array.isArray(data.seoSlugHistory) ? data.seoSlugHistory : [];
+        const history = existing && !prior.includes(existing) ? [...prior, existing] : prior;
+        out.push({ id: d.id, title: data.title ?? d.id, from: existing || '(none)', to: slug, history });
       }
       setPlanned(out);
     } catch (err: any) {
@@ -83,7 +96,7 @@ export function SeoSlugsTab() {
     } finally {
       setScanning(false);
     }
-  }, [firestore, toast]);
+  }, [firestore, toast, regenerate]);
 
   const apply = React.useCallback(async () => {
     if (!firestore || !planned?.length) return;
@@ -93,7 +106,10 @@ export function SeoSlugsTab() {
       for (let i = 0; i < planned.length; i += 450) {
         const batch = writeBatch(firestore);
         planned.slice(i, i + 450).forEach((p) => {
-          batch.update(doc(firestore, 'products', p.id), { seoSlug: p.to });
+          batch.update(doc(firestore, 'products', p.id), {
+            seoSlug: p.to,
+            ...(p.history.length ? { seoSlugHistory: p.history } : {}),
+          });
         });
         await batch.commit();
         setWritten(Math.min(i + 450, planned.length));
@@ -123,6 +139,22 @@ export function SeoSlugsTab() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <label className="flex items-start gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={regenerate}
+            onChange={(e) => { setRegenerate(e.target.checked); setPlanned(null); }}
+            className="mt-1"
+          />
+          <span>
+            <span className="font-medium">Also rebuild existing slugs</span>
+            <span className="block text-xs text-muted-foreground">
+              Applies the current format to every listing, not just the ones with
+              no slug. Old URLs keep working and point at the new one.
+            </span>
+          </span>
+        </label>
+
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={scan} disabled={scanning || writing} variant="outline">
             {scanning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -159,6 +191,11 @@ export function SeoSlugsTab() {
                 <p className="text-xs text-muted-foreground break-all">
                   {SITE_URL}/products/<span className="text-foreground">{p.to}</span>
                 </p>
+                {p.from !== '(none)' && (
+                  <p className="text-xs text-muted-foreground break-all">
+                    was <span className="line-through">{p.from}</span> — still resolves
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -166,8 +203,10 @@ export function SeoSlugsTab() {
 
         {planned !== null && planned.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            Nothing is written until you press Generate. Existing slugs are never
-            overwritten, so a listing that already ranks keeps its URL.{' '}
+            Nothing is written until you press Generate.{' '}
+            {regenerate
+              ? 'Renamed listings keep their old URL working, canonicalled to the new one.'
+              : 'Existing slugs are left alone.'}{' '}
             <Badge variant="outline" className="ml-1">safe to re-run</Badge>
           </p>
         )}

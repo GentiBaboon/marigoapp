@@ -64,6 +64,34 @@ export function slugify(input: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/**
+ * Letter sizes are spelled out in a URL.
+ *
+ * The stored size stays canonical `S` — that is what the facet matches on —
+ * but a slug ending `-s` reads like a typo or a stray plural, and "small" is a
+ * word people actually search. Numeric sizes are left alone: `-38` is already
+ * how a shoe size is written.
+ */
+const SIZE_SLUG_WORDS: Record<string, string> = {
+  XXS: 'xxs',
+  XS: 'extra-small',
+  S: 'small',
+  M: 'medium',
+  L: 'large',
+  XL: 'extra-large',
+  XXL: 'xxl',
+  '3XL': '3xl',
+  '4XL': '4xl',
+};
+
+/** The slug fragment for a stored size value. */
+export function sizeForSlug(size: string | undefined | null): string {
+  const raw = (size ?? '').trim();
+  if (!raw) return '';
+  const word = SIZE_SLUG_WORDS[raw.toUpperCase()];
+  return slugify(word ?? raw);
+}
+
 /** Trim to a length limit without cutting a word in half. */
 function truncateOnWord(slug: string, max: number): string {
   if (slug.length <= max) return slug;
@@ -92,7 +120,7 @@ export function generateProductSlug(product: SluggableProduct): string {
   // match how people search ("black gucci heels 38").
   const color = slugify(product.color ?? '');
   if (color && !parts.join('-').includes(color)) parts.push(color);
-  const size = slugify(product.size ?? '');
+  const size = sizeForSlug(product.size);
   if (size) parts.push(size);
 
   const slug = truncateOnWord(parts.join('-'), MAX_SLUG_LENGTH);

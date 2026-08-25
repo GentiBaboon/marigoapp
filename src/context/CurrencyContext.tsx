@@ -38,6 +38,19 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
  */
 export const DEFAULT_CURRENCY: Currency = 'ALL';
 
+/**
+ * The currencies a shopper can actually pick.
+ *
+ * `Currency` still includes USD so the conversion path stays intact — it is
+ * only withheld from the picker until it is finished. Restoring it means
+ * adding it back here and re-adding the row in `user-nav.tsx`.
+ *
+ * This list is also what a saved preference is validated against, so anyone
+ * who selected USD while it was offered lands back on the default instead of
+ * being stranded on prices in a currency no control can change.
+ */
+const SELECTABLE_CURRENCIES: Currency[] = ['EUR', 'ALL'];
+
 export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [currency, setCurrencyState] = useState<Currency>(DEFAULT_CURRENCY);
     const { user } = useUser();
@@ -48,7 +61,7 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     useEffect(() => {
         const savedCurrency = getCookie('marigo_currency') as Currency | undefined;
-        if (savedCurrency && ['EUR', 'ALL', 'USD'].includes(savedCurrency)) {
+        if (savedCurrency && SELECTABLE_CURRENCIES.includes(savedCurrency)) {
             setCurrencyState(savedCurrency);
         }
     }, []);
