@@ -19,7 +19,14 @@ Branding (`src/app/globals.css` CSS vars → `tailwind.config.ts`):
 
 Fonts: `font-headline` Georgia serif, `font-body` Inter, `font-logo` Poppins 700. Design spec: `docs/blueprint.md`.
 
-Locale: `<html lang="en">` — it must match the *server-rendered* content, and `LanguageContext` **defaults to `en`** (it said `sq` while serving English, which misfiles the site for both languages) and the picker offers `en` / `sq` only — Italian was pulled from the UI, `it.json` is retained in case it returns.
+Locale: `<html lang="en">` — it must match the *server-rendered* content, and `LanguageContext` **defaults to `en`** (it said `sq` while serving English, which misfiles the site for both languages).
+
+**The UI is English-only for now.** `LanguageSwitcher` still exists but is
+rendered nowhere: a picker offering one language only ever looks broken. The
+`sq` and `it` translation files are retained, so restoring it means mounting
+the component again — in the footer's brand column and in `user-nav.tsx` — not
+rebuilding anything. The chatbot still answers in Albanian; that is decided per
+message by `detectChatLanguage()`, not by this setting.
 
 ## 2. Tech stack
 
@@ -71,6 +78,7 @@ Locale: `<html lang="en">` — it must match the *server-rendered* content, and 
 ├── functions/                   # Firebase Cloud Functions — one 900-line src/index.ts
 ├── scripts/                     # set-admin-role.ts, set-super-admin.mjs, seed-brands.mjs, delete-no-photo-products.*
 ├── public/                      # manifest, icons, logo, favicon.ico, marigo-ai-avatar.png, sitemap, sw
+│   └── partners/                # Supporter logos rendered in the footer
 └── src/
     ├── middleware.ts            # Edge middleware — auth gate + CSRF
     ├── app/                     # Next App Router tree (+ icon.png / apple-icon.png conventions)
@@ -100,7 +108,16 @@ Public:
     threw and the caller's `.catch` rendered it as an empty rail. Every filter
     above 10 products was silently broken. It also re-sorts to the admin's
     curated order, which a `documentId()` query does not preserve.
-- `/about`, `/help`, `/privacy`, `/terms`
+- `/about`, `/privacy`, `/terms`
+- `/help` — the Help Centre. Questions live in `src/app/help/faq-content.ts`,
+  separate from the page that renders them. **Every figure in an answer is
+  imported from `src/lib/types.ts`** (commission, payout hold, refund window,
+  delivery fees) rather than typed into the prose, so the page cannot quote a
+  rate the checkout no longer charges. The prose is deliberately consistent
+  with `src/lib/chat-knowledge.ts` — the same ground truth the AI assistant
+  gets. Change one, check the other, or the page and the chatbot start
+  contradicting each other in public. Search is accent-folded (so `cmimi`
+  finds `çmimi`) and expands whatever matched.
 - `/browse` and `/browse/[...slug]` — filtered browsing (category/price/etc. via URL segments + params)
 - `/search` — search results, backed by the smart-search AI flow; overlay lives in `components/search/search-overlay.tsx`. The results grid itself is `search/client-page.tsx`, exported as `SearchResults` so the category routes can reuse it.
 - **`/{gender}` and `/{gender}/{category}`** (`/women`, `/women/shirts`) — the
@@ -118,6 +135,18 @@ Public:
     reason: `/^\/([^/]+)\/([^/]+)$/` would rewrite `/admin/orders` into a
     category page.
 - `/products/[id]` (+ `layout.tsx` supplying server-rendered metadata and JSON-LD via `src/lib/product-seo.ts`)
+  - Photos are `components/product/ProductGallery.tsx`: a vertical thumbnail
+    rail beside one large image on desktop, the swipeable carousel on phones.
+    Both render the same `images` array. Thumbnails are **click**-selected, not
+    hover — with hover-to-preview, moving the cursor off the thumbnail you just
+    picked sweeps across its neighbours and silently overrides the choice. The
+    active thumbnail takes a `ring`, not a `border`, which would resize it and
+    shuffle the whole rail.
+  - `components/product/ProductBreadcrumb.tsx` renders the category trail under
+    the photos (`Women Home › Brand › Category › Subcategory`). It has to map
+    **names back to slugs**: products store display names in `brandId` and
+    `categoryId` but a slug in `subcategoryId`. A crumb whose slug cannot be
+    resolved renders as plain text rather than a link to an empty result set.
   - **Only `active` / `reserved` / `sold` are public** (`src/lib/product-visibility.ts`).
     A `draft`, `pending_review`, `removed` or `expired` listing used to serve 200
     with `index, follow` *and* Product JSON-LD — a moderation hole, not a
@@ -169,6 +198,7 @@ Types in `src/lib/types.ts` (~855 lines — the single source of truth for both 
 |---|---|---|
 | `users/{uid}` | Profile, role, KYC, `stripeAccountId`, `salesCount`, badge tier, preferences | `active` / `banned` |
 | `users/{uid}/{wishlist,cart,addresses,paymentMethods}` | Owner-only subcollections | — |
+| ↳ `addresses/{id}` | `firstName` + `surname` are the inputs; **`fullName` is composed from them on save** and stays the stored value, because the delivery label, order confirmation, admin order view, courier pickup sheet and the order emails all read it. Plus optional `company` / `apartment`. Countries are Albania and Kosovo only (`src/lib/countries.ts`, Kosovo is `KS`) | — |
 | `products/{id}` | Listings (images, variants, quantity) | `draft`, `pending_review`, `active`, `sold`, `removed`, `expired`, `reserved` |
 | `products/{id}/offers/{offerId}` | Buyer→seller offers | `pending`, `accepted`, `rejected`, `expired` |
 | `orders/{id}` | Checkout orders (multi-seller via `sellerIds[]`, `payouts{}` map for idempotent transfers) | `pending_payment`, `processing`, `shipped`, `delivered`, `completed`, `cancelled`, `refunded` |
@@ -185,7 +215,7 @@ Types in `src/lib/types.ts` (~855 lines — the single source of truth for both 
 | `categories`, `brands`, `conditions`, `materials`, `colors`, `patterns`, `size_charts` | Catalog metadata (public read, admin write) | — |
 | `settings/global` | `commissionRate`, `payoutHoldHours`, `refundWindowDays` (full-admin write) | — |
 | `settings/{banners,macro_filters,homepage_blocks,badges}` | Merchandising + badge config (admin write) | — |
-| `config/exchangeRates` | EUR-base rates for `CurrencyContext` (EUR / ALL / USD) | — |
+| `config/exchangeRates` | EUR-base rates for `CurrencyContext`. **Does not exist in Firestore** — the fallback table in `CurrencyContext` is the rate the app really runs on | — |
 | `admin_logs/{id}` | Audit trail of admin actions | — |
 
 Defaults in `src/lib/types.ts` — `DEFAULT_PAYOUT_HOLD_HOURS = 72`, `DEFAULT_REFUND_WINDOW_DAYS = 14`, `DEFAULT_COMMISSION_RATE = 0.15`, plus `DEFAULT_BADGE_SETTINGS` and `DEFAULT_RELATED_PRODUCTS_CONFIG`. **`functions/src/index.ts` re-declares the hold/commission defaults — keep both sides in sync.**
@@ -216,6 +246,18 @@ Client hooks `use-admin-auth` / `use-courier-auth` enforce this in the UI; Fires
 **Image hosts:** `**.supabase.co/storage/v1/object/public/**` is wildcarded on purpose — `next/image` *throws* on an unlisted host and takes down the whole page, so rotating `NEXT_PUBLIC_SUPABASE_URL` used to break every page still rendering an old image. Also allowed: `firebasestorage.googleapis.com`, `placehold.co`, `images.unsplash.com`, `picsum.photos`.
 
 **Firestore rules (`firestore.rules`):** every collection has explicit rules — no wildcard catch-all. Helpers: `isSignedIn`, `isOwner`, `isAdmin` (custom claim `admin: true` **or** Firestore role in admin/super_admin/moderator/analyst), `isFullAdmin`, `isCourier`. Notable narrow grants: any signed-in user may decrement `products.quantity` / flip to `reserved` at checkout; buyers drive `approved → ready_for_pickup → shipping` on returns, sellers drive `shipping → received`.
+
+**Reviews are buyer-gated.** `create` was `isSignedIn()` with no constraint on
+who the review claimed to be from or whether a purchase happened — and the
+client Firebase config ships in the browser bundle, so anyone could post as any
+reviewer about any seller. Worse than it sounds: `fetchProductReviews` feeds
+`aggregateRating` into each listing's JSON-LD, so forged ratings became stars on
+the product's Google result. A review now requires `reviewerId == auth.uid`, a
+`revieweeId` that is a seller on the named order, that order's `buyerId` to be
+the caller, and status `delivered` or `completed`; rating 1–5; no self-review.
+Nothing in the app writes reviews yet — `ReviewForm` is rendered nowhere — so
+this closed the hole without changing a live flow. Rules changes need
+`firebase deploy --only firestore:rules`; a git push does **not** ship them.
 
 **Storage rules (`storage.rules`):** `users/{uid}/**` and `products/{uid}/{productId}/*` are owner-write / public-read; `deliveries/{id}/*` is signed-in read+write. All writes require an image content type under 10 MB. Note admin checks here use the custom claim **only** (no Firestore fallback).
 
@@ -386,7 +428,40 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 - Admin tables are a repeated shadcn + `@tanstack/react-table` pattern: `data-table.tsx` + `columns.tsx` + `data-table-toolbar.tsx` + `data-table-pagination.tsx` (+ `row-actions`) per domain (`products`, `orders`, `users`, `finance`, `logs`, `logistics/courier-table`). Copy an existing folder rather than inventing a new shape. CSV export via `src/lib/csv-export.ts`.
 - Admin charts in `components/admin/charts/` use `recharts` + `components/ui/chart.tsx`.
 - i18n: `src/lib/translations/{en,sq}.json` via `LanguageContext` (`it.json` is dormant); preference persisted to a cookie and to the user doc.
-- Currency: `CurrencyContext` + `config/exchangeRates` (EUR base; ALL / USD), persisted to `marigo_currency` cookie + user doc. Prices are stored in EUR — always format via `formatPrice`. **`DEFAULT_CURRENCY` is `ALL`** (the primary market is Albania); a saved cookie or user preference still wins. This is display only — storage, payouts, Stripe amounts and the admin/finance dashboards stay in EUR.
+- Currency: `CurrencyContext`, persisted to `marigo_currency` cookie + user doc.
+  Prices are stored in EUR — always format via `formatPrice`.
+  **`DEFAULT_CURRENCY` is `ALL`** (the primary market is Albania); a saved cookie
+  or user preference still wins. Display only — storage, payouts, Stripe amounts
+  and the admin/finance dashboards stay in EUR.
+  - **The rate is 93 ALL to the euro**, and it lives in the fallback table in
+    `CurrencyContext` because `config/exchangeRates` does not exist in Firestore.
+    Keep it in step with `ALL_PER_EUR` in `src/lib/types.ts`, which the delivery
+    fees are derived from.
+  - **`SELECTABLE_CURRENCIES` is `['EUR','ALL']`.** USD is still in the
+    `Currency` type and still converts — it is only withheld from the picker
+    until it is finished. It is also what a saved preference is validated
+    against, so anyone who picked USD while it was offered lands back on the
+    default rather than being stranded on prices no control can change.
+    Restoring it: add it here and re-add the row in `user-nav.tsx`.
+- **Delivery is priced per origin city**, and all of it lives in
+  `src/lib/shipping.ts` so the quote in the basket and the amount actually
+  charged cannot drift. `DEFAULT_SHIPPING_FEE_ALL` (200) per distinct city, or
+  `CROSS_BORDER_SHIPPING_FEE_ALL` (500) when the origin country differs from the
+  delivery country — in either direction, and still per city, so two Kosovan
+  cities into Albania is two crossings.
+  - The rule needs to know where a listing ships from, and a buyer **cannot read
+    `users/{sellerId}/addresses`** (owner-only). So `shippingFromCity` /
+    `shippingFromCountry` are copied onto the product at publish (`ReviewStep`).
+  - Listings from before this have neither and are pooled as **one unknown
+    origin charged once** — overcharging for missing data is worse than
+    undercharging. Existing stock keeps paying the flat fee until republished or
+    backfilled.
+  - `/api/create-order` recomputes from the server's own copy of each product
+    and the address on the order. The client's basket payload never decides a
+    price. Cities are matched accent- and case-folded.
+  - Cart lines snapshot the origin when the item is added, so a seller changing
+    their pickup city mid-basket leaves the *quote* stale — the charge stays
+    correct, since checkout re-reads.
 - **SEO: every indexable route declares its own canonical**, via `pageMetadata()`
   in `src/lib/seo.ts`. The root layout's `alternates: { canonical: '/' }` is
   inherited by any page that does not override it — that is how /about, /help,
@@ -468,6 +543,15 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
     PerplexityBot / Google-Extended et al. explicitly.
 - Favicons follow the **App Router icon convention**: `src/app/icon.png` and `src/app/apple-icon.png`, with `public/favicon.ico` for clients that probe that path directly. Do not add a `src/app/favicon.ico` — it is served at `/favicon.ico` and beats any `<link rel="icon">` in `layout.tsx`, which is what kept the old orange mark on screen. Both icon routes are excluded in `next-sitemap.config.js`, or they get listed as pages.
 - Mobile-first: bottom `MobileNav` (Home/Search/Cart/Favorites/Profile), hidden ≥ md; header popovers for cart/messages/notifications.
+- The footer's brand column carries `PartnerLogos` — the Startup Albania and
+  Ministry of Economy marks, with the funding credit on hover and on focus.
+  Matched on **height**, not width: the wordmark is 2.9:1 and the emblem is
+  nearly square, so equal widths would make one tower over the other. That
+  column is `1.5fr` against `1fr` link columns because at an even split the
+  logos overflowed into "Shop". The emblem is black line art and takes
+  `dark:invert` — the admin sidebar can leave `dark` on the document element.
+  Source artwork is **not** in the repo (gitignored); the processed PNGs in
+  `public/partners/` are what ships.
 - Error reporting: `src/lib/error-reporter.ts` (`reportError`, `reportWarning`) + `FirebaseErrorListener` mounted globally, fed by `src/firebase/error-emitter.ts`.
 
 ## 10. Commands (from `package.json`)
@@ -504,13 +588,18 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (429 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `category-url`, `email`, `platform-routes`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (467 passing): unit — `admin-permissions`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `listing-taxonomy`, `offers`, `platform-routes`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `product-card`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
 ## 11. CI (`.github/workflows/ci.yml`)
 
-- Triggers: push to `main` / `marigoappv1.0`, PRs to `main`.
+- Triggers: push to `main` / `marigoappv1.0`, and **every** pull request whatever
+  its base — a PR stacked on another feature branch used to get no typecheck, no
+  tests and no build, and because neither job is required GitHub still reported
+  it CLEAN. `edited` is in the type list because retargeting a PR fires that and
+  nothing else; both jobs skip unless `github.event.changes.base` is present, so
+  a typo in a description burns no runner. Concurrency cancels superseded runs.
 - `quality` job: `npm ci` → typecheck (`continue-on-error: true`) → `npm run test` → `next build` with dummy `NEXT_PUBLIC_FIREBASE_*` env.
 - `e2e` job (PRs only, `needs: quality`): Playwright + Chromium; uploads `playwright-report/` (7-day retention).
 - Because the build runs with placeholder env, **nothing may construct a Supabase/Stripe/Firebase client at module scope** — use lazy getters (`getSupabaseClient()`, `getStripe()`). This has broken CI before.
@@ -560,6 +649,35 @@ SITE_URL                      # optional; overrides the marigoapp.com default
 - **Never run `npm run build` while `npm run dev` is running.** The production build overwrites `.next`, and the dev server then 404s every `_next/static/*` chunk — the page renders as unstyled HTML with no error in the terminal. Fix: stop dev, `rm -rf .next`, restart.
 - `AuthenticityBadge` returns `null` for products without a completed check. Don't wrap it in a padded container — the wrapper still renders and leaves phantom space. Prefer a flex `gap` so an absent child contributes nothing.
 - `next/image` will not serve larger than the `width`/`height` props, whatever the source file holds. A 320px source declared as `width={128}` renders soft on a 64px retina button.
+- **`/search` filters mostly in the client, over a *paginated* server page.**
+  Only `subcategoryId` is a Firestore constraint; `categoryId`, brand, size,
+  colour, condition, material, pattern, price and the text query are applied to
+  whatever `PAGE_SIZE` listings came back. A filter whose matches all sat past
+  the first page rendered an empty grid — and since the infinite-scroll sentinel
+  lives *inside* that grid, nothing was left that could request page two. Stuck,
+  not slow. The pager now keeps pulling **while the filtered list is empty**, and
+  stops at the first match so a narrow filter does not read the whole collection.
+  Adding a new client-side filter inherits this; adding a Firestore-side one
+  does not.
+- **`/browse/[category]` is a category *menu*, not a product grid.** It lists
+  subcategories and top brands and links onward. Seeing "0 products" there is
+  the page working.
+- **A missing `NEXT_PUBLIC_FIREBASE_*` var now fails by name.** `initializeApp()`
+  with an undefined value used to surface as `auth/invalid-api-key`, once per
+  prerendered page, minified, naming nothing. `assertFirebaseConfig()`
+  (`src/firebase/config.ts`) throws with the variable and the fix. It is a
+  function, not a module-scope check: this module is imported during `next build`
+  page-data collection, and throwing at import time would fail the build before
+  any route runs.
+- **Radix `DialogContent` has no max-height and no scroll.** A form taller than
+  the viewport pushes its own submit button off-screen with no way to reach it.
+  Every dialog hosting `AddressForm` sets `max-h-[90dvh] overflow-y-auto pb-0` —
+  the `pb-0` matters, or fields scroll through the container's padding
+  *underneath* the pinned footer.
+- **A sticky footer inside a form is right in a dialog and wrong on a page.**
+  `AddressForm` takes `stickyFooter` (default true): on a scrolling page behind
+  the fixed `MobileNav` the pinned button anchors *under* the nav and all but
+  disappears, so the checkout's inline copy opts out.
 
 ## 14. Native apps (iOS & Android)
 
