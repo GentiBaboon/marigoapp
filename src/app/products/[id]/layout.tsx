@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/site';
 import { resolveSeoProduct, fetchProductReviews } from '@/lib/product-seo';
 import { buildProductPath, extractProductId } from '@/lib/product-slug';
+import { buildMetaTitle, buildMetaDescription } from '@/lib/product-meta';
 
 // Maps the stored condition slugs onto schema.org OfferItemCondition. The old
 // JSON-LD compared against 'new', which is not a value this app ever stores
@@ -31,22 +32,14 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     return { alternates: { canonical } };
   }
 
-  // Most titles already lead with the brand ("Zara Orange High Heels"), so
-  // prefixing unconditionally produced "ZARA Zara Orange High Heels".
-  const brandId = product.brandId?.trim() ?? '';
-  const titleStartsWithBrand =
-    !!brandId && product.title.toLowerCase().startsWith(brandId.toLowerCase());
-  const headline = titleStartsWithBrand || !brandId ? product.title : `${brandId} ${product.title}`;
-
   // An admin override, set on the listing's SEO panel, wins over the derived
   // copy. Blank means "use the default", so clearing the field restores it.
-  const title = product.seoTitle?.trim() || `${headline} | ${SITE_NAME}`;
-  const description = (
-    product.seoDescription?.trim() ||
-    (product.description && product.description.trim().length > 40
-      ? product.description
-      : `${headline}${product.condition ? ` in ${product.condition.replace(/-/g, ' ')} condition` : ''}. Buy authentic pre-owned luxury fashion on ${SITE_NAME}.`)
-  ).slice(0, 300);
+  //
+  // The defaults come from buildMetaTitle/buildMetaDescription, which compose
+  // to the length Google actually shows. The previous inline version emitted
+  // ~65-character titles and sliced the seller's prose at 300 — mid-word.
+  const title = product.seoTitle?.trim() || buildMetaTitle(product);
+  const description = product.seoDescription?.trim() || buildMetaDescription(product);
 
   const images = (product.images ?? []).map((i) => i.url).filter(Boolean).slice(0, 4);
 

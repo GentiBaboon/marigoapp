@@ -427,6 +427,12 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
       title would silently change a live URL whenever a typo was fixed,
       discarding its ranking. Saving a listing in admin with the slug field
       blank auto-completes it, so an admin never has to think about it.
+    - **Meta title and description are composed to fit** by
+      `src/lib/product-meta.ts`, used by both `products/[id]/layout.tsx` and
+      the admin preview so the two cannot disagree. Titles drop the
+      `| MarigoApp` suffix before truncating the product name, and descriptions
+      keep whole sentences only — the previous inline version emitted
+      65-character titles and sliced seller prose at 300, mid-word.
     - Admins override the slug, meta title and meta description on the SEO card
       in `/admin/products/[id]`. Blank means "use the derived default", and the
       card's preview mirrors the exact fallback chain in
@@ -475,7 +481,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (283 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `category-url`, `email`, `platform-routes`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (283 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `category-url`, `email`, `platform-routes`, `product-meta`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
