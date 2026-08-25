@@ -90,7 +90,7 @@ Locale: `<html lang="en">` — it must match the *server-rendered* content, and 
 **`/` is a splash screen that `router.replace('/home')`** — `/home` is the real homepage (client component, reads `?macroFilter=`). Don't add homepage content to `src/app/page.tsx`.
 
 Public:
-- `/` (splash) → `/home`. Section order is deliberate and lives in `src/app/home/page.tsx`: MacroFilters → HomepageBlocks → Personalized Picks → **Shop by Category** → **New In** → **50% OFF Preowned** → **Last Viewed**. Last Viewed is pinned last — it is a way back to something already seen, so it sits below everything still being discovered. Every section returns `null` when it has nothing to show, so the page has no empty headings.
+- `/` (splash) → `/home`. Section order is deliberate and lives in `src/app/home/page.tsx`: MacroFilters → HomepageBlocks → **Shop by Category** → **New In** → **50% OFF Preowned** → Personalized Picks → **Last Viewed**. Last Viewed is pinned last — it is a way back to something already seen, so it sits below everything still being discovered. Every section returns `null` when it has nothing to show, so the page has no empty headings.
   - Component names lag the headings: `NewArrivalsSection` renders "New In" and `RecentlyViewedSection` renders "Last Viewed".
   - `DiscountedSection` ("50% OFF Preowned") filters on a **computed** discount, which Firestore cannot query — it pulls a 100-row pool and works out `(originalPrice − price) / originalPrice` per item, deepest markdown first. Threshold is **≥49%**, not 50, so an item at 35 ← 69 (49.3%) still qualifies. Sold listings are excluded here, unlike other rails: a half-price item you cannot buy is worse than one fewer card.
   - Passing `?macroFilter=<id>` replaces the whole stack with `MacroFilteredProducts`.
@@ -531,6 +531,12 @@ SITE_URL                      # optional; overrides the marigoapp.com default
 - Cloud Functions requiring public invocation (`handleStripeWebhook`) are currently blocked by org policy — see §8 before assuming a webhook fires.
 - `src/lib/mock-data.ts` (~326 lines of sample products, brands, sizes) is still imported in places; check whether a value is real Firestore data or mock before relying on it.
 - **Product documents carry `brandId` / `categoryId`, never `brand` / `category`.** `PersonalizedPicks` filtered on the short names for a long time, so it matched nothing and rendered empty — while still spending a Gemini generation on every signed-in homepage load. Check the field name against `FirestoreProduct` before writing a `where()`.
+- **`PersonalizedPicks` builds its own heading** (`buildTitle`) from the query
+  the AI returned, not from the model's `reasoning` prose. The query filters on
+  `brandId` only when brands are present, so a model-written heading regularly
+  named a category it had never constrained — "More H&M Shoes for you" over a
+  knit two-piece set. Deriving the heading from the same value the query used
+  makes that impossible.
 - Any AI call on a high-traffic page needs a cache. `PersonalizedPicks` keys its recommendation on the taste profile in `sessionStorage`; without that, a few homepage visits by one shopper exhaust the project's daily generation quota for chat and listing too.
 - **Gemini models get retired without notice** and then 404. Never hardcode a model id in a route — use `TEXT_MODEL`/`generateText()` from `src/ai/models.ts`, or set `GENAI_TEXT_MODEL` to recover without a deploy.
 - **The Google AI free tier caps generation at ~20 requests before 429ing** (`generate_content_free_tier_requests`). That is well below real chat traffic, so production needs billing enabled on the GCP project. The chat route degrades to retrieval-only results rather than erroring, which makes the ceiling easy to miss — check the server log for `RESOURCE_EXHAUSTED` if replies suddenly read like canned copy.

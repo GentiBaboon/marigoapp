@@ -59,9 +59,6 @@ function HomePageContent() {
             </Suspense>
 
             <Suspense fallback={<SectionSkeleton />}>
-              <PersonalizedPicks />
-            </Suspense>
-            <Suspense fallback={<SectionSkeleton />}>
               <CategoriesSection />
             </Suspense>
             <Suspense fallback={<SectionSkeleton />}>
@@ -76,6 +73,9 @@ function HomePageContent() {
                 empty, so a new visitor never sees a bare heading. */}
             <Suspense fallback={<SectionSkeleton />}>
               <FavoritesSection />
+            </Suspense>
+            <Suspense fallback={<SectionSkeleton />}>
+              <PersonalizedPicks />
             </Suspense>
             <Suspense fallback={<SectionSkeleton />}>
               <RecentlyViewedSection />

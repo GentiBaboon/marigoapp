@@ -28,7 +28,7 @@ const recommendationPrompt = ai.definePrompt({
     - Prioritize brands and categories that appear most frequently in the user's wishlist.
     - If the user has a clear preference for a brand, suggest querying for that brand, maybe in a category they also like.
     - If the user has a clear preference for a category but not a specific brand, suggest that category.
-    - Create a short, engaging title for the recommendation set. For example, if you're recommending 'Chanel' items, the reasoning could be 'Because you love Chanel'. If you're recommending handbags, it could be 'More Handbags for You'.
+    - The reasoning field is an internal note explaining the choice. It is NOT shown to anyone: the rail's heading is built from the query itself, because a model-written heading kept naming a category the query never filtered on.
 
     User Preferences:
     - Wishlisted Brands: {{wishlistedBrands}}
