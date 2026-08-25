@@ -6,6 +6,7 @@ import { useUser, useFirestore, errorEmitter } from '@/firebase';
 import { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot, writeBatch, query, where, limit } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import type { FirestoreCoupon, FirestoreSettings } from '@/lib/types';
+import { validateCoupon, computeDiscount } from '@/lib/coupons';
 import { DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
 import { calculateShipping, type ShippingGroup } from '@/lib/shipping';
 
@@ -189,38 +190,47 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const applyCoupon = useCallback(async (code: string) => {
         if (!firestore) return { success: false, message: "Service unavailable" };
-        
+
         try {
             const q = query(collection(firestore, 'coupons'), where('code', '==', code.toUpperCase()), limit(1));
             const snap = await getDocs(q);
-            
-            if (snap.empty) return { success: false, message: "Invalid coupon code" };
-            
+
+            if (snap.empty) return { success: false, message: "That code is not valid." };
+
             const coupon = { id: snap.docs[0].id, ...snap.docs[0].data() } as FirestoreCoupon;
-            
-            if (!coupon.isActive) return { success: false, message: "This coupon is no longer active" };
-            if (subtotal < (coupon.minOrderValue || 0)) {
-                return { success: false, message: `Minimum spend of €${coupon.minOrderValue} required` };
+
+            // A first-order coupon needs the buyer's history. Only fetched when
+            // one is actually presented, and only as far as the first few
+            // orders — we need "any" not "how many".
+            let priorOrderCount = 0;
+            if (coupon.firstOrderOnly && user) {
+                const prior = await getDocs(
+                    query(collection(firestore, 'orders'), where('buyerId', '==', user.uid), limit(5)),
+                );
+                priorOrderCount = prior.docs.filter(d => (d.data() as any)?.status !== 'cancelled').length;
             }
 
+            // Same rules the order routes enforce — this is for instant
+            // feedback, not authority. src/lib/coupons.ts.
+            const result = validateCoupon(coupon, { subtotal, priorOrderCount });
+            if (!result.ok) return { success: false, message: result.message ?? 'That code cannot be used.' };
+
             setAppliedCoupon(coupon);
-            return { success: true, message: "Coupon applied!" };
+            return { success: true, message: "Discount applied." };
         } catch (e) {
-            return { success: false, message: "Error validating coupon" };
+            return { success: false, message: "Could not check that code. Try again." };
         }
-    }, [firestore, subtotal]);
+    }, [firestore, subtotal, user]);
 
     const removeCoupon = useCallback(() => {
         setAppliedCoupon(null);
     }, []);
 
-    const discountAmount = useMemo(() => {
-        if (!appliedCoupon) return 0;
-        if (appliedCoupon.type === 'percentage') {
-            return (subtotal * appliedCoupon.value) / 100;
-        }
-        return appliedCoupon.value;
-    }, [appliedCoupon, subtotal]);
+    // Same maths the server uses, so the figure shown is the figure charged.
+    const discountAmount = useMemo(
+        () => (appliedCoupon ? computeDiscount(appliedCoupon, subtotal) : 0),
+        [appliedCoupon, subtotal],
+    );
 
     const addToCart = useCallback(async (product: any, options?: { quantity?: number, selectedSize?: string, selectedColor?: string }) => {
         // Block reserved/sold listings — already promised to another buyer.

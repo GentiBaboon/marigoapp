@@ -62,6 +62,7 @@ const CouponDialog = ({
     minOrderValue: 0,
     isActive: true,
     usageLimit: 0,
+    firstOrderOnly: false,
   });
 
   React.useEffect(() => {
@@ -75,6 +76,7 @@ const CouponDialog = ({
         minOrderValue: 0,
         isActive: true,
         usageLimit: 0,
+        firstOrderOnly: false,
       });
     }
   }, [coupon]);
@@ -158,6 +160,20 @@ const CouponDialog = ({
               type="number"
               value={formData.minOrderValue}
               onChange={(e) => setFormData({ ...formData, minOrderValue: parseFloat(e.target.value) })}
+            />
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <Label>First order only</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Redeemable only by a buyer with no previous orders — the welcome
+                discount. Enforced when the order is placed, not just here.
+              </p>
+            </div>
+            <Switch
+              className="mt-1"
+              checked={!!formData.firstOrderOnly}
+              onCheckedChange={(val) => setFormData({ ...formData, firstOrderOnly: val })}
             />
           </div>
           <div className="flex items-center justify-between">
@@ -313,6 +329,7 @@ export default function MarketingPage() {
                             <p className="font-bold text-lg flex items-center gap-2">
                               {coupon.code}
                               {!coupon.isActive && <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground uppercase">Inactive</span>}
+                              {coupon.firstOrderOnly && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase">1st order</span>}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {coupon.type === 'percentage' ? `${coupon.value}% off` : `${currencyFormatter.format(coupon.value)} off`} 

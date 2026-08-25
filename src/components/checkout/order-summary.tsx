@@ -3,6 +3,7 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useCart } from '@/context/CartContext';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -12,7 +13,7 @@ import { useFirestore } from '@/firebase';
 import { useCurrency } from '@/context/CurrencyContext';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { UNKNOWN_CITY } from '@/lib/shipping';
-import { Tag, X, Truck } from 'lucide-react';
+import { Tag, X, Truck, Loader2 } from 'lucide-react';
 
 /**
  * Resolve seller display names for the sellers in this basket.
@@ -55,8 +56,30 @@ function useSellerNames(sellerIds: string[]) {
 export function OrderSummary() {
   const {
     items, removeFromCart, subtotal, totalShipping, shippingGroups,
-    grandTotal, appliedCoupon, discountAmount,
+    grandTotal, appliedCoupon, discountAmount, applyCoupon, removeCoupon,
   } = useCart();
+
+  // Promo entry lives here as well as in the cart: a shopper who reaches
+  // checkout with a code in hand should not have to go back a step to use it.
+  // Both surfaces share CartContext, so applying in one is reflected in the
+  // other — and the server revalidates regardless.
+  const [codeInput, setCodeInput] = React.useState('');
+  const [applying, setApplying] = React.useState(false);
+  const [codeError, setCodeError] = React.useState<string | null>(null);
+
+  const handleApplyCode = async () => {
+    const code = codeInput.trim();
+    if (!code) return;
+    setApplying(true);
+    setCodeError(null);
+    const result = await applyCoupon(code);
+    if (result.success) {
+      setCodeInput('');
+    } else {
+      setCodeError(result.message);
+    }
+    setApplying(false);
+  };
   const { formatPrice } = useCurrency();
   const router = useRouter();
 
@@ -172,6 +195,49 @@ export function OrderSummary() {
             </div>
           ))}
         </div>
+
+        <Separator />
+
+        {/* Discount code */}
+        {appliedCoupon ? (
+          <div className="flex items-center justify-between rounded-lg border border-green-600/30 bg-green-600/5 px-3 py-2">
+            <span className="flex items-center gap-2 text-sm font-medium text-green-700 dark:text-green-500">
+              <Tag className="h-3.5 w-3.5" />
+              {appliedCoupon.code} applied
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => { removeCoupon(); setCodeError(null); }}
+            >
+              Remove
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <div className="flex gap-2">
+              <Input
+                value={codeInput}
+                onChange={(e) => { setCodeInput(e.target.value); setCodeError(null); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleApplyCode(); } }}
+                placeholder="Discount code"
+                aria-label="Discount code"
+                autoCapitalize="characters"
+                className="h-10 uppercase placeholder:normal-case"
+              />
+              <Button
+                variant="outline"
+                className="h-10 shrink-0"
+                onClick={handleApplyCode}
+                disabled={applying || !codeInput.trim()}
+              >
+                {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+              </Button>
+            </div>
+            {codeError && <p className="text-xs text-destructive">{codeError}</p>}
+          </div>
+        )}
 
         <Separator />
 
