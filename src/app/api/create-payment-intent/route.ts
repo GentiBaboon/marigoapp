@@ -9,6 +9,7 @@ import {
 } from '@/lib/firebase-admin';
 import { sendOrderConfirmation, sendSellerOrderNotification, sendAdminNewOrder } from '@/lib/email';
 import { paymentIntentLimiter, applyRateLimit } from '@/lib/rate-limit';
+import { validateCoupon } from '@/lib/coupons';
 import { acceptedOfferPrice } from '@/lib/offer-pricing';
 
 function getStripe() {
@@ -50,14 +51,30 @@ async function calculateOrderTotal(
     shippingFee = 0;
   }
 
+  // Coupon eligibility is decided here, not in the browser. validateCoupon()
+  // is the same function the cart calls for instant feedback, but only this
+  // side changes what anyone is charged.
   let discount = 0;
   if (couponCode) {
     const coupons = await firestoreQuery('coupons', 'code', couponCode.toUpperCase(), idToken);
     if (coupons.length > 0) {
       const { id: couponDocId, data: coupon } = coupons[0];
-      if (coupon.isActive && subtotal >= (coupon.minOrderValue || 0)) {
-        discount =
-          coupon.type === 'percentage' ? (subtotal * coupon.value) / 100 : coupon.value;
+
+      // Only a first-order coupon needs the buyer's history, so the query is
+      // paid for only when one is actually presented.
+      let priorOrderCount = 0;
+      if (coupon.firstOrderOnly && buyerId) {
+        const prior = await firestoreQuery('orders', 'buyerId', buyerId, idToken, 5);
+        // A cancelled order should not burn someone's welcome discount.
+        priorOrderCount = prior.filter((o) => o.data?.status !== 'cancelled').length;
+      }
+
+      const result = validateCoupon({ id: couponDocId, ...coupon } as any, {
+        subtotal,
+        priorOrderCount,
+      });
+      if (result.ok) {
+        discount = result.discount;
         await firestoreUpdate(
           'coupons',
           couponDocId,

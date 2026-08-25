@@ -65,8 +65,10 @@ export default function CheckoutPage() {
         <CheckoutSteps currentStep={step} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 lg:gap-16">
-        <div className="lg:col-span-2">
+      {/* 50/50 from lg up — the summary carries the promo field and the
+          per-seller breakdown now, so a third of the width crowded it. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-12">
+        <div>
             <AnimatePresence mode="wait">
                  <motion.div
                     key={step}
@@ -89,7 +91,7 @@ export default function CheckoutPage() {
             </AnimatePresence>
         </div>
 
-        <div className="lg:col-span-1 mt-12 lg:mt-0">
+        <div className="mt-12 lg:mt-0">
           <OrderSummary />
         </div>
       </div>

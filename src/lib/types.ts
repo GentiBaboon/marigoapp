@@ -615,6 +615,10 @@ export interface FirestoreCoupon {
   isActive: boolean;
   usedCount: number;
   usageLimit?: number;
+  /** Redeemable only by a buyer with no previous orders — the welcome-discount
+   *  case. Enforced server-side in the order routes, because a client check
+   *  alone is only a hint. */
+  firstOrderOnly?: boolean;
   createdAt: FirestoreTimestamp;
   updatedAt: FirestoreTimestamp;
 }

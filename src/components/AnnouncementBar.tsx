@@ -12,8 +12,8 @@ export function AnnouncementBar() {
     <div className="w-full bg-primary text-white">
       <p className="px-6 py-1.5 text-center text-[13px] leading-normal">
         <span className="font-semibold">First Time?</span>{' '}
-        Shop: 15% off with code{' '}
-        <span className="font-bold">WELCOME15</span>. Sell: No fees on your first sale.{' '}
+        Shop: 10% off your first order with code{' '}
+        <span className="font-bold">WELCOME10</span>. Sell: No fees on your first sale.{' '}
         <Link href="/auth/signup" className="font-semibold underline underline-offset-2 hover:no-underline">
           Get Started!
         </Link>
