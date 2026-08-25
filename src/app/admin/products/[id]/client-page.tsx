@@ -64,6 +64,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { resolveSizeOptions, resolveSizeSystems, normalizeSize } from '@/lib/size-options';
 import { buildProductPath, generateProductSlug, slugify, uniqueSlug, MAX_SLUG_LENGTH } from '@/lib/product-slug';
 import { SITE_URL } from '@/lib/site';
+import { buildMetaTitle, buildMetaDescription, MAX_META_TITLE, MAX_META_DESCRIPTION } from '@/lib/product-meta';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -264,26 +265,23 @@ export default function AdminProductReviewPage() {
     [categoryId, sizeSystem, sizeChartsRaw],
   );
 
-  // What the listing page will actually emit, mirroring the fallback chain in
-  // src/app/products/[id]/layout.tsx so the preview cannot claim one thing
+  // What the listing page will actually emit. Both call the same builders as
+  // src/app/products/[id]/layout.tsx, so the preview cannot claim one thing
   // while the page renders another.
-  const seoPreviewTitle = React.useMemo(() => {
-    if (seoTitle.trim()) return seoTitle.trim();
-    const brand = brandId?.trim() ?? '';
-    const startsWithBrand = !!brand && title.toLowerCase().startsWith(brand.toLowerCase());
-    const headline = startsWithBrand || !brand ? title : `${brand} ${title}`;
-    return headline ? `${headline} | MarigoApp` : 'MarigoApp';
-  }, [seoTitle, title, brandId]);
+  const metaSource = React.useMemo(
+    () => ({ title, description, brandId, categoryId, condition, color, material, size }),
+    [title, description, brandId, categoryId, condition, color, material, size],
+  );
 
-  const seoPreviewDescription = React.useMemo(() => {
-    if (seoDescription.trim()) return seoDescription.trim();
-    if (description.trim().length > 40) return description.trim().slice(0, 300);
-    const brand = brandId?.trim() ?? '';
-    const startsWithBrand = !!brand && title.toLowerCase().startsWith(brand.toLowerCase());
-    const headline = startsWithBrand || !brand ? title : `${brand} ${title}`;
-    const cond = condition ? ` in ${condition.replace(/-/g, ' ')} condition` : '';
-    return `${headline}${cond}. Buy authentic pre-owned luxury fashion on MarigoApp.`;
-  }, [seoDescription, description, title, brandId, condition]);
+  const seoPreviewTitle = React.useMemo(
+    () => seoTitle.trim() || buildMetaTitle(metaSource),
+    [seoTitle, metaSource],
+  );
+
+  const seoPreviewDescription = React.useMemo(
+    () => seoDescription.trim() || buildMetaDescription(metaSource),
+    [seoDescription, metaSource],
+  );
 
   const seoSlugLength = slugify(seoSlug).length;
   const seoTitleLength = seoPreviewTitle.length;
@@ -1039,28 +1037,48 @@ export default function AdminProductReviewPage() {
 
           {/* Meta title */}
           <div className="space-y-1.5">
-            <Label className="font-semibold text-sm">Meta title</Label>
+            <div className="flex items-center justify-between">
+              <Label className="font-semibold text-sm">Meta title</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSeoTitle(buildMetaTitle(metaSource))}
+              >
+                Generate
+              </Button>
+            </div>
             <Input
               value={seoTitle}
               onChange={e => setSeoTitle(e.target.value)}
               placeholder={seoPreviewTitle}
             />
-            <p className={cn('text-xs', seoTitleLength > 60 ? 'text-destructive' : 'text-muted-foreground')}>
-              {seoTitleLength}/60 — Google truncates past about 60 characters.
+            <p className={cn('text-xs', seoTitleLength > MAX_META_TITLE ? 'text-destructive' : 'text-muted-foreground')}>
+              {seoTitleLength}/{MAX_META_TITLE} — Google truncates past about {MAX_META_TITLE} characters.
             </p>
           </div>
 
           {/* Meta description */}
           <div className="space-y-1.5">
-            <Label className="font-semibold text-sm">Meta description</Label>
+            <div className="flex items-center justify-between">
+              <Label className="font-semibold text-sm">Meta description</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSeoDescription(buildMetaDescription(metaSource))}
+              >
+                Generate
+              </Button>
+            </div>
             <Textarea
               value={seoDescription}
               onChange={e => setSeoDescription(e.target.value)}
               placeholder={seoPreviewDescription}
               className="resize-y min-h-[80px]"
             />
-            <p className={cn('text-xs', seoDescriptionLength > 155 ? 'text-destructive' : 'text-muted-foreground')}>
-              {seoDescriptionLength}/155 — Google truncates past about 155 characters.
+            <p className={cn('text-xs', seoDescriptionLength > MAX_META_DESCRIPTION ? 'text-destructive' : 'text-muted-foreground')}>
+              {seoDescriptionLength}/{MAX_META_DESCRIPTION} — Google truncates past about {MAX_META_DESCRIPTION} characters.
             </p>
           </div>
 
