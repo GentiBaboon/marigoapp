@@ -17,6 +17,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { chatLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
 import { generateText } from '@/ai/models';
 import { ChatInputSchema } from '@/ai/flows/ai-chat';
@@ -62,6 +63,11 @@ function fallbackReply(language: ChatLocale, hasProducts: boolean): string {
 }
 
 export async function POST(request: NextRequest) {
+  // Rate limit before any model call — see src/lib/rate-limit.ts for why these
+  // routes are the cheapest way to take the whole AI surface down.
+  const limited = applyRateLimit(request, chatLimiter);
+  if (limited) return limited;
+
   let language: ChatLocale = 'en';
   let retrieval: Awaited<ReturnType<typeof retrieveForMessage>> = {
     products: [], facetLinks: [], matchedFacets: [], isProductQuery: false, isApproximate: false,

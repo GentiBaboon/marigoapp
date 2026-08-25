@@ -130,16 +130,50 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.googletagmanager.com https://js.stripe.com",
+              /**
+               * `unsafe-eval` is a **dev-only** allowance. React Refresh and the
+               * webpack HMR client compile modules with eval, so removing it
+               * locally breaks fast refresh — but a production bundle never
+               * calls eval, and leaving it on hands any injected script the
+               * easiest possible execution primitive.
+               *
+               * `unsafe-inline` has to stay for now: the App Router emits inline
+               * bootstrap and streaming-payload scripts, and dropping it needs
+               * per-request nonces, which cannot be issued from `headers()` in
+               * next.config.js — that is a middleware change and a separate
+               * piece of work.
+               */
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://apis.google.com https://www.googletagmanager.com https://js.stripe.com`,
+              // Inline event handlers (onclick="…") are a classic XSS sink and
+              // React never emits them, so this costs nothing and closes one.
+              "script-src-attr 'none'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "img-src 'self' data: blob: https: http:",
+              /**
+               * `http:` is gone — there is no legitimate plaintext image source
+               * and it was a mixed-content hole. `https:` deliberately stays:
+               * listings carry Supabase URLs that rotate with the project ref,
+               * Google sign-in supplies avatars from googleusercontent.com, and
+               * a too-narrow list here means silently broken images across the
+               * catalogue rather than a visible error.
+               */
+              "img-src 'self' data: blob: https:",
+              "media-src 'self' https: blob:",
               "font-src 'self' https://fonts.gstatic.com",
-              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.supabase.co wss://*.firebaseio.com https://api.stripe.com https://api.mailtrap.io https://*.google-analytics.com" + emulatorOrigins,
+              // Mailtrap is gone — superseded by SendGrid, which is called
+              // server-side and needs no browser origin at all.
+              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.supabase.co wss://*.firebaseio.com wss://*.firestore.googleapis.com https://api.stripe.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com" + emulatorOrigins,
               "frame-src 'self' https://js.stripe.com https://*.firebaseapp.com",
+              // The PWA service worker and manifest, which default-src would
+              // otherwise have to cover implicitly.
+              "worker-src 'self' blob:",
+              "manifest-src 'self'",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
               "frame-ancestors 'none'",
+              // Belt to HSTS's braces: rewrites any stray http:// subresource
+              // rather than blocking it outright.
+              ...(isDev ? [] : ['upgrade-insecure-requests']),
             ].join('; '),
           },
         ],

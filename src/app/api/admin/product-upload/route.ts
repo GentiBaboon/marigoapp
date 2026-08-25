@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminUploadLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { createClient } from '@supabase/supabase-js';
 import { verifyIdToken, firestoreGet } from '@/lib/firebase-admin';
 import { PRODUCT_IMAGES_BUCKET as BUCKET } from '@/lib/supabase';
@@ -11,6 +12,11 @@ function getSupabaseAdmin() {
 }
 
 export async function POST(request: NextRequest) {
+  // Rate limit before any model call — see src/lib/rate-limit.ts for why these
+  // routes are the cheapest way to take the whole AI surface down.
+  const limited = applyRateLimit(request, adminUploadLimiter);
+  if (limited) return limited;
+
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {

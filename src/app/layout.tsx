@@ -19,6 +19,8 @@ import { CookieBanner } from '@/components/CookieBanner';
 import { Footer } from '@/components/footer';
 import { NativeRouteBridge } from '@/components/platform/NativeRouteBridge';
 
+import { PresenceTracker } from '@/components/analytics/presence-tracker';
+
 const ChatbotWidget = dynamic(() => import('@/components/ai/ChatbotWidget').then(mod => mod.ChatbotWidget), {
   ssr: false,
 });
@@ -203,6 +205,7 @@ export default function RootLayout({
                             a hardcoded guess at the chrome above them. */}
                         <main className="flex flex-1 flex-col pb-nav-safe md:pb-0">{children}</main>
                         <ChatbotWidget />
+                        <PresenceTracker />
                         <MobileNav />
                         <ShoppingPreferenceModal />
                         <DownloadAppBanner />

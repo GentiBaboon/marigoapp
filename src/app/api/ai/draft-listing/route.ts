@@ -13,6 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { aiDraftListingLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
 import { generateText } from '@/ai/models';
 import { verifyIdToken } from '@/lib/firebase-admin';
@@ -46,6 +47,11 @@ const RequestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // Rate limit before any model call — see src/lib/rate-limit.ts for why these
+  // routes are the cheapest way to take the whole AI surface down.
+  const limited = applyRateLimit(request, aiDraftListingLimiter);
+  if (limited) return limited;
+
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {

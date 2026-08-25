@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { aiDescriptionLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
@@ -38,6 +39,11 @@ const generationPrompt = ai.definePrompt({
 });
 
 export async function POST(request: NextRequest) {
+  // Rate limit before any model call — see src/lib/rate-limit.ts for why these
+  // routes are the cheapest way to take the whole AI surface down.
+  const limited = applyRateLimit(request, aiDescriptionLimiter);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const parsed = GenerateDescriptionInputSchema.safeParse(body);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { stripeConnectLimiter, applyRateLimit } from '@/lib/rate-limit';
 import Stripe from 'stripe';
 import {
   verifyIdToken,
@@ -22,6 +23,11 @@ function getStripe() {
 }
 
 export async function POST(req: NextRequest) {
+  // Rate limit before any model call — see src/lib/rate-limit.ts for why these
+  // routes are the cheapest way to take the whole AI surface down.
+  const limited = applyRateLimit(req, stripeConnectLimiter);
+  if (limited) return limited;
+
   try {
     const authHeader = req.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {

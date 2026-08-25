@@ -129,6 +129,82 @@ export const otpVerifyLimiter = createRateLimiter('otp-verify', {
   windowSeconds: 10 * 60,
 });
 
+/**
+ * The AI routes — the most expensive thing an anonymous caller can reach.
+ *
+ * These are unauthenticated by design (the chatbot must answer signed-out
+ * visitors; the description and recommendation helpers are stateless), and
+ * they were also unlimited, which made them a quota-exhaustion vector rather
+ * than merely a cost one. The Google AI free tier 429s at roughly 20 requests
+ * (`generate_content_free_tier_requests`), and CLAUDE.md §13 records what that
+ * looks like from the outside: chat degrades to canned retrieval-only copy
+ * while pricing, descriptions and smart-search fail outright. A single script
+ * could take all of that down for every real visitor, for free.
+ *
+ * Budgets are per IP and sized to the honest use of each route, not to the
+ * model's price. Generous enough for a shared NAT, mean enough for a loop.
+ */
+export const chatLimiter = createRateLimiter('ai-chat', {
+  limit: 40,
+  windowSeconds: 10 * 60,
+});
+
+/** Listing copy: a seller regenerates a few times per listing. */
+export const aiDescriptionLimiter = createRateLimiter('ai-description', {
+  limit: 15,
+  windowSeconds: 10 * 60,
+});
+
+/** Homepage recommendations. Already cached per session, so a legitimate
+ *  visitor spends one of these per taste profile, not one per page view. */
+export const aiRecommendationsLimiter = createRateLimiter('ai-recommendations', {
+  limit: 30,
+  windowSeconds: 10 * 60,
+});
+
+/** Image generation — the priciest call in the app, and the slowest. */
+export const aiImageLimiter = createRateLimiter('ai-image', {
+  limit: 10,
+  windowSeconds: 10 * 60,
+});
+
+/** Multimodal draft-listing: nine photos in, a whole form out. Token-gated
+ *  already, so this only stops a signed-in account draining the quota. */
+export const aiDraftListingLimiter = createRateLimiter('ai-draft-listing', {
+  limit: 10,
+  windowSeconds: 10 * 60,
+});
+
+/** Stripe Connect onboarding. Each call can create a real connected account
+ *  at the platform, so an unbounded loop is an abuse problem at Stripe, not
+ *  just here. Nobody legitimately onboards twice in a minute. */
+export const stripeConnectLimiter = createRateLimiter('stripe-connect', {
+  limit: 5,
+  windowSeconds: 10 * 60,
+});
+
+/** Admin image ingest. Admin-only, so this is a backstop against a runaway
+ *  bulk import rather than an attacker. */
+export const adminUploadLimiter = createRateLimiter('admin-upload', {
+  limit: 60,
+  windowSeconds: 60,
+});
+
+/**
+ * Visitor heartbeats.
+ *
+ * Sized against the heartbeat interval, not against abuse: one visitor beats
+ * roughly every 45s, so a browser tab spends ~14 of these per 10 minutes. The
+ * ceiling is high because a shared NAT — an office, a campus, a mobile
+ * carrier — legitimately puts many real visitors behind one IP, and throttling
+ * them would silently under-count exactly the traffic this feature exists to
+ * measure. It still stops a script from filling the store.
+ */
+export const presenceLimiter = createRateLimiter('presence', {
+  limit: 400,
+  windowSeconds: 10 * 60,
+});
+
 // ── Helper to extract client IP ─────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from 'next/server';

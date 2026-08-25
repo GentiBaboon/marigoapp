@@ -1,4 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  ADMIN_GATE_COOKIE,
+  ADMIN_GATE_TTL_DAYS,
+  isGateEnabled,
+  isUnlockPath,
+  signGateCookie,
+  verifyGateCookie,
+} from '@/lib/admin-gate';
 
 /**
  * Next.js Edge Middleware
@@ -85,7 +93,7 @@ function generateCsrfToken(): string {
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const origin = request.headers.get('origin');
   const isNativeOrigin = Boolean(origin && NATIVE_ORIGINS.has(origin));
@@ -110,6 +118,73 @@ export function middleware(request: NextRequest) {
   const isProtectedPage = PROTECTED_ROUTES.some((r) => pathname.startsWith(r));
   const isAdminPage = ADMIN_ROUTES.some((r) => pathname.startsWith(r));
   const isCourierPage = COURIER_ROUTES.some((r) => pathname.startsWith(r));
+
+  // ── 1a. The masked door in front of /admin ──
+  // Runs before the auth redirect below on purpose: redirecting to
+  // /auth/login?redirect=/admin would announce the panel just as loudly as a
+  // 403 would. See src/lib/admin-gate.ts.
+  const gate = { unlockPath: process.env.ADMIN_UNLOCK_PATH, secret: process.env.ADMIN_GATE_SECRET };
+  if (isGateEnabled(gate)) {
+    // The secret path itself: mint the cookie and send them to the real panel.
+    // A redirect rather than a rewrite, so the secret does not linger in the
+    // address bar, in browser history, or in the Referer of the next request.
+    if (isUnlockPath(pathname, gate.unlockPath!)) {
+      const expiresAt = Date.now() + ADMIN_GATE_TTL_DAYS * 24 * 60 * 60 * 1000;
+      const unlocked = NextResponse.redirect(new URL('/admin', request.url));
+      unlocked.cookies.set(ADMIN_GATE_COOKIE, await signGateCookie(gate.secret!, expiresAt), {
+        httpOnly: true, // never readable by JS — nothing in the app needs it
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax', // survives arriving from a bookmark or another site
+        path: '/',
+        maxAge: ADMIN_GATE_TTL_DAYS * 24 * 60 * 60,
+      });
+      return unlocked;
+    }
+
+    if (isAdminPage) {
+      const unlockedAlready = await verifyGateCookie(
+        gate.secret!,
+        request.cookies.get(ADMIN_GATE_COOKIE)?.value,
+      );
+      if (!unlockedAlready) {
+        /**
+         * Rewritten so nothing matches, which makes Next answer 404.
+         *
+         * Two details, both learned by diffing the result against a real miss:
+         *
+         * 1. **No fixed sentinel.** Next embeds the rewritten pathname in the
+         *    streamed router payload, so a constant like `/__mg_absent` lands
+         *    in the HTML — and comparing the body with any other 404 then
+         *    shows `/admin` was handled specially, which is the one fact the
+         *    gate exists to hide. Only the original path is echoed here.
+         *
+         * 2. **Segment count is preserved.** A one-segment miss falls through
+         *    to the root `/[gender]` route, which calls `notFound()`; a
+         *    three-segment miss matches no route at all and gets Next's
+         *    built-in 404. Those render *different* HTML shells, so adding or
+         *    dropping a segment is itself a loud tell. Suffixing the first
+         *    segment keeps the request in the same comparison class.
+         *
+         * What remains is the suffix character in the echoed path. Removing
+         * even that would mean rendering the 404 body by hand and keeping it
+         * in step with Next's own across upgrades — a brittle trade for an
+         * attacker who, on a marketplace, would assume an admin panel anyway.
+         */
+        const [, first, ...rest] = pathname.split('/');
+        const missing = request.nextUrl.clone();
+        missing.pathname = `/${first}-${rest.length ? `/${rest.join('/')}` : ''}`;
+        return NextResponse.rewrite(missing, { status: 404 });
+      }
+    }
+  }
+
+  // Admin pages are never indexable. robots.txt already disallows /admin, but
+  // a disallowed URL can still be indexed from an inbound link — only a header
+  // or meta tag on a page the crawler is allowed to fetch actually removes it
+  // (the same reasoning as the /view routes in next-sitemap.config.js).
+  if (isAdminPage) {
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+  }
 
   if ((isProtectedPage || isAdminPage || isCourierPage) && !hasSession) {
     const loginUrl = request.nextUrl.clone();

@@ -180,8 +180,11 @@ Authenticated (gated by middleware §6):
 
 Courier (`/courier/*`, role-gated): `dashboard`, `jobs`, `delivery/[deliveryId]`, `earnings`, `profile`.
 
-Admin (`/admin/*`, role-gated). Sidebar entries map 1:1 to permissions from `src/lib/admin-permissions.ts`:
-`/admin` (dashboard), `products` (+ `[id]`), `orders` (+ `[id]`), `users`, `finance`, `marketing`, `logistics`, `moderation`, `disputes`, `refunds`, `returns`, `support`, `logs`, `settings`.
+Admin (`/admin/*`, role-gated, and **behind the masked gate in §6c**). Sidebar entries map 1:1 to permissions from `src/lib/admin-permissions.ts`:
+`/admin` (dashboard), `products` (+ `[id]`), `orders` (+ `[id]`), `users`, `analytics`, `finance`, `marketing`, `logistics`, `moderation`, `disputes`, `refunds`, `returns`, `support`, `logs`, `settings`.
+- **`/admin/analytics`** — live visitors (Redis, §9b) plus registration history
+  by date (Firestore). Two halves, two stores, on purpose: presence is
+  ephemeral and expires itself, signup history is durable.
 - **`/admin/danger/reset-orders`** — unlinked destructive operator tool: wipes every order, restocks products, decrements seller `salesCount`, and deletes the related returns/refunds/disputes/transactions. Two confirmation gates + typing `RESET`. Deliberately absent from navigation.
 
 API routes (`src/app/api/`):
@@ -200,6 +203,7 @@ API routes (`src/app/api/`):
 | `forgot-password` | — | Rate-limited; proxies the `sendPasswordResetLink` function with `RESET_SERVICE_SECRET` |
 | `auth/send-otp` | Bearer ID token | Rate-limited; mails a 6-digit activation code. The address comes from the **token's `email` claim**, never the body — otherwise a signed-in user could aim Marigo's mail at anyone |
 | `auth/verify-otp` | Bearer ID token | Rate-limited; checks the code and activates the account. Idempotent |
+| `presence` | POST: none (Bearer optional) · GET: Bearer + `analytics.view` | Visitor heartbeat in, live view out. The **only** writer to the presence store, so the write path is rate-limited rather than open (§9b). GET answers **404** to anyone without the permission |
 
 ## 5. Data model (Firestore)
 
@@ -312,6 +316,41 @@ decoration.
   production a valid code.
 - Google and Apple sign-in do not pass through this — those providers verify
   the address themselves.
+
+## 6c. The masked `/admin` door
+
+`src/lib/admin-gate.ts` + a block in `src/middleware.ts`. Visiting
+`ADMIN_UNLOCK_PATH` once per device mints an HMAC-signed httpOnly cookie
+(`__mg_gate`, 30 days); without it every `/admin/*` path answers **404**.
+
+**This is obscurity, not authentication.** `useAdminAuth`, `ROLE_PERMISSIONS`
+and the Firestore rules are still the things that stop an attacker. What it
+buys is that essentially all traffic hitting `/admin` is a scanner walking a
+wordlist, and a scanner cannot follow a door it never sees.
+
+- **404, never 403**, and the gate runs *before* the auth redirect — bouncing
+  to `/auth/login?redirect=/admin` advertises the panel as loudly as a 403.
+- **A signed cookie, not a renamed route.** Renaming to `/{secret}` means the
+  client router knows the secret, which puts it in the JS bundle. Here it is a
+  **server-only** env var and the 25 existing `/admin` links are untouched.
+- **The 404 must not be fingerprintable**, and two things nearly made it so:
+  - Next embeds the *rewritten* pathname in the streamed router payload, so a
+    fixed sentinel like `/__mg_absent` appeared in the HTML — diffing `/admin`
+    against any other 404 then revealed it was handled specially. Only the
+    original path is echoed now.
+  - **Segment count decides which 404 you get.** A one-segment miss falls
+    through to the root `/[gender]` route and calls `notFound()`; a
+    three-segment miss matches nothing and gets Next's built-in 404 — different
+    HTML shells. The rewrite suffixes the *first* segment so depth is
+    preserved. Verified at all three depths.
+- **Fails open when unset.** Both env vars blank means the gate is simply off
+  and `/admin` behaves as before. Failing closed on missing config would lock
+  an operator out with no way back that does not involve a deploy.
+- `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet` on admin responses.
+  robots.txt already disallows `/admin`, but a disallowed URL can still be
+  indexed from an inbound link.
+- The E2E spec asserts the *property* ("never reveals the panel"), not the
+  mechanism, because CI runs with the gate off.
 
 **Storage rules (`storage.rules`):** `users/{uid}/**` and `products/{uid}/{productId}/*` are owner-write / public-read; `deliveries/{id}/*` is signed-in read+write. All writes require an image content type under 10 MB. Note admin checks here use the custom claim **only** (no Firestore fallback).
 
@@ -608,6 +647,43 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
   `public/partners/` are what ships.
 - Error reporting: `src/lib/error-reporter.ts` (`reportError`, `reportWarning`) + `FirebaseErrorListener` mounted globally, fed by `src/firebase/error-emitter.ts`.
 
+## 9b. Live visitor presence
+
+`src/lib/presence.ts` + `/api/presence` + `usePresence()` (mounted from the
+root layout via `PresenceTracker`, so it covers signed-out shoppers — the
+majority).
+
+**Upstash Redis, not Firestore**, for two reasons:
+
+1. **There would be no safe way to write it.** Most shoppers browse signed out,
+   and with no service-account key a server route reaches Firestore with the
+   *caller's* token — so it cannot write on an anonymous visitor's behalf
+   either. Tracking them in Firestore would mean an unauthenticated write path,
+   i.e. an unmetered cost attack. The browser only ever talks to
+   `/api/presence`, which is IP rate-limited, and the Upstash credential stays
+   server-side.
+2. **Expiry.** Redis keys carry a TTL, so a closed tab disappears on its own.
+   The Firestore equivalent needs a scheduled sweep.
+
+- **Optional.** No `UPSTASH_*` env means the heartbeat no-ops and the panel
+  renders setup instructions. Every other page is unaffected — CI and previews
+  build clean.
+- **The heartbeat must send `x-csrf-token`.** Middleware exempts *Bearer*
+  requests from CSRF, and a signed-out visitor has no Bearer token — exactly
+  the visitor being counted. Without the double-submit header every anonymous
+  beat is rejected 403 and the live view only ever shows signed-in users.
+- **Backgrounded tabs stop beating** (`visibilitychange`), or a tab left open
+  reports as a live visitor forever and pays a write every 45s to say so.
+- **Identity comes from the token, never the body** — otherwise anyone could
+  populate the operator's live view with names of their choosing. An invalid
+  token is treated as anonymous rather than rejected.
+- **Session ids are validated (`/^[0-9a-f]{32}$/`) before becoming Redis keys.**
+- Stored deliberately: no IP, no raw user-agent — a coarse device class and the
+  path, which is all a live dashboard needs. `sessionStorage`, not
+  `localStorage`: a session is this tab, this visit, not a tracking id.
+- `PRESENCE_WINDOW_MS` (90s) is two heartbeats, so one dropped beat does not
+  blink a real visitor off the dashboard.
+
 ## 10. Commands (from `package.json`)
 
 ```
@@ -642,7 +718,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (505 passing): unit — `admin-permissions`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `product-card`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (572 passing): unit — `admin-permissions`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
@@ -670,6 +746,10 @@ SENDGRID_API_KEY / SENDGRID_FROM_EMAIL / SENDGRID_FROM_NAME
 MAILTRAP_TOKEN                 # legacy, superseded
 RESET_SERVICE_SECRET
 OTP_SECRET                    # signs the email activation codes; falls back to RESET_SERVICE_SECRET
+ADMIN_UNLOCK_PATH             # optional; secret path that unlocks /admin (§6c). SERVER-ONLY
+ADMIN_GATE_SECRET             # optional; signs the __mg_gate cookie. SERVER-ONLY
+UPSTASH_REDIS_REST_URL        # optional; live visitor presence (§9b)
+UPSTASH_REDIS_REST_TOKEN
 SITE_URL                      # optional; overrides the marigoapp.com default
 ```
 
@@ -677,6 +757,30 @@ SITE_URL                      # optional; overrides the marigoapp.com default
 
 ## 13. Known gotchas
 
+- **Rate-limit every route that spends money or model quota.** Four AI routes
+  (`/api/chat`, `generate-description`, `recommendations`, `remove-background`)
+  were unauthenticated *and* unlimited — and the Google AI free tier 429s at
+  ~20 requests, so anyone could take chat, pricing, descriptions and
+  smart-search down for free. All eight spending routes now call
+  `applyRateLimit` **before** the model call. A new AI or Stripe route inherits
+  this requirement.
+- **`toDate()` does not accept a plain `Date`.** It handles a string, a
+  Firestore `Timestamp` (`.toDate()`) and `{seconds}` — a bare `Date` has none
+  of those and comes back `null`. Test fixtures built from `new Date()`
+  silently count as "no value", which makes assertions pass against empty
+  output.
+- **CSP: production has no `unsafe-eval`.** It is dev-only, for React Refresh.
+  Anything needing runtime `eval`/`new Function` will work locally and fail in
+  production — verify against a real production build, not `npm run dev`.
+  `unsafe-inline` on `script-src` remains: the App Router emits inline
+  bootstrap scripts, and removing it needs per-request nonces from middleware,
+  which `headers()` in next.config.js cannot issue.
+- **Next.js advisories need a 16 major.** 14.2.35 is current here and *is*
+  patched against CVE-2025-29927 (the `x-middleware-subrequest` middleware
+  bypass) — verified, and load-bearing, since both the auth gate and §6c live
+  in middleware. The rest are DoS/cache-poisoning fixed only in Next 16, which
+  touches App Router APIs, `next-pwa` and the Capacitor static export. Its own
+  branch, not a drive-by.
 - **TS build errors are silenced** (`next.config.js` `typescript.ignoreBuildErrors: true`, `eslint.ignoreDuringBuilds: true`); CI typecheck is `continue-on-error`. Fix before flipping either flag.
 - `FirestoreTimestamp` is a union (`Timestamp | FieldValue | {seconds,nanoseconds}`) — use the `toDate()` helper in `src/lib/types.ts`, never `.toDate()` directly.
 - `src/app/page.tsx` is a splash redirect. Homepage work belongs in `src/app/home/page.tsx`.
