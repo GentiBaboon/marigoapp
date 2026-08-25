@@ -90,9 +90,9 @@ Locale: `<html lang="en">` — it must match the *server-rendered* content, and 
 **`/` is a splash screen that `router.replace('/home')`** — `/home` is the real homepage (client component, reads `?macroFilter=`). Don't add homepage content to `src/app/page.tsx`.
 
 Public:
-- `/` (splash) → `/home`. Section order is deliberate and lives in `src/app/home/page.tsx`: MacroFilters → HomepageBlocks → **Shop by Category** → **New In** → **50% OFF Preowned** → Personalized Picks → **Last Viewed**. Last Viewed is pinned last — it is a way back to something already seen, so it sits below everything still being discovered. Every section returns `null` when it has nothing to show, so the page has no empty headings.
+- `/` (splash) → `/home`. Section order is deliberate and lives in `src/app/home/page.tsx`: MacroFilters → HomepageBlocks → **Shop by Category** → **New In** → **50% OFF Preloved** → Personalized Picks → **Last Viewed**. Last Viewed is pinned last — it is a way back to something already seen, so it sits below everything still being discovered. Every section returns `null` when it has nothing to show, so the page has no empty headings.
   - Component names lag the headings: `NewArrivalsSection` renders "New In" and `RecentlyViewedSection` renders "Last Viewed".
-  - `DiscountedSection` ("50% OFF Preowned") filters on a **computed** discount, which Firestore cannot query — it pulls a 100-row pool and works out `(originalPrice − price) / originalPrice` per item, deepest markdown first. Threshold is **≥49%**, not 50, so an item at 35 ← 69 (49.3%) still qualifies. Sold listings are excluded here, unlike other rails: a half-price item you cannot buy is worse than one fewer card.
+  - `DiscountedSection` ("50% OFF Preloved") filters on a **computed** discount, which Firestore cannot query — it pulls a 100-row pool and works out `(originalPrice − price) / originalPrice` per item, deepest markdown first. Threshold is **≥49%**, not 50, so an item at 35 ← 69 (49.3%) still qualifies. Sold listings are excluded here, unlike other rails: a half-price item you cannot buy is worse than one fewer card.
   - Passing `?macroFilter=<id>` replaces the whole stack with `MacroFilteredProducts`.
     That component fetches by `documentId() in [...]` and filters status **in
     memory**. It must not add a second `in` clause: Firestore multiplies a
