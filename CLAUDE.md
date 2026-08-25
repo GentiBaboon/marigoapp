@@ -118,6 +118,14 @@ Public:
     reason: `/^\/([^/]+)\/([^/]+)$/` would rewrite `/admin/orders` into a
     category page.
 - `/products/[id]` (+ `layout.tsx` supplying server-rendered metadata and JSON-LD via `src/lib/product-seo.ts`)
+  - **Only `active` / `reserved` / `sold` are public** (`src/lib/product-visibility.ts`).
+    A `draft`, `pending_review`, `removed` or `expired` listing used to serve 200
+    with `index, follow` *and* Product JSON-LD — a moderation hole, not a
+    cosmetic one. The layout now emits `noindex` and no structured data for
+    those, and the page renders "This listing isn't available" with a generic
+    title. **The seller still sees their own** at any status; there is no admin
+    branch on that page because `useAdminAuth` redirects non-admins to `/home`
+    and would bounce every shopper — admins moderate from `/admin/products/[id]`.
 - `/delivery-partner` and `/delivery-partner/apply` — courier recruitment funnel
 - `/(onboarding)/welcome` — first-run flow
 
@@ -496,7 +504,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (429 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `category-url`, `email`, `platform-routes`, `product-meta`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (429 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `category-url`, `email`, `platform-routes`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
