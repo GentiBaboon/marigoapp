@@ -1,11 +1,16 @@
 import type { Metadata } from 'next';
-import { pageMetadata } from '@/lib/seo';
+import { pageMetadata, noindexMetadata } from '@/lib/seo';
 import { GENDER_LABELS, isGenderSegment } from '@/lib/category-url';
 
 type Props = { params: { gender: string }; children: React.ReactNode };
 
 export function generateMetadata({ params }: Props): Metadata {
-  const gender = isGenderSegment(params.gender) ? params.gender : 'women';
+  // The page calls notFound() for a segment that is not a gender, but a
+  // layout's metadata is resolved regardless — so defaulting to 'women' here
+  // titled every unmatched top-level URL "Women's Pre-Owned Luxury Fashion".
+  if (!isGenderSegment(params.gender)) return noindexMetadata('Page not found | MarigoApp');
+
+  const gender = params.gender;
   const label = GENDER_LABELS[gender];
 
   return pageMetadata({
