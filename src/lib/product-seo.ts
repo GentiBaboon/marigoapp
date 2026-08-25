@@ -53,6 +53,7 @@ export interface SeoProduct {
   sellerId?: string;
   /** Admin SEO overrides, set on the listing's SEO panel. See product-slug.ts. */
   seoSlug?: string;
+  seoSlugHistory?: string[];
   seoTitle?: string;
   seoDescription?: string;
 }
@@ -108,10 +109,45 @@ export async function fetchProductBySlug(slug: string): Promise<SeoProduct | nul
  * first, then the interim `slug--id` shape, then a bare document id. All three
  * are live in the wild.
  */
+/** Look a listing up by a slug it *used* to have, so renamed URLs keep working. */
+export async function fetchProductByHistoricSlug(slug: string): Promise<SeoProduct | null> {
+  if (!PROJECT || !API_KEY || !slug) return null;
+  try {
+    const res = await fetch(`${BASE}:runQuery?key=${API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'products' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'seoSlugHistory' },
+              op: 'ARRAY_CONTAINS',
+              value: { stringValue: slug },
+            },
+          },
+          limit: 1,
+        },
+      }),
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    const doc = (Array.isArray(rows) ? rows : []).find((r: any) => r?.document?.fields)?.document;
+    if (!doc) return null;
+    return { id: String(doc.name).split('/').pop() as string, ...decodeFields(doc.fields) } as SeoProduct;
+  } catch {
+    return null;
+  }
+}
+
 export async function resolveSeoProduct(param: string): Promise<SeoProduct | null> {
   if (!param) return null;
   const bySlug = await fetchProductBySlug(param);
   if (bySlug) return bySlug;
+  // A slug this listing used to have — renaming must not 404 an indexed URL.
+  const historic = await fetchProductByHistoricSlug(param);
+  if (historic) return historic;
   const id = extractProductId(param);
   return fetchProductForSeo(id);
 }

@@ -4,19 +4,22 @@ import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { PartnerLogos } from '@/components/PartnerLogos';
 
 export function Footer() {
   return (
     <footer className="bg-background border-t hidden md:block">
       <div className="container mx-auto py-12 px-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        {/* The brand column is wider than the link columns: it holds the
+            supporter logos, which overflowed into "Shop" at an even split. */}
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
           <div>
             <Logo size="md" className="mb-4" />
-            <p className="text-muted-foreground">More than a fashion marketplace.</p>
-            <div className="mt-4">
-              <LanguageSwitcher />
-            </div>
+            <p className="text-muted-foreground">Buy and Sell Fashion, Beauty and Art.</p>
+            {/* The language picker used to sit here. It offered a single
+                language, which is a control that only ever looks broken —
+                it comes back when there is a second one to switch to. */}
+            <PartnerLogos />
           </div>
           <div>
             <h3 className="font-semibold mb-4">Shop</h3>

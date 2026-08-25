@@ -312,6 +312,10 @@ export interface FirestoreProduct {
    *  whenever a typo was fixed, discarding whatever ranking it had.
    *  See src/lib/product-slug.ts. */
   seoSlug?: string;
+  /** Slugs this listing used to live at. A slug change rewrites a live URL, so
+   *  the old one is kept here and still resolves — it just canonicals to the
+   *  current slug, which consolidates any ranking instead of 404ing it. */
+  seoSlugHistory?: string[];
   /** Overrides the <title> and og:title on the listing page. Falls back to
    *  "{title} | {brand} | MarigoApp" when blank. */
   seoTitle?: string;
@@ -416,9 +420,24 @@ export interface FirestoreTransaction {
 
 // --- Shared Components ---
 export const addressSchema = z.object({
+  firstName: z.string().min(2, "First name is required"),
+  surname: z.string().min(2, "Surname is required"),
+  /**
+   * Composed from `firstName` + `surname` when the form is submitted, never
+   * typed directly.
+   *
+   * The name is captured as two fields because that is what a courier label
+   * and a customs form expect, but the delivery label, order confirmation,
+   * admin order view, courier pickup sheet and the order emails all read
+   * `fullName`. Splitting the input must not change what any of them read, so
+   * the composed value stays the stored one.
+   */
   fullName: z.string().min(2, "Full name is required"),
+  company: z.string().optional(),
   phone: z.string().min(6, "Valid phone number is required"),
   address: z.string().min(5, "Full street address is required"),
+  /** Apartment / suite / building. Optional — plenty of addresses have none. */
+  apartment: z.string().optional(),
   city: z.string().min(2, "City is required"),
   postal: z.string().min(3, "Postal code is required"),
   country: z.string().min(2, "Country is required"),

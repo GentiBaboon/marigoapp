@@ -124,7 +124,7 @@ export function AddressStep() {
                 </div>
             </CardContent>
              <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                <DialogContent>
+                <DialogContent className="max-h-[90dvh] overflow-y-auto pb-0">
                 <DialogHeader>
                     <DialogTitle>{editingAddress ? 'Edit Address' : 'Add New Address'}</DialogTitle>
                     <DialogDescription>

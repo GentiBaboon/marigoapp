@@ -40,7 +40,6 @@ import { useTranslation, type Locale } from '@/context/LanguageContext';
 import { useCart } from '@/context/CartContext';
 import { doc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { FirestoreUser } from '@/lib/types';
-import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationsPopover } from './header-popovers/NotificationsPopover';
 import { MessagesPopover } from './header-popovers/MessagesPopover';
 import { CartPopover } from './header-popovers/CartPopover';
@@ -208,14 +207,6 @@ export function UserNav() {
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
 
-          <DropdownMenuGroup className="sm:hidden">
-             <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1.5">
-              Language
-            </DropdownMenuLabel>
-            <LanguageSwitcher />
-            <DropdownMenuSeparator />
-          </DropdownMenuGroup>
-
           <DropdownMenuGroup>
             <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1.5">
               Support
@@ -250,7 +241,6 @@ export function UserNav() {
           </DropdownMenuLabel>
           <DropdownMenuRadioGroup value={currency} onValueChange={(value) => setCurrency(value as Currency)}>
               <DropdownMenuRadioItem value="EUR" className="cursor-pointer">Euro (EUR)</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="USD" className="cursor-pointer">US Dollar (USD)</DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="ALL" className="cursor-pointer">Albanian Lek (ALL)</DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
           
