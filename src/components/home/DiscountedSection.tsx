@@ -6,7 +6,7 @@ import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useShoppingPreference } from '@/hooks/use-shopping-preference';
 import type { FirestoreProduct } from '@/lib/types';
-import { ProductCard } from '@/components/product-card';
+import { ProductCard, toCardProduct } from '@/components/product-card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -88,20 +88,7 @@ export function DiscountedSection() {
             {products.map(p => (
               <ProductCard
                 key={p.id}
-                product={{
-                  id: p.id,
-                  brandId: p.brandId,
-                  title: p.title,
-                  price: p.price,
-                  originalPrice: p.originalPrice,
-                  images: p.images,
-                  sellerId: p.sellerId,
-                  size: p.size,
-                  condition: p.condition,
-                  color: p.color,
-                  vintage: p.vintage,
-                  status: p.status,
-                }}
+                product={toCardProduct(p)}
               />
             ))}
           </div>

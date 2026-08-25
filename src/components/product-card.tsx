@@ -12,8 +12,48 @@ import React from 'react';
 import { useCurrency } from '@/context/CurrencyContext';
 import type { FirestoreProduct } from '@/lib/types';
 
+/** Fields a ProductCard needs from a listing. */
+export type ProductCardProduct = Partial<FirestoreProduct> & {
+  id: string;
+  brand?: string;
+  image?: string;
+};
+
+/**
+ * Narrow a listing to what the card renders.
+ *
+ * Call sites used to hand-pick these fields inline, and every list drifted
+ * separately: `originalPrice` was missing from /search so results showed full
+ * price while the homepage showed the discount, and `seoSlug` was missing
+ * everywhere, so `buildProductPath` fell back to the raw id and every card
+ * linked to /products/draft_1786… instead of the readable URL.
+ *
+ * One function now decides, so a field added to the card reaches every surface
+ * at once instead of eight literals needing the same edit.
+ */
+export function toCardProduct(p: ProductCardProduct): ProductCardProduct {
+  return {
+    id: p.id,
+    brandId: p.brandId,
+    brand: p.brand,
+    title: p.title,
+    price: p.price,
+    originalPrice: p.originalPrice,
+    images: p.images,
+    image: p.image,
+    sellerId: p.sellerId,
+    size: p.size,
+    condition: p.condition,
+    color: p.color,
+    vintage: p.vintage,
+    status: p.status,
+    // Without this the card links to the raw document id.
+    seoSlug: p.seoSlug,
+  };
+}
+
 interface ProductCardProps {
-  product: Partial<FirestoreProduct> & { id: string; brand?: string; image?: string };
+  product: ProductCardProduct;
   className?: string;
 }
 

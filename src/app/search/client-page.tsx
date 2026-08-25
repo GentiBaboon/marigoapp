@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ProductCard } from '@/components/product-card';
+import { ProductCard, toCardProduct } from '@/components/product-card';
 import { SlidersHorizontal, Loader2, X, ChevronDown, Search as SearchIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -934,27 +934,7 @@ function ProductListPage() {
           <>
             <div className="grid grid-cols-2 gap-x-4 gap-y-8 mt-2">
               {products.map((p) => (
-                <ProductCard
-                  key={p.id}
-                  product={{
-                    id: p.id,
-                    brandId: p.brandId,
-                    title: p.title,
-                    price: p.price,
-                    // ProductCard derives the strike-through and the −% badge
-                    // from originalPrice; without it the card silently renders
-                    // as full price, which is how the homepage rails and these
-                    // results ended up disagreeing about the same listing.
-                    originalPrice: p.originalPrice,
-                    images: p.images,
-                    sellerId: p.sellerId,
-                    size: p.size,
-                    condition: p.condition,
-                    color: p.color,
-                    vintage: p.vintage,
-                    status: p.status,
-                  }}
-                />
+                <ProductCard key={p.id} product={toCardProduct(p)} />
               ))}
             </div>
             <InfiniteScrollSentinel
