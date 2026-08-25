@@ -15,7 +15,9 @@ import { useToast } from '@/hooks/use-toast';
 import type { MacroFilter, MacroFiltersConfig } from '@/components/home/MacroFilters';
 
 const DEFAULT_FILTERS: MacroFilter[] = [
-  { id: 'preowned', label: 'Preowned', enabled: false, productIds: [], memberIds: [] },
+  // Label only — the id stays `preowned` because /home?macroFilter=preowned is
+  // a live URL people have shared.
+  { id: 'preowned', label: 'Preloved', enabled: false, productIds: [], memberIds: [] },
   { id: 'new', label: 'New', enabled: false, productIds: [], memberIds: [] },
   { id: 'luxury', label: 'Luxury', enabled: false, productIds: [], memberIds: [] },
   { id: 'influencer', label: 'Influencer', enabled: false, productIds: [], memberIds: [] },

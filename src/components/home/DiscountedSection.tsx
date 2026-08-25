@@ -76,7 +76,7 @@ export function DiscountedSection() {
 
   return (
     <section>
-      <h2 className="text-xl md:text-2xl font-serif mb-6">50% OFF Preowned</h2>
+      <h2 className="text-xl md:text-2xl font-serif mb-6">50% OFF Preloved</h2>
 
       {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
