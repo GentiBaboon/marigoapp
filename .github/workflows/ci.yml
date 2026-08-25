@@ -3,13 +3,33 @@ name: CI
 on:
   push:
     branches: [main, marigoappv1.0]
+  # Every pull request, whatever its base.
+  #
+  # This used to be `branches: [main]`, so a PR stacked on another feature
+  # branch got no typecheck, no tests and no build — and because neither job is
+  # marked required, GitHub still reported the PR as CLEAN and it could be
+  # merged on the Vercel check alone. PR #28 reached that state.
+  #
+  # `reopened` and `edited` matter too: retargeting a PR fires `edited`, which
+  # is not in the default set, so a stacked PR rebased onto main after its
+  # parent merged would otherwise still show the parent's stale run — or none.
   pull_request:
-    branches: [main]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+# One live run per PR or branch. Pushing twice in quick succession otherwise
+# leaves the first run grinding through E2E for results nobody will read, while
+# holding a runner.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality:
     name: Lint, Type Check & Test
     runs-on: ubuntu-latest
+    # `edited` fires for title and body edits too; only a base change alters
+    # what needs testing.
+    if: github.event.action != 'edited' || github.event.changes.base != null
 
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +63,7 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: quality
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && (github.event.action != 'edited' || github.event.changes.base != null)
 
     steps:
       - uses: actions/checkout@v4
