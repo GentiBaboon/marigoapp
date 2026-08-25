@@ -10,6 +10,7 @@ import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { useRouteParams as useParams } from '@/lib/platform/use-route-param';
 import { extractProductId } from '@/lib/product-slug';
 import { canViewProduct } from '@/lib/product-visibility';
+import { NotFoundState } from '@/components/not-found-state';
 import {
   Heart,
   MessageSquare,
@@ -159,12 +160,9 @@ export default function ProductDetailPage() {
     }, [firestore, product?.id, product?.sellerId, user]);
 
     if (!slugLookupDone || isProductLoading || isUserLoading) return <ProductPageSkeleton />;
-    if (!product) return (
-        <div className="container mx-auto max-w-4xl px-4 py-8 text-center">
-            <h1 className="text-xl font-bold">Product not found</h1>
-            <Button asChild variant="link" className="mt-4"><Link href="/home">Go to Homepage</Link></Button>
-        </div>
-    );
+    // A slug that matches nothing — usually an old or mistyped link, so treat it
+    // as a missing page rather than a broken listing.
+    if (!product) return <NotFoundState variant="page" />;
 
     // A listing that is not published is not public. The seller keeps access to
     // their own — they need to see a draft or a pending item to work on it.
@@ -173,15 +171,11 @@ export default function ProductDetailPage() {
     // /home, so calling it on a public page would bounce every shopper. Admins
     // moderate from /admin/products/[id], which shows any status.
     if (!canViewProduct({ status: product.status, sellerId: product.sellerId, viewerId: user?.uid })) {
-        return (
-            <div className="container mx-auto max-w-4xl px-4 py-16 text-center">
-                <h1 className="text-xl font-bold">This listing isn&apos;t available</h1>
-                <p className="mt-2 text-muted-foreground">
-                    It may have been removed, or it is not published yet.
-                </p>
-                <Button asChild variant="link" className="mt-4"><Link href="/home">Go to Homepage</Link></Button>
-            </div>
-        );
+        // `sold` and `reserved` are public and render normally with their
+        // badges, so reaching here means draft / pending_review / removed /
+        // expired. The copy stays vague about which — none of those is the
+        // visitor's business.
+        return <NotFoundState variant="listing-unavailable" />;
     }
 
     const handleAddToCart = () => {

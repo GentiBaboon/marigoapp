@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
-import { pageMetadata } from '@/lib/seo';
+import { pageMetadata, noindexMetadata } from '@/lib/seo';
 import { GENDER_LABELS, isGenderSegment, titleiseSlug } from '@/lib/category-url';
 
 type Props = { params: { gender: string; category: string }; children: React.ReactNode };
 
 export function generateMetadata({ params }: Props): Metadata {
-  const gender = isGenderSegment(params.gender) ? params.gender : 'women';
+  // See the note in ../layout.tsx — metadata runs even when the page 404s.
+  if (!isGenderSegment(params.gender)) return noindexMetadata('Page not found | MarigoApp');
+
+  const gender = params.gender;
   const label = GENDER_LABELS[gender];
   const category = titleiseSlug(params.category);
 
