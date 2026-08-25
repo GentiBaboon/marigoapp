@@ -374,7 +374,7 @@ export function PricingStep() {
 
       {/* Address Selection Dialog */}
       <Dialog open={isAddrDialogOpen} onOpenChange={setIsAddrDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto pb-0">
             <DialogHeader>
                 <DialogTitle>{isAddingNew ? 'Add New Address' : 'Select Shipping Address'}</DialogTitle>
                 <DialogDescription>Where will you be shipping this item from?</DialogDescription>

@@ -159,9 +159,9 @@ export const PLATFORM_KNOWLEDGE = `
 # MarigoApp — what it is
 A marketplace for authentic pre-owned and new luxury fashion, serving Albania,
 Italy and the wider EU. Private individuals and registered brands sell; buyers
-browse, make offers, and buy. Prices are stored in EUR; the site can display
-EUR, ALL (Albanian lek) and USD via the currency switcher. Interface languages
-are English and Albanian.
+browse, make offers, and buy. Prices are stored in EUR; the site displays ALL
+(Albanian lek) by default and EUR if the visitor switches. The interface is in
+English.
 
 # Buying
 - Browse from the home page, or use the search icon in the header. Filter by
@@ -182,9 +182,10 @@ are English and Albanian.
 # Selling
 - You must be signed in to list an item. Selling starts at ${KNOWN_ROUTES.sell}
   — the "Sell" button sits in the top-right of the header on desktop.
-- The listing wizard has 8 steps: category → photos → details (brand, size,
-  condition, colour, material) → description → pricing → pickup address →
-  review → done.
+- The listing wizard has 6 steps then a confirmation: photos → category →
+  description → details (brand, size, condition, colour, material) → pricing →
+  review → done. There is no separate address step; the pickup address is
+  chosen on the review screen.
 - AI helps while listing: it can write the description for you and suggest a
   price from the item's details. There is also a background remover for photos.
 - New listings may go to "pending review" before appearing publicly. Statuses
@@ -210,6 +211,11 @@ are English and Albanian.
 
 # Delivery
 - Sellers hand items to a courier; couriers deliver and confirm with a signature.
+- Delivery is charged per city an order ships from: two sellers in the same city
+  share one fee, two cities cost two. A parcel crossing the Albania–Kosovo
+  border costs more than a domestic one, in either direction. The order summary
+  itemises this before payment.
+- Delivery addresses cover Albania and Kosovo.
 - Anyone can apply to become a courier at ${KNOWN_ROUTES.deliveryPartner}.
 
 # Returns, refunds and disputes

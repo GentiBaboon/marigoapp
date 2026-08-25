@@ -417,6 +417,15 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
     deliberately does *not* fall back to a derived slug: a derived slug is not
     in Firestore, so linking to it would 404. Run the backfill after importing
     listings, or they stay on ugly URLs.
+    - **Letter sizes are spelled out in the slug** (`sizeForSlug`): `S` becomes
+      `small`, not `-s`, which reads like a typo and is not a word anyone
+      searches. The stored `size` stays canonical `S` — the facet matches on
+      that. Numeric sizes are left alone (`-38`).
+    - **Renaming a slug rewrites a live URL.** The old one is pushed onto
+      `seoSlugHistory` and still resolves, canonicalled to the new slug, so
+      ranking moves across instead of 404ing. Resolution order is
+      slug → history → `slug--id` → id, on both the server
+      (`resolveSeoProduct`) and the client.
     - **Backfill has two front doors**: `scripts/backfill-slugs.mjs` (needs
       service-account credentials) and the **SEO tab in `/admin/settings`**,
       which does the same work from the browser using the admin's own session —
@@ -481,7 +490,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (283 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `category-url`, `email`, `platform-routes`, `product-meta`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (420 passing): unit/component — `admin-permissions`, `catalog-cache`, `chat-knowledge`, `chat-lexicon`, `cookies`, `csv-export`, `error-reporter`, `listing-taxonomy`, `category-url`, `email`, `platform-routes`, `product-meta`, `product-slug`, `rate-limit`, `size-options`, `types`, `product-card`, `confirm-action-dialog`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

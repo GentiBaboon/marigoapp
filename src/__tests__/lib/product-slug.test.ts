@@ -6,6 +6,7 @@ import {
   extractProductId,
   hasSlug,
   uniqueSlug,
+  sizeForSlug,
   MAX_SLUG_LENGTH,
 } from '@/lib/product-slug';
 
@@ -55,6 +56,17 @@ describe('generateProductSlug', () => {
     })).toBe('zara-heels-coral-38');
   });
 
+  // A slug ending "-s" reads like a typo or a stray plural; "small" is a word
+  // people search. The stored size stays canonical `S` either way.
+  it('spells out letter sizes but leaves numeric ones alone', () => {
+    expect(generateProductSlug({ id: 'x', title: 'Vest', brandId: 'Mango', size: 'S' }))
+      .toBe('mango-vest-small');
+    expect(generateProductSlug({ id: 'x', title: 'Bag', brandId: 'Guess', size: 'M' }))
+      .toBe('guess-bag-medium');
+    expect(generateProductSlug({ id: 'x', title: 'Heels', brandId: 'Gucci', size: '38' }))
+      .toBe('gucci-heels-38');
+  });
+
   it('does not repeat a colour already in the title', () => {
     expect(generateProductSlug({ id: 'x', title: 'Black Dress', brandId: 'Mango', color: 'black' }))
       .toBe('mango-black-dress');
@@ -74,6 +86,32 @@ describe('generateProductSlug', () => {
 
   it('returns empty when there is nothing to slug', () => {
     expect(generateProductSlug({ id: 'x' })).toBe('');
+  });
+});
+
+describe('sizeForSlug', () => {
+  it('maps every letter size to a readable word', () => {
+    expect(sizeForSlug('S')).toBe('small');
+    expect(sizeForSlug('M')).toBe('medium');
+    expect(sizeForSlug('L')).toBe('large');
+    expect(sizeForSlug('XS')).toBe('extra-small');
+    expect(sizeForSlug('XL')).toBe('extra-large');
+  });
+
+  it('is case-insensitive about the stored value', () => {
+    expect(sizeForSlug('s')).toBe('small');
+  });
+
+  it('passes through numeric and free-form sizes', () => {
+    expect(sizeForSlug('38')).toBe('38');
+    expect(sizeForSlug('38.5')).toBe('38-5');
+    expect(sizeForSlug('One Size')).toBe('one-size');
+  });
+
+  it('handles empty input', () => {
+    expect(sizeForSlug('')).toBe('');
+    expect(sizeForSlug(null)).toBe('');
+    expect(sizeForSlug(undefined)).toBe('');
   });
 });
 

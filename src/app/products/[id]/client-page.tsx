@@ -3,18 +3,12 @@
 
 import * as React from 'react';
 import Image from 'next/image';
+import { ProductGallery } from '@/components/product/ProductGallery';
+import { ProductBreadcrumb } from '@/components/product/ProductBreadcrumb';
 import Link from 'next/link';
 import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { useRouteParams as useParams } from '@/lib/platform/use-route-param';
 import { extractProductId } from '@/lib/product-slug';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselPrevious,
-  CarouselNext,
-  type CarouselApi,
-} from '@/components/ui/carousel';
 import {
   Heart,
   MessageSquare,
@@ -88,9 +82,16 @@ export default function ProductDetailPage() {
         if (!firestore || !routeParam) { setSlugLookupDone(true); return; }
         (async () => {
             try {
-                const snap = await getDocs(
+                let snap = await getDocs(
                     query(collection(firestore, 'products'), where('seoSlug', '==', routeParam), limit(1)),
                 );
+                // A slug this listing used to have — renaming must not 404 a
+                // URL that is already indexed or shared.
+                if (snap.empty) {
+                    snap = await getDocs(
+                        query(collection(firestore, 'products'), where('seoSlugHistory', 'array-contains', routeParam), limit(1)),
+                    );
+                }
                 if (!cancelled) setSlugMatchId(snap.empty ? null : snap.docs[0].id);
             } catch {
                 if (!cancelled) setSlugMatchId(null);
@@ -121,11 +122,7 @@ export default function ProductDetailPage() {
     const { addToCart } = useCart();
     const { toast } = useToast();
   
-    const [api, setApi] = React.useState<CarouselApi>();
-    const [current, setCurrent] = React.useState(0);
-    const [count, setCount] = React.useState(0);
     const [isOfferSheetOpen, setIsOfferSheetOpen] = React.useState(false);
-    const [failedImages, setFailedImages] = React.useState<Set<number>>(new Set());
     const [isChatLoading, setIsChatLoading] = React.useState(false);
     const [selectedSize, setSelectedSize] = React.useState<string | null>(null);
     const { isFavorite, addToWishlist, removeFromWishlist } = useWishlist();
@@ -141,13 +138,6 @@ export default function ProductDetailPage() {
 
     const isSeller = user?.uid === product?.sellerId;
     const isSoldOrReserved = product?.status === 'sold' || product?.status === 'reserved';
-
-    React.useEffect(() => {
-        if (!api) return;
-        setCount(api.scrollSnapList().length);
-        setCurrent(api.selectedScrollSnap() + 1);
-        api.on('select', () => setCurrent(api.selectedScrollSnap() + 1));
-    }, [api]);
 
     // Remember this product for the shopper's own "Last Viewed" rail. Separate
     // from the counter below: that one is the listing's public view count, this
@@ -223,56 +213,12 @@ export default function ProductDetailPage() {
     return (
       <div className="container mx-auto max-w-4xl px-0 md:px-4 py-6 md:py-10 pb-32 md:pb-10">
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
-          <div className="flex flex-col items-center">
-             <Carousel setApi={setApi} className="w-full relative">
-              <CarouselContent>
-                {(product.images ?? []).map((img, index) => {
-                    const imgUrl = typeof img === 'string' ? img : img?.url || '';
-                    const isValidUrl = imgUrl.startsWith('http') || imgUrl.startsWith('data:');
-                    return (
-                    <CarouselItem key={index}>
-                      <div className="aspect-[3/4] relative bg-muted rounded-lg overflow-hidden">
-                        {isValidUrl && !failedImages.has(index) ? (
-                        <Image
-                          src={imgUrl}
-                          alt={`${product.title} image ${index + 1}`}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 100vw, 50vw"
-                          priority={index === 0}
-                          unoptimized={imgUrl.startsWith('data:')}
-                          onError={() => setFailedImages(prev => new Set(prev).add(index))}
-                        />
-                        ) : (
-                        <div className="flex items-center justify-center h-full text-muted-foreground text-xs">Image unavailable</div>
-                        )}
-                      </div>
-                    </CarouselItem>
-                    );
-                  })}
-              </CarouselContent>
-               {count > 1 && (
-                <div className="absolute bottom-4 right-4 bg-black/50 text-white text-xs font-semibold rounded-full px-3 py-1.5">
-                    {current} / {count}
-                </div>
-              )}
-              {/* Pointer-only affordance: touch users already swipe, and the
-                  arrows would sit on top of the photo they came to look at.
-                  Both are stacked on the right so one thumb/cursor position
-                  steps through the whole gallery. */}
-              {count > 1 && (
-                <div className="pointer-events-none absolute inset-y-0 right-2 hidden items-center md:flex">
-                  <div className="pointer-events-auto flex flex-col gap-2">
-                    <CarouselPrevious
-                      className="static h-9 w-9 translate-x-0 translate-y-0 border-none bg-black/50 text-white opacity-80 shadow-none transition hover:bg-black/70 hover:text-white hover:opacity-100 disabled:opacity-30"
-                    />
-                    <CarouselNext
-                      className="static h-9 w-9 translate-x-0 translate-y-0 border-none bg-black/50 text-white opacity-80 shadow-none transition hover:bg-black/70 hover:text-white hover:opacity-100 disabled:opacity-30"
-                    />
-                  </div>
-                </div>
-              )}
-            </Carousel>
+          <div className="flex flex-col gap-6">
+            <ProductGallery images={product.images ?? []} title={product.title} />
+            {/* The category trail sits under the photos, where it reads as a
+                way back out to the wider catalogue rather than competing with
+                the brand name for the top of the page. */}
+            <ProductBreadcrumb product={product} className="px-4 md:px-0" />
           </div>
   
           {/* Tighter rhythm on phones, where the serif brand line and the

@@ -234,7 +234,10 @@ export default function AddressesPage() {
       </div>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent>
+        {/* dvh, not vh: iOS reports the expanded-toolbar height for vh, which
+            would push the panel past the visible area. The panel scrolls so the
+            form's pinned save button always has a bottom edge to sit on. */}
+        <DialogContent className="max-h-[90dvh] overflow-y-auto pb-0">
           <DialogHeader>
             <DialogTitle>{editingAddress ? 'Edit Address' : 'Add New Address'}</DialogTitle>
             <DialogDescription>
