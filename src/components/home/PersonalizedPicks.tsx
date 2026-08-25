@@ -37,6 +37,29 @@ function ProductCardSkeleton() {
  */
 const RECS_CACHE_KEY = 'marigo_reco_cache_v1';
 
+/**
+ * Heading for the rail, derived from the filter the query actually applied.
+ *
+ * It used to be the model's own `reasoning` string, which is free prose and
+ * regularly over-promised: the query below filters on **brandId only** when
+ * brands are present, yet the model would write "More H&M Shoes for you" over a
+ * rail containing an H&M knit two-piece set. A heading that names a category
+ * the query never constrained is simply wrong.
+ *
+ * Deriving it from the same value the query used makes that impossible.
+ */
+function buildTitle(q: { brands?: string[]; categories?: string[] } | undefined): string {
+  const brands = q?.brands?.filter(Boolean) ?? [];
+  const categories = q?.categories?.filter(Boolean) ?? [];
+
+  // Mirrors the query below: brands win, categories are the fallback.
+  if (brands.length === 1) return `More ${brands[0]} items for you`;
+  if (brands.length > 1) return 'More from brands you love';
+  if (categories.length === 1) return `More ${categories[0]} for you`;
+  if (categories.length > 1) return 'Picked for you';
+  return 'Curated for You';
+}
+
 type CachedRecommendation = { key: string; query: unknown; reasoning?: string };
 
 function tasteKey(input: RecommendationInput, gender: string | null): string {
@@ -166,7 +189,7 @@ export function PersonalizedPicks() {
 
                 setRecommendations({
                     products: fetchedProducts.slice(0, 8),
-                    title: recommendationQuery.reasoning || "Curated for You"
+                    title: buildTitle(recommendationQuery.query),
                 });
 
             } catch (error) {
