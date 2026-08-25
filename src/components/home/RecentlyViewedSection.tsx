@@ -12,7 +12,7 @@
 import * as React from 'react';
 import { useFirestore } from '@/firebase';
 import type { FirestoreProduct } from '@/lib/types';
-import { ProductCard } from '@/components/product-card';
+import { ProductCard, toCardProduct } from '@/components/product-card';
 import { PagedList } from '@/components/InfiniteScrollSentinel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRecentlyViewedIds } from '@/hooks/use-recently-viewed';
@@ -87,20 +87,7 @@ export function RecentlyViewedSection({ excludeId, title = 'Last Viewed' }: Rece
           {p => (
             <ProductCard
               key={p.id}
-              product={{
-                id: p.id,
-                brandId: p.brandId,
-                title: p.title,
-                price: p.price,
-                originalPrice: p.originalPrice,
-                images: p.images,
-                sellerId: p.sellerId,
-                size: p.size,
-                condition: p.condition,
-                color: p.color,
-                vintage: p.vintage,
-                status: p.status,
-              }}
+              product={toCardProduct(p)}
             />
           )}
         </PagedList>

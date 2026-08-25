@@ -39,7 +39,7 @@ vi.mock('@/lib/placeholder-images', () => ({
   PlaceHolderImages: [],
 }));
 
-import { ProductCard } from '@/components/product-card';
+import { ProductCard, toCardProduct } from '@/components/product-card';
 
 describe('ProductCard', () => {
   const baseProduct = {
@@ -136,5 +136,47 @@ describe('ProductCard', () => {
     render(<ProductCard product={baseProduct} />);
 
     expect(screen.getByRole('link')).toHaveAttribute('href', '/products/prod-1');
+  });
+});
+
+describe('toCardProduct', () => {
+  const full = {
+    id: 'p1',
+    brandId: 'Zara',
+    title: 'Snake Print Bag',
+    price: 15,
+    originalPrice: 35,
+    images: [{ url: 'https://x/a.jpg' }],
+    sellerId: 's1',
+    size: 'S',
+    condition: 'good-condition',
+    color: 'brown',
+    vintage: false,
+    status: 'active',
+    seoSlug: 'zara-snake-print-bag-brown-small',
+  } as any;
+
+  // The regression this exists to stop. Call sites used to hand-pick fields
+  // inline and each list drifted: originalPrice was missing from /search, and
+  // seoSlug was missing everywhere — so every card linked to /products/draft_…
+  // instead of the readable URL.
+  it.each(['seoSlug', 'originalPrice', 'id', 'title', 'price', 'images', 'status'])(
+    'carries %s through',
+    (field) => {
+      expect(toCardProduct(full)[field as keyof typeof full]).toEqual(full[field]);
+    },
+  );
+
+  it('produces a slug URL when the listing has one', () => {
+    render(<ProductCard product={toCardProduct(full)} />);
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      '/products/zara-snake-print-bag-brown-small',
+    );
+  });
+
+  it('falls back to the id URL when the listing has no slug', () => {
+    render(<ProductCard product={toCardProduct({ ...full, seoSlug: undefined })} />);
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/products/p1');
   });
 });

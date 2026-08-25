@@ -13,7 +13,7 @@ import { collection, query, where, documentId, getDocs } from 'firebase/firestor
 import { useFirestore, useUser } from '@/firebase';
 import { useWishlist } from '@/context/WishlistContext';
 import type { FirestoreProduct } from '@/lib/types';
-import { ProductCard } from '@/components/product-card';
+import { ProductCard, toCardProduct } from '@/components/product-card';
 import { PagedList } from '@/components/InfiniteScrollSentinel';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -110,20 +110,7 @@ export function FavoritesSection() {
           {p => (
             <ProductCard
               key={p.id}
-              product={{
-                id: p.id,
-                brandId: p.brandId,
-                title: p.title,
-                price: p.price,
-                originalPrice: p.originalPrice,
-                images: p.images,
-                sellerId: p.sellerId,
-                size: p.size,
-                condition: p.condition,
-                color: p.color,
-                vintage: p.vintage,
-                status: p.status,
-              }}
+              product={toCardProduct(p)}
             />
           )}
         </PagedList>

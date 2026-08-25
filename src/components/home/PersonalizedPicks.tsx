@@ -5,7 +5,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { collection, query, where, limit, documentId, getDocs, QueryConstraint } from 'firebase/firestore';
 import { useShoppingPreference } from '@/hooks/use-shopping-preference';
 import type { FirestoreProduct } from '@/lib/types';
-import { ProductCard } from '@/components/product-card';
+import { ProductCard, toCardProduct } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getRecommendations, RecommendationInput } from '@/ai/flows/get-recommendations';
 import { useWishlist } from '@/context/WishlistContext';
@@ -202,20 +202,7 @@ export function PersonalizedPicks() {
             ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
                     {recommendations?.products.map((p) => (
-                        <ProductCard key={p.id} product={{
-                            id: p.id,
-                            brandId: p.brandId,
-                            title: p.title,
-                            price: p.price,
-                            originalPrice: p.originalPrice,
-                            images: p.images,
-                            sellerId: p.sellerId,
-                            size: p.size,
-                            condition: p.condition,
-                            color: p.color,
-                            vintage: p.vintage,
-                            status: p.status,
-                        }} />
+                        <ProductCard key={p.id} product={toCardProduct(p)} />
                     ))}
                 </div>
             )}

@@ -6,7 +6,7 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useCatalog } from '@/hooks/use-catalog';
 import type { FirestoreProduct, FirestoreCategory } from '@/lib/types';
 import { useShoppingPreference } from '@/hooks/use-shopping-preference';
-import { ProductCard } from '@/components/product-card';
+import { ProductCard, toCardProduct } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -178,20 +178,7 @@ export function CategoriesSection() {
                     {items.map(p => (
                       <ProductCard
                         key={p.id}
-                        product={{
-                          id: p.id,
-                          brandId: p.brandId,
-                          title: p.title,
-                          price: p.price,
-                          originalPrice: p.originalPrice,
-                          images: p.images,
-                          sellerId: p.sellerId,
-                          size: p.size,
-                          condition: p.condition,
-                          color: p.color,
-                          vintage: p.vintage,
-                          status: p.status,
-                        }}
+                        product={toCardProduct(p)}
                       />
                     ))}
                   </div>

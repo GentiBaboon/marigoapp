@@ -5,7 +5,7 @@ import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useShoppingPreference } from '@/hooks/use-shopping-preference';
 import type { FirestoreProduct } from '@/lib/types';
-import { ProductCard } from '@/components/product-card';
+import { ProductCard, toCardProduct } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import Link from 'next/link';
@@ -75,20 +75,7 @@ export function NewArrivalsSection() {
                     <div className="flex space-x-4 pb-4">
                         {activeProducts?.map((p) => (
                                 <div key={p.id} className="w-48 flex-shrink-0">
-                                    <ProductCard product={{
-                                        id: p.id,
-                                        brandId: p.brandId,
-                                        title: p.title,
-                                        price: p.price,
-                                        originalPrice: p.originalPrice,
-                                        images: p.images,
-                                        sellerId: p.sellerId,
-                                        size: p.size,
-                                        condition: p.condition,
-                                        color: p.color,
-                                        vintage: p.vintage,
-                                        status: p.status,
-                                    }} />
+                                    <ProductCard product={toCardProduct(p)} />
                                 </div>
                         ))}
                     </div>
