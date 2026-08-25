@@ -94,6 +94,12 @@ Public:
   - Component names lag the headings: `NewArrivalsSection` renders "New In" and `RecentlyViewedSection` renders "Last Viewed".
   - `DiscountedSection` ("50% OFF Preowned") filters on a **computed** discount, which Firestore cannot query — it pulls a 100-row pool and works out `(originalPrice − price) / originalPrice` per item, deepest markdown first. Threshold is **≥49%**, not 50, so an item at 35 ← 69 (49.3%) still qualifies. Sold listings are excluded here, unlike other rails: a half-price item you cannot buy is worse than one fewer card.
   - Passing `?macroFilter=<id>` replaces the whole stack with `MacroFilteredProducts`.
+    That component fetches by `documentId() in [...]` and filters status **in
+    memory**. It must not add a second `in` clause: Firestore multiplies a
+    query's disjunctions and caps them at 30, so pairing 24 ids with 3 statuses
+    threw and the caller's `.catch` rendered it as an empty rail. Every filter
+    above 10 products was silently broken. It also re-sorts to the admin's
+    curated order, which a `documentId()` query does not preserve.
 - `/about`, `/help`, `/privacy`, `/terms`
 - `/browse` and `/browse/[...slug]` — filtered browsing (category/price/etc. via URL segments + params)
 - `/search` — search results, backed by the smart-search AI flow; overlay lives in `components/search/search-overlay.tsx`. The results grid itself is `search/client-page.tsx`, exported as `SearchResults` so the category routes can reuse it.

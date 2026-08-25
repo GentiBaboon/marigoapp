@@ -21,30 +21,46 @@ function ProductCardSkeleton() {
   );
 }
 
+/** Statuses a macro filter will display. Anything else — draft, pending_review,
+ *  removed — is tagged but not yet public, so it is filtered out below. */
+const DISPLAYABLE = ['active', 'reserved', 'sold'];
+
 async function fetchProductsByIds(
   firestore: any,
   productIds: string[]
 ): Promise<FirestoreProduct[]> {
   if (productIds.length === 0) return [];
-  // Firestore 'in' supports up to 30 values — batch if needed
+
+  // One `in` clause per query, and status filtered in memory afterwards.
+  //
+  // This used to combine `where(documentId(), 'in', batch)` with
+  // `where('status', 'in', [...])`. Firestore caps a query's disjunctions at 30
+  // and multiplies them, so a 24-id batch became 24 x 3 = 72 and the whole
+  // query threw — which the caller's `.catch` turned into an empty rail. The
+  // Preowned filter had 24 products tagged and rendered "No active products in
+  // this filter yet", while New (6) and Designers (3) stayed under the cap and
+  // looked fine. Any filter above 10 products was silently broken.
   const results: FirestoreProduct[] = [];
-  const batches = [];
+  const batches: string[][] = [];
   for (let i = 0; i < productIds.length; i += 30) {
     batches.push(productIds.slice(i, i + 30));
   }
   await Promise.all(
     batches.map(async (batch) => {
       const snap = await getDocs(
-        query(
-          collection(firestore, 'products'),
-          where(documentId(), 'in', batch),
-          where('status', 'in', ['active', 'reserved', 'sold'])
-        )
+        query(collection(firestore, 'products'), where(documentId(), 'in', batch)),
       );
-      snap.docs.forEach((d) => results.push({ id: d.id, ...d.data() } as FirestoreProduct));
+      snap.docs.forEach((d) => {
+        const product = { id: d.id, ...d.data() } as FirestoreProduct;
+        if (DISPLAYABLE.includes(product.status)) results.push(product);
+      });
     })
   );
-  return results;
+
+  // Restore the admin's ordering — Firestore returns documents by id, which
+  // has nothing to do with the order they were curated in.
+  const rank = new Map(productIds.map((id, i) => [id, i]));
+  return results.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
 }
 
 interface Props {
@@ -76,7 +92,12 @@ export function MacroFilteredProducts({ filterId }: Props) {
     setProductsLoading(true);
     fetchProductsByIds(firestore, productIds)
       .then(setProducts)
-      .catch(() => setProducts([]))
+      .catch((err) => {
+        // Was a bare `setProducts([])`, which made a broken query and an empty
+        // filter look identical — the reason this went unnoticed.
+        console.error('[MacroFilteredProducts] failed to load products:', err);
+        setProducts([]);
+      })
       .finally(() => setProductsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firestore, configLoading, productIdsKey]);
