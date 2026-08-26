@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { verifyIdToken, firestoreGet, firestoreUpdate } from '@/lib/firebase-admin';
+import { verifyIdToken, firestoreGet, firestoreUpdate, firestoreCreate, firestoreQuery } from '@/lib/firebase-admin';
+import { sendOrderConfirmation, sendSellerOrderNotification, sendAdminNewOrder } from '@/lib/email';
 import { decrementStockForItems } from '@/lib/inventory-server';
 import { paymentIntentLimiter, applyRateLimit } from '@/lib/rate-limit';
 
@@ -100,6 +101,110 @@ export async function POST(req: NextRequest) {
     );
 
     await decrementStockForItems(order.items || [], idToken);
+
+    // Everything below is the announcement that a sale happened, so it belongs
+    // here rather than at intent creation: none of it is true until the money
+    // is held. All of it is best-effort — the payment is captured and the
+    // order is moved, so a failed email must not fail the request.
+    const items: any[] = Array.isArray(order.items) ? order.items : [];
+    const sellerIds: string[] = Array.isArray(order.sellerIds) ? order.sellerIds : [];
+    const orderNumber = order.orderNumber || orderId;
+    const firstItem: any = items[0] || {};
+    const productTitle: string = firstItem.title || `#${orderNumber}`;
+
+    // The coupon's use is spent now, not when the intent was created — an
+    // abandoned checkout used to burn a single-use code for an order that
+    // never happened.
+    if (order.couponCode) {
+      try {
+        const coupons = await firestoreQuery('coupons', 'code', String(order.couponCode).toUpperCase(), idToken);
+        if (coupons.length > 0) {
+          const { id: couponDocId, data: coupon } = coupons[0];
+          await firestoreUpdate(
+            'coupons',
+            couponDocId,
+            { usedCount: (coupon.usedCount || 0) + 1 },
+            idToken,
+          );
+        }
+      } catch (e) {
+        console.warn('[confirm-order] coupon usage not recorded', e);
+      }
+    }
+
+    const buyerData = await firestoreGet('users', buyerId, idToken).catch(() => null);
+    if (buyerData?.email) {
+      sendOrderConfirmation({
+        buyerEmail: buyerData.email,
+        buyerName: buyerData.name || 'Customer',
+        orderNumber,
+        orderId,
+        items,
+        totalAmount: order.totalAmount,
+        paymentMethod: 'card',
+        shippingAddress: order.shippingAddress,
+      }).catch(console.error);
+    }
+
+    for (const sellerId of sellerIds) {
+      const sellerData = await firestoreGet('users', sellerId, idToken).catch(() => null);
+      if (sellerData?.email) {
+        sendSellerOrderNotification({
+          sellerEmail: sellerData.email,
+          sellerName: sellerData.name || 'Seller',
+          orderNumber,
+          orderId,
+          items: items.filter((i: any) => i.sellerId === sellerId),
+          totalAmount: order.totalAmount,
+        }).catch(console.error);
+      }
+      firestoreCreate(
+        'notifications',
+        {
+          userId: sellerId,
+          title: `New sale — ${productTitle}`,
+          message: 'You have a new order to prepare.',
+          type: 'order_update',
+          read: false,
+          createdAt: now,
+          data: firstItem.image
+            ? { link: `/profile/listings/sales/${orderId}`, imageUrl: firstItem.image }
+            : { link: `/profile/listings/sales/${orderId}` },
+        },
+        idToken,
+      ).catch((e) => console.warn('seller notification failed', e));
+    }
+
+    firestoreCreate(
+      'notifications',
+      {
+        userId: buyerId,
+        title: `${productTitle} — Order placed`,
+        message: 'Your order has been received.',
+        type: 'order_update',
+        read: false,
+        createdAt: now,
+        data: firstItem.image
+          ? { link: `/profile/orders/${orderId}`, imageUrl: firstItem.image }
+          : { link: `/profile/orders/${orderId}` },
+      },
+      idToken,
+    ).catch((e) => console.warn('buyer notification failed', e));
+
+    // Operational alert. The card is authorised, not captured, at this point —
+    // the template says so, because an admin reading it must not assume the
+    // money has moved.
+    sendAdminNewOrder({
+      orderNumber,
+      orderId,
+      buyerName: buyerData?.displayName || buyerData?.name,
+      buyerEmail: buyerData?.email,
+      items,
+      totalAmount: order.totalAmount,
+      paymentMethod: 'card',
+      sellerCount: sellerIds.length,
+      shippingAddress: order.shippingAddress,
+    }).catch(console.error);
 
     return NextResponse.json({ ok: true, status: 'processing' });
   } catch (error: any) {

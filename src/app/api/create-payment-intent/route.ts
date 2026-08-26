@@ -8,7 +8,6 @@ import {
   firestoreUpdate,
   firestoreCreate,
 } from '@/lib/firebase-admin';
-import { sendOrderConfirmation, sendSellerOrderNotification, sendAdminNewOrder } from '@/lib/email';
 import { paymentIntentLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { validateCoupon } from '@/lib/coupons';
 import { acceptedOfferPrice } from '@/lib/offer-pricing';
@@ -25,6 +24,14 @@ async function calculateOrderTotal(
   idToken: string,
   /** The buyer, so an accepted offer on a line can be honoured. */
   buyerId?: string,
+  /**
+   * Whether to spend the coupon's use here.
+   *
+   * False on the card path: this runs before the card is confirmed, so an
+   * abandoned checkout burned a single-use code for an order that never
+   * happened. `/api/confirm-order` spends it once the money is held.
+   */
+  consumeCoupon = true,
 ) {
   let subtotal = 0;
   const sellerIds = new Set<string>();
@@ -85,12 +92,14 @@ async function calculateOrderTotal(
       });
       if (result.ok) {
         discount = result.discount;
-        await firestoreUpdate(
-          'coupons',
-          couponDocId,
-          { usedCount: (coupon.usedCount || 0) + 1 },
-          idToken
-        );
+        if (consumeCoupon) {
+          await firestoreUpdate(
+            'coupons',
+            couponDocId,
+            { usedCount: (coupon.usedCount || 0) + 1 },
+            idToken
+          );
+        }
       }
     }
   }
@@ -140,6 +149,9 @@ export async function POST(req: NextRequest) {
       couponCode,
       idToken,
       buyerId,
+      // Validated and discounted, but not spent — the card has not been
+      // confirmed yet. /api/confirm-order spends it.
+      false,
     );
 
     const totalInCents = Math.round(total * 100);
@@ -217,88 +229,15 @@ export async function POST(req: NextRequest) {
       idToken
     );
 
-    // Send emails (non-blocking)
-    if (buyerData?.email) {
-      sendOrderConfirmation({
-        buyerEmail: buyerData.email,
-        buyerName: buyerData.name || 'Customer',
-        orderNumber,
-        orderId,
-        items: validatedItems,
-        totalAmount: total,
-        paymentMethod: 'card',
-        shippingAddress,
-      }).catch(console.error);
-    }
-
-    for (const sellerId of sellerIds) {
-      const sellerData = await firestoreGet('users', sellerId, idToken).catch(() => null);
-      if (sellerData?.email) {
-        sendSellerOrderNotification({
-          sellerEmail: sellerData.email,
-          sellerName: sellerData.name || 'Seller',
-          orderNumber,
-          orderId,
-          items: validatedItems.filter((i: any) => i.sellerId === sellerId),
-          totalAmount: total,
-        }).catch(console.error);
-      }
-      const firstItem: any = validatedItems[0] || {};
-      const productTitle: string = firstItem.title || `#${orderNumber}`;
-      const sellerNotifData = firstItem.image
-        ? { link: `/profile/listings/sales/${orderId}`, imageUrl: firstItem.image }
-        : { link: `/profile/listings/sales/${orderId}` };
-      firestoreCreate(
-        'notifications',
-        {
-          userId: sellerId,
-          title: `New sale — ${productTitle}`,
-          message: 'You have a new order to prepare.',
-          type: 'order_update',
-          read: false,
-          createdAt,
-          data: sellerNotifData,
-        },
-        idToken,
-      ).catch((e) => console.warn('seller notification failed', e));
-    }
-
-    // In-app notification for the buyer.
-    {
-      const firstItem: any = validatedItems[0] || {};
-      const productTitle: string = firstItem.title || `#${orderNumber}`;
-      const buyerData = firstItem.image
-        ? { link: `/profile/orders/${orderId}`, imageUrl: firstItem.image }
-        : { link: `/profile/orders/${orderId}` };
-      firestoreCreate(
-        'notifications',
-        {
-          userId: buyerId,
-          title: `${productTitle} — Order placed`,
-          message: 'Your order has been received.',
-          type: 'order_update',
-          read: false,
-          createdAt,
-          data: buyerData,
-        },
-        idToken,
-      ).catch((e) => console.warn('buyer notification failed', e));
-    }
-
-    // Operational alert. The card is authorised, not captured, at this point —
-    // the template says so, because an admin reading this must not assume the
-    // money has moved.
-    sendAdminNewOrder({
-      orderNumber,
-      orderId,
-      buyerName: buyerData?.displayName || buyerData?.name,
-      buyerEmail: buyerData?.email,
-      items: validatedItems,
-      totalAmount: total,
-      paymentMethod: 'card',
-      sellerCount: sellerIds.length,
-      shippingAddress,
-    }).catch(console.error);
+    // No emails, no notifications, no coupon spend here.
+    //
+    // All of it used to fire before `stripe.confirmCardPayment`, so an
+    // abandoned or declined checkout still told the buyer their order was
+    // confirmed, told the seller they had sold the item, and alerted the
+    // operator to a sale — for money that never arrived. Telling a seller
+    // their item is gone when it is not is the worst of those.
+    //
+    // /api/confirm-order does all of it, once Stripe says the money is held.
 
     return NextResponse.json({ clientSecret: pi.client_secret, orderId });
   } catch (err: any) {

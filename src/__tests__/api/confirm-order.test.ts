@@ -3,10 +3,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockVerify = vi.fn();
 const mockGet = vi.fn();
 const mockUpdate = vi.fn().mockResolvedValue(undefined);
+const mockCreate = vi.fn().mockResolvedValue('n1');
+const mockQuery = vi.fn().mockResolvedValue([]);
 vi.mock('@/lib/firebase-admin', () => ({
   verifyIdToken: (...a: any[]) => mockVerify(...a),
   firestoreGet: (...a: any[]) => mockGet(...a),
   firestoreUpdate: (...a: any[]) => mockUpdate(...a),
+  firestoreCreate: (...a: any[]) => mockCreate(...a),
+  firestoreQuery: (...a: any[]) => mockQuery(...a),
+}));
+
+const mockBuyerEmail = vi.fn().mockResolvedValue(undefined);
+const mockSellerEmail = vi.fn().mockResolvedValue(undefined);
+const mockAdminEmail = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/lib/email', () => ({
+  sendOrderConfirmation: (...a: any[]) => mockBuyerEmail(...a),
+  sendSellerOrderNotification: (...a: any[]) => mockSellerEmail(...a),
+  sendAdminNewOrder: (...a: any[]) => mockAdminEmail(...a),
 }));
 
 const mockRetrieve = vi.fn();
@@ -60,6 +73,8 @@ describe('POST /api/confirm-order', () => {
     mockRetrieve.mockResolvedValue({ status: 'requires_capture' });
     mockUpdate.mockResolvedValue(undefined);
     mockDecrement.mockResolvedValue(undefined);
+    mockCreate.mockResolvedValue('n1');
+    mockQuery.mockResolvedValue([]);
   });
 
   it('takes the stock once payment is really held', async () => {
@@ -125,5 +140,64 @@ describe('POST /api/confirm-order', () => {
     const res = await POST(req({ orderId: 'o1' }));
     expect(res.status).toBe(400);
     expect(mockDecrement).not.toHaveBeenCalled();
+  });
+
+  // ── side effects that used to fire before the card was confirmed ──────────
+
+  it('emails the buyer, the seller and the operator only after payment', async () => {
+    mockGet.mockImplementation(async (col: string) =>
+      col === 'orders'
+        ? { ...ORDER, sellerIds: ['s1'], orderNumber: 'MG-1', totalAmount: 50 }
+        : { email: 'someone@example.com', name: 'Someone' },
+    );
+    await POST(req({ orderId: 'o1' }));
+    expect(mockBuyerEmail).toHaveBeenCalledTimes(1);
+    expect(mockSellerEmail).toHaveBeenCalledTimes(1);
+    expect(mockAdminEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends nothing when Stripe says the payment did not complete', async () => {
+    mockRetrieve.mockResolvedValue({ status: 'requires_payment_method' });
+    await POST(req({ orderId: 'o1' }));
+    // The seller must never be told they sold something that was not paid for.
+    expect(mockSellerEmail).not.toHaveBeenCalled();
+    expect(mockBuyerEmail).not.toHaveBeenCalled();
+    expect(mockAdminEmail).not.toHaveBeenCalled();
+  });
+
+  it('does not re-send on a second call', async () => {
+    mockGet.mockResolvedValue({ ...ORDER, status: 'processing' });
+    await POST(req({ orderId: 'o1' }));
+    expect(mockBuyerEmail).not.toHaveBeenCalled();
+    expect(mockSellerEmail).not.toHaveBeenCalled();
+  });
+
+  it('spends the coupon use here, not at intent time', async () => {
+    mockGet.mockImplementation(async (col: string) =>
+      col === 'orders' ? { ...ORDER, couponCode: 'WELCOME10' } : { email: 'b@x.com' },
+    );
+    mockQuery.mockResolvedValue([{ id: 'c1', data: { usedCount: 4 } }]);
+    await POST(req({ orderId: 'o1' }));
+    const couponWrite = mockUpdate.mock.calls.find(c => c[0] === 'coupons');
+    expect(couponWrite?.[2]).toEqual({ usedCount: 5 });
+  });
+
+  it('does not spend a coupon when the payment failed', async () => {
+    mockRetrieve.mockResolvedValue({ status: 'canceled' });
+    mockGet.mockResolvedValue({ ...ORDER, couponCode: 'WELCOME10' });
+    await POST(req({ orderId: 'o1' }));
+    expect(mockUpdate.mock.calls.find(c => c[0] === 'coupons')).toBeUndefined();
+  });
+
+  it('still succeeds when an email throws', async () => {
+    mockGet.mockImplementation(async (col: string) =>
+      col === 'orders' ? { ...ORDER } : { email: 'b@x.com' },
+    );
+    mockBuyerEmail.mockRejectedValueOnce(new Error('sendgrid down'));
+    const res = await POST(req({ orderId: 'o1' }));
+    // The money is held and the stock is taken; a failed email is not a
+    // reason to tell the buyer their order failed.
+    expect(res.status).toBe(200);
+    expect(mockDecrement).toHaveBeenCalled();
   });
 });
