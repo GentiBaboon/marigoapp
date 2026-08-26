@@ -25,7 +25,11 @@ import {
 } from '@/lib/presence';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+// No `export const dynamic = 'force-dynamic'` here. It is refused outright by
+// `output: 'export'` — the Capacitor build — and it bought nothing: both
+// handlers read `req.headers` and the POST reads `req.json()`, so Next already
+// treats them as dynamic and never statically optimises them. Adding it back
+// breaks the iOS and Android builds while changing nothing on the web.
 
 function bearer(req: NextRequest): string | null {
   const header = req.headers.get('authorization') ?? '';

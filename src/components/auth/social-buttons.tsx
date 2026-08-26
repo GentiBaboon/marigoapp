@@ -1,11 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/firebase';
 import { usePostAuthRedirect } from '@/hooks/use-post-auth-redirect';
-import { signInWithGoogle, signInWithApple } from '@/firebase/auth/actions';
+import {
+  signInWithGoogle,
+  signInWithApple,
+  completeOAuthRedirect,
+} from '@/firebase/auth/actions';
 import { useToast } from '@/hooks/use-toast';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -36,10 +40,42 @@ const AppleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export function SocialButtons({ variant = 'outline', className }: { variant?: ButtonProps['variant'], className?: string}) {
   const [loading, setLoading] = useState<null | 'google' | 'apple'>(null);
+  // True while a returning redirect is being claimed, so the buttons stay
+  // disabled instead of inviting a second sign-in on top of one completing.
+  const [resumingRedirect, setResumingRedirect] = useState(true);
   const router = useRouter();
   const nextPath = usePostAuthRedirect();
   const auth = useAuth();
   const { toast } = useToast();
+
+  // Claims the credential waiting after a full-page redirect. Without this the
+  // redirect path is a dead end — the provider sends the user back, Firebase is
+  // holding the result, and the sign-in screen simply renders again as though
+  // nothing happened. Resolves to nothing on a normal visit.
+  useEffect(() => {
+    let cancelled = false;
+    completeOAuthRedirect(auth)
+      .then((result) => {
+        if (cancelled) return;
+        if (result.success) {
+          router.push(nextPath);
+          return;
+        }
+        if (result.error) {
+          toast({
+            variant: 'destructive',
+            title: 'Sign in failed',
+            description: result.error,
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setResumingRedirect(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [auth, router, nextPath, toast]);
 
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
     setLoading(provider);
@@ -49,22 +85,31 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
 
       if (result.success) {
         router.push(nextPath);
-      } else {
-        toast({
-          variant: 'destructive',
-          title: `Sign in with ${
-            provider.charAt(0).toUpperCase() + provider.slice(1)
-          } failed`,
-          description: result.error,
-        });
+        setLoading(null);
+        return;
       }
+
+      if (result.redirecting) {
+        // The browser is on its way to the provider. There is no outcome to
+        // report, and the spinner deliberately stays up: clearing it would
+        // flash the buttons back to idle in the instant before the page goes.
+        return;
+      }
+
+      toast({
+        variant: 'destructive',
+        title: `Sign in with ${
+          provider.charAt(0).toUpperCase() + provider.slice(1)
+        } failed`,
+        description: result.error,
+      });
+      setLoading(null);
     } catch {
       toast({
         variant: 'destructive',
         title: 'Sign in failed',
         description: 'An unexpected error occurred. Please try again.',
       });
-    } finally {
       setLoading(null);
     }
   };
@@ -75,7 +120,7 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
         variant={variant}
         className={cn("w-full", className)}
         onClick={() => handleSocialLogin('apple')}
-        disabled={!!loading}
+        disabled={!!loading || resumingRedirect}
       >
         {loading === 'apple' ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -88,7 +133,7 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
         variant={variant}
         className={cn("w-full", className)}
         onClick={() => handleSocialLogin('google')}
-        disabled={!!loading}
+        disabled={!!loading || resumingRedirect}
       >
         {loading === 'google' ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
