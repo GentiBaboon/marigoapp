@@ -13,6 +13,28 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { IS_NATIVE_BUILD } from '@/lib/platform/native';
+
+/**
+ * Whether to offer Google / Apple sign-in at all on this build.
+ *
+ * Off in the native bundle. Neither provider can complete inside a WebView:
+ * Google refuses OAuth from an embedded browser outright (`disallowed_useragent`,
+ * their anti-phishing policy since 2016), and the app initialises Auth without a
+ * popupRedirectResolver anyway — that resolver is what used to hang and stall
+ * every Firestore query, so it is not coming back. Showing buttons that can only
+ * ever fail is worse than not showing them, and App Store guideline 4.8 only
+ * demands Sign in with Apple when some *other* third-party sign-in is on offer,
+ * so hiding both keeps that requirement out of play too.
+ *
+ * A build-time constant, not a runtime check: the native bundle then never
+ * contains the markup, so there is no flash of a button that vanishes on
+ * hydration. Email and password sign-in is unaffected on every platform.
+ *
+ * Restoring these on device means @capacitor-firebase/authentication, which
+ * signs in through the native SDKs instead of the WebView.
+ */
+export const SOCIAL_SIGN_IN_AVAILABLE = !IS_NATIVE_BUILD;
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -113,6 +135,10 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
       setLoading(null);
     }
   };
+
+  // Belt and braces: callers also hide the surrounding divider, but a caller
+  // that forgets should still render nothing rather than dead buttons.
+  if (!SOCIAL_SIGN_IN_AVAILABLE) return null;
 
   return (
     <div className="space-y-4">

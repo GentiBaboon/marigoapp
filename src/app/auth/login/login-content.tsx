@@ -2,7 +2,10 @@
 
 import { useSearchParams } from 'next/navigation';
 import { LoginForm } from '@/components/auth/login-form';
-import { SocialButtons } from '@/components/auth/social-buttons';
+import {
+  SocialButtons,
+  SOCIAL_SIGN_IN_AVAILABLE,
+} from '@/components/auth/social-buttons';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -32,17 +35,23 @@ export function LoginContent() {
             </div>
             <div className="space-y-5">
                 <LoginForm />
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <Separator />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      Or sign in with
-                    </span>
-                  </div>
-                </div>
-                <SocialButtons />
+                {/* Divider and buttons travel together: with social sign-in
+                    off, a lone "Or sign in with" heading over nothing looks broken. */}
+                {SOCIAL_SIGN_IN_AVAILABLE && (
+                  <>
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <Separator />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">
+                          Or sign in with
+                        </span>
+                      </div>
+                    </div>
+                    <SocialButtons />
+                  </>
+                )}
                 <div className="text-center text-sm">
                   Don&apos;t have an account?{' '}
                   <Link href={signupHref} className="underline">
