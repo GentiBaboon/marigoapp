@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { PartnerLogos } from '@/components/PartnerLogos';
+import { buildCategoryPath } from '@/lib/category-url';
 
 export function Footer() {
   return (
@@ -24,9 +25,14 @@ export function Footer() {
           <div>
             <h3 className="font-semibold mb-4">Shop</h3>
             <ul className="space-y-2 text-muted-foreground">
-              <li><Link href="/browse/women" className="hover:text-primary">Womenswear</Link></li>
-              <li><Link href="/browse/men" className="hover:text-primary">Menswear</Link></li>
-              <li><Link href="/browse/children" className="hover:text-primary">Children</Link></li>
+              {/* The gender landing pages, not /browse/{gender}. A single
+                  browse segment is resolved against top-level CATEGORY slugs,
+                  so /browse/women matched nothing and rendered "Category not
+                  found" — the header already links this way. Built through
+                  buildCategoryPath so the vocabulary lives in one place. */}
+              <li><Link href={buildCategoryPath('women')} className="hover:text-primary">Womenswear</Link></li>
+              <li><Link href={buildCategoryPath('men')} className="hover:text-primary">Menswear</Link></li>
+              <li><Link href={buildCategoryPath('children')} className="hover:text-primary">Children</Link></li>
             </ul>
           </div>
           <div>
