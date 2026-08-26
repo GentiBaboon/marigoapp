@@ -1,3 +1,4 @@
+import { availableStock, canFulfil, orderedQuantity } from '@/lib/stock';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   verifyIdToken,
@@ -30,7 +31,11 @@ async function calculateOrderTotal(
   for (const item of items) {
     const lookupId = item.productId || item.id;
     const pData = await firestoreGet('products', lookupId, idToken);
-    if (!pData || !['active', 'reserved'].includes(pData.status)) {
+    // Status *and* stock. Status alone let a listing that was `active` with
+    // quantity 0 through — the decrement below then recomputed `remaining` as
+    // 0 and flipped it back to `reserved`, so the same single unit could be
+    // sold over and over.
+    if (!pData || !['active', 'reserved'].includes(pData.status) || !canFulfil(pData, item)) {
       console.warn('[create-order] item rejected', {
         title: item.title,
         lookupId,
@@ -38,6 +43,8 @@ async function calculateOrderTotal(
         rawProductId: item.productId,
         found: !!pData,
         status: pData?.status,
+        available: availableStock(pData, item.selectedSize || item.size),
+        wanted: orderedQuantity(item),
       });
       throw new Error(`Item "${item.title}" is no longer available.`);
     }

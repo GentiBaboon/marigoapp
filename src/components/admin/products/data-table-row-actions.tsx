@@ -1,5 +1,6 @@
 'use client';
 
+import { stockRestoreForStatusChange } from '@/lib/stock';
 import * as React from 'react';
 import { Row } from '@tanstack/react-table';
 import Link from 'next/link';
@@ -60,7 +61,10 @@ export function DataTableRowActions<TData>({
     if (!firestore || !adminUser) return;
     setIsLoading(true);
     try {
-      await updateDoc(doc(firestore, 'products', product.id), { status: newStatus });
+      // Same half-undo as the detail page: leaving `reserved` must restore the
+      // unit checkout took, or the listing is live with nothing to sell.
+      const restore = stockRestoreForStatusChange(product as any, product.status, newStatus);
+      await updateDoc(doc(firestore, 'products', product.id), { status: newStatus, ...(restore ?? {}) });
       await logAction('product_status_changed', `Changed "${product.title}" status to "${newStatus}"`);
       toast({ title: 'Status Updated', description: `"${product.title}" is now "${newStatus}".` });
     } catch {

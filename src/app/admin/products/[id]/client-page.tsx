@@ -1,5 +1,6 @@
 'use client';
 
+import { stockRestoreForStatusChange } from '@/lib/stock';
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useRouteParams as useParams } from '@/lib/platform/use-route-param';
@@ -513,7 +514,10 @@ export default function AdminProductReviewPage() {
     setIsUpdating(true);
     try {
       const previousStatus = product.status;
-      await updateDoc(doc(firestore, 'products', id), { status: newStatus });
+      // Coming back from `reserved` has to give the unit back too, or the
+      // listing goes live with zero stock — see stockRestoreForStatusChange.
+      const restore = stockRestoreForStatusChange(product as any, previousStatus, newStatus);
+      await updateDoc(doc(firestore, 'products', id), { status: newStatus, ...(restore ?? {}) });
       await logAction('product_status_changed', `Changed "${product.title}" status to "${newStatus}"`);
 
       // First time a listing is approved for the marketplace: notify the

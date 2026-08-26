@@ -1,3 +1,4 @@
+import { availableStock, canFulfil, orderedQuantity } from '@/lib/stock';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import {
@@ -32,7 +33,16 @@ async function calculateOrderTotal(
   for (const item of items) {
     const lookupId = item.productId || item.id;
     const pData = await firestoreGet('products', lookupId, idToken);
-    if (!pData || !['active', 'reserved'].includes(pData.status)) {
+    // Same guard as /api/create-order: a listing with no stock left must not
+    // reach a payment intent, whatever its status says.
+    if (!pData || !['active', 'reserved'].includes(pData.status) || !canFulfil(pData, item)) {
+      console.warn('[create-payment-intent] item rejected', {
+        title: item.title,
+        lookupId,
+        status: pData?.status,
+        available: availableStock(pData, item.selectedSize || item.size),
+        wanted: orderedQuantity(item),
+      });
       throw new Error(`Item "${item.title}" is no longer available.`);
     }
     // An accepted offer overrides the asking price — resolved from the offer
