@@ -11,7 +11,6 @@ import { FirebaseClientProvider } from '@/firebase';
 import { CartProvider } from '@/context/CartContext';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { ShoppingPreferenceModal } from '@/components/home/ShoppingPreferenceModal';
-import { DownloadAppBanner } from '@/components/home/DownloadAppBanner';
 import { CurrencyProvider } from '@/context/CurrencyContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import dynamic from 'next/dynamic';
@@ -208,7 +207,9 @@ export default function RootLayout({
                         <PresenceTracker />
                         <MobileNav />
                         <ShoppingPreferenceModal />
-                        <DownloadAppBanner />
+                        {/* The app-download banner is pulled from the website
+                            for now. The component is untouched — mount it here
+                            again when the store listings are live. */}
                         <Footer />
                       </div>
                       <Toaster />

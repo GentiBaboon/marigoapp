@@ -105,8 +105,15 @@ export function renderEmail({ heading, body, preheader }: LayoutArgs): string {
 
           <tr>
             <td align="center" style="padding:28px 32px 8px;">
-              <a href="${absoluteUrl('/')}" style="text-decoration:none;font-family:'Helvetica Neue',Arial,sans-serif;font-size:26px;font-weight:bold;letter-spacing:-0.5px;color:${PRIMARY};">
-                ${escapeHtml(SITE_NAME.replace('App', ''))}<span style="color:${INK};">.</span>
+              <!-- The real wordmark, black. Served at 420px and displayed at
+                   150 so it stays sharp on a retina screen, and referenced
+                   absolutely because a mail client has no site to resolve a
+                   relative path against. display:block kills the baseline gap
+                   Outlook leaves under an inline image. -->
+              <a href="${absoluteUrl('/')}" style="text-decoration:none;">
+                <img src="${absoluteUrl('/logo-black.png')}" alt="${escapeHtml(SITE_NAME)}"
+                     width="150" height="40"
+                     style="display:block;border:0;outline:none;text-decoration:none;width:150px;height:auto;" />
               </a>
             </td>
           </tr>
