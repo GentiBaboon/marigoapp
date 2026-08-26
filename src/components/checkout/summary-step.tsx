@@ -126,6 +126,30 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
 
       const status = confirmResult.paymentIntent.status;
       if (status === 'requires_capture' || status === 'succeeded') {
+        // Stock is taken here, not when the intent was created, so an
+        // abandoned checkout leaves the listing untouched. The route re-reads
+        // the intent from Stripe rather than believing this call, and is a
+        // no-op if it has already run.
+        try {
+          const confirmRes = await fetch('/api/confirm-order', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ orderId }),
+          });
+          if (!confirmRes.ok) {
+            const data = await confirmRes.json().catch(() => ({}));
+            console.error('[checkout] confirm-order failed', data);
+          }
+        } catch (err) {
+          // The money is held and the order exists, so the buyer is done —
+          // failing them here would be a lie. The order stays
+          // `pending_payment` for an admin to reconcile.
+          console.error('[checkout] confirm-order threw', err);
+        }
+
         toast({ title: 'Order Confirmed!', description: 'Funds are safely held in escrow.', variant: 'success' });
         // Navigate before clearing — see comment above for the race rationale.
         router.push(`/checkout/success/${orderId}`);

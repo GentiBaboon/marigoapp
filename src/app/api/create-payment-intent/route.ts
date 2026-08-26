@@ -181,33 +181,19 @@ export async function POST(req: NextRequest) {
 
     const pi = await stripe.paymentIntents.create(piOptions);
 
-    // Decrement stock by the ordered amount (mirrors the COD path in
-    // create-order). Listings with remaining stock stay buyable; only when
-    // quantity hits zero do we flip to "reserved" so the listing stays
-    // visible but can't be ordered again.
-    await Promise.all(
-      validatedItems.map(async (item: any) => {
-        const p = await firestoreGet('products', item.productId || item.id, idToken);
-        const currentQty = typeof p?.quantity === 'number' ? p.quantity : 1;
-        const orderedQty =
-          typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
-        const remaining = Math.max(0, currentQty - orderedQty);
-        const update: Record<string, unknown> = { quantity: remaining };
-        if (remaining === 0) update.status = 'reserved';
-        // Multi-variant listings: decrement the matching size's stock alongside
-        // the top-level quantity so the size picker stays in sync.
-        const variants = Array.isArray(p?.variants) ? p.variants : null;
-        const itemSize = item.selectedSize || item.size;
-        if (variants && itemSize) {
-          update.variants = variants.map((v: any) =>
-            v?.size === itemSize
-              ? { ...v, quantity: Math.max(0, (Number(v.quantity) || 0) - orderedQty) }
-              : v
-          );
-        }
-        await firestoreUpdate('products', item.productId || item.id, update, idToken);
-      }),
-    );
+    // Stock is deliberately NOT taken here.
+    //
+    // This runs before `stripe.confirmCardPayment`, so decrementing at this
+    // point reserved the listing on the strength of an intent to pay. A
+    // declined card, a closed tab or an abandoned 3DS step then left it
+    // reserved with nothing to put it back: the webhook that handles
+    // `payment_intent.canceled` is 403'd by the org policy (docs/payments-status.md),
+    // and there is no sweep for stale intents. Listings stayed unbuyable
+    // indefinitely, and the buyer could not even retry.
+    //
+    // `/api/confirm-order` takes the stock instead, once Stripe confirms the
+    // money is really held. An abandoned checkout now touches no inventory at
+    // all — the order simply stays `pending_payment` and the item stays live.
 
     // Create order document
     const createdAt = new Date().toISOString();

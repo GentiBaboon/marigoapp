@@ -1,3 +1,4 @@
+import { decrementStockForItems } from '@/lib/inventory-server';
 import { availableStock, canFulfil, orderedQuantity } from '@/lib/stock';
 import { NextRequest, NextResponse } from 'next/server';
 import {
@@ -154,39 +155,11 @@ export async function POST(req: NextRequest) {
 
     const orderNumber = `MG-COD-${Date.now()}`;
 
-    // Decrement stock by the ordered amount. Listings with remaining stock
-    // stay "active" (still buyable by other shoppers); only when stock hits
-    // zero do we flip the listing to "reserved" so it stays visible on the
-    // marketplace but can't be ordered again. The status moves to "sold"
-    // once admin marks the order completed, and back to "active" if the
-    // order is cancelled/refunded (with quantity restored).
-    await Promise.all(
-      validatedItems.map(async (item: any) => {
-        const p = await firestoreGet('products', item.productId || item.id, idToken);
-        const currentQty = typeof p?.quantity === 'number' ? p.quantity : 1;
-        const orderedQty =
-          typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
-        const remaining = Math.max(0, currentQty - orderedQty);
-        const update: Record<string, unknown> = { quantity: remaining };
-        if (remaining === 0) update.status = 'reserved';
-        // Multi-variant listings (Official Brand sellers): decrement the
-        // matching size's stock too, so the size picker on the public page
-        // reflects what's actually left. If a size match can't be found we
-        // still decrement top-level quantity above, which is safer than
-        // silently overselling.
-        const variants = Array.isArray(p?.variants) ? p.variants : null;
-        const itemSize = item.selectedSize || item.size;
-        if (variants && itemSize) {
-          const nextVariants = variants.map((v: any) =>
-            v?.size === itemSize
-              ? { ...v, quantity: Math.max(0, (Number(v.quantity) || 0) - orderedQty) }
-              : v
-          );
-          update.variants = nextVariants;
-        }
-        await firestoreUpdate('products', item.productId || item.id, update, idToken);
-      }),
-    );
+    // Cash on delivery is committed the moment it is placed — there is no
+    // later confirmation step — so the stock comes off here. The card path
+    // takes it in /api/confirm-order instead, once Stripe says the money is
+    // held; both go through the same helper so the two cannot drift.
+    await decrementStockForItems(validatedItems, idToken);
 
     const createdAt = new Date().toISOString();
     const orderId = await firestoreCreate(
