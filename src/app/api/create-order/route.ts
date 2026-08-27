@@ -155,12 +155,6 @@ export async function POST(req: NextRequest) {
 
     const orderNumber = `MG-COD-${Date.now()}`;
 
-    // Cash on delivery is committed the moment it is placed — there is no
-    // later confirmation step — so the stock comes off here. The card path
-    // takes it in /api/confirm-order instead, once Stripe says the money is
-    // held; both go through the same helper so the two cannot drift.
-    await decrementStockForItems(validatedItems, idToken);
-
     const createdAt = new Date().toISOString();
     const orderId = await firestoreCreate(
       'orders',
@@ -180,6 +174,18 @@ export async function POST(req: NextRequest) {
       },
       idToken
     );
+
+    // Stock comes off *after* the order exists, never before.
+    //
+    // Cash on delivery is committed the moment it is placed, so the stock does
+    // come off in this request — but the decrement used to run first, and any
+    // failure writing the order then left the listing reserved with nothing
+    // recording why. No order meant no admin screen could release it either,
+    // since every release path starts from an order's line items. This is the
+    // same ordering /api/confirm-order uses: the durable record first, the
+    // inventory second, so a crash between them loses stock rather than
+    // stranding it.
+    await decrementStockForItems(validatedItems, idToken);
 
     // In-app notifications (best-effort).
     const firstItem: any = validatedItems[0] || {};
