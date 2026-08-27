@@ -304,105 +304,12 @@ async function calculateOrderTotal(items: any[], couponCode?: string) {
   return {subtotal, shippingFee, discount, total, sellerIds: Array.from(sellerIds), validatedItems};
 }
 
-// ═══════════════════════════════════════════════════════
-// CREATE PAYMENT INTENT (Card Payments - Escrow)
-// ═══════════════════════════════════════════════════════
-export const createPaymentIntent = onCall({region: "europe-west1", secrets: [STRIPE_SECRET_KEY]}, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
-
-  const {items, shippingAddress, paymentMethodId, couponCode} = request.data;
-  const stripe = getStripe();
-  const buyerId = request.auth.uid;
-
-  try {
-    const {total, sellerIds, discount, validatedItems} = await calculateOrderTotal(items, couponCode);
-    const totalInCents = Math.round(total * 100);
-
-    if (totalInCents < 50) {
-      throw new HttpsError("invalid-argument", "Order total must be at least €0.50");
-    }
-
-    // Get or create Stripe customer
-    const buyerSnap = await db.collection("users").doc(buyerId).get();
-    let customerId = buyerSnap.data()?.stripeCustomerId;
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: buyerSnap.data()?.email || undefined,
-        name: buyerSnap.data()?.name || undefined,
-        metadata: {firebaseUid: buyerId},
-      });
-      customerId = customer.id;
-      await db.collection("users").doc(buyerId).update({stripeCustomerId: customerId});
-    }
-
-    const orderNumber = `MG-${Date.now()}`;
-
-    const piOptions: Stripe.PaymentIntentCreateParams = {
-      amount: totalInCents,
-      currency: "eur",
-      capture_method: "manual", // ESCROW: Hold funds, capture later
-      customer: customerId,
-      metadata: {
-        buyerId,
-        sellerIds: sellerIds.join(","),
-        orderNumber,
-        itemCount: String(items.length),
-      },
-      description: `Marigo Luxe Purchase - ${orderNumber}`,
-    };
-
-    if (paymentMethodId) {
-      piOptions.payment_method = paymentMethodId;
-    }
-
-    const pi = await stripe.paymentIntents.create(piOptions);
-
-    // Reserve products
-    const batch = db.batch();
-    for (const item of items) {
-      batch.update(db.collection("products").doc(item.id), {status: "reserved"});
-    }
-
-    // Create order
-    const orderRef = db.collection("orders").doc();
-    batch.set(orderRef, {
-      orderNumber,
-      buyerId,
-      sellerIds,
-      items: validatedItems,
-      totalAmount: total,
-      discountAmount: discount,
-      couponCode: couponCode || null,
-      status: "pending_payment",
-      paymentIntentId: pi.id,
-      paymentMethod: "card",
-      shippingAddress,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    await batch.commit();
-
-    return {clientSecret: pi.client_secret, orderId: orderRef.id};
-  } catch (error: any) {
-    logger.error("createPaymentIntent error", {message: error.message, code: error.code, type: error.type, statusCode: error.statusCode});
-    if (error instanceof HttpsError) throw error;
-    // Stripe errors have a `type` property - surface them with a helpful message
-    if (error.type === "StripeCardError") {
-      throw new HttpsError("failed-precondition", error.message || "Your card was declined. Please try another payment method.");
-    }
-    if (error.type === "StripeInvalidRequestError") {
-      throw new HttpsError("invalid-argument", "Payment configuration error. Please contact support.");
-    }
-    if (error.type === "StripeAuthenticationError") {
-      throw new HttpsError("failed-precondition", "Payment service configuration issue. Please contact support.");
-    }
-    if (error.type === "StripeConnectionError" || error.type === "StripeAPIError") {
-      throw new HttpsError("unavailable", "Payment service is temporarily unavailable. Please try again in a moment.");
-    }
-    throw new HttpsError("internal", error.message || "Payment processing failed. Please try again.");
-  }
-});
+// The callable `createPaymentIntent` was removed. Card checkout goes through
+// /api/create-payment-intent and /api/confirm-order in the Next app, which is
+// what the client has always called — nothing ever invoked this one. It also
+// still carried the original bug those routes were fixed for: it reserved
+// every product unconditionally, before the card was confirmed and without
+// checking stock, so an abandoned checkout stranded the listing.
 
 // ═══════════════════════════════════════════════════════
 // CREATE ORDER (Cash on Delivery)

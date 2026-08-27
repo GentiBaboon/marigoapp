@@ -62,7 +62,7 @@ Cloud Functions runtime: Node.js 20 (2nd Gen)
 
 1. Re-run the invoker grant:
    ```bash
-   for fn in updateOrderStatus createPaymentIntent createOrder handleStripeWebhook capturePayment processRefund createStripeConnectedAccount sendPasswordResetLink getSellerBalance requestPayout; do
+   for fn in updateOrderStatus createOrder handleStripeWebhook capturePayment processRefund createStripeConnectedAccount sendPasswordResetLink getSellerBalance requestPayout; do
      gcloud functions add-invoker-policy-binding "$fn" \
        --region=europe-west1 \
        --member=allUsers

@@ -194,7 +194,8 @@ API routes (`src/app/api/`):
 | `ai/generate-description`, `ai/recommendations`, `ai/remove-background` | — | CSRF-exempt (stateless) |
 | `ai/draft-listing` | Bearer ID token | Multimodal: photos + a hint → a `Partial<SellFormValues>` snapped to the live taxonomy (§7). Spends model quota, so it is not open to anonymous callers |
 | `chat` | — | Genkit chatbot; CSRF-exempt |
-| `create-payment-intent` | Bearer ID token | Rate-limited; creates the Stripe PI |
+| `create-payment-intent` | Bearer ID token | Rate-limited; creates the Stripe PI and a `pending_payment` order. Takes **no** stock, spends no coupon and sends no mail — it runs before the card is confirmed |
+| `confirm-order` | Bearer ID token | Rate-limited; called after `confirmCardPayment` succeeds. Re-reads the intent from Stripe (never trusts the client), moves the order to `processing`, then takes stock, spends the coupon and sends the confirmations. Idempotent — the order's status is the guard |
 | `create-order` | Bearer ID token | Rate-limited; sends buyer + seller mail |
 | `stripe/create-connected-account` | Bearer ID token | Same-origin mirror of the `createStripeConnectedAccount` function — exists because org policy blocks `allUsers` invoker on the deployed function (§8) |
 | `upload` | Bearer ID token | Rate-limited; service-role Supabase upload to `product-images` |
@@ -473,13 +474,22 @@ that for `code === 'permission-denied'`.
 
 **Model: manual-capture escrow.** The buyer's card is *authorized* at checkout (`capture_method: 'manual'`), funds are captured only after delivery + a hold window, then split to sellers over Stripe Connect.
 
+**Nothing is consumed until the payment lands.** Stock, the coupon's use and
+every confirmation email fire in `/api/confirm-order`, after Stripe reports
+the money held — not in `/api/create-payment-intent`, which runs *before*
+`confirmCardPayment`. They used to fire there, so an abandoned or declined
+checkout stranded the listing as `reserved`, burned a single-use coupon and
+told the seller they had sold something they had not. There is no automatic
+recovery from that: the webhook handling `payment_intent.canceled` is 403'd
+by the org policy. Cash on delivery still takes stock at placement — that
+order is committed the moment it is made.
+
 Client: Stripe Elements in `components/checkout/payment-step.tsx`, wrapped by `components/providers/stripe-provider.tsx`.
 
 Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from Secret Manager — `STRIPE_SECRET_KEY`, `STRIPE_WH_SECRET`, `APP_URL`):
 
 | Function | Kind | Role |
 |---|---|---|
-| `createPaymentIntent` | callable | Creates the manual-capture PI |
 | `createOrder` | callable | Order creation |
 | `updateOrderStatus` | callable | Status transitions, marks products sold / releases on refund, fans out notifications |
 | `handleStripeWebhook` | HTTP | Verifies signature; handles `payment_intent.amount_capturable_updated`, `.succeeded`, `.payment_failed`, `.canceled`, `charge.refunded` |
