@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import * as React from 'react';
 import { Row } from '@tanstack/react-table';
 import { MoreHorizontal, Ban, Trash2, ShieldCheck, View, CircleSlash, Loader2, BadgeCheck } from 'lucide-react';
@@ -170,9 +171,12 @@ export function DataTableRowActions<TData>({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-        <DropdownMenuItem>
-          <View className="mr-2 h-4 w-4" />
-          View Details
+        {/* This was a dead menu item — it rendered, and did nothing. */}
+        <DropdownMenuItem asChild>
+          <Link href={`/admin/users/${targetUser.id}`}>
+            <View className="mr-2 h-4 w-4" />
+            View Details
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSub>
             <DropdownMenuSubTrigger>

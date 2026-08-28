@@ -41,7 +41,9 @@ export function DataTable<TData, TValue>({
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
         []
     )
-    const [sorting, setSorting] = React.useState<SortingState>([])
+    // Newest first by default. A list of users is read to see who just
+    // arrived, not who registered first.
+    const [sorting, setSorting] = React.useState<SortingState>([{ id: 'createdAt', desc: true }])
 
     const table = useReactTable({
         data,

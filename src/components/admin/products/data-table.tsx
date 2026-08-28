@@ -43,7 +43,9 @@ export function DataTable<TData, TValue>({
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
         []
     )
-    const [sorting, setSorting] = React.useState<SortingState>([])
+    // Newest first by default — the listings an admin needs to look at are
+    // almost always the ones just posted.
+    const [sorting, setSorting] = React.useState<SortingState>([{ id: 'listingCreated', desc: true }])
 
     const table = useReactTable({
         data,

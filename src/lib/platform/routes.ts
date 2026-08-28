@@ -83,6 +83,7 @@ const ROUTE_RULES: RouteRule[] = [
   },
   { pattern: /^\/admin\/orders\/([^/]+)$/, nativePath: '/admin/orders/view', params: ['id'] },
   { pattern: /^\/admin\/products\/([^/]+)$/, nativePath: '/admin/products/view', params: ['id'] },
+  { pattern: /^\/admin\/users\/([^/]+)$/, nativePath: '/admin/users/view', params: ['id'] },
   // Catch-all. The whole tail becomes one value and is re-split on read.
   { pattern: /^\/browse\/(.+)$/, nativePath: '/browse/view', params: ['slug'] },
 ];

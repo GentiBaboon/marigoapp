@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { X, Trash2, Ban, Download } from 'lucide-react';
 import { DataTableViewOptions } from './data-table-view-options';
 import { DataTableFacetedFilter } from './data-table-faceted-filter';
+import { DataTableSort } from '@/components/admin/data-table-sort';
 import { writeBatch, doc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
@@ -110,6 +111,7 @@ export function DataTableToolbar<TData>({
             options={statuses}
           />
         )}
+        <DataTableSort table={table} column="createdAt" newestLabel="Newest members" oldestLabel="Oldest members" />
         {isFiltered && (
           <Button
             variant="ghost"

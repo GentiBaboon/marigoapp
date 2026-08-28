@@ -126,7 +126,17 @@ function columnsFor(badgeSettings: Partial<BadgeSettings> | null): ColumnDef<Fir
   },
    {
     accessorKey: 'createdAt',
-    header: 'Join Date',
+    // Sortable: this is what "newest first" orders by, and the toolbar's sort
+    // control writes into the same state as this header.
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+      >
+        Join Date
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => {
       const { createdAt } = row.original;
       const d = toDate(createdAt);

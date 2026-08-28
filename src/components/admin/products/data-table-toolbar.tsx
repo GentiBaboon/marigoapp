@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { X, Trash2, Download } from 'lucide-react';
 import { DataTableViewOptions } from '@/components/admin/users/data-table-view-options';
 import { DataTableFacetedFilter } from '@/components/admin/users/data-table-faceted-filter';
-import { brands } from '@/lib/mock-data';
+import { DataTableSort } from '@/components/admin/data-table-sort';
 import { writeBatch, doc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
@@ -26,16 +26,21 @@ const statuses = [
     { label: 'Rejected', value: 'rejected' },
 ];
 
-const brandOptions = brands.map(brand => ({
-    label: brand.name,
-    value: brand.name
-}));
-
 
 export function DataTableToolbar<TData>({
   table,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0;
+  // Brand options come from the rows actually in the table, not from
+  // `mock-data`. That list is Chanel/Prada/Dior placeholder data — it offered
+  // brands the catalogue does not carry and omitted every one it does, so the
+  // filter matched nothing whichever option you picked.
+  const brandOptions = Array.from(
+    table.getColumn('brand')?.getFacetedUniqueValues()?.keys() ?? [],
+  )
+    .filter((b): b is string => typeof b === 'string' && b.trim().length > 0)
+    .sort((a, b) => a.localeCompare(b))
+    .map(b => ({ label: b, value: b }));
   const selectedRows = table.getFilteredSelectedRowModel().rows;
   const hasSelection = selectedRows.length > 0;
   const firestore = useFirestore();
@@ -100,6 +105,7 @@ export function DataTableToolbar<TData>({
             options={brandOptions}
           />
         )}
+        <DataTableSort table={table} column="listingCreated" newestLabel="Newest listings" oldestLabel="Oldest listings" />
         {isFiltered && (
           <Button
             variant="ghost"
