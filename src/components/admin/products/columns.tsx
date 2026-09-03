@@ -60,8 +60,12 @@ export const columns: ColumnDef<FirestoreProduct>[] = [
     },
   },
   {
-    accessorKey: 'brand',
+    // `brandId`, not `brand`. Product documents have never carried a `brand`
+    // field, so this column — and the Brand filter reading it — were empty for
+    // every row.
+    accessorKey: 'brandId',
     header: 'Brand',
+    cell: ({ row }) => row.original.brandId || '—',
   },
    {
     accessorKey: 'sellerId',

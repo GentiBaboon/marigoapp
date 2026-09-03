@@ -118,7 +118,20 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      allow create: if isActiveUser() && request.resource.data.sellerId == request.auth.uid;
+      // A seller lists their own items. An admin may also list *on behalf of*
+      // a seller — operator-led onboarding, where stock is photographed and
+      // catalogued centrally before the seller ever opens the app.
+      //
+      // This is a real widening: an admin can create a listing attributed to
+      // any account, and the seller has no say in it. It is granted because
+      // the alternative was signing in as the seller, which means handling
+      // their password. `sellerId` is still required and must be a real string,
+      // so a listing can never end up ownerless — every downstream screen
+      // (earnings, payouts, the seller's own listings page) keys off it.
+      allow create: if isActiveUser()
+        && request.resource.data.sellerId is string
+        && request.resource.data.sellerId.size() > 0
+        && (request.resource.data.sellerId == request.auth.uid || isAdmin());
       // Seller or admin can update freely. Additionally, any signed-in user
       // can perform two narrow updates:
       //   1. Decrement `quantity` (and optionally flip `status` to `reserved`)

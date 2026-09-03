@@ -36,7 +36,7 @@ export function DataTableToolbar<TData>({
   // brands the catalogue does not carry and omitted every one it does, so the
   // filter matched nothing whichever option you picked.
   const brandOptions = Array.from(
-    table.getColumn('brand')?.getFacetedUniqueValues()?.keys() ?? [],
+    table.getColumn('brandId')?.getFacetedUniqueValues()?.keys() ?? [],
   )
     .filter((b): b is string => typeof b === 'string' && b.trim().length > 0)
     .sort((a, b) => a.localeCompare(b))
@@ -98,9 +98,9 @@ export function DataTableToolbar<TData>({
             options={statuses}
           />
         )}
-        {table.getColumn('brand') && (
+        {table.getColumn('brandId') && (
           <DataTableFacetedFilter
-            column={table.getColumn('brand')}
+            column={table.getColumn('brandId')}
             title="Brand"
             options={brandOptions}
           />
