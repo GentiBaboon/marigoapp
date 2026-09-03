@@ -17,6 +17,7 @@ import {
   isExpired,
   roleFor,
   offerStatusLabel,
+  summarizeOffers,
   OFFER_EXPIRY_DAYS,
   MIN_OFFER_RATIO,
 } from '@/lib/offers';
@@ -50,6 +51,12 @@ describe('status vocabulary', () => {
     expect(offerStatusLabel('pending', 'buyer')).toBe('Awaiting seller');
     expect(offerStatusLabel('countered', 'buyer')).toBe('Counter-offer for you');
     expect(offerStatusLabel('countered', 'seller')).toBe('You countered');
+  });
+
+  it('names whose turn it is for an admin, who is neither party', () => {
+    expect(offerStatusLabel('pending', 'admin')).toBe('Awaiting seller');
+    expect(offerStatusLabel('countered', 'admin')).toBe('Awaiting buyer');
+    expect(offerStatusLabel('accepted', 'admin')).toBe('Accepted');
   });
 });
 
@@ -216,5 +223,32 @@ describe('roleFor', () => {
   // over an offer the user did not make.
   it('resolves seller first when one user is both', () => {
     expect(roleFor('same', { buyerId: 'same' }, { sellerId: 'same' })).toBe('seller');
+  });
+});
+
+describe('summarizeOffers', () => {
+  const future = Timestamp.fromDate(new Date(Date.now() + 86_400_000));
+  const past = Timestamp.fromDate(new Date(Date.now() - 86_400_000));
+
+  it('counts whose turn it is and folds expiry in', () => {
+    const summary = summarizeOffers([
+      { status: 'pending', expiresAt: future },
+      { status: 'pending', expiresAt: past }, // lapsed — waits on nobody
+      { status: 'countered', expiresAt: future },
+      { status: 'accepted' },
+      { status: 'declined' },
+      { status: 'rejected' }, // legacy spelling of declined
+    ]);
+    expect(summary.total).toBe(6);
+    expect(summary.awaitingSeller).toBe(1);
+    expect(summary.awaitingBuyer).toBe(1);
+    expect(summary.accepted).toBe(1);
+    // 4 settled (expired, accepted, declined, rejected), 1 accepted.
+    expect(summary.acceptanceRate).toBe(0.25);
+  });
+
+  it('has no acceptance rate until something has settled', () => {
+    expect(summarizeOffers([{ status: 'pending', expiresAt: future }]).acceptanceRate).toBeNull();
+    expect(summarizeOffers([]).acceptanceRate).toBeNull();
   });
 });

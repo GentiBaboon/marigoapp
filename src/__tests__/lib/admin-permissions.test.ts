@@ -8,7 +8,7 @@ import {
 } from '@/lib/admin-permissions';
 
 const ALL_PERMISSION_NAMES: AdminPermission[] = [
-  'dashboard.view', 'products.manage', 'orders.manage',
+  'dashboard.view', 'products.manage', 'orders.manage', 'offers.view',
   'users.view', 'users.manage', 'users.change_role',
   'finance.view', 'finance.manage', 'settings.manage',
   'moderation.manage', 'marketing.manage', 'logistics.manage',
@@ -18,27 +18,28 @@ const ALL_PERMISSION_NAMES: AdminPermission[] = [
 
 describe('admin-permissions', () => {
   describe('ROLE_PERMISSIONS', () => {
-    it('super_admin has all 18 permissions', () => {
-      expect(ROLE_PERMISSIONS.super_admin).toHaveLength(18);
+    it('super_admin has all 19 permissions', () => {
+      expect(ROLE_PERMISSIONS.super_admin).toHaveLength(19);
       for (const perm of ALL_PERMISSION_NAMES) {
         expect(ROLE_PERMISSIONS.super_admin).toContain(perm);
       }
     });
 
     it('admin has all permissions except users.change_role', () => {
-      expect(ROLE_PERMISSIONS.admin).toHaveLength(17);
+      expect(ROLE_PERMISSIONS.admin).toHaveLength(18);
       expect(ROLE_PERMISSIONS.admin).not.toContain('users.change_role');
       for (const perm of ALL_PERMISSION_NAMES.filter(p => p !== 'users.change_role')) {
         expect(ROLE_PERMISSIONS.admin).toContain(perm);
       }
     });
 
-    it('moderator has exactly 8 permissions', () => {
-      expect(ROLE_PERMISSIONS.moderator).toHaveLength(8);
+    it('moderator has exactly 9 permissions', () => {
+      expect(ROLE_PERMISSIONS.moderator).toHaveLength(9);
       expect(ROLE_PERMISSIONS.moderator).toContain('dashboard.view');
       expect(ROLE_PERMISSIONS.moderator).toContain('products.manage');
       expect(ROLE_PERMISSIONS.moderator).toContain('moderation.manage');
       expect(ROLE_PERMISSIONS.moderator).toContain('orders.manage');
+      expect(ROLE_PERMISSIONS.moderator).toContain('offers.view');
       expect(ROLE_PERMISSIONS.moderator).toContain('support.manage');
       expect(ROLE_PERMISSIONS.moderator).toContain('disputes.manage');
       expect(ROLE_PERMISSIONS.moderator).toContain('refunds.manage');
@@ -60,6 +61,10 @@ describe('admin-permissions', () => {
 
     it('analyst cannot access products.manage', () => {
       expect(ROLE_PERMISSIONS.analyst).not.toContain('products.manage');
+    });
+
+    it('analyst cannot see offers — they are a moderation view, not a report', () => {
+      expect(ROLE_PERMISSIONS.analyst).not.toContain('offers.view');
     });
   });
 

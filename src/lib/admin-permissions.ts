@@ -2,6 +2,7 @@ export type AdminPermission =
   | 'dashboard.view'
   | 'products.manage'
   | 'orders.manage'
+  | 'offers.view'
   | 'users.view'
   | 'users.manage'
   | 'users.change_role'
@@ -19,7 +20,7 @@ export type AdminPermission =
   | 'analytics.view';
 
 const ALL_PERMISSIONS: AdminPermission[] = [
-  'dashboard.view', 'products.manage', 'orders.manage',
+  'dashboard.view', 'products.manage', 'orders.manage', 'offers.view',
   'users.view', 'users.manage', 'users.change_role',
   'finance.view', 'finance.manage', 'settings.manage',
   'moderation.manage', 'marketing.manage', 'logistics.manage',
@@ -32,7 +33,7 @@ export const ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
   admin: ALL_PERMISSIONS.filter(p => p !== 'users.change_role'),
   moderator: [
     'dashboard.view', 'products.manage', 'moderation.manage',
-    'orders.manage', 'support.manage', 'disputes.manage',
+    'orders.manage', 'offers.view', 'support.manage', 'disputes.manage',
     'refunds.manage', 'returns.manage',
   ],
   analyst: [

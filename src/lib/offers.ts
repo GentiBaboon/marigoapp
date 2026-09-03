@@ -55,12 +55,19 @@ export function awaitingParty(status: string): OfferActor | null {
   return null;
 }
 
-export function offerStatusLabel(status: string, audience: OfferActor): string {
+/**
+ * `audience` is who is reading. Buyer and seller get second-person copy
+ * ("Awaiting your reply"); an admin is neither party, so the open states name
+ * whose turn it is instead — the operator's question is "who is this waiting
+ * on?", never "what should I do?".
+ */
+export function offerStatusLabel(status: string, audience: OfferActor | 'admin'): string {
   const s = normalizeStatus(status);
   switch (s) {
     case 'pending':
       return audience === 'seller' ? 'Awaiting your reply' : 'Awaiting seller';
     case 'countered':
+      if (audience === 'admin') return 'Awaiting buyer';
       return audience === 'buyer' ? 'Counter-offer for you' : 'You countered';
     case 'accepted':
       return 'Accepted';
@@ -276,4 +283,49 @@ export function roleFor(
   if (product?.sellerId && uid === product.sellerId) return 'seller';
   if (offer?.buyerId && uid === offer.buyerId) return 'buyer';
   return null;
+}
+
+// ─── Admin summary ────────────────────────────────────────────────────────────
+
+export interface OfferSummary {
+  total: number;
+  /** Open and waiting on the seller. */
+  awaitingSeller: number;
+  /** Open and waiting on the buyer (the seller has countered). */
+  awaitingBuyer: number;
+  accepted: number;
+  /** Accepted as a share of every *settled* negotiation — open ones are
+   *  excluded, so the figure does not sink under whatever is still pending. */
+  acceptanceRate: number | null;
+}
+
+/**
+ * The counts on the admin offers page. Expiry is folded in via
+ * `effectiveStatus`, so an offer that lapsed unanswered is not reported as
+ * still waiting on anyone.
+ */
+export function summarizeOffers(
+  offers: ReadonlyArray<{ status?: string; expiresAt?: FirestoreTimestamp }>,
+  now: Date = new Date(),
+): OfferSummary {
+  let awaitingSeller = 0;
+  let awaitingBuyer = 0;
+  let accepted = 0;
+  let settled = 0;
+  for (const offer of offers) {
+    const status = effectiveStatus(offer, now);
+    if (status === 'pending') awaitingSeller += 1;
+    else if (status === 'countered') awaitingBuyer += 1;
+    else {
+      settled += 1;
+      if (status === 'accepted') accepted += 1;
+    }
+  }
+  return {
+    total: offers.length,
+    awaitingSeller,
+    awaitingBuyer,
+    accepted,
+    acceptanceRate: settled > 0 ? accepted / settled : null,
+  };
 }
