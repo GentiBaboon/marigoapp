@@ -67,6 +67,13 @@ const getErrorMessage = (error: any): string => {
                 return 'An account already exists with the same email but a different sign-in method.';
             case 'auth/too-many-requests':
                 return 'Too many failed attempts. Please try again later.';
+            // The account was banned from /admin/users: `syncBanToAuth`
+            // disables the Auth user, and this is how a disabled user is
+            // told. Deliberately not the generic "check your credentials" —
+            // a banned member re-entering the same password ten times learns
+            // nothing, and support then hears it as a login bug.
+            case 'auth/user-disabled':
+                return 'This account has been suspended. Contact hello@marigoapp.com if you think this is a mistake.';
             case 'auth/network-request-failed':
                 return 'Network error. Please check your connection and try again.';
             default:

@@ -181,7 +181,16 @@ Authenticated (gated by middleware §6):
 Courier (`/courier/*`, role-gated): `dashboard`, `jobs`, `delivery/[deliveryId]`, `earnings`, `profile`.
 
 Admin (`/admin/*`, role-gated, and **behind the masked gate in §6c**). Sidebar entries map 1:1 to permissions from `src/lib/admin-permissions.ts`:
-`/admin` (dashboard), `products` (+ `[id]`), `orders` (+ `[id]`), `users`, `analytics`, `finance`, `marketing`, `logistics`, `moderation`, `disputes`, `refunds`, `returns`, `support`, `logs`, `settings`.
+`/admin` (dashboard), `products` (+ `[id]`), `orders` (+ `[id]`), `offers`, `users`, `analytics`, `finance`, `marketing`, `logistics`, `moderation`, `disputes`, `refunds`, `returns`, `support`, `logs`, `settings`.
+- **`/admin/offers`** — every buyer→seller offer across all listings, newest
+  first, with whose-turn counts and an acceptance rate. **Read-only**: the
+  offer `update` rule names only the two parties, and an operator overriding a
+  haggle is not a feature anyone asked for. It is one `collectionGroup('offers')`
+  query ordered by `createdAt`, which needs the COLLECTION_GROUP `fieldOverrides`
+  entry in `firestore.indexes.json` — until that is deployed the page falls back
+  to an unordered read and says so in a banner. Listings and people are joined
+  once per distinct id (`fetchMap`), not per row. Per-listing offers are still
+  on `/admin/products/[id]`.
 - **`/admin/analytics`** — live visitors (Redis, §9b) plus registration history
   by date (Firestore). Two halves, two stores, on purpose: presence is
   ephemeral and expires itself, signup history is durable.
@@ -212,7 +221,7 @@ Types in `src/lib/types.ts` (~855 lines — the single source of truth for both 
 
 | Collection | Purpose | Key statuses |
 |---|---|---|
-| `users/{uid}` | Profile, role, KYC, `stripeAccountId`, `salesCount`, badge tier, preferences | `active` / `banned` |
+| `users/{uid}` | Profile, role, KYC, `stripeAccountId`, `salesCount`, badge tier, preferences. `role` and `status` are admin-only fields (§6d) | `active` / `banned` |
 | `users/{uid}/{wishlist,cart,addresses,paymentMethods}` | Owner-only subcollections | — |
 | `email_verifications/{uid}` | Live 6-digit activation challenge — HMAC'd code, expiry, attempt and send counters. Cleared in place when spent, never deleted | — |
 | ↳ `addresses/{id}` | `firstName` + `surname` are the inputs; **`fullName` is composed from them on save** and stays the stored value, because the delivery label, order confirmation, admin order view, courier pickup sheet and the order emails all read it. Plus optional `company` / `apartment`. Countries are Albania and Kosovo only (`src/lib/countries.ts`, Kosovo is `KS`) | — |
@@ -250,10 +259,10 @@ Roles (`UserRoleEnum`): `buyer`, `seller`, `courier`, `admin`, `super_admin`, `m
 
 **Server-side auth (`src/lib/firebase-admin.ts`):** `verifyIdToken` validates against Firebase's JWKS with `jose` — no service-account credentials anywhere, which is what lets the app run on Vercel. Firestore reads/writes from API routes go through the REST helpers (`firestoreGet/Query/Update/Create`) using the caller's ID token, so **security rules still apply on the server path**.
 
-**Role gating:** `src/lib/admin-permissions.ts` defines 18 `AdminPermission` values and `ROLE_PERMISSIONS`:
+**Role gating:** `src/lib/admin-permissions.ts` defines 19 `AdminPermission` values and `ROLE_PERMISSIONS`:
 - `super_admin` — everything
 - `admin` — everything except `users.change_role`
-- `moderator` — dashboard, products, moderation, orders, support, disputes, refunds, returns
+- `moderator` — dashboard, products, moderation, orders, offers, support, disputes, refunds, returns
 - `analyst` — dashboard, finance.view, analytics.view, logs.view
 
 Client hooks `use-admin-auth` / `use-courier-auth` enforce this in the UI; Firestore rules enforce it on data.
@@ -352,6 +361,41 @@ wordlist, and a scanner cannot follow a door it never sees.
   indexed from an inbound link.
 - The E2E spec asserts the *property* ("never reveals the panel"), not the
   mechanism, because CI runs with the gate off.
+
+## 6d. Account bans
+
+A ban is `users/{uid}.status == 'banned'`, set from `/admin/users` (the
+"delete" action there is the same write). For a long time that was the whole
+of it — a label the admin table could filter on — and a banned buyer went on
+making offers, buying and messaging exactly as before: no rule, no route and
+no login check ever read it. Two layers now enforce it, in this order:
+
+1. **`firestore.rules` — `isActiveUser()`.** Every write a member can make
+   (listings, offers, orders, messages, reviews, reports, disputes, returns,
+   notifications, courier applications, their own profile) is gated on it;
+   admin branches are not, so an operator can still act on the account's
+   data and the other party can still message or decline. Reads are not
+   gated — the helper is a document read, and every public page would pay
+   it. **This layer is the one that matters**: an ID token already issued
+   stays valid for up to an hour and cannot be recalled.
+2. **`syncBanToAuth` (Cloud Function, `users/{uid}` write trigger).** The
+   Next app has no service-account key and cannot touch Firebase Auth, so
+   the function disables the Auth user and revokes their refresh tokens when
+   the status flips to `banned`, and re-enables on unban. Sign-in then fails
+   with `auth/user-disabled`, which `getErrorMessage()` renders as a
+   suspension notice rather than "check your credentials".
+
+**`role` and `status` are admin-only fields.** The owner update rule used to
+allow any field, and `isAdmin()` falls back to the *stored* role — so any
+account could promote itself to `super_admin` from the browser console, and a
+banned one could unban itself. Owner updates now reject a diff touching
+either; the first-login bootstrap may create only `buyer` / `active`.
+
+Rules changes ship with `firebase deploy --only firestore:rules`; the function
+with `firebase deploy --only functions:syncBanToAuth`. **`npm run test:rules`**
+runs `scripts/test-firestore-rules.mjs` against the Firestore emulator — 34
+allow/deny cases over plain REST, no extra dependencies, needs a JVM. Not in
+CI. Add a case for any rule you touch.
 
 **Storage rules (`storage.rules`):** `users/{uid}/**` and `products/{uid}/{productId}/*` are owner-write / public-read; `deliveries/{id}/*` is signed-in read+write. All writes require an image content type under 10 MB. Note admin checks here use the custom claim **only** (no Firestore fallback).
 
@@ -459,6 +503,10 @@ that for `code === 'permission-denied'`.
 - **Expiry is evaluated on read** (`effectiveStatus`), not by a scheduled job:
   an offer past `expiresAt` renders as expired and offers no actions, with no
   infrastructure and no write.
+- `offerStatusLabel(status, audience)` takes `'admin'` as well as the two
+  parties: the open states then name whose turn it is ("Awaiting buyer") rather
+  than addressing the reader. `summarizeOffers()` is the count block on
+  `/admin/offers`; its acceptance rate is over *settled* offers only.
 - **An accepted offer is honoured server-side.** Checkout deliberately re-reads
   every price from Firestore and ignores the cart, so the agreed price is
   resolved by `acceptedOfferPrice()` (`src/lib/offer-pricing.ts`) inside
@@ -499,6 +547,7 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 | `createStripeConnectedAccount` | callable | Connect Express onboarding |
 | `getSellerBalance`, `requestPayout` | callable | Seller wallet (`/profile/wallet`, `/profile/earnings`) |
 | `sendPasswordResetLink` | HTTP | Backs `/api/forgot-password` |
+| `syncBanToAuth` | Firestore trigger on `users/{uid}` | Disables / re-enables the Auth user and revokes refresh tokens when `status` flips to or from `banned` (§6d) |
 
 `distributeOrderToSellers` computes each seller's net (`subtotal × (1 − commissionRate)`), transfers into their connected account, and writes ledger rows. **Idempotent** via a `payouts[sellerId].transferId` map on the order, so retried captures no-op. Sellers with no `stripeAccountId` are skipped and flagged for manual settlement.
 
@@ -705,6 +754,7 @@ npm run typecheck   # tsc --noEmit   (CI continue-on-error — pre-existing erro
 npm run test        # Vitest (jsdom) — src/**/*.{test,spec}.{ts,tsx}
 npm run test:watch  # Vitest watch
 npm run test:e2e    # Playwright against localhost:3001 (starts the dev server itself)
+npm run test:rules  # firestore.rules allow/deny cases in the Firestore emulator (needs a JVM; not in CI)
 
 npm run build:native  # Static export for the app shells → .next-native
 npm run sync:native   # build:native + npx cap sync (copies into ios/ and android/)
@@ -720,7 +770,7 @@ Functions (inside `functions/`): `npm run build` (tsc), `npm run serve` (build +
 
 `.claude/launch.json` defines two preview configs: **Next.js Dev Server** (port 3001) and **Firebase Functions Emulator** (port 5001). Emulator ports: functions 5001, firestore 8080, auth 9099, UI disabled.
 
-Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`, `normalize-sizes.mjs`, `generate-sitemap.mjs`, `backfill-slugs.mjs`, `preview-emails.mjs`.
+Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-brands.mjs`, `delete-no-photo-products.{js,mjs}`, `normalize-sizes.mjs`, `generate-sitemap.mjs`, `backfill-slugs.mjs`, `preview-emails.mjs`, `test-firestore-rules.mjs`.
 
 `normalize-sizes.mjs` folds `products.size`, `products.variants[].size` and
 `size_charts.sizes[]` onto the canonical vocabulary. **Dry run by default** —
@@ -728,7 +778,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (572 passing): unit — `admin-permissions`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (612 passing): unit — `admin-permissions`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

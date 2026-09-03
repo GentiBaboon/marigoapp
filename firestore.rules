@@ -35,6 +35,31 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'courier';
     }
 
+    // A ban is `users/{uid}.status == 'banned'`, set from /admin/users. For a
+    // long time that was the whole of it — a label the admin table could
+    // filter on — and a banned buyer went on making offers, buying and
+    // messaging exactly as before, because nothing below ever looked at it.
+    //
+    // This is the layer that actually stops them. The Cloud Function
+    // `syncBanToAuth` also disables the Auth user and revokes their refresh
+    // tokens, but an ID token already issued stays valid for up to an hour
+    // and cannot be recalled, so for that hour these rules are the only
+    // thing in the way. Every write a member can make is gated on
+    // `isActiveUser()`; admin branches are not, so an operator can still act
+    // on a banned account's data.
+    //
+    // Reads are deliberately not gated: the helper costs a document read,
+    // and every public page would pay it.
+    function isBanned() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('status', 'active') == 'banned';
+    }
+
+    function isActiveUser() {
+      return isSignedIn() && !isBanned();
+    }
+
     // --------------------------------------------------------------------
     // Collections
     // --------------------------------------------------------------------
@@ -42,8 +67,26 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if true;
       allow list: if isAdmin();
-      allow create: if isOwner(userId) || isAdmin();
-      allow update: if isOwner(userId) || isAdmin();
+
+      // `role` and `status` are the two fields the rest of this file trusts:
+      // isAdmin() falls back to the stored role, and isBanned() reads the
+      // status. The owner used to be able to write both — which meant any
+      // account could promote itself to super_admin from the browser console,
+      // and a banned one could simply unban itself. They are now admin-only.
+      // The first-login bootstrap in FirebaseProvider writes `buyer` / `active`
+      // and nothing else may.
+      allow create: if isAdmin() || (
+        isOwner(userId)
+        && request.resource.data.get('role', 'buyer') == 'buyer'
+        && request.resource.data.get('status', 'active') == 'active'
+      );
+      // A banned member may not edit their own profile either — the display
+      // name is public. `resource` is this very document, so no extra read.
+      allow update: if isAdmin() || (
+        isOwner(userId)
+        && resource.data.get('status', 'active') != 'banned'
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status'])
+      );
 
       match /wishlist/{productId} { allow read, write: if isOwner(userId); }
       match /cart/{productId} { allow read, write: if isOwner(userId); }
@@ -75,7 +118,7 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.sellerId == request.auth.uid;
+      allow create: if isActiveUser() && request.resource.data.sellerId == request.auth.uid;
       // Seller or admin can update freely. Additionally, any signed-in user
       // can perform two narrow updates:
       //   1. Decrement `quantity` (and optionally flip `status` to `reserved`)
@@ -83,9 +126,8 @@ service cloud.firestore {
       //   2. Increment `views` by 1 — product-detail view counter.
       //   3. Adjust `wishlistCount` by ±1 — wishlist add/remove flow.
       // Anything touching other fields requires seller or admin.
-      allow update: if isSignedIn() && (
+      allow update: if isAdmin() || (isActiveUser() && (
         resource.data.sellerId == request.auth.uid
-        || isAdmin()
         || (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity', 'status'])
           && request.resource.data.quantity is int
@@ -108,8 +150,8 @@ service cloud.firestore {
           )
           && request.resource.data.wishlistCount >= 0
         )
-      );
-      allow delete: if isAdmin() || (isSignedIn() && resource.data.sellerId == request.auth.uid);
+      ));
+      allow delete: if isAdmin() || (isActiveUser() && resource.data.sellerId == request.auth.uid);
 
       // Offers. The transition table here mirrors TRANSITIONS in
       // src/lib/offers.ts — if one changes, change both, or the UI will offer
@@ -127,7 +169,7 @@ service cloud.firestore {
 
         allow read: if isBuyer() || isSeller() || isAdmin();
 
-        allow create: if isSignedIn()
+        allow create: if isActiveUser()
           && request.resource.data.buyerId == request.auth.uid
           && request.resource.data.sellerId == listingSeller()
           // A seller bidding on their own listing is either a mistake or an
@@ -139,7 +181,7 @@ service cloud.firestore {
           && request.resource.data.offerAmount < get(/databases/$(database)/documents/products/$(productId)).data.price;
 
         allow update: if isAdmin() || (
-          (isBuyer() || isSeller())
+          isActiveUser() && (isBuyer() || isSeller())
           // Identities and the parent listing are immutable for the life of
           // the negotiation.
           && request.resource.data.buyerId == resource.data.buyerId
@@ -213,8 +255,8 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || request.auth.uid in resource.data.sellerIds || isAdmin());
-      allow create: if isSignedIn();
-      allow update: if isAdmin() || (isSignedIn() && (resource.data.buyerId == request.auth.uid || request.auth.uid in resource.data.sellerIds));
+      allow create: if isActiveUser();
+      allow update: if isAdmin() || (isActiveUser() && (resource.data.buyerId == request.auth.uid || request.auth.uid in resource.data.sellerIds));
       // Admin-only delete — used by the operator reset tool at
       // /admin/danger/reset-orders. No buyer/seller delete path; cancellations
       // go through status updates, not deletions.
@@ -226,7 +268,7 @@ service cloud.firestore {
       // Any signed-in user can create a notification (e.g. seller notifying
       // buyer of a status change, buyer notifying seller of a refund request).
       // The targeted userId must be present so it can be queried by recipient.
-      allow create: if isSignedIn() && request.resource.data.userId is string;
+      allow create: if isActiveUser() && request.resource.data.userId is string;
       allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
@@ -245,19 +287,19 @@ service cloud.firestore {
 
     match /courier_profiles/{id} {
       allow read: if isOwner(id) || isAdmin();
-      allow write: if isAdmin() || isOwner(id);
+      allow write: if isAdmin() || (isOwner(id) && isActiveUser());
     }
 
     match /reports/{id} {
       allow read: if isAdmin();
-      allow create: if isSignedIn();
+      allow create: if isActiveUser();
       allow update: if isAdmin();
     }
 
     match /support_chats/{chatId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn();
-      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isActiveUser();
+      allow update: if isAdmin() || (isActiveUser() && resource.data.userId == request.auth.uid);
 
       // Support messages: only the chat owner and admins can read/write
       match /messages/{msgId} {
@@ -265,29 +307,29 @@ service cloud.firestore {
           get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid ||
           isAdmin()
         );
-        allow create: if isSignedIn() && (
-          get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid ||
-          isAdmin()
+        allow create: if isAdmin() || (
+          isActiveUser()
+          && get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid
         );
       }
     }
 
     match /conversations/{conversationId} {
       allow read: if isSignedIn() && (request.auth.uid in resource.data.participants || isAdmin());
-      allow create: if isSignedIn() && request.auth.uid in request.resource.data.participants;
-      allow update: if isSignedIn() && (request.auth.uid in resource.data.participants || isAdmin());
+      allow create: if isActiveUser() && request.auth.uid in request.resource.data.participants;
+      allow update: if isAdmin() || (isActiveUser() && request.auth.uid in resource.data.participants);
 
       match /messages/{messageId} {
         allow read: if isSignedIn() && (
           request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants ||
           isAdmin()
         );
-        allow create: if isSignedIn()
+        allow create: if isActiveUser()
           && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
           && request.resource.data.senderId == request.auth.uid;
-        allow update: if isSignedIn() && (
-          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants ||
-          isAdmin()
+        allow update: if isAdmin() || (
+          isActiveUser()
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
         );
       }
     }
@@ -307,7 +349,7 @@ service cloud.firestore {
       // in Google's rich results as stars on a product page. A review is now
       // only accepted from the buyer of a real, delivered order, about a seller
       // who was actually on it.
-      allow create: if isSignedIn()
+      allow create: if isActiveUser()
         && request.resource.data.reviewerId == request.auth.uid
         // No reviewing yourself, however the order is shaped.
         && request.resource.data.revieweeId != request.auth.uid
@@ -331,35 +373,35 @@ service cloud.firestore {
 
     match /refunds/{refundId} {
       allow read: if isSignedIn() && (resource.data.requestedBy == request.auth.uid || isAdmin());
-      allow create: if isSignedIn();
+      allow create: if isActiveUser();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /disputes/{disputeId} {
       allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn();
+      allow create: if isActiveUser();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /returns/{returnId} {
       allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn();
+      allow create: if isActiveUser();
       // Admins can do anything. The buyer drives the in-transit phase (packs
       // the item, hands it to the courier): `approved → ready_for_pickup`
       // and `ready_for_pickup → shipping`. The seller drives the receiving
       // phase: `shipping → received`. Any other transition (refund / reject /
       // etc.) stays admin-only.
       allow update: if isAdmin() || (
-        isSignedIn()
+        isActiveUser()
         && resource.data.buyerId == request.auth.uid
         && (
           (resource.data.status == 'approved' && request.resource.data.status == 'ready_for_pickup')
           || (resource.data.status == 'ready_for_pickup' && request.resource.data.status == 'shipping')
         )
       ) || (
-        isSignedIn()
+        isActiveUser()
         && resource.data.sellerId == request.auth.uid
         && resource.data.status == 'shipping'
         && request.resource.data.status == 'received'

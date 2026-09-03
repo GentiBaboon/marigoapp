@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError, onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import {onDocumentWritten} from "firebase-functions/v2/firestore";
 import {defineSecret} from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
 import Stripe from "stripe";
@@ -805,5 +806,57 @@ export const requestPayout = onCall({region: "europe-west1", secrets: [STRIPE_SE
     return {success: true};
   } catch (error: any) {
     throw new HttpsError("internal", error.message);
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// ACCOUNT BANS → FIREBASE AUTH
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Mirror `users/{uid}.status` into Firebase Auth.
+ *
+ * Banning from /admin/users writes `status: 'banned'` to the user document —
+ * the Next app has no service-account key (CLAUDE.md §6), so it can write a
+ * Firestore field but cannot touch Firebase Auth. That is this function's
+ * job: the Admin SDK here disables the Auth user, which ends new sign-ins,
+ * and revokes their refresh tokens, which ends the session's ability to mint
+ * a new ID token. The one already in hand stays valid for up to an hour — ID
+ * tokens are not revocable — and for that hour `firestore.rules` is what
+ * stops the account from writing anything (`isActiveUser()`).
+ *
+ * `onDocumentWritten` rather than `onDocumentUpdated` so a document created
+ * banned (a restore, an import) is handled too. Idempotent: nothing happens
+ * unless the banned/not-banned bit actually flipped, so an admin editing an
+ * unrelated field on a banned account costs no Auth call.
+ *
+ * Unbanning re-enables the Auth user. Refresh tokens are not restored — the
+ * member signs in again, which is the right amount of friction.
+ */
+export const syncBanToAuth = onDocumentWritten({document: "users/{uid}", region: "europe-west1"}, async (event) => {
+  const before = event.data?.before?.exists ? event.data.before.data() : undefined;
+  const after = event.data?.after?.exists ? event.data.after.data() : undefined;
+  const wasBanned = before?.status === "banned";
+  const isBanned = after?.status === "banned";
+
+  // A deleted document is not an unban: the Auth user, if any, is left as is.
+  if (!after || wasBanned === isBanned) return;
+
+  const uid = event.params.uid;
+  try {
+    await admin.auth().updateUser(uid, {disabled: isBanned});
+    if (isBanned) await admin.auth().revokeRefreshTokens(uid);
+    logger.info(isBanned ? "Auth user disabled after ban" : "Auth user re-enabled after unban", {uid});
+  } catch (error: any) {
+    // The Firestore document can outlive the Auth account (or precede it, on
+    // an import). Nothing to disable, and nothing to retry.
+    if (error?.code === "auth/user-not-found") {
+      logger.warn("Ban status changed on a user with no Auth account", {uid});
+      return;
+    }
+    // Anything else — a transient Auth outage — rethrows so the trigger
+    // retries rather than leaving a banned member able to sign in.
+    logger.error("syncBanToAuth failed", {uid, message: error?.message, code: error?.code});
+    throw error;
   }
 });

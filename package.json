@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-marigo \"node scripts/test-firestore-rules.mjs\"",
     "email:check": "node scripts/check-email-config.mjs",
     "email:preview": "node scripts/preview-emails.mjs",
     "email:send": "node scripts/preview-emails.mjs --send",
