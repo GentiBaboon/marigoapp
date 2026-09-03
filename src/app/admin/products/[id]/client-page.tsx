@@ -457,7 +457,13 @@ export default function AdminProductReviewPage() {
     if (!productRef || !adminUser || !product) return;
     setIsSaving(true);
     try {
-      const parsedPrice = parseFloat(price) || product.price;
+      // `parseFloat('') || product.price` was NaN || undefined -> undefined on
+      // any listing with no price yet, and Firestore refuses `undefined`. The
+      // save then died with "Unsupported field value" naming a field the admin
+      // had not touched, so nothing on the page could be edited — including
+      // adding an image.
+      const priceInput = parseFloat(price);
+      const parsedPrice = Number.isFinite(priceInput) ? priceInput : product.price;
       const parsedOriginalPrice = originalPrice ? parseFloat(originalPrice) : null;
       const parsedQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
       // Clean variants and roll up the total. If variants exist, they are the
@@ -497,6 +503,15 @@ export default function AdminProductReviewPage() {
         updatedAt: serverTimestamp(),
       };
       if (parsedOriginalPrice !== null) updates.originalPrice = parsedOriginalPrice;
+
+      // A draft can legitimately be missing price, and any future field read
+      // into the form the same way could be missing too. Reading one back out
+      // and writing it straight through turns "this is empty" into a payload
+      // Firestore will not accept, so drop the empties rather than send them.
+      // Leaving the key out means the field simply stays absent.
+      for (const key of Object.keys(updates)) {
+        if (updates[key] === undefined) delete updates[key];
+      }
 
       await updateDoc(productRef, updates);
       await logAction('product_edited', `Admin edited product "${title.trim()}"`);
