@@ -698,6 +698,15 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
     with EUR saved gets a lek figure in a field the save path reads as EUR.
   - An empty box yields `undefined`, not `0`, so a draft with no price keeps
     having no price rather than being published free.
+  - **Admin listing money goes through `<Money eur={...} />`**
+    (`src/components/admin/money.tsx`), not a local `Intl.NumberFormat`. The
+    products table, the moderation queue and the offers table each held their
+    own EUR formatter and printed euro whatever the picker said, so the list
+    showed "25,00 €" for a listing whose own page had just started saying
+    2.400 ALL. **Finance stays EUR on purpose** — the revenue chart, order
+    totals, commission and payouts reconcile against Stripe, which settles in
+    euro, and mixing the two invites an operator to compare a lek figure with
+    a euro one.
 - **Delivery is priced per origin city**, and all of it lives in
   `src/lib/shipping.ts` so the quote in the basket and the amount actually
   charged cannot drift. `DEFAULT_SHIPPING_FEE_ALL` (200) per distinct city, or

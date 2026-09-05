@@ -16,13 +16,9 @@ import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/fi
 import { useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import type { FirestoreProduct, FirestoreUser } from '@/lib/types';
+import { Money } from '@/components/admin/money';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-
-const currencyFormatter = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-});
 
 // Helper component to fetch and display seller name
 const SellerInfo = ({ sellerId }: { sellerId: string }) => {
@@ -138,7 +134,7 @@ const ModerationCard: React.FC<ModerationCardProps> = ({ product }) => {
                 <div className="text-sm space-y-1 mt-1">
                     <p><span className="text-muted-foreground">Category:</span> {product.categoryId}</p>
                     <p><span className="text-muted-foreground">Condition:</span> {product.condition}</p>
-                    <p><span className="text-muted-foreground">Price:</span> {currencyFormatter.format(product.price)}</p>
+                    <p><span className="text-muted-foreground">Price:</span> <Money eur={product.price} /></p>
                 </div>
             </div>
         </div>

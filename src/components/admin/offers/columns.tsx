@@ -10,6 +10,7 @@ import type { FirestoreOffer } from '@/lib/types';
 import { toDate } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { currentAmount, effectiveStatus, offerStatusLabel, type OfferStatus } from '@/lib/offers';
+import { Money } from '@/components/admin/money';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,7 +44,6 @@ export interface AdminOfferRow extends FirestoreOffer {
   effectiveStatus: OfferStatus;
 }
 
-const currencyFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 
 const statusStyles: Record<OfferStatus, string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-200 dark:border-yellow-900',
@@ -135,11 +135,11 @@ export const columns: ColumnDef<AdminOfferRow>[] = [
       const countered = offer.effectiveStatus === 'countered' && offer.counterOfferAmount != null;
       return (
         <div className="flex flex-col leading-tight">
-          <span className="font-medium tabular-nums">{currencyFormatter.format(onTable)}</span>
+          <Money eur={onTable} className="font-medium tabular-nums" />
           <span className="text-xs text-muted-foreground tabular-nums">
-            {asking != null ? `of ${currencyFormatter.format(asking)}` : 'asking price unknown'}
+            {asking != null ? <>of <Money eur={asking} /></> : 'asking price unknown'}
             {below != null && below > 0 && ` · ${below}% below`}
-            {countered && ` · buyer bid ${currencyFormatter.format(offer.offerAmount ?? offer.amount ?? 0)}`}
+            {countered && <> · buyer bid <Money eur={offer.offerAmount ?? offer.amount ?? 0} /></>}
           </span>
         </div>
       );

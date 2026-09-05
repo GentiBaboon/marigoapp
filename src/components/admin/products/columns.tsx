@@ -9,11 +9,7 @@ import { ArrowUpDown, CheckCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-
-const currencyFormatter = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-});
+import { Money } from '@/components/admin/money';
 
 export const columns: ColumnDef<FirestoreProduct>[] = [
   {
@@ -91,7 +87,7 @@ export const columns: ColumnDef<FirestoreProduct>[] = [
         </Button>
       )
     },
-    cell: ({ row }) => currencyFormatter.format(row.original.price),
+    cell: ({ row }) => <Money eur={row.original.price} />,
   },
   {
     accessorKey: 'quantity',
