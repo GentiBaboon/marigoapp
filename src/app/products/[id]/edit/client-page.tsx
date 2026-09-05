@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { toAttributeItems } from '@/lib/attribute-options';
 import { resolveSizeOptions, resolveSizeSystems, normalizeSize } from '@/lib/size-options';
 import { omitUndefined, parseNumericInput } from '@/lib/firestore-write';
+import { currencySuffix, eurToInputValue, resolveEurFromInput } from '@/lib/price-conversion';
 import {
   ArrowLeft,
   Loader2,
@@ -72,7 +73,10 @@ export default function EditListingPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
-  const { formatPrice } = useCurrency();
+  const { formatPrice, currency, rate } = useCurrency();
+  // See the admin product page: the currency preference settles a render late,
+  // so an untouched price box is re-seeded rather than reinterpreted.
+  const priceTouched = React.useRef(false);
   const [isSaving, setIsSaving] = React.useState(false);
 
   // ── Product Data ──
@@ -227,7 +231,8 @@ export default function EditListingPage() {
       setMaterial(product.material ?? '');
       setPattern(product.pattern ?? '');
       setVintage(product.vintage ?? false);
-      setPrice(product.price?.toString() ?? '');
+      // Displayed in the seller's currency (lek by default), stored as EUR.
+      setPrice(eurToInputValue(product.price, currency, rate));
       setSelectedAddressId(product.shippingFromAddressId);
       setSeeded(true);
     }
@@ -241,8 +246,14 @@ export default function EditListingPage() {
     }
   }, [addresses, selectedAddressId]);
 
+  React.useEffect(() => {
+    if (!product || !seeded || priceTouched.current) return;
+    setPrice(eurToInputValue(product.price, currency, rate));
+  }, [currency, rate, product, seeded]);
+
   // ── Pricing calculations ──
-  const currentPrice = parseFloat(price) || 0;
+  // EUR. The typed figure is lek unless the seller switched their currency.
+  const currentPrice = resolveEurFromInput(price, currency, rate, product?.price) ?? 0;
   const fee = currentPrice * PLATFORM_FEE;
   const earnings = currentPrice - fee;
 
@@ -317,7 +328,7 @@ export default function EditListingPage() {
         material,
         pattern,
         vintage,
-        price: parseNumericInput(price, product?.price),
+        price: resolveEurFromInput(price, currency, rate, product?.price) ?? product?.price,
         shippingFromAddressId: selectedAddressId,
         updatedAt: serverTimestamp(),
       }));
@@ -731,11 +742,11 @@ export default function EditListingPage() {
               <Input
                 type="number"
                 value={price}
-                onChange={e => setPrice(e.target.value)}
-                className="h-20 text-4xl font-bold pl-12"
+                onChange={e => { priceTouched.current = true; setPrice(e.target.value); }}
+                className="h-20 text-4xl font-bold pl-4 pr-24"
                 placeholder="0"
               />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground">€</span>
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xl font-bold text-muted-foreground">{currencySuffix(currency)}</span>
             </div>
           </div>
 
@@ -743,11 +754,11 @@ export default function EditListingPage() {
           <div className="bg-primary/5 rounded-xl p-6 border border-primary/10 space-y-4">
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">Platform fee (15%)</span>
-              <span className="font-medium text-destructive">- €{fee.toFixed(2)}</span>
+              <span className="font-medium text-destructive">−{formatPrice(fee)}</span>
             </div>
             <div className="flex justify-between items-center text-lg font-bold">
               <span>You will receive</span>
-              <span className="text-green-600">€{earnings.toFixed(2)}</span>
+              <span className="text-green-600">{formatPrice(earnings)}</span>
             </div>
           </div>
 

@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { useFirestore, useDoc, useMemoFirebase, useUser } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { getCookie, setCookie } from '@/lib/cookies';
+import { FALLBACK_RATES, rateFor } from '@/lib/price-conversion';
 
 export type Currency = 'EUR' | 'ALL' | 'USD';
 
@@ -23,6 +24,15 @@ interface CurrencyContextType {
     setCurrency: (currency: Currency) => void;
     formatPrice: (priceInEur: number, targetCurrency?: Currency) => string;
     rates: ExchangeRates['rates'] | null;
+    /**
+     * The live rate for the active currency, already fallen back.
+     *
+     * `rates` is null whenever `config/exchangeRates` is missing — which is
+     * always — so a consumer reading it had to restate the fallback table to
+     * do anything useful. This one is always a usable number, and is what
+     * price *inputs* convert through.
+     */
+    rate: number;
     isLoading: boolean;
 }
 
@@ -80,10 +90,11 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const formatPrice = useCallback((priceInEur: number, targetCurrency?: Currency) => {
         const c = targetCurrency || currency;
-        // Fallback table. `config/exchangeRates` does not exist in Firestore,
-        // so in practice this IS the rate the app runs on. Keep ALL in step
-        // with ALL_PER_EUR in src/lib/types.ts, which derives the shipping fee.
-        const rates = exchangeRates?.rates || { EUR: 1, ALL: 93, USD: 1.08 };
+        // `config/exchangeRates` does not exist in Firestore, so FALLBACK_RATES
+        // is in practice the rate the app runs on. It lives in
+        // `@/lib/price-conversion` alongside the input conversion, so display
+        // and entry cannot disagree about what a lek is worth.
+        const rates = exchangeRates?.rates || FALLBACK_RATES;
         const rate = rates[c] || 1;
         const convertedPrice = priceInEur * rate;
         
@@ -101,8 +112,10 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     }, [currency, exchangeRates]);
 
+    const rate = rateFor(currency, exchangeRates?.rates);
+
     return (
-        <CurrencyContext.Provider value={{ currency, setCurrency, formatPrice, rates: exchangeRates?.rates || null, isLoading }}>
+        <CurrencyContext.Provider value={{ currency, setCurrency, formatPrice, rate, rates: exchangeRates?.rates || null, isLoading }}>
             {children}
         </CurrencyContext.Provider>
     );

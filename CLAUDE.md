@@ -669,6 +669,28 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
     against, so anyone who picked USD while it was offered lands back on the
     default rather than being stranded on prices no control can change.
     Restoring it: add it here and re-add the row in `user-nav.tsx`.
+- **Price *inputs* are in the display currency; storage stays EUR.**
+  `src/lib/price-conversion.ts` is the only crossing — `resolveEurFromInput()`
+  on the way in, `eurToInputValue()` on the way out — used by the sell wizard's
+  `PricingStep`, the seller edit page and the admin product page. Since
+  `DEFAULT_CURRENCY` is `ALL`, a seller types **2325** and the document stores
+  **€25**; commission, payouts, Stripe amounts and every finance figure are
+  untouched EUR.
+  - **The failure mode is a factor of 93.** A lek figure written straight into
+    the EUR field turns a 2.500 ALL dress into a €2,500 one — the same bug
+    `src/lib/offers.ts` documents for the offer sheet. Never divide by a rate
+    at a call site.
+  - **A stored price must survive a no-op save.** €21.25 renders as 1.976 ALL
+    and 1976 / 93 is €21.247…, so a plain round-trip shaved a fraction off the
+    price on *every* save, compounding. `resolveEurFromInput()` takes the
+    stored EUR and returns it unchanged when the typed figure still renders as
+    the same lek value.
+  - **The currency preference arrives a render late** (cookie, read in an
+    effect), so the first render is always the default. Every price box
+    re-seeds on `[currency, rate]` while untouched — without that, a seller
+    with EUR saved gets a lek figure in a field the save path reads as EUR.
+  - An empty box yields `undefined`, not `0`, so a draft with no price keeps
+    having no price rather than being published free.
 - **Delivery is priced per origin city**, and all of it lives in
   `src/lib/shipping.ts` so the quote in the basket and the amount actually
   charged cannot drift. `DEFAULT_SHIPPING_FEE_ALL` (200) per distinct city, or
@@ -852,7 +874,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (636 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (651 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

@@ -39,6 +39,8 @@ import type { MacroFilter, MacroFiltersConfig } from '@/components/home/MacroFil
 import { toDate } from '@/lib/types';
 import { GENDER_OPTIONS } from '@/lib/listing-options';
 import { omitUndefined } from '@/lib/firestore-write';
+import { useCurrency } from '@/context/CurrencyContext';
+import { currencySuffix, eurToInputValue, resolveEurFromInput } from '@/lib/price-conversion';
 import { toAttributeItems } from '@/lib/attribute-options';
 import { notifyUser } from '@/lib/notifications';
 import { format } from 'date-fns';
@@ -123,6 +125,12 @@ export default function AdminProductReviewPage() {
   const firestore = useFirestore();
   const { user: adminUser } = useUser();
   const { toast } = useToast();
+  const { currency, rate } = useCurrency();
+  // The saved currency preference is read from a cookie in an effect, so the
+  // first render is always the default (lek) and a later one may be EUR. The
+  // price box would then hold a lek figure that the save path reads as EUR —
+  // a 93x error. Re-seed an untouched box whenever the currency settles.
+  const priceTouched = React.useRef(false);
 
   const [isUpdating, setIsUpdating] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -309,14 +317,23 @@ export default function AdminProductReviewPage() {
       setSeoTitle((product as any).seoTitle ?? '');
       setSeoDescription((product as any).seoDescription ?? '');
       setVintage(product.vintage ?? false);
-      setPrice(product.price?.toString() ?? '');
-      setOriginalPrice(product.originalPrice?.toString() ?? '');
+      // Shown in the operator's display currency (lek by default); converted
+      // back to EUR on save. Storage stays EUR — commission, payouts and the
+      // Stripe amount all read this field.
+      setPrice(eurToInputValue(product.price, currency, rate));
+      setOriginalPrice(eurToInputValue(product.originalPrice, currency, rate));
       setQuantity(((product as any).quantity ?? 1).toString());
       setListingType(product.listingType ?? 'fixed_price');
       setVariants(Array.isArray((product as any).variants) ? (product as any).variants : []);
       setSeeded(true);
     }
   }, [product, seeded]);
+
+  React.useEffect(() => {
+    if (!product || !seeded || priceTouched.current) return;
+    setPrice(eurToInputValue(product.price, currency, rate));
+    setOriginalPrice(eurToInputValue(product.originalPrice, currency, rate));
+  }, [currency, rate, product, seeded]);
 
   // ── Fetch conversations ──
   React.useEffect(() => {
@@ -459,9 +476,13 @@ export default function AdminProductReviewPage() {
       // save then died with "Unsupported field value" naming a field the admin
       // had not touched, so nothing on the page could be edited — including
       // adding an image.
-      const priceInput = parseFloat(price);
-      const parsedPrice = Number.isFinite(priceInput) ? priceInput : product.price;
-      const parsedOriginalPrice = originalPrice ? parseFloat(originalPrice) : null;
+      // `resolveEurFromInput` is the only place a typed figure becomes EUR. It
+      // returns undefined for an empty box, which `omitUndefined` then drops,
+      // so a draft with no price stays without one rather than becoming 0.
+      const parsedPrice = resolveEurFromInput(price, currency, rate, product.price) ?? product.price;
+      const parsedOriginalPrice = originalPrice
+        ? resolveEurFromInput(originalPrice, currency, rate, product.originalPrice) ?? null
+        : null;
       const parsedQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
       // Clean variants and roll up the total. If variants exist, they are the
       // source of truth for stock — the top-level `quantity` field mirrors the
@@ -910,29 +931,29 @@ export default function AdminProductReviewPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="font-semibold text-sm">Price (EUR)</Label>
+                <Label className="font-semibold text-sm">Price ({currencySuffix(currency)})</Label>
                 <div className="relative">
                   <Input
                     type="number"
                     value={price}
-                    onChange={e => setPrice(e.target.value)}
-                    placeholder="0.00"
-                    className="pl-7"
+                    onChange={e => { priceTouched.current = true; setPrice(e.target.value); }}
+                    placeholder="0"
+                    className="pr-14"
                   />
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">€</span>
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">{currencySuffix(currency)}</span>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label className="font-semibold text-sm">Original Price (EUR)</Label>
+                <Label className="font-semibold text-sm">Original Price ({currencySuffix(currency)})</Label>
                 <div className="relative">
                   <Input
                     type="number"
                     value={originalPrice}
-                    onChange={e => setOriginalPrice(e.target.value)}
-                    placeholder="0.00"
-                    className="pl-7"
+                    onChange={e => { priceTouched.current = true; setOriginalPrice(e.target.value); }}
+                    placeholder="0"
+                    className="pr-14"
                   />
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">€</span>
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">{currencySuffix(currency)}</span>
                 </div>
               </div>
             </div>
