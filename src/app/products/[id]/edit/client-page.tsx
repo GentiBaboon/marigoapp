@@ -22,6 +22,8 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { toAttributeItems } from '@/lib/attribute-options';
+import { omitUndefined, parseNumericInput } from '@/lib/firestore-write';
 import {
   ArrowLeft,
   Loader2,
@@ -137,6 +139,15 @@ export default function EditListingPage() {
   const { data: colors } = useCollection<FirestoreAttribute>(colorsQuery);
   const { data: patterns } = useCollection<FirestoreAttribute>(patternsQuery);
   const { data: addresses } = useCollection<FirestoreAddress>(addressesCollection);
+
+  // Catalog rows do not all carry the same field name — `conditions` stores
+  // `value`, the rest store `slug`. `toAttributeItems` resolves both; reading
+  // `.value` directly (as this page used to) yields `value: undefined` for all
+  // 296 material/colour/pattern records and renders an empty dropdown.
+  const conditionItems = React.useMemo(() => toAttributeItems(conditions), [conditions]);
+  const materialItems = React.useMemo(() => toAttributeItems(materials), [materials]);
+  const colorItems = React.useMemo(() => toAttributeItems(colors), [colors]);
+  const patternItems = React.useMemo(() => toAttributeItems(patterns), [patterns]);
 
   // ── Category Tree for Combobox ──
   // Option values use each subcategory's unique doc `id`. Slugs collide
@@ -278,7 +289,11 @@ export default function EditListingPage() {
     }
     setIsSaving(true);
     try {
-      await updateDoc(productRef, {
+      // Every `undefined` in this payload aborts the *whole* write — Firestore
+      // throws before the request leaves the browser. A draft legitimately has
+      // no price and a new seller has no saved address, so both keys have to be
+      // able to simply not be sent rather than be sent as `undefined`.
+      await updateDoc(productRef, omitUndefined({
         images: images.map((img, i) => ({ ...img, position: i })),
         gender,
         subcategoryId,
@@ -292,10 +307,10 @@ export default function EditListingPage() {
         material,
         pattern,
         vintage,
-        price: parseFloat(price) || product!.price,
+        price: parseNumericInput(price, product?.price),
         shippingFromAddressId: selectedAddressId,
         updatedAt: serverTimestamp(),
-      });
+      }));
       toast({ title: 'Listing updated', description: 'Your changes have been saved.' });
       router.push(`/products/${productId}`);
     } catch (err: any) {
@@ -599,13 +614,13 @@ export default function EditListingPage() {
                 <SelectValue placeholder="Select condition" />
               </SelectTrigger>
               <SelectContent>
-                {conditions && conditions.length > 0
-                  ? conditions.map(c => <SelectItem key={c.id} value={c.value}>{c.name}</SelectItem>)
-                  : ['new_with_tags', 'new_without_tags', 'very_good', 'good', 'fair'].map(v => (
-                      <SelectItem key={v} value={v}>
-                        {v.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </SelectItem>
-                    ))}
+                {/* No hardcoded fallback: the old one offered `new_with_tags`
+                    while the catalog and every stored listing use
+                    `new-with-tag`, so picking one during the brief load
+                    window saved a value no search facet could match. */}
+                {conditionItems.map(c => (
+                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -617,7 +632,7 @@ export default function EditListingPage() {
               <Combobox
                 value={material}
                 onValueChange={setMaterial}
-                items={materials?.map(m => ({ value: m.value, label: m.name })) || []}
+                items={materialItems}
                 placeholder="Material"
                 searchPlaceholder="Search..."
                 emptyPlaceholder="No results."
@@ -628,7 +643,7 @@ export default function EditListingPage() {
               <Combobox
                 value={color}
                 onValueChange={setColor}
-                items={colors?.map(c => ({ value: c.value, label: c.name })) || []}
+                items={colorItems}
                 placeholder="Color"
                 searchPlaceholder="Search..."
                 emptyPlaceholder="No results."
@@ -652,7 +667,7 @@ export default function EditListingPage() {
               <Combobox
                 value={pattern}
                 onValueChange={setPattern}
-                items={patterns?.map(p => ({ value: p.value, label: p.name })) || []}
+                items={patternItems}
                 placeholder="Pattern"
                 searchPlaceholder="Search..."
                 emptyPlaceholder="No results."

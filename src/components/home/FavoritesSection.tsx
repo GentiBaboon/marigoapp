@@ -13,6 +13,7 @@ import { collection, query, where, documentId, getDocs } from 'firebase/firestor
 import { useFirestore, useUser } from '@/firebase';
 import { useWishlist } from '@/context/WishlistContext';
 import type { FirestoreProduct } from '@/lib/types';
+import { isPubliclyViewable } from '@/lib/product-visibility';
 import { ProductCard, toCardProduct } from '@/components/product-card';
 import { PagedList } from '@/components/InfiniteScrollSentinel';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -57,7 +58,17 @@ export async function fetchProductsByIds(
 
   const found = new Map<string, FirestoreProduct>();
   snapshots.forEach(snap => {
-    snap.docs.forEach(d => found.set(d.id, { id: d.id, ...d.data() } as FirestoreProduct));
+    snap.docs.forEach(d => {
+      const product = { id: d.id, ...d.data() } as FirestoreProduct;
+      // A `documentId() in [...]` query cannot also constrain status —
+      // Firestore multiplies a query's disjunctions and caps them at 30 — so
+      // the check has to happen here. Without it these two rails were the one
+      // public surface that would still render a listing after it was pulled:
+      // favourite an item, have it removed for being counterfeit, and it kept
+      // its card, its price and a working link. The same held for a draft the
+      // seller had merely opened, which is how it was found.
+      if (isPubliclyViewable(product.status)) found.set(d.id, product);
+    });
   });
 
   // Preserve the caller's order, and silently drop ids whose product has since

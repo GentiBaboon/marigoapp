@@ -238,7 +238,7 @@ Types in `src/lib/types.ts` (~855 lines — the single source of truth for both 
 | `reviews/{id}` | Seller/product reviews | — |
 | `refunds/{id}`, `disputes/{id}`, `returns/{id}` | Post-purchase workflows (returns have a buyer-driven → seller-driven transition ladder enforced in rules) | — |
 | `coupons/{id}` | Discount codes (admin-writable, signed-in read) | — |
-| `categories`, `brands`, `conditions`, `materials`, `colors`, `patterns`, `size_charts` | Catalog metadata (public read, admin write) | — |
+| `categories`, `brands`, `conditions`, `materials`, `colors`, `patterns`, `size_charts` | Catalog metadata (public read, admin write). **These do not share a field name** — see §9c | — |
 | `settings/global` | `commissionRate`, `payoutHoldHours`, `refundWindowDays` (full-admin write) | — |
 | `settings/{banners,macro_filters,homepage_blocks,badges}` | Merchandising + badge config (admin write) | — |
 | `config/exchangeRates` | EUR-base rates for `CurrencyContext`. **Does not exist in Firestore** — the fallback table in `CurrencyContext` is the rate the app really runs on | — |
@@ -566,6 +566,43 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 - Order status is modelled audience-aware in `src/lib/order-status.ts`: `STATUS_RANK`, `statusLabel(status, 'buyer'|'seller'|'admin')`, `TIMELINE_STEPS` / `TIMELINE_STEPS_SELLER`, `nextSellerTransition` / `nextAdminTransition`.
 - Order side-effects live in `src/lib/order-lifecycle.ts` (`recordRefund`, `recordReturn`, `recordRefundForReturn`, `recordRefundForDispute`) and `src/lib/order-inventory.ts` (`releaseOrderItems`, `markOrderItemsSoldIfDepleted`).
 - Notifications: `src/lib/notifications.ts` (`notifyUser`, `notifyOrderStatus`, `humanReadableStatus`).
+- **Catalog attribute options go through `src/lib/attribute-options.ts`.**
+  `conditions` stores `name` + `value`; `materials`, `colors` and `patterns`
+  store `name` + `slug` + `order` and have **no `value` at all** — 296
+  documents of it. `FirestoreAttribute` declared `value` as required, so
+  `row.value` typechecked everywhere while being `undefined` everywhere, and
+  Radix will not render a `SelectItem` without a value. The listing **edit**
+  page therefore had permanently empty Material / Colour / Pattern dropdowns,
+  and the `/search` colour, material and pattern facets set the filter to
+  `undefined` on click. Both were silent — no error, just nothing.
+  `toAttributeItems()` (and `resolveAttributeValue()` where the caller needs
+  `hex`/`id`, as the swatches do) resolves `value` → `slug` → slugified `name`,
+  which is the order the stored listings agree with (`condition:
+  "very-good-condition"`, `color: "dark-brown"`). The sell wizard had patched
+  this inline and the edit page had not, which is exactly how one screen could
+  set an attribute the other could never change. Never read `.value` directly.
+  The admin attribute editor now writes `slug` alongside `value` so the two
+  conventions converge rather than drift further.
+- **Never put `undefined` in a Firestore write — use `omitUndefined()`**
+  (`src/lib/firestore-write.ts`). `updateDoc` throws *before* the request
+  leaves the browser and loses the **entire** payload, naming only one field.
+  This has now bitten three screens in the same shape: a draft with no price
+  (`parseFloat('') || product.price` → `NaN || undefined` → `undefined`), a
+  seller with no saved address (`shippingFromAddressId: undefined`), and the
+  admin attribute editor (`value: attribute.value` on a record that stores
+  `slug`). Every one of them presented to the user as "Save does nothing" —
+  and in the listing editor as "I can't add an image", because the images were
+  in the same call. Use `parseNumericInput()` rather than `parseFloat(x) || y`,
+  which also mistakes a valid `0` for a missing value.
+- **An id-based product query cannot filter status, so filter it in memory.**
+  `where(documentId(), 'in', [...])` cannot take a second `in` clause —
+  Firestore multiplies a query's disjunctions and caps them at 30 — so the
+  three personal rails (`/favorites`, `FavoritesSection`, `RecentlyViewedSection`
+  via `fetchProductsByIds`) fetch by id and must call `isPubliclyViewable()`
+  themselves. They did not, which made them the one public surface that still
+  rendered a listing after it was pulled: favourite an item, have it removed
+  for being counterfeit, and it kept its card, its price and a working link.
+  `MacroFilteredProducts` already did this correctly; copy that, not the rails.
 - **Sizes come from `src/lib/size-options.ts`, never from a text input.** It
   resolves options as **admin `size_charts` → `SIZE_PRESETS` → `UNIVERSAL_SIZES`**,
   and `resolveSizeOptions()` is guaranteed non-empty for every category × system
@@ -778,7 +815,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (612 passing): unit — `admin-permissions`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (628 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

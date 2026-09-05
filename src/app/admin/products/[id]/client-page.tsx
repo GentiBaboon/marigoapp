@@ -37,6 +37,8 @@ import type {
 } from '@/lib/types';
 import type { MacroFilter, MacroFiltersConfig } from '@/components/home/MacroFilters';
 import { toDate } from '@/lib/types';
+import { omitUndefined } from '@/lib/firestore-write';
+import { toAttributeItems } from '@/lib/attribute-options';
 import { notifyUser } from '@/lib/notifications';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -509,11 +511,7 @@ export default function AdminProductReviewPage() {
       // and writing it straight through turns "this is empty" into a payload
       // Firestore will not accept, so drop the empties rather than send them.
       // Leaving the key out means the field simply stays absent.
-      for (const key of Object.keys(updates)) {
-        if (updates[key] === undefined) delete updates[key];
-      }
-
-      await updateDoc(productRef, updates);
+      await updateDoc(productRef, omitUndefined(updates));
       await logAction('product_edited', `Admin edited product "${title.trim()}"`);
       toast({ title: 'Saved', description: 'Product updated successfully.' });
     } catch (err: any) {
@@ -804,13 +802,11 @@ export default function AdminProductReviewPage() {
                   <SelectValue placeholder="Select condition" />
                 </SelectTrigger>
                 <SelectContent>
-                  {conditions && conditions.length > 0
-                    ? conditions.map(c => <SelectItem key={c.id} value={c.value}>{c.name}</SelectItem>)
-                    : ['new_with_tags', 'new_without_tags', 'very_good', 'good', 'fair'].map(v => (
-                        <SelectItem key={v} value={v}>
-                          {v.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </SelectItem>
-                      ))}
+                  {/* The old hardcoded fallback used `new_with_tags` while
+                      the catalog and every listing use `new-with-tag`. */}
+                  {toAttributeItems(conditions).map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

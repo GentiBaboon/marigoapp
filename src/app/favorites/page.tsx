@@ -13,6 +13,7 @@ import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 import type { FirestoreProduct } from '@/lib/types';
+import { isPubliclyViewable } from '@/lib/product-visibility';
 
 const categories = [
   { id: 'all', label: 'All' },
@@ -78,7 +79,11 @@ export default function FavoritesPage() {
               const q = query(collection(firestore, 'products'), where(documentId(), 'in', chunk));
               const querySnapshot = await getDocs(q);
               querySnapshot.forEach((doc) => {
-                results.push({ id: doc.id, ...doc.data() } as FirestoreProduct);
+                const product = { id: doc.id, ...doc.data() } as FirestoreProduct;
+                // An id-based query cannot also filter status, so it is checked
+                // here: a withdrawn or draft listing must not keep a live card
+                // in someone's favourites just because they saved it earlier.
+                if (isPubliclyViewable(product.status)) results.push(product);
               });
             }
           }

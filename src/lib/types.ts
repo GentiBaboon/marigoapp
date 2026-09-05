@@ -624,11 +624,25 @@ export interface FirestoreBrand {
   verified: boolean;
 }
 
+/**
+ * A catalog attribute row (condition / material / colour / pattern).
+ *
+ * `value` is optional because it genuinely is: only `conditions` stores it.
+ * `materials`, `colors` and `patterns` store `slug` instead. Declaring `value`
+ * as required was not a harmless inaccuracy — it made `row.value` typecheck at
+ * every call site while being `undefined` at all ~296 of them, which is how the
+ * listing edit page shipped with three permanently empty dropdowns.
+ *
+ * Resolve options through `toAttributeItems()` in `@/lib/attribute-options`
+ * rather than reading either field directly.
+ */
 export interface FirestoreAttribute {
   id: string;
   name: string;
-  value: string;
+  value?: string;
+  slug?: string;
   hex?: string;
+  order?: number;
 }
 
 export interface FirestoreCoupon {

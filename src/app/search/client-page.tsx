@@ -23,6 +23,7 @@ import {
   getDocs, type QueryDocumentSnapshot, type DocumentData,
 } from 'firebase/firestore';
 import type { FirestoreProduct, FirestoreCategory, FirestoreAttribute, FirestoreBrand } from '@/lib/types';
+import { resolveAttributeValue } from '@/lib/attribute-options';
 import { cn } from '@/lib/utils';
 import { resolveSizeOptions, normalizeSize, sizesMatch } from '@/lib/size-options';
 import { buildCategoryPath } from '@/lib/category-url';
@@ -398,19 +399,35 @@ function FilterSheet({
     [brands],
   );
   const sortedConditions = React.useMemo(
-    () => (conditions ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+    () =>
+      (conditions ?? [])
+        .map((r) => ({ ...r, value: resolveAttributeValue(r) }))
+        .filter((r) => r.value.length > 0)
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [conditions],
   );
   const sortedColors = React.useMemo(
-    () => (colors ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+    () =>
+      (colors ?? [])
+        .map((r) => ({ ...r, value: resolveAttributeValue(r) }))
+        .filter((r) => r.value.length > 0)
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [colors],
   );
   const sortedMaterials = React.useMemo(
-    () => (materials ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+    () =>
+      (materials ?? [])
+        .map((r) => ({ ...r, value: resolveAttributeValue(r) }))
+        .filter((r) => r.value.length > 0)
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [materials],
   );
   const sortedPatterns = React.useMemo(
-    () => (patterns ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+    () =>
+      (patterns ?? [])
+        .map((r) => ({ ...r, value: resolveAttributeValue(r) }))
+        .filter((r) => r.value.length > 0)
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [patterns],
   );
 

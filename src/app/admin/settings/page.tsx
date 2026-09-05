@@ -21,6 +21,8 @@ import { useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase
 import { invalidateCatalog } from '@/lib/catalog-cache';
 import { doc, collection, query, orderBy, updateDoc, addDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import type { FirestoreSettings, FirestoreCategory, FirestoreBrand, FirestoreAttribute } from '@/lib/types';
+import { resolveAttributeValue } from '@/lib/attribute-options';
+import { omitUndefined } from '@/lib/firestore-write';
 import { useToast } from '@/hooks/use-toast';
 import SettingsLoading from './loading';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -231,9 +233,13 @@ const AttributeDialog = ({
 
     React.useEffect(() => {
         if (attribute) {
+            // `attribute.value` is absent on every material/colour/pattern
+            // record — those store `slug`. Reading it raw put `undefined` into
+            // the payload, and `updateDoc` rejects that, so editing any of
+            // them failed with a bare "Error saving".
             setFormData({
                 name: attribute.name,
-                value: attribute.value,
+                value: resolveAttributeValue(attribute),
                 hex: attribute.hex || '',
             });
         } else {
@@ -244,11 +250,16 @@ const AttributeDialog = ({
     const handleSave = async () => {
         setIsLoading(true);
         try {
+            // Write `slug` alongside `value` so the two conventions converge
+            // instead of drifting further apart: `conditions` is keyed on
+            // `value`, everything else on `slug`, and a record saved here
+            // previously grew a `value` its siblings did not have.
+            const payload = omitUndefined({ ...formData, slug: formData.value });
             if (attribute?.id) {
-                await updateDoc(doc(firestore, collectionName, attribute.id), formData);
+                await updateDoc(doc(firestore, collectionName, attribute.id), payload);
                 toast({ title: 'Updated successfully.' });
             } else {
-                await addDoc(collection(firestore, collectionName), formData);
+                await addDoc(collection(firestore, collectionName), payload);
                 toast({ title: 'Added successfully.' });
             }
             onOpenChange(false);

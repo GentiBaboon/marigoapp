@@ -20,6 +20,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { sellStep4Schema, canUseVariants, type FirestoreCategory, type FirestoreAttribute, type FirestoreUser } from '@/lib/types';
+import { toAttributeItems } from '@/lib/attribute-options';
 import { useBadgeSettings } from '@/hooks/use-badge-settings';
 import type { z } from 'zod';
 import { StepActions } from '@/components/sell/StepActions';
@@ -95,25 +96,13 @@ export function DetailsStep() {
     return parent ? `${parent.name} / ${sub?.name}` : sub?.name || '';
   }, [formData.subcategoryId, formData.categoryId, categories]);
 
-  // Build combobox items from a Firestore attribute collection. Some seeded
-  // records lack the `value` field — fall back to a slugified name so the
-  // option still renders and remains selectable.
-  const slugify = (s: string) =>
-    s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  const toAttributeItems = React.useCallback((rows?: FirestoreAttribute[] | null) => {
-    if (!rows) return [];
-    return rows
-      .filter((r) => typeof r?.name === 'string' && r.name.trim().length > 0)
-      .map((r) => ({
-        value: (r.value && r.value.trim()) || slugify(r.name),
-        label: r.name,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, []);
-
-  const materialItems = React.useMemo(() => toAttributeItems(materials), [materials, toAttributeItems]);
-  const colorItems = React.useMemo(() => toAttributeItems(colors), [colors, toAttributeItems]);
-  const patternItems = React.useMemo(() => toAttributeItems(patterns), [patterns, toAttributeItems]);
+  // Option shape is resolved in `@/lib/attribute-options` — the catalog
+  // collections disagree on the field name and none of these rows can be read
+  // as `.value` directly.
+  const conditionItems = React.useMemo(() => toAttributeItems(conditions), [conditions]);
+  const materialItems = React.useMemo(() => toAttributeItems(materials), [materials]);
+  const colorItems = React.useMemo(() => toAttributeItems(colors), [colors]);
+  const patternItems = React.useMemo(() => toAttributeItems(patterns), [patterns]);
 
   // Systems and sizes both resolve through src/lib/size-options.ts, which
   // walks admin chart → built-in preset → universal list. That is what lets
@@ -162,12 +151,9 @@ export function DetailsStep() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {conditions?.map(c => {
-                    const val = (c.value && c.value.trim()) || slugify(c.name);
-                    return (
-                      <SelectItem key={c.id} value={val}>{c.name}</SelectItem>
-                    );
-                  })}
+                  {conditionItems.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <FormMessage />
