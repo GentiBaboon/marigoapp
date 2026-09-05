@@ -15,6 +15,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import imageCompression from 'browser-image-compression';
+import { ANALYSIS_COMPRESSION, fileToDataUri } from '@/lib/image-for-model';
 import { useDropzone } from 'react-dropzone';
 import { getAuth } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
@@ -33,7 +34,7 @@ const MAX_IMAGES = 9;
 /** What goes into the draft — matches the manual Photos step's settings. */
 const STORAGE_COMPRESSION = { maxSizeMB: 0.8, maxWidthOrHeight: 1200, useWebWorker: true };
 /** What goes to the model — small enough that nine of them still fit in a request. */
-const ANALYSIS_COMPRESSION = { maxSizeMB: 0.12, maxWidthOrHeight: 640, useWebWorker: true };
+
 
 interface StagedImage {
   id: string;
@@ -43,15 +44,6 @@ interface StagedImage {
   file: File;
   name: string;
   type: string;
-}
-
-function fileToDataUri(file: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('Could not read image'));
-    reader.readAsDataURL(file);
-  });
 }
 
 interface AiListingAssistantProps {

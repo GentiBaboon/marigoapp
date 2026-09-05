@@ -211,6 +211,7 @@ API routes (`src/app/api/`):
 |---|---|---|
 | `ai/generate-description`, `ai/recommendations`, `ai/remove-background` | — | CSRF-exempt (stateless) |
 | `ai/draft-listing` | Bearer ID token | Multimodal: photos + a hint → a `Partial<SellFormValues>` snapped to the live taxonomy (§7). Spends model quota, so it is not open to anonymous callers |
+| `ai/suggest-price` | Bearer ID token | Rate-limited. Photos + the details filled in so far → a min/max/recommended price **in EUR** and one line of reasoning. Backs the suggestion panel in `PricingStep`, which converts for display; the panel it replaced was hardcoded |
 | `chat` | — | Genkit chatbot; CSRF-exempt |
 | `create-payment-intent` | Bearer ID token | Rate-limited; creates the Stripe PI and a `pending_payment` order. Takes **no** stock, spends no coupon and sends no mail — it runs before the card is confirmed |
 | `confirm-order` | Bearer ID token | Rate-limited; called after `confirmCardPayment` succeeds. Re-reads the intent from Stripe (never trusts the client), moves the order to `processing`, then takes stock, spends the coupon and sends the confirmations. Idempotent — the order's status is the guard |
@@ -417,7 +418,13 @@ Entry: `src/ai/genkit.ts` — `googleAI()` plugin with an explicit default model
 **Model ids live in `src/ai/models.ts`, not scattered through the routes.** `TEXT_MODEL` / `IMAGE_MODEL` are env-overridable (`GENAI_TEXT_MODEL`, `GENAI_IMAGE_MODEL`), and `generateText()` wraps `ai.generate()` with automatic failover down `TEXT_FALLBACKS` when Google 404s a retired model. This exists because `gemini-2.0-flash` was hardcoded in two places, got retired, and took down chat + pricing + descriptions + recommendations + smart-search simultaneously with no non-deploy recovery. Prefer `generateText()` over `ai.generate()` in new flows.
 
 Flows in `src/ai/flows/` (each exports a Zod input/output schema pair plus an async wrapper):
-- `ai-suggest-price.ts` → `suggestPrice` — seller price suggestion
+- `ai-suggest-price.ts` → `suggestPrice` — seller price suggestion. **The
+  wizard does not call this flow**: it is a `'use server'` action, which the
+  Capacitor export cannot reach (§14), and it calls `ai.definePrompt` directly
+  so it has no model failover. `/api/ai/suggest-price` reimplements it on
+  `generateText()` and is what `PricingStep` uses; the flow is kept as the
+  schema of record. Its EUR figures are converted for display by
+  `price-conversion` — the panel shows lek
 - `generate-description.ts` → `generateDescription` — listing copy
 - `get-recommendations.ts` → `getRecommendations` — product recommendations
 - `smart-search.ts` → `smartSearch` — semantic search backing `/search`

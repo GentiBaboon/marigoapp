@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { MapPin, Truck, Plus, Edit, Check, Loader2 } from 'lucide-react';
+import { Sparkles, MapPin, Truck, Plus, Edit, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
@@ -13,8 +13,10 @@ import type { FirestoreAddress, FirestoreUser, ProductVariant } from '@/lib/type
 import { canUseVariants, DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
 import { useCurrency } from '@/context/CurrencyContext';
 import {
-  currencySuffix, eurToInputValue, resolveEurFromInput,
+  currencySuffix, eurToInputValue, fromEur, resolveEurFromInput,
 } from '@/lib/price-conversion';
+import { toModelImages } from '@/lib/image-for-model';
+import { getAuth } from 'firebase/auth';
 import { useBadgeSettings } from '@/hooks/use-badge-settings';
 import { resolveSizeOptions, resolveSizeSystems } from '@/lib/size-options';
 import { Trash2 } from 'lucide-react';
@@ -40,6 +42,52 @@ export function PricingStep() {
   // second EUR; re-seeding an untouched box keeps the figure honest, while a
   // typed one is left exactly as typed.
   const priceTouched = useRef(false);
+
+  // ── AI price suggestion ──
+  const [suggestion, setSuggestion] = useState<{
+    minPrice: number; maxPrice: number; recommendedPrice: number; reasoning: string;
+  } | null>(null);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+
+  const requestSuggestion = async () => {
+    setIsSuggesting(true);
+    setSuggestError(null);
+    try {
+      const authUser = getAuth().currentUser;
+      if (!authUser) throw new Error('Sign in to get a price suggestion.');
+      const idToken = await authUser.getIdToken();
+
+      // Three photos is plenty to judge condition, and keeps the request
+      // inside the body limit and the 30s function ceiling.
+      const images = await toModelImages(formData.images ?? [], 3);
+
+      const res = await fetch('/api/ai/suggest-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({
+          images,
+          title: formData.title,
+          brand: formData.brandId,
+          category: formData.subcategoryId || formData.categoryId,
+          condition: formData.condition,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Could not suggest a price just now.');
+      setSuggestion(data);
+    } catch (err: any) {
+      setSuggestError(err?.message || 'Could not suggest a price just now.');
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
+  /** Put a suggested EUR figure into the box, in whatever currency it shows. */
+  const applySuggestion = (eur: number) => {
+    priceTouched.current = true;
+    setPrice(String(fromEur(eur, currency, rate)));
+  };
 
   useEffect(() => {
     if (priceTouched.current) return;
@@ -340,15 +388,57 @@ export function PricingStep() {
       </div>
 
 
-      {/* The "IA Price Suggestion" panel that sat here was hardcoded: a fixed
-          "€280 - €350" range and an "Apply €320" button, shown for every
-          listing whatever its brand or category. It was already misleading
-          while prices were in euro, and became actively harmful once this
-          field started taking lek — the button wrote a bare 320 into it,
-          pricing a €300 jacket at about €3.44.
+      {/* Backed by /api/ai/suggest-price. What sat here before was hardcoded
+          — a fixed "€280 - €350" and an "Apply €320" button on every listing.
+          The figures below are EUR from the model; `applySuggestion` converts
+          them into whatever currency the box is showing. */}
+      <div className="p-4 bg-muted/30 rounded-lg space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-primary font-semibold">
+            <Sparkles className="h-4 w-4" />
+            <span>AI price suggestion</span>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={requestSuggestion}
+            disabled={isSuggesting}
+          >
+            {isSuggesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {suggestion ? 'Suggest again' : 'Suggest a price'}
+          </Button>
+        </div>
 
-          `suggestPrice` in src/ai/flows/ai-suggest-price.ts is the real flow;
-          wire that up here rather than restoring a fixed number. */}
+        {!suggestion && !suggestError && !isSuggesting && (
+          <p className="text-sm text-muted-foreground">
+            I can read your photos and the details you have filled in so far, and
+            suggest what similar pieces sell for.
+          </p>
+        )}
+
+        {suggestError && <p className="text-sm text-destructive">{suggestError}</p>}
+
+        {suggestion && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">{suggestion.reasoning}</p>
+            <p className="text-sm">
+              Typical range{' '}
+              <span className="font-bold text-foreground">
+                {formatPrice(suggestion.minPrice)} – {formatPrice(suggestion.maxPrice)}
+              </span>
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => applySuggestion(suggestion.recommendedPrice)}
+            >
+              Apply {formatPrice(suggestion.recommendedPrice)}
+            </Button>
+          </div>
+        )}
+      </div>
 
       <div className="space-y-6">
         {/* Offers Toggle */}

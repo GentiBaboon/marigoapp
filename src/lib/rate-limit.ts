@@ -175,6 +175,14 @@ export const aiDraftListingLimiter = createRateLimiter('ai-draft-listing', {
   windowSeconds: 10 * 60,
 });
 
+/** Price suggestion from photos. Multimodal and token-gated like the draft
+ *  assistant, and a seller may reasonably ask more than once while tuning a
+ *  price — but not thirty times. */
+export const aiPriceSuggestionLimiter = createRateLimiter('ai-price-suggestion', {
+  limit: 15,
+  windowSeconds: 10 * 60,
+});
+
 /** Stripe Connect onboarding. Each call can create a real connected account
  *  at the platform, so an unbounded loop is an abuse problem at Stripe, not
  *  just here. Nobody legitimately onboards twice in a minute. */
