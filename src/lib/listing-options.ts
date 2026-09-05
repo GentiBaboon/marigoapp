@@ -28,9 +28,10 @@ export interface LabelledOption {
 }
 
 /**
- * `value` doubles as the routing key: `/women`, `/men`, `/children` are real
- * pages (see `isGenderSegment()` in `src/lib/category-url.ts`). Renaming one
- * here breaks those URLs, so treat the values as fixed and change only labels.
+ * `value` doubles as the routing key. All four are real indexable pages —
+ * `GENDER_SEGMENTS` in `src/lib/category-url.ts` is exactly this list, and
+ * `/unisex` routes like the rest — so renaming any one of them breaks a live
+ * URL. Treat the values as fixed and change only the labels.
  */
 export const GENDER_OPTIONS: readonly LabelledOption[] = [
   { value: 'women', label: 'Womenswear' },

@@ -2,12 +2,21 @@ import { describe, it, expect } from 'vitest';
 import {
   GENDER_OPTIONS, ORIGIN_OPTIONS, PACKAGING_ITEMS, purchaseYears,
 } from '@/lib/listing-options';
+import { GENDER_SEGMENTS, isGenderSegment } from '@/lib/category-url';
 
 describe('listing-options', () => {
   it('keeps the gender values that are also routing keys', () => {
     // `/women`, `/men`, `/children` are real indexable pages gated by
     // isGenderSegment(); renaming a value here 404s a live URL.
     expect(GENDER_OPTIONS.map(g => g.value)).toEqual(['women', 'men', 'children', 'unisex']);
+  });
+
+  it('every gender value is a real route segment', () => {
+    // The constraint this replaces was a prose comment. Both lists are the
+    // same four keys, and `/unisex` routes exactly like the other three, so a
+    // rename on either side must fail here rather than 404 a live URL.
+    expect(GENDER_OPTIONS.map(g => g.value)).toEqual([...GENDER_SEGMENTS]);
+    for (const g of GENDER_OPTIONS) expect(isGenderSegment(g.value)).toBe(true);
   });
 
   it('keeps the packaging ids, which are what listings store', () => {

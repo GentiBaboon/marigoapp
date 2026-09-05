@@ -88,7 +88,8 @@ message by `detectChatLanguage()`, not by this setting.
     ├── firebase/                # Client SDK init + hooks + provider + error emitter
     ├── hooks/                   # admin/courier auth, search suggestions, preferences, visual viewport
     ├── lib/                     # Types, order lifecycle, permissions, rate-limit, env, i18n JSON,
-    │                            #   chat-{knowledge,lexicon,retrieval}, listing-taxonomy, firestore-rest
+    │                            #   chat-{knowledge,lexicon,retrieval}, listing-taxonomy, firestore-rest,
+    │                            #   attribute-options, listing-options, size-options, firestore-write
     ├── services/                # ProductService / OrderService / UserService / image upload
     └── __tests__/               # Vitest setup + tests
 ```
@@ -172,7 +173,15 @@ Auth (`/auth/*`): `login`, `signup`, `forgot-password`, `reset-password`, `verif
 Authenticated (gated by middleware §6):
 - `/profile`, `/profile/addresses`, `/profile/listings`, `/profile/listings/sales/[orderId]`, `/profile/orders`, `/profile/orders/[orderId]`, `/profile/offers`, `/profile/earnings`, `/profile/wallet`, `/profile/payments`, `/profile/settings`, `/profile/stripe-onboarding`
 - `/sell` — listing wizard. Entry is a **mode choice** (`ListingModeStep`): manual, or the AI assistant (§7). The wizard itself is 6 numbered steps + success, rendered by `switch (currentStep)` in `src/app/sell/page.tsx`: 1 Photos → 2 Category → 3 Description → 4 Details → 5 Pricing → 6 Review → 7 Success. State lives in `SellFormContext` (localStorage drafts, `marigo_sell_drafts_v7`); server actions in `src/app/sell/actions.ts`. There is no separate Address step — the pickup address is chosen inside `ReviewStep`, which also uploads the images and writes the product as `pending_review`.
-- `/products/[id]/edit` — edit an existing listing (mirrors the sell flow)
+- `/products/[id]/edit` — edit an existing listing. It **mirrors the sell
+  wizard but is a separate implementation**, and that gap is this codebase's
+  most reliable source of bugs: within one week it shipped empty
+  Material/Colour/Pattern dropdowns, a free-text size box, saves that died on
+  `undefined`, and four duplicated option lists. Every shared vocabulary it
+  needs now comes from a module (`attribute-options`, `size-options`,
+  `listing-options`, `firestore-write`). **Changing a field in the wizard means
+  checking this page**, and preferably moving the logic into one of those
+  modules rather than copying it.
 - `/products/[id]/offers/[offerId]` — offer detail / negotiation
 - `/cart`, `/checkout`, `/checkout/success/[orderId]`
 - `/messages`, `/messages/[conversationId]` — real-time chat
@@ -238,7 +247,7 @@ Types in `src/lib/types.ts` (~855 lines — the single source of truth for both 
 | `reviews/{id}` | Seller/product reviews | — |
 | `refunds/{id}`, `disputes/{id}`, `returns/{id}` | Post-purchase workflows (returns have a buyer-driven → seller-driven transition ladder enforced in rules) | — |
 | `coupons/{id}` | Discount codes (admin-writable, signed-in read) | — |
-| `categories`, `brands`, `conditions`, `materials`, `colors`, `patterns`, `size_charts` | Catalog metadata (public read, admin write). **These do not share a field name** — see §9c | — |
+| `categories`, `brands`, `conditions`, `materials`, `colors`, `patterns`, `size_charts` | Catalog metadata (public read, admin write). **These do not share a field name**: `conditions` has `value`, the rest have `slug` — see §9 | — |
 | `settings/global` | `commissionRate`, `payoutHoldHours`, `refundWindowDays` (full-admin write) | — |
 | `settings/{banners,macro_filters,homepage_blocks,badges}` | Merchandising + badge config (admin write) | — |
 | `config/exchangeRates` | EUR-base rates for `CurrencyContext`. **Does not exist in Firestore** — the fallback table in `CurrencyContext` is the rate the app really runs on | — |
@@ -574,8 +583,10 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
   the edit page carrying the comment "Kept in step with originOptions in
   DescriptionStep" — an admission that nothing enforced it. Unlike the catalog
   collections these are **not** admin-editable, because code branches on them:
-  the gender `value`s are the routing keys behind `/women`, `/men` and
-  `/children`, and the packaging `id`s are what listings store. `purchaseYears()`
+  the gender `value`s are the routing keys, matching `GENDER_SEGMENTS` in
+  `src/lib/category-url.ts` exactly — **all four**, `/unisex` included — so
+  renaming one breaks a live URL; and the packaging `id`s are what listings
+  store. `purchaseYears()`
   is a function, not a constant, so a tab open across New Year does not keep
   offering a list without the current year.
 - **Catalog attribute options go through `src/lib/attribute-options.ts`.**
@@ -631,7 +642,10 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
   seller could pick `S` in the wizard and then type `Small` over it on the
   next screen, which is exactly the pair `normalizeSize()` exists to undo.
   Editing a legacy listing now folds its stored size onto the canonical key
-  on seed, so opening and saving repairs it.
+  on seed, so opening and saving repairs it. That page also never wrote
+  `sizeSystem` at all, so **a listing last saved there before this stores a
+  bare number with no system** — `38` that could be EU, UK or US. Nothing
+  backfills that; it is recorded on the next edit.
 - Admin tables are a repeated shadcn + `@tanstack/react-table` pattern: `data-table.tsx` + `columns.tsx` + `data-table-toolbar.tsx` + `data-table-pagination.tsx` (+ `row-actions`) per domain (`products`, `orders`, `users`, `finance`, `logs`, `logistics/courier-table`). Copy an existing folder rather than inventing a new shape. CSV export via `src/lib/csv-export.ts`.
 - Admin charts in `components/admin/charts/` use `recharts` + `components/ui/chart.tsx`.
 - i18n: `src/lib/translations/{en,sq}.json` via `LanguageContext` (`it.json` is dormant); preference persisted to a cookie and to the user doc.
@@ -833,7 +847,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (635 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (636 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
