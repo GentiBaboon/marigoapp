@@ -18,10 +18,6 @@ const getInitials = (name?: string | null) => {
     : name.substring(0, 2);
 };
 
-const currencyFormatter = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-});
 
 const statusVariants: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
   active: 'secondary',

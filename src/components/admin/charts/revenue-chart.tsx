@@ -1,5 +1,6 @@
 'use client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCurrency } from '@/context/CurrencyContext';
 import {
   Line,
   LineChart,
@@ -17,12 +18,17 @@ interface RevenueChartProps {
   orders: FirestoreOrder[];
 }
 
-const currencyFormatter = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-});
-
 export function RevenueChart({ orders }: RevenueChartProps) {
+  // Axis labels compact once the *converted* figure gets long. The threshold
+  // has to be on what is displayed, not on the stored EUR: at 93 lek to the
+  // euro a €400 month is "37.200 ALL", and five of those stacked down a Y axis
+  // squeeze the plot off the card. The tooltip always shows the full figure.
+  const { formatPrice, rate } = useCurrency();
+  const axisLabel = (value: number) => {
+    const shown = value * rate;
+    if (Math.abs(shown) >= 10000) return `${Math.round(shown / 1000)}k`;
+    return formatPrice(value);
+  };
   const data = useMemo(() => {
     const monthlyRevenue: { [key: string]: number } = {};
     
@@ -67,12 +73,12 @@ export function RevenueChart({ orders }: RevenueChartProps) {
               fontSize={12}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(value) => currencyFormatter.format(value as number)}
+              tickFormatter={(value) => axisLabel(value as number)}
             />
             <Tooltip
               contentStyle={{ backgroundColor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "0.5rem" }}
               labelStyle={{ color: "#0f172a" }}
-              formatter={(value) => [currencyFormatter.format(value as number), 'Revenue']}
+              formatter={(value) => [formatPrice(value as number), 'Revenue']}
             />
             <Line
               type="monotone"

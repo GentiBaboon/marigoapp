@@ -700,13 +700,23 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
     having no price rather than being published free.
   - **Admin listing money goes through `<Money eur={...} />`**
     (`src/components/admin/money.tsx`), not a local `Intl.NumberFormat`. The
-    products table, the moderation queue and the offers table each held their
-    own EUR formatter and printed euro whatever the picker said, so the list
-    showed "25,00 €" for a listing whose own page had just started saying
-    2.400 ALL. **Finance stays EUR on purpose** — the revenue chart, order
-    totals, commission and payouts reconcile against Stripe, which settles in
-    euro, and mixing the two invites an operator to compare a lek figure with
-    a euro one.
+    admin screens each held their own `Intl.NumberFormat('de-DE', 'EUR')` and
+    printed euro whatever the picker said — eleven of them — so the products
+    list showed "25,00 €" for a listing whose own page said 2.400 ALL. The
+    dashboard, finance, marketing, refunds, returns, support, the orders /
+    finance / offers / products tables and the revenue chart all now read the
+    picker.
+  - **Two things deliberately stay EUR.** `admin_logs` entries
+    (`eurAudit` in `/admin/refunds`) — the ledger is permanent and the refund
+    settles in euro through Stripe, so formatting log text with the operator's
+    *display* currency would have two admins writing different numbers for the
+    same action, and would make an old entry unreadable if the rate moved. And
+    everything stored: prices, order totals, payouts and Stripe amounts are
+    EUR on the document, always.
+  - The revenue chart's Y axis compacts to `37k` once the **converted** figure
+    passes 10.000 — at 93 to the euro a €400 month is "37.200 ALL", and five
+    of those stacked squeeze the plot off the card. Threshold on what is
+    shown, not on the stored EUR.
 - **Delivery is priced per origin city**, and all of it lives in
   `src/lib/shipping.ts` so the quote in the basket and the amount actually
   charged cannot drift. `DEFAULT_SHIPPING_FEE_ALL` (200) per distinct city, or

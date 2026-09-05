@@ -1,6 +1,7 @@
 
 'use client';
 import { useMemo, useState } from 'react';
+import { useCurrency } from '@/context/CurrencyContext';
 import { collection, query, where, doc } from 'firebase/firestore';
 import {
   useFirestore,
@@ -43,12 +44,9 @@ const OrdersByCountryChart = dynamic(() => import('@/components/admin/charts/ord
 
 import { subDays } from 'date-fns';
 
-const currencyFormatter = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-});
 
 export default function AdminDashboardPage() {
+  const { formatPrice } = useCurrency();
   const firestore = useFirestore();
   const [period, setPeriod] = useState<Period>('30d');
 
@@ -161,7 +159,7 @@ export default function AdminDashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <StatCard
           title="Total Revenue"
-          value={currencyFormatter.format(stats.totalRevenue)}
+          value={formatPrice(stats.totalRevenue)}
           description={`${stats.ordersInPeriod} orders in period`}
           icon={<DollarSign className="text-muted-foreground h-4 w-4" />}
           isLoading={isLoading}
@@ -193,13 +191,13 @@ export default function AdminDashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 my-8">
          <StatCard
           title="Avg. Order Value"
-          value={currencyFormatter.format(stats.avgOrderValue)}
+          value={formatPrice(stats.avgOrderValue)}
           icon={<DollarSign className="text-muted-foreground h-4 w-4" />}
           isLoading={isLoading}
         />
          <StatCard
           title="Commission Earned"
-          value={currencyFormatter.format(stats.commissionEarned)}
+          value={formatPrice(stats.commissionEarned)}
           description={`at ${commissionRate * 100}% rate`}
           icon={<DollarSign className="text-muted-foreground h-4 w-4" />}
           isLoading={isLoading}

@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useCurrency } from '@/context/CurrencyContext';
 import { collection, query, orderBy, limit, doc, updateDoc, addDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import type { FirestoreReturn } from '@/lib/types';
@@ -55,7 +56,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const currencyFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   requested: 'outline',
@@ -84,6 +84,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function AdminReturnsPage() {
+  const { formatPrice } = useCurrency();
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
@@ -204,7 +205,7 @@ export default function AdminReturnsPage() {
     const totalAmount = ret.items.reduce((sum, item) => sum + item.price, 0);
     openConfirm(
       `Process ${ret.type === 'return' ? 'Refund' : 'Exchange'}`,
-      `Process ${ret.type === 'return' ? 'refund of ' + currencyFormatter.format(totalAmount) : 'exchange'} for order #${ret.orderNumber}?`,
+      `Process ${ret.type === 'return' ? 'refund of ' + formatPrice(totalAmount) : 'exchange'} for order #${ret.orderNumber}?`,
       ret.type === 'return' ? 'Process Refund' : 'Process Exchange',
       'default',
       async () => {
@@ -304,7 +305,7 @@ export default function AdminReturnsPage() {
     const totalAmount = ret.items.reduce((sum, item) => sum + item.price, 0);
     openConfirm(
       'Backfill refund record',
-      `Create the missing refund + finance entries for order #${ret.orderNumber} (${currencyFormatter.format(totalAmount)})? Use this when /admin/refunds and /admin/finance don't reflect a refund that was already processed.`,
+      `Create the missing refund + finance entries for order #${ret.orderNumber} (${formatPrice(totalAmount)})? Use this when /admin/refunds and /admin/finance don't reflect a refund that was already processed.`,
       'Backfill',
       'default',
       async () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useCurrency } from '@/context/CurrencyContext';
 import { collection, query, orderBy, limit, doc, updateDoc, addDoc, getDoc, serverTimestamp, arrayUnion, where } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import type { FirestoreRefund, FirestoreOrder } from '@/lib/types';
@@ -46,7 +47,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const currencyFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+/**
+ * Audit-log amounts stay EUR, deliberately.
+ *
+ * `admin_logs` is a permanent record, and the refund itself is settled in euro
+ * through Stripe. Formatting log text with the operator's *display* currency
+ * would make two admins write different numbers for the same action, and would
+ * make an old entry unreadable if the rate ever moved. The dialogs and the
+ * table beside it show lek, because those are read now, by a person, in the
+ * currency they picked.
+ */
+const eurAudit = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   requested: 'outline',
@@ -56,6 +67,7 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'o
 };
 
 export default function AdminRefundsPage() {
+  const { formatPrice } = useCurrency();
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
@@ -139,7 +151,7 @@ export default function AdminRefundsPage() {
     setConfirmDialog({
       open: true,
       title: 'Approve Refund',
-      description: `Approve refund of ${currencyFormatter.format(refund.amount)} for order #${refund.orderNumber}? This will also update the order status to refunded.`,
+      description: `Approve refund of ${formatPrice(refund.amount)} for order #${refund.orderNumber}? This will also update the order status to refunded.`,
       actionLabel: 'Approve',
       variant: 'default',
       onConfirm: async () => {
@@ -195,7 +207,7 @@ export default function AdminRefundsPage() {
             });
           }
 
-          await logAction('refund_approved', `Approved refund of ${currencyFormatter.format(refund.amount)} for order #${refund.orderNumber}`, refund.id);
+          await logAction('refund_approved', `Approved refund of ${eurAudit.format(refund.amount)} for order #${refund.orderNumber}`, refund.id);
           toast({ title: 'Refund Approved', description: `Refund for order #${refund.orderNumber} has been approved.` });
           setConfirmDialog((prev) => ({ ...prev, open: false }));
         } catch (error) {
@@ -211,7 +223,7 @@ export default function AdminRefundsPage() {
     setConfirmDialog({
       open: true,
       title: 'Reject Refund',
-      description: `Reject refund request of ${currencyFormatter.format(refund.amount)} for order #${refund.orderNumber}?`,
+      description: `Reject refund request of ${formatPrice(refund.amount)} for order #${refund.orderNumber}?`,
       actionLabel: 'Reject',
       variant: 'destructive',
       onConfirm: async () => {
@@ -243,7 +255,7 @@ export default function AdminRefundsPage() {
             console.warn('[refund reject] could not notify buyer', e);
           }
 
-          await logAction('refund_rejected', `Rejected refund of ${currencyFormatter.format(refund.amount)} for order #${refund.orderNumber}`, refund.id);
+          await logAction('refund_rejected', `Rejected refund of ${eurAudit.format(refund.amount)} for order #${refund.orderNumber}`, refund.id);
           toast({ title: 'Refund Rejected', description: `Refund for order #${refund.orderNumber} has been rejected.` });
           setConfirmDialog((prev) => ({ ...prev, open: false }));
         } catch (error) {
@@ -259,7 +271,7 @@ export default function AdminRefundsPage() {
     setConfirmDialog({
       open: true,
       title: 'Mark as Processed',
-      description: `Mark refund of ${currencyFormatter.format(refund.amount)} for order #${refund.orderNumber} as processed?`,
+      description: `Mark refund of ${formatPrice(refund.amount)} for order #${refund.orderNumber} as processed?`,
       actionLabel: 'Mark Processed',
       variant: 'default',
       onConfirm: async () => {
@@ -303,7 +315,7 @@ export default function AdminRefundsPage() {
     {
       accessorKey: 'amount',
       header: 'Amount',
-      cell: ({ row }) => currencyFormatter.format(row.original.amount),
+      cell: ({ row }) => formatPrice(row.original.amount),
     },
     {
       accessorKey: 'status',

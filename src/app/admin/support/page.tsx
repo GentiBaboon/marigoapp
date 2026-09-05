@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Money } from '@/components/admin/money';
 import {
   collection,
   query,
@@ -305,7 +306,7 @@ export default function AdminSupportPage() {
                               <div className="min-w-0">
                                 <p className="font-bold text-xs uppercase text-foreground">{msg.productData.brandId}</p>
                                 <p className="text-xs truncate text-foreground">{msg.productData.title}</p>
-                                <p className="text-sm font-semibold text-foreground">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(msg.productData.price)}</p>
+                                <p className="text-sm font-semibold text-foreground"><Money eur={msg.productData.price} /></p>
                               </div>
                             </div>
                           </div>
@@ -388,7 +389,7 @@ export default function AdminSupportPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-xs uppercase">{p.brandId}</p>
                     <p className="text-sm truncate">{p.title}</p>
-                    <p className="text-sm font-semibold">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(p.price)}</p>
+                    <p className="text-sm font-semibold"><Money eur={p.price} /></p>
                   </div>
                   <Button size="sm" variant="outline">Send</Button>
                 </div>

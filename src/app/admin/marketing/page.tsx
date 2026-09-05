@@ -1,6 +1,7 @@
 
 'use client';
 import * as React from 'react';
+import { useCurrency } from '@/context/CurrencyContext';
 import Link from 'next/link';
 import {
   Card,
@@ -38,10 +39,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import MarketingLoading from './loading';
 import { StatCard } from '@/components/admin/stat-card';
 
-const currencyFormatter = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-});
 
 const CouponDialog = ({
   open,
@@ -196,6 +193,7 @@ const CouponDialog = ({
 };
 
 export default function MarketingPage() {
+  const { formatPrice } = useCurrency();
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -282,13 +280,13 @@ export default function MarketingPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard 
           title="Revenue from Coupons" 
-          value={currencyFormatter.format(roiStats.totalRevenue)} 
+          value={formatPrice(roiStats.totalRevenue)} 
           icon={<TrendingUp className="h-4 w-4 text-green-600" />}
           description="Total sales generated using discount codes"
         />
         <StatCard 
           title="Marketing Cost" 
-          value={currencyFormatter.format(roiStats.totalDiscount)} 
+          value={formatPrice(roiStats.totalDiscount)} 
           icon={<DollarSign className="h-4 w-4 text-destructive" />}
           description="Total value of discounts granted"
         />
@@ -332,7 +330,7 @@ export default function MarketingPage() {
                               {coupon.firstOrderOnly && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase">1st order</span>}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {coupon.type === 'percentage' ? `${coupon.value}% off` : `${currencyFormatter.format(coupon.value)} off`} 
+                              {coupon.type === 'percentage' ? `${coupon.value}% off` : `${formatPrice(coupon.value)} off`} 
                               {coupon.minOrderValue > 0 && ` • Min. €${coupon.minOrderValue}`}
                             </p>
                           </div>
@@ -341,7 +339,7 @@ export default function MarketingPage() {
                         <div className="flex items-center gap-8 px-4 sm:px-0">
                           <div className="text-center">
                             <p className="text-xs text-muted-foreground uppercase font-bold tracking-tighter">Sales</p>
-                            <p className="font-bold">{currencyFormatter.format(perf.revenue)}</p>
+                            <p className="font-bold">{formatPrice(perf.revenue)}</p>
                           </div>
                           <div className="text-center">
                             <p className="text-xs text-muted-foreground uppercase font-bold tracking-tighter">ROI</p>

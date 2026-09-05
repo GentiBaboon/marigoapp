@@ -1,5 +1,6 @@
 'use client';
 import { ColumnDef } from '@tanstack/react-table';
+import { Money } from '@/components/admin/money';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import type { FirestoreOrder, FirestoreUser } from '@/lib/types';
@@ -11,10 +12,6 @@ import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { statusLabel } from '@/lib/order-status';
 
-const currencyFormatter = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-});
 
 const statusVariants: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
   processing: 'default',
@@ -110,7 +107,7 @@ export const columns: ColumnDef<FirestoreOrder>[] = [
         </Button>
       )
     },
-    cell: ({ row }) => currencyFormatter.format(row.original.totalAmount),
+    cell: ({ row }) => <Money eur={row.original.totalAmount} />,
   },
   {
     accessorKey: 'status',

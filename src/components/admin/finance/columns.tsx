@@ -1,5 +1,6 @@
 'use client';
 import { ColumnDef } from '@tanstack/react-table';
+import { Money } from '@/components/admin/money';
 import { Badge } from '@/components/ui/badge';
 import type { FirestoreOrder, FirestoreUser } from '@/lib/types';
 import { toDate } from '@/lib/types';
@@ -9,10 +10,6 @@ import { Button } from '@/components/ui/button';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 
-const currencyFormatter = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-});
 
 const statusVariants: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
   processing: 'default',
@@ -86,7 +83,7 @@ export const columns: ColumnDef<FirestoreOrder>[] = [
         </Button>
       )
     },
-    cell: ({ row }) => <div className="text-right">{currencyFormatter.format(row.original.totalAmount)}</div>,
+    cell: ({ row }) => <div className="text-right"><Money eur={row.original.totalAmount} /></div>,
   },
    {
     id: 'commission',
@@ -103,7 +100,7 @@ export const columns: ColumnDef<FirestoreOrder>[] = [
         const commission = isCancelled ? 0 : amount * COMMISSION_RATE * (isRefunded ? -1 : 1);
         return (
           <div className={`text-right ${isRefunded ? 'text-destructive' : ''}`}>
-            {currencyFormatter.format(commission)}
+            <Money eur={commission} />
           </div>
         );
     },
@@ -120,7 +117,7 @@ export const columns: ColumnDef<FirestoreOrder>[] = [
         const payout = isCancelled ? 0 : (amount - commission) * (isRefunded ? -1 : 1);
         return (
           <div className={`text-right ${isRefunded ? 'text-destructive' : ''}`}>
-            {currencyFormatter.format(payout)}
+            <Money eur={payout} />
           </div>
         );
     },

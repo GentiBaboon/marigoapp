@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useCurrency } from '@/context/CurrencyContext';
 import { collection, query, orderBy, limit, doc } from 'firebase/firestore';
 import { useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { type FirestoreOrder, type FirestoreSettings, toDate } from '@/lib/types';
@@ -14,12 +15,9 @@ import { DataTable } from '@/components/admin/finance/data-table';
 import { columns } from '@/components/admin/finance/columns';
 import FinanceLoading from './loading';
 
-const currencyFormatter = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-});
 
 export default function AdminFinancePage() {
+  const { formatPrice } = useCurrency();
   const firestore = useFirestore();
 
   // Configurable commission rate from Firestore
@@ -106,32 +104,32 @@ export default function AdminFinancePage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <StatCard
             title="Total Revenue"
-            value={currencyFormatter.format(financialStats.totalRevenue)}
+            value={formatPrice(financialStats.totalRevenue)}
             icon={<DollarSign className="text-muted-foreground h-4 w-4" />}
             isLoading={isLoading}
             />
              <StatCard
             title="Commission Earned"
-            value={currencyFormatter.format(financialStats.commissionEarned)}
+            value={formatPrice(financialStats.commissionEarned)}
             description={`at ${commissionRate * 100}% rate`}
             icon={<Percent className="text-muted-foreground h-4 w-4" />}
             isLoading={isLoading}
             />
              <StatCard
             title="Pending Payouts"
-            value={currencyFormatter.format(financialStats.pendingPayouts)}
+            value={formatPrice(financialStats.pendingPayouts)}
             icon={<Banknote className="text-muted-foreground h-4 w-4" />}
             isLoading={isLoading}
             />
              <StatCard
             title="Total Refunds"
-            value={currencyFormatter.format(financialStats.totalRefunds)}
+            value={formatPrice(financialStats.totalRefunds)}
             icon={<Undo className="text-muted-foreground h-4 w-4" />}
             isLoading={isLoading}
             />
              <StatCard
             title="Tax Collected"
-            value={currencyFormatter.format(financialStats.taxCollected)}
+            value={formatPrice(financialStats.taxCollected)}
             icon={<Receipt className="text-muted-foreground h-4 w-4" />}
             isLoading={isLoading}
             />
