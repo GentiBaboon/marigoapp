@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { sellStep3Schema } from '@/lib/types';
+import { ORIGIN_OPTIONS, PACKAGING_ITEMS, purchaseYears } from '@/lib/listing-options';
 import type { z } from 'zod';
 import { StepActions } from '@/components/sell/StepActions';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -40,21 +41,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 type Step3Values = z.infer<typeof sellStep3Schema>;
 
-const currentYear = new Date().getFullYear();
-const years = Array.from({ length: 30 }, (_, i) => String(currentYear - i));
-
-// `origin` is a free string in the schema, not an enum, so trimming this list
-// cannot invalidate a listing already saved with a retired value.
-const originOptions = [
-    { value: 'direct', label: 'Direct from brand' },
-    { value: 'other', label: 'Other' },
-]
-
-const packagingItems = [
-    { id: 'card', label: 'Card or certificate' },
-    { id: 'dustBag', label: 'Dust bag' },
-    { id: 'box', label: 'Original box' },
-]
+const years = purchaseYears();
 
 export function DescriptionStep() {
   const { formData, setFormData, nextStep } = useSellForm();
@@ -131,7 +118,7 @@ export function DescriptionStep() {
                       defaultValue={field.value}
                       className="space-y-2"
                     >
-                      {originOptions.map((option) => (
+                      {ORIGIN_OPTIONS.map((option) => (
                         <FormItem key={option.value} className="flex items-center space-x-3">
                           <FormControl>
                             <RadioGroupItem value={option.value} />
@@ -194,7 +181,7 @@ export function DescriptionStep() {
                   <div className="mb-4">
                     <FormLabel className="text-base">Packaging <span className="font-normal text-muted-foreground">(optional)</span></FormLabel>
                   </div>
-                  {packagingItems.map((item) => (
+                  {PACKAGING_ITEMS.map((item) => (
                     <FormField
                       key={item.id}
                       control={form.control}

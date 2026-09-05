@@ -14,6 +14,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useSellForm } from '@/components/sell/SellFormContext';
 import { sellStep2Schema, type FirestoreCategory, type FirestoreBrand } from '@/lib/types';
+import { GENDER_OPTIONS } from '@/lib/listing-options';
 import type { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -99,12 +100,7 @@ export function CategoryStep() {
                     defaultValue={field.value}
                     className="space-y-3"
                   >
-                    {[
-                      { value: 'women', label: 'Womenswear' },
-                      { value: 'men', label: 'Menswear' },
-                      { value: 'children', label: 'Children' },
-                      { value: 'unisex', label: 'Unisex' }
-                    ].map(
+                    {GENDER_OPTIONS.map(
                       (g) => (
                         <FormItem key={g.value} className="flex items-center">
                           <FormControl>

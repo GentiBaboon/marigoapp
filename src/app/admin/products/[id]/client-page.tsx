@@ -37,6 +37,7 @@ import type {
 } from '@/lib/types';
 import type { MacroFilter, MacroFiltersConfig } from '@/components/home/MacroFilters';
 import { toDate } from '@/lib/types';
+import { GENDER_OPTIONS } from '@/lib/listing-options';
 import { omitUndefined } from '@/lib/firestore-write';
 import { toAttributeItems } from '@/lib/attribute-options';
 import { notifyUser } from '@/lib/notifications';
@@ -99,12 +100,6 @@ const STATUS_COLORS: Record<string, string> = {
   reserved: 'bg-purple-100 text-purple-800',
 };
 
-const GENDER_OPTIONS = [
-  { value: 'women', label: 'Womenswear' },
-  { value: 'men', label: 'Menswear' },
-  { value: 'children', label: 'Children' },
-  { value: 'unisex', label: 'Unisex' },
-];
 
 const LISTING_TYPES = [
   { value: 'fixed_price', label: 'Fixed Price' },

@@ -14,6 +14,7 @@ import type {
   ProductImage,
 } from '@/lib/types';
 import { DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
+import { GENDER_OPTIONS, ORIGIN_OPTIONS, PACKAGING_ITEMS, purchaseYears } from '@/lib/listing-options';
 import { useCurrency } from '@/context/CurrencyContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,28 +61,9 @@ import {
 } from '@/components/ui/dialog';
 import { AddressForm } from '@/components/profile/address-form';
 
-const GENDER_OPTIONS = [
-  { value: 'women', label: 'Womenswear' },
-  { value: 'men', label: 'Menswear' },
-  { value: 'children', label: 'Children' },
-  { value: 'unisex', label: 'Unisex' },
-] as const;
-
-// Kept in step with originOptions in components/sell/steps/DescriptionStep.tsx.
-const ORIGIN_OPTIONS = [
-  { value: 'direct', label: 'Direct from brand' },
-  { value: 'other', label: 'Other' },
-];
-
-const PACKAGING_ITEMS = [
-  { id: 'card', label: 'Card or certificate' },
-  { id: 'dustBag', label: 'Dust bag' },
-  { id: 'box', label: 'Original box' },
-];
 
 const PLATFORM_FEE = 0.15;
-const currentYear = new Date().getFullYear();
-const YEARS = Array.from({ length: 30 }, (_, i) => String(currentYear - i));
+const YEARS = purchaseYears();
 
 export default function EditListingPage() {
   const params = useParams();

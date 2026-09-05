@@ -566,6 +566,18 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 - Order status is modelled audience-aware in `src/lib/order-status.ts`: `STATUS_RANK`, `statusLabel(status, 'buyer'|'seller'|'admin')`, `TIMELINE_STEPS` / `TIMELINE_STEPS_SELLER`, `nextSellerTransition` / `nextAdminTransition`.
 - Order side-effects live in `src/lib/order-lifecycle.ts` (`recordRefund`, `recordReturn`, `recordRefundForReturn`, `recordRefundForDispute`) and `src/lib/order-inventory.ts` (`releaseOrderItems`, `markOrderItemsSoldIfDepleted`).
 - Notifications: `src/lib/notifications.ts` (`notifyUser`, `notifyOrderStatus`, `humanReadableStatus`).
+- **Fixed listing option lists live in `src/lib/listing-options.ts`** —
+  `GENDER_OPTIONS`, `ORIGIN_OPTIONS`, `PACKAGING_ITEMS`, `purchaseYears()`.
+  They are short enough to look harmless inline, which is why they had been
+  copied: gender existed three times (an anonymous literal in `CategoryStep`,
+  the seller edit page, the admin product page) and the rest twice each, with
+  the edit page carrying the comment "Kept in step with originOptions in
+  DescriptionStep" — an admission that nothing enforced it. Unlike the catalog
+  collections these are **not** admin-editable, because code branches on them:
+  the gender `value`s are the routing keys behind `/women`, `/men` and
+  `/children`, and the packaging `id`s are what listings store. `purchaseYears()`
+  is a function, not a constant, so a tab open across New Year does not keep
+  offering a list without the current year.
 - **Catalog attribute options go through `src/lib/attribute-options.ts`.**
   `conditions` stores `name` + `value`; `materials`, `colors` and `patterns`
   store `name` + `slug` + `order` and have **no `value` at all** — 296
@@ -821,7 +833,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (628 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (635 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
