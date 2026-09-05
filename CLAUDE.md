@@ -643,9 +643,14 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
   next screen, which is exactly the pair `normalizeSize()` exists to undo.
   Editing a legacy listing now folds its stored size onto the canonical key
   on seed, so opening and saving repairs it. That page also never wrote
-  `sizeSystem` at all, so **a listing last saved there before this stores a
-  bare number with no system** — `38` that could be EU, UK or US. Nothing
-  backfills that; it is recorded on the next edit.
+  `sizeSystem`, though **no listing actually lost one**: `updateDoc` only
+  touches the keys it is given, so a system stamped by the wizard survived
+  every edit. Audited 2026-09-05 — of 41 listings, 28 carry a system (27 `EU`,
+  1 `International`) and the 13 nulls all have no size either, so nothing
+  needed backfilling. Worth re-checking only if listings are ever imported
+  around the wizard, which is the one path that could produce a size with no
+  system. A bare `38` is unresolvable after the fact — it could be EU, IT, FR,
+  UK or US — so it has to be captured at write time, not inferred later.
 - Admin tables are a repeated shadcn + `@tanstack/react-table` pattern: `data-table.tsx` + `columns.tsx` + `data-table-toolbar.tsx` + `data-table-pagination.tsx` (+ `row-actions`) per domain (`products`, `orders`, `users`, `finance`, `logs`, `logistics/courier-table`). Copy an existing folder rather than inventing a new shape. CSV export via `src/lib/csv-export.ts`.
 - Admin charts in `components/admin/charts/` use `recharts` + `components/ui/chart.tsx`.
 - i18n: `src/lib/translations/{en,sq}.json` via `LanguageContext` (`it.json` is dormant); preference persisted to a cookie and to the user doc.
