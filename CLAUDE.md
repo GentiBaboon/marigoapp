@@ -613,7 +613,13 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
   "12 months") onto that key, and `sizesMatch()` is what the facet compares with —
   plain `===` left pre-migration listings unreachable from their own filter pill.
   Entry points: `DetailsStep`, `PricingStep` (variants), `size-config-tab`
-  (admin), `/api/ai/draft-listing`, and the `/search` facet.
+  (admin), `/api/ai/draft-listing`, the `/search` facet, and the listing
+  **edit** page. That last one was a free-text `<Input>` long after the rest
+  had moved — the same split that left its attribute dropdowns empty — so a
+  seller could pick `S` in the wizard and then type `Small` over it on the
+  next screen, which is exactly the pair `normalizeSize()` exists to undo.
+  Editing a legacy listing now folds its stored size onto the canonical key
+  on seed, so opening and saving repairs it.
 - Admin tables are a repeated shadcn + `@tanstack/react-table` pattern: `data-table.tsx` + `columns.tsx` + `data-table-toolbar.tsx` + `data-table-pagination.tsx` (+ `row-actions`) per domain (`products`, `orders`, `users`, `finance`, `logs`, `logistics/courier-table`). Copy an existing folder rather than inventing a new shape. CSV export via `src/lib/csv-export.ts`.
 - Admin charts in `components/admin/charts/` use `recharts` + `components/ui/chart.tsx`.
 - i18n: `src/lib/translations/{en,sq}.json` via `LanguageContext` (`it.json` is dormant); preference persisted to a cookie and to the user doc.

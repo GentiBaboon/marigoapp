@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { toAttributeItems } from '@/lib/attribute-options';
+import { resolveSizeOptions, resolveSizeSystems, normalizeSize } from '@/lib/size-options';
 import { omitUndefined, parseNumericInput } from '@/lib/firestore-write';
 import {
   ArrowLeft,
@@ -127,6 +128,10 @@ export default function EditListingPage() {
     () => (firestore ? collection(firestore, 'patterns') : null),
     [firestore]
   );
+  const sizeChartsQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'size_charts') : null),
+    [firestore]
+  );
   const addressesCollection = useMemoFirebase(
     () => (user && firestore ? collection(firestore, 'users', user.uid, 'addresses') : null),
     [user, firestore]
@@ -138,6 +143,9 @@ export default function EditListingPage() {
   const { data: materials } = useCollection<FirestoreAttribute>(materialsQuery);
   const { data: colors } = useCollection<FirestoreAttribute>(colorsQuery);
   const { data: patterns } = useCollection<FirestoreAttribute>(patternsQuery);
+  const { data: sizeChartsRaw } = useCollection<{
+    id: string; categoryType: string; sizeSystem: string; sizes: string[]; isActive?: boolean;
+  }>(sizeChartsQuery);
   const { data: addresses } = useCollection<FirestoreAddress>(addressesCollection);
 
   // Catalog rows do not all carry the same field name — `conditions` stores
@@ -191,6 +199,20 @@ export default function EditListingPage() {
   const [material, setMaterial] = React.useState('');
   const [color, setColor] = React.useState('');
   const [size, setSize] = React.useState('');
+  const [sizeSystem, setSizeSystem] = React.useState('');
+
+  // Same resolution the sell wizard uses: admin `size_charts` → `SIZE_PRESETS`
+  // → `UNIVERSAL_SIZES`. `resolveSizeOptions` is guaranteed non-empty, which is
+  // what lets this be a dropdown with no free-text fallback — this page was the
+  // last screen in the app still asking the seller to type a size.
+  const availableSystems = React.useMemo(
+    () => resolveSizeSystems(categoryId, sizeChartsRaw),
+    [categoryId, sizeChartsRaw],
+  );
+  const sizeOptions = React.useMemo(
+    () => resolveSizeOptions({ categoryType: categoryId, sizeSystem, charts: sizeChartsRaw }),
+    [categoryId, sizeSystem, sizeChartsRaw],
+  );
   const [pattern, setPattern] = React.useState('');
   const [vintage, setVintage] = React.useState(false);
 
@@ -213,7 +235,12 @@ export default function EditListingPage() {
       setTitle(product.title ?? '');
       setDescription(product.description ?? '');
       setCondition(product.condition ?? '');
-      setSize(product.size ?? '');
+      // Pre-migration listings hold free text here ("Small", "EU 38"), which
+      // no dropdown can select and which `sizesMatch` had to paper over on the
+      // search facet. Fold it onto the canonical key on the way in, so editing
+      // a legacy listing quietly repairs it instead of preserving it.
+      setSize(normalizeSize(product.size) || '');
+      setSizeSystem(product.sizeSystem ?? '');
       setColor(product.color ?? '');
       setMaterial(product.material ?? '');
       setPattern(product.pattern ?? '');
@@ -302,7 +329,8 @@ export default function EditListingPage() {
         title: title.trim(),
         description: description.trim(),
         condition,
-        size: size.trim(),
+        size,
+        sizeSystem,
         color,
         material,
         pattern,
@@ -653,14 +681,35 @@ export default function EditListingPage() {
 
           {/* Size + Pattern */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="space-y-2 flex flex-col">
               <Label className="font-semibold">Size</Label>
-              <Input
-                value={size}
-                onChange={e => setSize(e.target.value)}
-                placeholder="e.g. 42 / M"
-                className="h-12"
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <Select
+                  value={sizeSystem}
+                  onValueChange={v => {
+                    setSizeSystem(v);
+                    // The chosen size may not exist in the new system's chart.
+                    setSize('');
+                  }}
+                >
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="System" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSystems.map(sys => (
+                      <SelectItem key={sys} value={sys}>{sys}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Combobox
+                  value={size}
+                  onValueChange={setSize}
+                  items={sizeOptions}
+                  placeholder="Size"
+                  searchPlaceholder="Search sizes..."
+                  emptyPlaceholder="No matching size."
+                />
+              </div>
             </div>
             <div className="space-y-2 flex flex-col">
               <Label className="font-semibold">Pattern</Label>
