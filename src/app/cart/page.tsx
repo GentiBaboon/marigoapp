@@ -10,11 +10,12 @@ import { Input } from '@/components/ui/input';
 import { useCart } from '@/context/CartContext';
 import { ShoppingBag, Trash2, Heart, ArrowRight, Loader2, Tag, X } from 'lucide-react';
 import { useCurrency } from '@/context/CurrencyContext';
+import { CartLinePrice } from '@/components/cart/line-price';
 import { useWishlist } from '@/context/WishlistContext';
 import { useToast } from '@/hooks/use-toast';
 
 export default function CartPage() {
-    const { items, removeFromCart, updateQuantity, subtotal, totalShipping, grandTotal, appliedCoupon, discountAmount, applyCoupon, removeCoupon, isLoading } = useCart();
+    const { items, removeFromCart, subtotal, totalShipping, grandTotal, appliedCoupon, discountAmount, applyCoupon, removeCoupon, isLoading } = useCart();
     const { formatPrice } = useCurrency();
     const { addToWishlist } = useWishlist();
     const { toast } = useToast();
@@ -98,7 +99,12 @@ export default function CartPage() {
                                                     <p className="font-bold text-xs uppercase tracking-widest text-primary">{item.brand}</p>
                                                     <h3 className="font-medium text-lg leading-tight">{item.title}</h3>
                                                 </div>
-                                                <p className="font-bold text-lg">{formatPrice(item.price)}</p>
+                                                <CartLinePrice
+                                                    price={item.price}
+                                                    originalPrice={item.originalPrice}
+                                                    align="end"
+                                                    priceClassName="text-lg"
+                                                />
                                             </div>
                                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-2">
                                                 {item.selectedSize && <span>Size: <span className="text-foreground font-medium">{item.selectedSize}</span></span>}
@@ -107,34 +113,16 @@ export default function CartPage() {
                                         </div>
 
                                         <div className="flex items-center justify-between mt-4">
-                                            {(() => {
-                                              const atMax = typeof item.stock === 'number' && item.quantity >= item.stock;
-                                              return (
-                                                <div className="flex items-center gap-3">
-                                                  <div className="flex items-center border rounded-full bg-background px-2">
-                                                    <Button
-                                                      variant="ghost"
-                                                      size="icon"
-                                                      className="h-8 w-8 rounded-full"
-                                                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                                    >-</Button>
-                                                    <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                                                    <Button
-                                                      variant="ghost"
-                                                      size="icon"
-                                                      className="h-8 w-8 rounded-full"
-                                                      disabled={atMax}
-                                                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                                    >+</Button>
-                                                  </div>
-                                                  {atMax && (
-                                                    <span className="text-xs text-muted-foreground">
-                                                      Max stock: {item.stock}
-                                                    </span>
-                                                  )}
-                                                </div>
-                                              );
-                                            })()}
+                                            {/* Pre-owned pieces are one-offs: there is nothing to
+                                                step a quantity up to, so the +/- control only ever
+                                                advertised a limit. A plain stock note says the same
+                                                thing without offering a button that does nothing. */}
+                                            <span className="text-sm text-muted-foreground">
+                                                {typeof item.stock === 'number'
+                                                    ? `Only ${item.stock} in stock`
+                                                    : item.quantity > 1 ? `Qty ${item.quantity}` : null}
+                                                {typeof item.stock === 'number' && item.quantity > 1 && ` · Qty ${item.quantity}`}
+                                            </span>
                                             <div className="flex gap-4">
                                                 <Button 
                                                     variant="ghost" 

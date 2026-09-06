@@ -454,9 +454,14 @@ export async function retrieveForMessage(
     id: product.id,
     title: product.title || '',
     price: Number(product.price) || 0,
+    ...(Number(product.originalPrice) > (Number(product.price) || 0)
+      ? { originalPrice: Number(product.originalPrice) }
+      : {}),
     image: product.images?.[0]?.url || '',
     brandId: brandName || product.brandId || '',
     sellerId: product.sellerId || '',
+    shippingFromCity: product.shippingFromCity ?? null,
+    shippingFromCountry: product.shippingFromCountry ?? null,
     brandName,
     categoryId: product.categoryId || '',
     size: product.size,

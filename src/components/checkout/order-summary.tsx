@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { doc, getDoc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useCurrency } from '@/context/CurrencyContext';
+import { CartLinePrice } from '@/components/cart/line-price';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { UNKNOWN_CITY } from '@/lib/shipping';
 import { Tag, X, Truck, Loader2 } from 'lucide-react';
@@ -174,7 +175,12 @@ export function OrderSummary() {
                       <p className="text-sm text-muted-foreground truncate">{item.title || 'Item'}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">Size: {item.selectedSize || 'N/A'}</p>
                     </div>
-                    <p className="font-semibold text-sm">{formatPrice(item.price)}</p>
+                    <CartLinePrice
+                      price={item.price}
+                      originalPrice={item.originalPrice}
+                      align="end"
+                      priceClassName="text-sm font-semibold"
+                    />
                     <Button
                       variant="ghost"
                       size="icon"

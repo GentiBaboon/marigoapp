@@ -27,6 +27,12 @@ export type CartItem = {
     brand: string;
     title: string;
     price: number;
+    /**
+     * The listing's pre-markdown price, only when it is higher than `price`,
+     * so the cart and checkout can show the saving. Absent on lines added
+     * before the field existed.
+     */
+    originalPrice?: number;
     image: string;
     sellerId: string;
     quantity: number;
@@ -283,6 +289,12 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     brand: product.brand || product.brandId || '',
                     title: product.title,
                     price: product.price,
+                    // Only a real markdown; `undefined` is stripped by the
+                    // JSON round-trip below before it reaches Firestore.
+                    originalPrice:
+                        typeof product.originalPrice === 'number' && product.originalPrice > product.price
+                            ? product.originalPrice
+                            : undefined,
                     image: product.images?.[0]?.url || product.image || '',
                     sellerId: product.sellerId,
                     quantity: nextQty,

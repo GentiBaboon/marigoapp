@@ -70,26 +70,58 @@ function ProductCardInChat({ product }: { product: ChatProductCard }) {
       id: product.id,
       title: product.title,
       price: product.price,
+      originalPrice: product.originalPrice,
       brand: product.brandId,
       image: product.image,
       sellerId: product.sellerId,
+      // Without these the line lands in the "unknown origin" pool and the
+      // basket quotes a second courier run beside a listing from the same city.
+      shippingFromCity: product.shippingFromCity ?? null,
+      shippingFromCountry: product.shippingFromCountry ?? null,
       images: [{ url: product.image, position: 0 }],
     });
   };
 
+  const hasDiscount =
+    typeof product.originalPrice === 'number' && product.originalPrice > product.price;
+  const pct = hasDiscount
+    ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100)
+    : 0;
+
   return (
-    <div className="border rounded-lg p-2 bg-background shadow-sm">
+    // `min-w-0` + `overflow-hidden`: the card sits in a 2-column grid inside a
+    // `max-w-xs` bubble, so each column is ~140px. Buttons never shrink below
+    // their label, so side by side they spilled past the card's white area.
+    // Stacked full-width, they stay inside whatever width the column gets.
+    <div className="min-w-0 overflow-hidden rounded-lg border bg-background p-2 shadow-sm">
       {product.image && (
-        <div className="relative h-28 w-full rounded-md overflow-hidden bg-muted mb-2">
+        <div className="relative mb-2 h-28 w-full overflow-hidden rounded-md bg-muted">
           <Image src={product.image} alt={product.title} fill className="object-cover" sizes="200px" />
         </div>
       )}
-      <p className="font-bold text-[11px] uppercase tracking-wider truncate">{product.brandId}</p>
-      <p className="text-xs text-muted-foreground truncate">{product.title}</p>
-      <p className="text-sm font-semibold mt-1">{formatPrice(product.price)}</p>
-      <div className="flex gap-1.5 mt-2">
-        <Button size="sm" className="flex-1 h-7 text-xs" onClick={handleAddToCart}>Add to Cart</Button>
-        <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={() => router.push(`/products/${product.id}`)}>View</Button>
+      <p className="truncate text-[11px] font-bold uppercase tracking-wider">{product.brandId}</p>
+      <p className="truncate text-xs text-muted-foreground">{product.title}</p>
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5">
+        <p className="text-sm font-semibold">{formatPrice(product.price)}</p>
+        {hasDiscount && (
+          <>
+            <p className="text-[10px] text-muted-foreground line-through">
+              {formatPrice(product.originalPrice!)}
+            </p>
+            <span className="text-xs font-bold text-green-700">−{pct}%</span>
+          </>
+        )}
+      </div>
+      <div className="mt-2 flex flex-col gap-1.5">
+        <Button size="sm" className="h-7 w-full text-xs" onClick={handleAddToCart}>Add to Cart</Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 w-full text-xs"
+          onClick={() => router.push(`/products/${product.id}`)}
+        >
+          View
+        </Button>
       </div>
     </div>
   );

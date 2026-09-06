@@ -234,7 +234,9 @@ function OfferActions({
    *  agreed price. Checkout re-derives that price server-side from this same
    *  offer document, so the cart entry is a convenience, not the authority. */
   const handleBuyAtAgreedPrice = () => {
-    addToCart({ ...product, price: onTable }, { quantity: 1 });
+    // The agreed price is the markdown here, so the line strikes through the
+    // asking price rather than any earlier listing discount.
+    addToCart({ ...product, price: onTable, originalPrice: product.price }, { quantity: 1 });
     router.push('/cart');
   };
 

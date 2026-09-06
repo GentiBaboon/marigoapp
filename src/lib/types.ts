@@ -886,9 +886,14 @@ export interface ChatProductCard {
   id: string;
   title: string;
   price: number;
+  /** Pre-markdown price, when the listing is discounted — the card shows the saving. */
+  originalPrice?: number;
   image: string;
   brandId: string;
   sellerId: string;
+  /** Origin, copied off the listing so a line added from chat groups for delivery like any other. */
+  shippingFromCity?: string | null;
+  shippingFromCountry?: string | null;
 }
 
 export type SupportMessageType = 'text' | 'product_card';

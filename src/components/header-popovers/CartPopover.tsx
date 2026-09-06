@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
 import { useCurrency } from '@/context/CurrencyContext';
+import { CartLinePrice } from '@/components/cart/line-price';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ShoppingCart, X } from 'lucide-react';
@@ -54,7 +55,7 @@ export function CartPopover() {
                       {item.title}
                     </Link>
                     <div className="flex items-baseline gap-2 mt-1">
-                      <p className="text-sm font-bold">{formatPrice(item.price)}</p>
+                      <CartLinePrice price={item.price} originalPrice={item.originalPrice} priceClassName="text-sm" />
                       {item.quantity > 1 && <span className="text-xs text-muted-foreground">× {item.quantity}</span>}
                       {item.selectedSize && <span className="text-xs text-muted-foreground">· {item.selectedSize}</span>}
                     </div>
