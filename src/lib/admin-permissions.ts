@@ -14,6 +14,8 @@ export type AdminPermission =
   | 'logistics.manage'
   | 'logs.view'
   | 'support.manage'
+  /** Read buyer↔seller conversations on /admin/messages. View only. */
+  | 'messages.view'
   | 'disputes.manage'
   | 'refunds.manage'
   | 'returns.manage'
@@ -24,7 +26,7 @@ const ALL_PERMISSIONS: AdminPermission[] = [
   'users.view', 'users.manage', 'users.change_role',
   'finance.view', 'finance.manage', 'settings.manage',
   'moderation.manage', 'marketing.manage', 'logistics.manage',
-  'logs.view', 'support.manage', 'disputes.manage',
+  'logs.view', 'support.manage', 'messages.view', 'disputes.manage',
   'refunds.manage', 'returns.manage', 'analytics.view',
 ];
 
@@ -33,8 +35,8 @@ export const ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
   admin: ALL_PERMISSIONS.filter(p => p !== 'users.change_role'),
   moderator: [
     'dashboard.view', 'products.manage', 'moderation.manage',
-    'orders.manage', 'offers.view', 'support.manage', 'disputes.manage',
-    'refunds.manage', 'returns.manage',
+    'orders.manage', 'offers.view', 'support.manage', 'messages.view',
+    'disputes.manage', 'refunds.manage', 'returns.manage',
   ],
   analyst: [
     'dashboard.view', 'finance.view', 'analytics.view', 'logs.view',

@@ -19,6 +19,7 @@ import {
 import { useFirestore } from '@/firebase';
 import type { FirestoreOffer, FirestoreProduct, FirestoreUser } from '@/lib/types';
 import { effectiveStatus, summarizeOffers } from '@/lib/offers';
+import { fetchMap } from '@/lib/fetch-map';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { StatCard } from '@/components/admin/stat-card';
@@ -58,19 +59,6 @@ async function loadOfferDocs(firestore: Firestore): Promise<{
     }
     throw err;
   }
-}
-
-async function fetchMap<T>(
-  ids: Iterable<string>,
-  load: (id: string) => Promise<T | null>,
-): Promise<Map<string, T>> {
-  const unique = Array.from(new Set(ids)).filter(Boolean);
-  const entries = await Promise.all(
-    unique.map(async (id) => [id, await load(id).catch(() => null)] as const),
-  );
-  const map = new Map<string, T>();
-  for (const [id, value] of entries) if (value) map.set(id, value);
-  return map;
 }
 
 function firstImageUrl(product: FirestoreProduct | undefined): string | null {

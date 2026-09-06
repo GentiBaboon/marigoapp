@@ -18,23 +18,24 @@ const ALL_PERMISSION_NAMES: AdminPermission[] = [
 
 describe('admin-permissions', () => {
   describe('ROLE_PERMISSIONS', () => {
-    it('super_admin has all 19 permissions', () => {
-      expect(ROLE_PERMISSIONS.super_admin).toHaveLength(19);
+    it('super_admin has all 20 permissions', () => {
+      expect(ROLE_PERMISSIONS.super_admin).toHaveLength(20);
       for (const perm of ALL_PERMISSION_NAMES) {
         expect(ROLE_PERMISSIONS.super_admin).toContain(perm);
       }
     });
 
     it('admin has all permissions except users.change_role', () => {
-      expect(ROLE_PERMISSIONS.admin).toHaveLength(18);
+      expect(ROLE_PERMISSIONS.admin).toHaveLength(19);
       expect(ROLE_PERMISSIONS.admin).not.toContain('users.change_role');
       for (const perm of ALL_PERMISSION_NAMES.filter(p => p !== 'users.change_role')) {
         expect(ROLE_PERMISSIONS.admin).toContain(perm);
       }
     });
 
-    it('moderator has exactly 9 permissions', () => {
-      expect(ROLE_PERMISSIONS.moderator).toHaveLength(9);
+    it('moderator has exactly 10 permissions', () => {
+      expect(ROLE_PERMISSIONS.moderator).toHaveLength(10);
+      expect(ROLE_PERMISSIONS.moderator).toContain('messages.view');
       expect(ROLE_PERMISSIONS.moderator).toContain('dashboard.view');
       expect(ROLE_PERMISSIONS.moderator).toContain('products.manage');
       expect(ROLE_PERMISSIONS.moderator).toContain('moderation.manage');
@@ -65,6 +66,10 @@ describe('admin-permissions', () => {
 
     it('analyst cannot see offers — they are a moderation view, not a report', () => {
       expect(ROLE_PERMISSIONS.analyst).not.toContain('offers.view');
+    });
+
+    it('analyst cannot read members\' private messages', () => {
+      expect(ROLE_PERMISSIONS.analyst).not.toContain('messages.view');
     });
   });
 

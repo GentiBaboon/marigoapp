@@ -1,406 +1,391 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { format, formatDistanceToNow, isToday } from 'date-fns';
+import { ArrowLeft, Bot, MessageSquare, Search, Sparkles, UserRound, Users } from 'lucide-react';
+import { collection, doc, getDoc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
+
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { Money } from '@/components/admin/money';
-import {
-  collection,
-  query,
-  orderBy,
-  limit,
-  addDoc,
-  serverTimestamp,
-  onSnapshot,
-  doc,
-  updateDoc,
-  getDocs,
-  where,
-} from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { StatCard } from '@/components/admin/stat-card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, MessageSquare, ArrowLeft, CheckCheck, ShoppingBag, Search, Loader2 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import Image from 'next/image';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import type { FirestoreProduct, ChatProductCard } from '@/lib/types';
+import { fetchMap } from '@/lib/fetch-map';
+import { toDate, type ChatProductCard, type FirestoreUser } from '@/lib/types';
+import AssistantChatsLoading from './loading';
 
-interface SupportChat {
+/** Newest chats shown. A transcript is a handful of turns, so this stays cheap. */
+const CHATS_LIMIT = 100;
+
+/**
+ * One `support_chats` document. The AI widget writes `userId` / `topic` /
+ * `status` / `startedAt` / `lastMessageAt` and nothing else — no name, no
+ * subject, no last-message preview. Those are joined or derived here. The
+ * optional legacy fields belong to the earlier human-support shape and are
+ * read when present so old threads still render.
+ */
+interface AssistantChat {
   id: string;
   userId: string;
-  userName: string;
-  subject: string;
-  status: 'open' | 'closed';
-  lastMessage: string;
-  lastMessageAt: any;
-  unreadByAdmin: number;
+  topic?: string;
+  status?: string;
+  startedAt?: unknown;
+  lastMessageAt?: unknown;
+  /** Legacy human-support fields. */
+  userName?: string;
+  subject?: string;
+  lastMessage?: string;
 }
 
-interface SupportMessage {
+/**
+ * One message. The widget stores `{ role, content, timestamp, products? }`;
+ * the earlier support shape stored `{ senderId, senderName, isAdmin, content,
+ * createdAt }`. Both are rendered — the difference is who wrote it.
+ */
+interface AssistantMessage {
   id: string;
-  senderId: string;
-  senderName: string;
+  role?: 'user' | 'model';
   content: string;
-  createdAt: any;
-  isAdmin: boolean;
+  timestamp?: unknown;
+  createdAt?: unknown;
+  isAdmin?: boolean;
+  senderName?: string;
+  products?: ChatProductCard[];
   type?: 'text' | 'product_card';
   productData?: ChatProductCard;
 }
 
-export default function AdminSupportPage() {
-  const firestore = useFirestore();
-  const { user: adminUser } = useUser();
-  const [selectedChat, setSelectedChat] = React.useState<SupportChat | null>(null);
-  const [messages, setMessages] = React.useState<SupportMessage[]>([]);
-  const [newMessage, setNewMessage] = React.useState('');
-  const [isSending, setIsSending] = React.useState(false);
-  const messagesEndRef = React.useRef<HTMLDivElement>(null);
-  const [productSearchOpen, setProductSearchOpen] = React.useState(false);
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [searchResults, setSearchResults] = React.useState<FirestoreProduct[]>([]);
-  const [isSearching, setIsSearching] = React.useState(false);
+function messageDate(msg: AssistantMessage): Date | null {
+  return toDate((msg.timestamp ?? msg.createdAt) as any);
+}
 
-  // Fetch all support chats
-  const chatsQuery = useMemoFirebase(
-    () => query(collection(firestore, 'support_chats'), orderBy('lastMessageAt', 'desc'), limit(50)),
-    [firestore]
+function fromVisitor(msg: AssistantMessage): boolean {
+  return msg.role === 'user' || (msg.role == null && !msg.isAdmin);
+}
+
+function displayName(user: FirestoreUser | undefined, chat: AssistantChat): string {
+  return user?.name || user?.displayName || chat.userName || user?.email || `${chat.userId.slice(0, 8)}…`;
+}
+
+function ProductChip({ product }: { product: ChatProductCard }) {
+  return (
+    <Link
+      href={`/admin/products/${product.id}`}
+      className="flex items-center gap-2 rounded-md border bg-background p-1.5 pr-3 text-foreground hover:bg-muted"
+    >
+      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded bg-muted">
+        {product.image && <Image src={product.image} alt="" fill className="object-cover" sizes="40px" />}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-[10px] font-bold uppercase tracking-wider">{product.brandId}</p>
+        <p className="truncate text-xs">{product.title}</p>
+        <p className="text-xs font-semibold">
+          <Money eur={product.price} />
+        </p>
+      </div>
+    </Link>
   );
-  const { data: chats, isLoading: chatsLoading } = useCollection<SupportChat>(chatsQuery);
+}
 
-  // Listen to messages for selected chat
+export default function AdminAssistantChatsPage() {
+  const firestore = useFirestore();
+  const [users, setUsers] = React.useState<Map<string, FirestoreUser>>(new Map());
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [messages, setMessages] = React.useState<AssistantMessage[] | null>(null);
+  const [search, setSearch] = React.useState('');
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  // Live: an operator can watch a chat as it happens.
+  const chatsQuery = useMemoFirebase(
+    () => query(collection(firestore, 'support_chats'), orderBy('lastMessageAt', 'desc'), limit(CHATS_LIMIT)),
+    [firestore],
+  );
+  const { data: chats, isLoading } = useCollection<AssistantChat>(chatsQuery);
+
+  // Names are not on the chat document, so join them — once per distinct
+  // shopper, and only for ids not already resolved.
   React.useEffect(() => {
-    if (!selectedChat || !firestore) return;
-
-    const messagesRef = collection(firestore, 'support_chats', selectedChat.id, 'messages');
-    const q = query(messagesRef, orderBy('createdAt', 'asc'), limit(100));
-
-    const unsub = onSnapshot(q, (snap) => {
-      const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as SupportMessage));
-      setMessages(msgs);
+    if (!chats) return;
+    const missing = chats.map((c) => c.userId).filter((id) => id && !users.has(id));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    fetchMap(missing, async (id) => {
+      const snap = await getDoc(doc(firestore, 'users', id));
+      return snap.exists() ? ({ id: snap.id, ...snap.data() } as FirestoreUser) : null;
+    }).then((found) => {
+      if (cancelled || found.size === 0) return;
+      setUsers((prev) => new Map([...prev, ...found]));
     });
+    return () => {
+      cancelled = true;
+    };
+    // `users` is deliberately not a dependency: it only grows, and re-running
+    // on every growth would refetch nothing but still churn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chats, firestore]);
 
-    // Mark as read by admin
-    if (selectedChat.unreadByAdmin > 0) {
-      updateDoc(doc(firestore, 'support_chats', selectedChat.id), { unreadByAdmin: 0 });
-    }
-
-    return () => unsub();
-  }, [selectedChat, firestore]);
-
+  // Transcript for the selected chat. No `orderBy`: the widget stamps
+  // `timestamp` and the legacy shape stamped `createdAt`, and Firestore drops
+  // any document missing the sort field — which is exactly how the previous
+  // version of this page showed every assistant chat as empty. Sorted here.
   React.useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!selectedId) {
+      setMessages(null);
+      return;
+    }
+    setMessages(null);
+    const unsub = onSnapshot(collection(firestore, 'support_chats', selectedId, 'messages'), (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() } as AssistantMessage));
+      rows.sort((a, b) => (messageDate(a)?.getTime() ?? 0) - (messageDate(b)?.getTime() ?? 0));
+      setMessages(rows);
+    });
+    return () => unsub();
+  }, [selectedId, firestore]);
+
+  // Scroll the transcript's own viewport, not the document: `scrollIntoView`
+  // walks every scrollable ancestor and yanked the whole admin page down to
+  // the footer each time a chat was opened.
+  React.useEffect(() => {
+    const viewport = messagesEndRef.current?.closest('[data-radix-scroll-area-viewport]');
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!newMessage.trim() || !selectedChat || !firestore || !adminUser) return;
-    setIsSending(true);
-
-    try {
-      const messagesRef = collection(firestore, 'support_chats', selectedChat.id, 'messages');
-      await addDoc(messagesRef, {
-        senderId: adminUser.uid,
-        senderName: adminUser.displayName || 'Admin',
-        content: newMessage.trim(),
-        createdAt: serverTimestamp(),
-        isAdmin: true,
-      });
-
-      await updateDoc(doc(firestore, 'support_chats', selectedChat.id), {
-        lastMessage: newMessage.trim(),
-        lastMessageAt: serverTimestamp(),
-      });
-
-      setNewMessage('');
-    } catch (err) {
-      console.error('Failed to send message:', err);
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const handleCloseChat = async () => {
-    if (!selectedChat || !firestore) return;
-    await updateDoc(doc(firestore, 'support_chats', selectedChat.id), { status: 'closed' });
-  };
-
-  const handleReopenChat = async () => {
-    if (!selectedChat || !firestore) return;
-    await updateDoc(doc(firestore, 'support_chats', selectedChat.id), { status: 'open' });
-  };
-
-  const handleProductSearch = async () => {
-    if (!searchQuery.trim() || !firestore) return;
-    setIsSearching(true);
-    try {
-      const q = query(collection(firestore, 'products'), where('status', '==', 'active'), limit(20));
-      const snap = await getDocs(q);
-      const results = snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as FirestoreProduct))
-        .filter(p =>
-          p.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.brandId?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      setSearchResults(results);
-    } catch (err) {
-      console.error('Product search error:', err);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleSendProduct = async (product: FirestoreProduct) => {
-    if (!selectedChat || !firestore || !adminUser) return;
-    const messagesRef = collection(firestore, 'support_chats', selectedChat.id, 'messages');
-    await addDoc(messagesRef, {
-      senderId: adminUser.uid,
-      senderName: adminUser.displayName || 'Support',
-      content: `Check out this product: ${product.title}`,
-      createdAt: serverTimestamp(),
-      isAdmin: true,
-      type: 'product_card',
-      productData: {
-        id: product.id,
-        title: product.title,
-        price: product.price,
-        image: product.images?.[0]?.url || '',
-        brandId: product.brandId,
-        sellerId: product.sellerId,
-      },
+  const filtered = React.useMemo(() => {
+    if (!chats) return [];
+    const needle = search.trim().toLowerCase();
+    if (!needle) return chats;
+    return chats.filter((chat) => {
+      const user = users.get(chat.userId);
+      return [displayName(user, chat), user?.email, chat.topic, chat.subject]
+        .some((v) => v?.toLowerCase().includes(needle));
     });
-    await updateDoc(doc(firestore, 'support_chats', selectedChat.id), {
-      lastMessage: `Shared product: ${product.title}`,
-      lastMessageAt: serverTimestamp(),
-    });
-    setProductSearchOpen(false);
-    setSearchQuery('');
-    setSearchResults([]);
-  };
+  }, [chats, users, search]);
 
-  const openChats = chats?.filter(c => c.status === 'open') || [];
-  const closedChats = chats?.filter(c => c.status === 'closed') || [];
+  const selected = chats?.find((c) => c.id === selectedId) ?? null;
+  const selectedUser = selected ? users.get(selected.userId) : undefined;
+
+  const stats = React.useMemo(() => {
+    const all = chats ?? [];
+    const today = all.filter((c) => {
+      const d = toDate((c.lastMessageAt ?? c.startedAt) as any);
+      return d ? isToday(d) : false;
+    }).length;
+    return { total: all.length, today, people: new Set(all.map((c) => c.userId)).size };
+  }, [chats]);
+
+  if (isLoading && !chats) return <AssistantChatsLoading />;
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] gap-4">
-      {/* Chat List */}
-      <Card className="w-80 shrink-0 flex flex-col">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Support Chats
-          </CardTitle>
-          <CardDescription>
-            {openChats.length} open, {closedChats.length} closed
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-hidden p-0">
-          <ScrollArea className="h-full">
-            <div className="px-3 pb-3 space-y-1">
-              {chatsLoading ? (
-                <p className="text-sm text-muted-foreground p-4 text-center">Loading...</p>
-              ) : chats && chats.length > 0 ? (
-                chats.map((chat) => (
-                  <button
-                    key={chat.id}
-                    onClick={() => setSelectedChat(chat)}
-                    className={cn(
-                      'w-full text-left rounded-lg p-3 transition-colors',
-                      selectedChat?.id === chat.id
-                        ? 'bg-primary/10 border border-primary/20'
-                        : 'hover:bg-muted'
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-sm truncate">{chat.userName}</span>
-                      <Badge
-                        variant={chat.status === 'open' ? 'default' : 'secondary'}
-                        className="text-[10px] shrink-0"
-                      >
-                        {chat.status}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate">{chat.subject}</p>
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">{chat.lastMessage}</p>
-                    {chat.unreadByAdmin > 0 && (
-                      <Badge variant="destructive" className="mt-1 text-[10px]">
-                        {chat.unreadByAdmin} new
-                      </Badge>
-                    )}
-                  </button>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground p-4 text-center">No support chats yet.</p>
-              )}
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button asChild variant="outline" size="icon">
+          <Link href="/admin">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold tracking-tight">Assistant Chats</h1>
+          <p className="text-muted-foreground">
+            What shoppers asked Marigo, the AI assistant, and what she answered. Read-only — replies typed here
+            would reach nobody, since the widget does not listen for them.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard
+          title="Chats"
+          value={stats.total}
+          icon={<Bot className="h-4 w-4 text-muted-foreground" />}
+          description={stats.total >= CHATS_LIMIT ? `Newest ${CHATS_LIMIT} shown` : 'Signed-in shoppers only'}
+        />
+        <StatCard
+          title="Active today"
+          value={stats.today}
+          icon={<Sparkles className="h-4 w-4 text-muted-foreground" />}
+          description="With a message today"
+        />
+        <StatCard
+          title="Shoppers"
+          value={stats.people}
+          icon={<Users className="h-4 w-4 text-muted-foreground" />}
+          description="Distinct accounts"
+        />
+      </div>
+
+      <div className="flex flex-col gap-4 lg:h-[calc(100vh-22rem)] lg:min-h-[480px] lg:flex-row">
+        <Card className="flex max-h-[50vh] shrink-0 flex-col lg:max-h-none lg:w-80">
+          <CardHeader className="space-y-3 pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MessageSquare className="h-4 w-4" />
+              Conversations
+            </CardTitle>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Name, email or topic"
+                className="h-9 pl-8"
+              />
             </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      {/* Chat Window */}
-      <Card className="flex-1 flex flex-col">
-        {selectedChat ? (
-          <>
-            <CardHeader className="pb-3 border-b">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="md:hidden h-8 w-8"
-                    onClick={() => setSelectedChat(null)}
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>{selectedChat.userName?.charAt(0) || 'U'}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <CardTitle className="text-base">{selectedChat.userName}</CardTitle>
-                    <CardDescription className="text-xs">{selectedChat.subject}</CardDescription>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {selectedChat.status === 'open' ? (
-                    <Button variant="outline" size="sm" onClick={handleCloseChat}>
-                      <CheckCheck className="mr-1.5 h-3.5 w-3.5" />
-                      Close
-                    </Button>
-                  ) : (
-                    <Button variant="outline" size="sm" onClick={handleReopenChat}>
-                      Reopen
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent className="flex-1 overflow-hidden p-0">
-              <ScrollArea className="h-full p-4">
-                <div className="space-y-4">
-                  {messages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={cn('flex', msg.isAdmin ? 'justify-end' : 'justify-start')}
-                    >
-                      <div
+          </CardHeader>
+          <CardContent className="flex-1 overflow-hidden p-0">
+            <ScrollArea className="h-full">
+              <div className="space-y-1 px-3 pb-3">
+                {filtered.length === 0 ? (
+                  <p className="p-4 text-center text-sm text-muted-foreground">
+                    {chats && chats.length > 0 ? 'Nothing matches that search.' : 'No assistant chats yet.'}
+                  </p>
+                ) : (
+                  filtered.map((chat) => {
+                    const user = users.get(chat.userId);
+                    const when = toDate((chat.lastMessageAt ?? chat.startedAt) as any);
+                    return (
+                      <button
+                        key={chat.id}
+                        type="button"
+                        onClick={() => setSelectedId(chat.id)}
                         className={cn(
-                          'max-w-[70%] rounded-2xl px-4 py-2.5',
-                          msg.isAdmin
-                            ? 'bg-primary text-primary-foreground rounded-br-sm'
-                            : 'bg-muted rounded-bl-sm'
+                          'w-full rounded-lg p-3 text-left transition-colors',
+                          selectedId === chat.id ? 'border border-primary/20 bg-primary/10' : 'hover:bg-muted',
                         )}
                       >
-                        <p className="text-sm">{msg.content}</p>
-                        {msg.type === 'product_card' && msg.productData && (
-                          <div className="max-w-[280px] border rounded-lg p-3 space-y-2 bg-background shadow-sm mt-2">
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Product Recommendation</p>
-                            <div className="flex gap-3 items-center">
-                              {msg.productData.image && (
-                                <div className="relative h-14 w-14 rounded bg-muted overflow-hidden flex-shrink-0">
-                                  <Image src={msg.productData.image} alt="" fill className="object-cover" sizes="56px" />
+                        <div className="mb-0.5 flex items-center justify-between gap-2">
+                          <span className="truncate text-sm font-medium">{displayName(user, chat)}</span>
+                          {when && (
+                            <span className="shrink-0 text-[10px] text-muted-foreground">
+                              {formatDistanceToNow(when, { addSuffix: true })}
+                            </span>
+                          )}
+                        </div>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {chat.topic || chat.subject || chat.lastMessage || 'No topic recorded'}
+                        </p>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        <Card className="flex min-h-[480px] flex-1 flex-col">
+          {selected ? (
+            <>
+              <CardHeader className="border-b pb-3">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-9 w-9">
+                    {selectedUser?.photoURL && <AvatarImage src={selectedUser.photoURL} alt="" />}
+                    <AvatarFallback>{displayName(selectedUser, selected).charAt(0).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="truncate text-base">{displayName(selectedUser, selected)}</CardTitle>
+                    <CardDescription className="truncate text-xs">
+                      {selectedUser?.email || selected.userId}
+                      {(() => {
+                        const started = toDate(selected.startedAt as any);
+                        return started ? ` · started ${format(started, 'd MMM yyyy, HH:mm')}` : '';
+                      })()}
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline" className="shrink-0 gap-1">
+                    <Bot className="h-3 w-3" />
+                    AI assistant
+                  </Badge>
+                </div>
+              </CardHeader>
+
+              <CardContent className="flex-1 overflow-hidden p-0">
+                <ScrollArea className="h-full p-4">
+                  {messages === null ? (
+                    <p className="text-center text-sm text-muted-foreground">Loading transcript…</p>
+                  ) : messages.length === 0 ? (
+                    <p className="text-center text-sm text-muted-foreground">This chat has no saved messages.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {messages.map((msg) => {
+                        const visitor = fromVisitor(msg);
+                        const when = messageDate(msg);
+                        const author = visitor
+                          ? displayName(selectedUser, selected)
+                          : msg.role === 'model'
+                            ? 'Marigo'
+                            : msg.senderName || 'Support';
+                        const cards = [
+                          ...(msg.products ?? []),
+                          ...(msg.type === 'product_card' && msg.productData ? [msg.productData] : []),
+                        ];
+                        return (
+                          <div key={msg.id} className={cn('flex gap-2', visitor ? 'justify-start' : 'justify-end')}>
+                            {visitor && (
+                              <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
+                                <UserRound className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div
+                              className={cn(
+                                'max-w-[75%] rounded-2xl px-4 py-2.5',
+                                visitor ? 'rounded-bl-sm bg-muted' : 'rounded-br-sm bg-primary/10',
+                              )}
+                            >
+                              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                {author}
+                              </p>
+                              <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                              {cards.length > 0 && (
+                                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                                  {cards.map((p) => (
+                                    <ProductChip key={p.id} product={p} />
+                                  ))}
                                 </div>
                               )}
-                              <div className="min-w-0">
-                                <p className="font-bold text-xs uppercase text-foreground">{msg.productData.brandId}</p>
-                                <p className="text-xs truncate text-foreground">{msg.productData.title}</p>
-                                <p className="text-sm font-semibold text-foreground"><Money eur={msg.productData.price} /></p>
-                              </div>
+                              <p className="mt-1 text-[10px] text-muted-foreground">
+                                {when ? format(when, 'd MMM, HH:mm') : ''}
+                              </p>
                             </div>
+                            {!visitor && (
+                              <Image
+                                src="/marigo-ai-avatar.png"
+                                alt=""
+                                width={28}
+                                height={28}
+                                className="mt-1 h-7 w-7 shrink-0 rounded-full object-cover"
+                              />
+                            )}
                           </div>
-                        )}
-                        <p
-                          className={cn(
-                            'text-[10px] mt-1',
-                            msg.isAdmin ? 'text-primary-foreground/60' : 'text-muted-foreground'
-                          )}
-                        >
-                          {msg.createdAt?.toDate
-                            ? format(msg.createdAt.toDate(), 'HH:mm')
-                            : '...'}
-                        </p>
-                      </div>
+                        );
+                      })}
+                      <div ref={messagesEndRef} />
                     </div>
-                  ))}
-                  <div ref={messagesEndRef} />
-                </div>
-              </ScrollArea>
-            </CardContent>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </>
+          ) : (
+            <div className="flex flex-1 items-center justify-center text-muted-foreground">
+              <div className="text-center">
+                <Bot className="mx-auto mb-3 h-12 w-12 opacity-30" />
+                <p className="font-medium">Select a chat</p>
+                <p className="text-sm">Pick a conversation on the left to read the transcript.</p>
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
 
-            <div className="border-t p-4">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSend();
-                }}
-                className="flex gap-2"
-              >
-                <Input
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a reply..."
-                  disabled={isSending}
-                />
-                <Button type="submit" disabled={isSending || !newMessage.trim()}>
-                  <Send className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon" onClick={() => setProductSearchOpen(true)} title="Share Product" type="button">
-                  <ShoppingBag className="h-4 w-4" />
-                </Button>
-              </form>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">Select a conversation</p>
-              <p className="text-sm">Choose a support chat from the left to start responding.</p>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      <Dialog open={productSearchOpen} onOpenChange={setProductSearchOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Share a Product</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Search by name or brand..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleProductSearch()}
-              />
-              <Button onClick={handleProductSearch} disabled={isSearching} size="icon">
-                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              </Button>
-            </div>
-            <div className="max-h-[300px] overflow-y-auto space-y-2">
-              {searchResults.map((p) => (
-                <div key={p.id} className="flex items-center gap-3 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer" onClick={() => handleSendProduct(p)}>
-                  <div className="relative h-12 w-12 rounded bg-muted overflow-hidden flex-shrink-0">
-                    {p.images?.[0]?.url && <Image src={p.images[0].url} alt="" fill className="object-cover" sizes="48px" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-xs uppercase">{p.brandId}</p>
-                    <p className="text-sm truncate">{p.title}</p>
-                    <p className="text-sm font-semibold"><Money eur={p.price} /></p>
-                  </div>
-                  <Button size="sm" variant="outline">Send</Button>
-                </div>
-              ))}
-              {searchResults.length === 0 && searchQuery && !isSearching && (
-                <p className="text-center text-sm text-muted-foreground py-4">No products found. Try different keywords.</p>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <p className="text-xs text-muted-foreground">
+        Only signed-in shoppers&apos; chats are saved; visitors who chat before signing in leave no transcript.
+        Nothing on this page writes to Firestore.
+      </p>
     </div>
   );
 }

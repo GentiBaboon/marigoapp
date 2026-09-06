@@ -191,7 +191,7 @@ Authenticated (gated by middleware §6):
 Courier (`/courier/*`, role-gated): `dashboard`, `jobs`, `delivery/[deliveryId]`, `earnings`, `profile`.
 
 Admin (`/admin/*`, role-gated, and **behind the masked gate in §6c**). Sidebar entries map 1:1 to permissions from `src/lib/admin-permissions.ts`:
-`/admin` (dashboard), `products` (+ `[id]`), `orders` (+ `[id]`), `offers`, `users`, `analytics`, `finance`, `marketing`, `logistics`, `moderation`, `disputes`, `refunds`, `returns`, `support`, `logs`, `settings`.
+`/admin` (dashboard), `products` (+ `[id]`), `orders` (+ `[id]`), `offers`, `users`, `analytics`, `finance`, `marketing`, `logistics`, `moderation`, `disputes`, `refunds`, `returns`, `support` (Assistant Chats), `messages`, `logs`, `settings`.
 - **`/admin/offers`** — every buyer→seller offer across all listings, newest
   first, with whose-turn counts and an acceptance rate. **Read-only**: the
   offer `update` rule names only the two parties, and an operator overriding a
@@ -201,6 +201,26 @@ Admin (`/admin/*`, role-gated, and **behind the masked gate in §6c**). Sidebar 
   to an unordered read and says so in a banner. Listings and people are joined
   once per distinct id (`fetchMap`), not per row. Per-listing offers are still
   on `/admin/products/[id]`.
+- **`/admin/support` — "Assistant Chats"**: every saved conversation with
+  Marigo, the AI assistant (§7), **read-only**. The page was built for an
+  earlier human-support shape and silently broke when the widget became the
+  only writer to `support_chats`: it showed `userName` / `subject` the widget
+  never writes, and ordered messages by `createdAt` while the widget stamps
+  `timestamp` — Firestore drops documents missing the sort field, so every
+  transcript rendered empty. It now joins names from `users` (once per
+  distinct shopper, `fetchMap`), reads messages **unordered and sorts in
+  memory** so both shapes render, and has no reply box: the widget renders
+  local state and never listens to Firestore, so an admin reply typed there
+  reached nobody. Only signed-in shoppers' chats exist — the widget persists
+  nothing for anonymous visitors.
+- **`/admin/messages`** — buyer↔seller `conversations`, newest first, with a
+  transcript pane; dispute threads (`source: 'dispute'`) are badged and
+  filterable. **Read-only by design** — an operator moderates, they do not
+  join in — and gated on `messages.view` (moderator and up; not analyst).
+  **Opening a thread writes a `conversation_viewed` entry to `admin_logs`**,
+  once per thread per visit: this is private correspondence between two
+  members and reading it should leave a trace. Needs no rules change — the
+  conversation rules already grant `isAdmin()` reads.
 - **`/admin/analytics`** — live visitors (Redis, §9b) plus registration history
   by date (Firestore). Two halves, two stores, on purpose: presence is
   ephemeral and expires itself, signup history is durable.
@@ -270,10 +290,10 @@ Roles (`UserRoleEnum`): `buyer`, `seller`, `courier`, `admin`, `super_admin`, `m
 
 **Server-side auth (`src/lib/firebase-admin.ts`):** `verifyIdToken` validates against Firebase's JWKS with `jose` — no service-account credentials anywhere, which is what lets the app run on Vercel. Firestore reads/writes from API routes go through the REST helpers (`firestoreGet/Query/Update/Create`) using the caller's ID token, so **security rules still apply on the server path**.
 
-**Role gating:** `src/lib/admin-permissions.ts` defines 19 `AdminPermission` values and `ROLE_PERMISSIONS`:
+**Role gating:** `src/lib/admin-permissions.ts` defines 20 `AdminPermission` values and `ROLE_PERMISSIONS`:
 - `super_admin` — everything
 - `admin` — everything except `users.change_role`
-- `moderator` — dashboard, products, moderation, orders, offers, support, disputes, refunds, returns
+- `moderator` — dashboard, products, moderation, orders, offers, support, messages, disputes, refunds, returns
 - `analyst` — dashboard, finance.view, analytics.view, logs.view
 
 Client hooks `use-admin-auth` / `use-courier-auth` enforce this in the UI; Firestore rules enforce it on data.
@@ -485,7 +505,7 @@ A turn is **retrieve → generate → sanitize**:
 
 Degradation is deliberate: if generation fails but retrieval succeeded, the route still returns the products with a bilingual lead-in rather than an error.
 
-The widget is lazy (`ssr: false`) in `src/app/layout.tsx`, opens on a global `open-chatbot` event (fired from `/help`), and its FAB is desktop-only (`hidden md:inline-flex`). Transcripts persist to `support_chats` **only for signed-in users** and strictly fire-and-forget — answering must never depend on the write. It used to, which meant signed-out visitors got no reply at all.
+The widget is lazy (`ssr: false`) in `src/app/layout.tsx`, opens on a global `open-chatbot` event (fired from `/help`), and its FAB is desktop-only (`hidden md:inline-flex`). Transcripts persist to `support_chats` **only for signed-in users** and strictly fire-and-forget — answering must never depend on the write. It used to, which meant signed-out visitors got no reply at all. Operators read them on `/admin/support` (§4); the widget never reads them back, so nothing written there reaches the shopper.
 
 ## 7b. Offers (buyer↔seller negotiation)
 
@@ -741,13 +761,22 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
   - The rule needs to know where a listing ships from, and a buyer **cannot read
     `users/{sellerId}/addresses`** (owner-only). So `shippingFromCity` /
     `shippingFromCountry` are copied onto the product at publish (`ReviewStep`).
-  - Listings from before this have neither and are pooled as **one unknown
-    origin charged once** — overcharging for missing data is worse than
-    undercharging. Existing stock keeps paying the flat fee until republished or
-    backfilled.
-  - `/api/create-order` recomputes from the server's own copy of each product
-    and the address on the order. The client's basket payload never decides a
-    price. Cities are matched accent- and case-folded.
+  - Listings from before this have neither. They **ride along with a known
+    city** when the basket has one (a domestic one by preference), and only
+    form their own single "unknown" group, charged once, when nothing in the
+    basket names a city. They used to be a separate group beside Tirana, so
+    one stamped item plus one legacy item was quoted and charged two courier
+    runs — and every un-stamped listing is Tirana stock too. Overcharging for
+    missing data is worse than undercharging. Re-saving a listing on the
+    **edit page** now stamps the origin from the selected pickup address, so
+    a seller repairs their own legacy stock by opening and saving it; the
+    admin page cannot, because it cannot read the seller's address book.
+  - `/api/create-order` **and `/api/create-payment-intent`** recompute from the
+    server's own copy of each product and the address on the order. The
+    client's basket payload never decides a price. The card route used to
+    charge a flat €10.90 per item from before the module existed, so a card
+    buyer was authorised for ~5× the quoted fee while cash on delivery paid
+    the quote — anything that prices delivery must call `calculateShipping`. Cities are matched accent- and case-folded.
   - Cart lines snapshot the origin when the item is added, so a seller changing
     their pickup city mid-basket leaves the *quote* stale — the charge stays
     correct, since checkout re-reads.
@@ -915,7 +944,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (651 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (654 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
