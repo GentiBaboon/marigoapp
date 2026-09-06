@@ -89,7 +89,8 @@ message by `detectChatLanguage()`, not by this setting.
     ├── hooks/                   # admin/courier auth, search suggestions, preferences, visual viewport
     ├── lib/                     # Types, order lifecycle, permissions, rate-limit, env, i18n JSON,
     │                            #   chat-{knowledge,lexicon,retrieval}, listing-taxonomy, firestore-rest,
-    │                            #   attribute-options, listing-options, size-options, firestore-write
+    │                            #   attribute-options, listing-options, size-options, firestore-write,
+    │                            #   price-conversion, image-for-model
     ├── services/                # ProductService / OrderService / UserService / image upload
     └── __tests__/               # Vitest setup + tests
 ```
@@ -431,7 +432,16 @@ Flows in `src/ai/flows/` (each exports a Zod input/output schema pair plus an as
 - `remove-background.ts` → `removeBackground` — product-image cleanup
 - `ai-chat.ts` → types + `chatWithAI` client helper; the logic lives in `src/app/api/chat/route.ts`
 
-`src/components/ai/flows/` holds thin client wrappers for the price/description flows.
+**Description generation is dead code.** `/api/ai/generate-description` holds
+the live logic and is rate-limited, but **nothing in the app calls it** — the
+sell wizard's description box has no generate button. Two further copies of the
+same schema and prompt sit unused: `src/ai/flows/generate-description.ts` (a
+*client wrapper* that fetches the route) and
+`src/components/ai/flows/generate-description.ts` (the original `'use server'`
+flow). The directory names are the wrong way round for this pair, which is how
+it went unnoticed. All three prompts are still identical. The route is also
+**unauthenticated**, so it is open model quota serving a feature that does not
+exist — wire it up like `/api/ai/suggest-price` or delete all three.
 
 ### AI-assisted listing (`/api/ai/draft-listing` + `components/sell/AiListingAssistant`)
 
@@ -676,6 +686,11 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
     against, so anyone who picked USD while it was offered lands back on the
     default rather than being stranded on prices no control can change.
     Restoring it: add it here and re-add the row in `user-nav.tsx`.
+- **Photos sent to a model go through `src/lib/image-for-model.ts`.** Listings
+  publish at 0.8 MB / 1200px; what a model reads is shrunk to 0.12 MB / 640px,
+  because nine full-size photos exceed both the request body limit and the 30s
+  Vercel ceiling while buying no accuracy. The AI listing assistant and the
+  price suggestion share it so the two cannot disagree about "small enough".
 - **Price *inputs* are in the display currency; storage stays EUR.**
   `src/lib/price-conversion.ts` is the only crossing — `resolveEurFromInput()`
   on the way in, `eurToInputValue()` on the way out — used by the sell wizard's
