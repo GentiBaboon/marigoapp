@@ -366,8 +366,20 @@ export interface FirestoreOrder {
     brand: string;
     image: string;
     sellerId: string;
+    /** Units ordered; absent on older lines, which count as one. */
+    quantity?: number;
+    selectedSize?: string | null;
   }>;
+  /** What the buyer pays: merchandise + delivery − discount. EUR. */
   totalAmount: number;
+  /**
+   * Merchandise value and delivery fee, stored separately since 2026-09-06 so
+   * finance can charge commission on goods and not on the courier's fee.
+   * Older orders lack them — read through `src/lib/order-money.ts`, which
+   * derives them from the lines and the total.
+   */
+  subtotal?: number;
+  shippingFee?: number;
   status:
     | "pending_payment"
     | "payment_failed"

@@ -33,10 +33,11 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { collection, query, where, orderBy, limit, doc } from 'firebase/firestore';
+import { collection, query, where, limit, doc } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import type { FirestoreOrder, FirestoreSettings } from '@/lib/types';
 import { toDate } from '@/lib/types';
+import { newestFirst } from '@/lib/order-money';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -129,18 +130,20 @@ export default function SellerWalletPage() {
   const { data: settings } = useDoc<FirestoreSettings>(settingsRef);
   const commissionRate = settings?.commissionRate ?? 0.15;
 
-  // Every order this seller is part of, recent first. `array-contains` keeps
-  // the query single-field so no composite index is needed.
+  // Every order this seller is part of. No `orderBy`: paired with
+  // `array-contains` it is a composite query, and the index it needs is not
+  // deployed — the page threw `failed-precondition` and showed nothing.
+  // Sorted in memory below instead (see `newestFirst`).
   const salesQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return query(
       collection(firestore, 'orders'),
       where('sellerIds', 'array-contains', user.uid),
-      orderBy('createdAt', 'desc'),
       limit(200),
     );
   }, [firestore, user?.uid]);
-  const { data: orders, isLoading } = useCollection<FirestoreOrder>(salesQuery);
+  const { data: rawOrders, isLoading } = useCollection<FirestoreOrder>(salesQuery);
+  const orders = React.useMemo(() => newestFirst(rawOrders, (o) => toDate(o.createdAt as any)), [rawOrders]);
 
   // Calculate this seller's portion of each order. An order can contain items
   // from multiple sellers; only sum the line items whose sellerId is mine.

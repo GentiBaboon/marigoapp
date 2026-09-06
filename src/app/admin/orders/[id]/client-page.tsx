@@ -10,6 +10,8 @@ import { useFirestore, useUser, useDoc, useCollection, useMemoFirebase } from '@
 import { doc, collection, query, where, orderBy, limit, updateDoc, addDoc, arrayUnion, serverTimestamp, getDocs, increment } from 'firebase/firestore';
 import type { FirestoreOrder, FirestoreUser, FirestoreConversation, FirestoreMessage } from '@/lib/types';
 import { statusLabel } from '@/lib/order-status';
+import { Money } from '@/components/admin/money';
+import { orderMerchandise, orderShipping } from '@/lib/order-money';
 import { toDate } from '@/lib/types';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -282,22 +284,34 @@ export default function AdminOrderDetailPage() {
               <span className="text-sm text-muted-foreground">Payment</span>
               <span className="text-sm capitalize">{order.paymentMethod}</span>
             </div>
+            {/* Goods and delivery apart: commission is owed on the first and
+                the courier is owed the second, so an operator following an
+                order needs both, not one figure. Older orders lack the stored
+                fields; the helpers derive them. */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total</span>
-              <span className="text-sm font-semibold">{order.totalAmount.toFixed(2)} EUR</span>
+              <span className="text-sm text-muted-foreground">Items</span>
+              <span className="text-sm"><Money eur={orderMerchandise(order)} /></span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Delivery</span>
+              <span className="text-sm"><Money eur={orderShipping(order)} /></span>
             </div>
             {order.discountAmount != null && order.discountAmount > 0 && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Discount</span>
-                <span className="text-sm text-green-600">-{order.discountAmount.toFixed(2)} EUR</span>
+                <span className="text-sm text-green-600">-<Money eur={order.discountAmount} /></span>
               </div>
             )}
             {order.taxAmount != null && order.taxAmount > 0 && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Tax</span>
-                <span className="text-sm">{order.taxAmount.toFixed(2)} EUR</span>
+                <span className="text-sm"><Money eur={order.taxAmount} /></span>
               </div>
             )}
+            <div className="flex items-center justify-between border-t pt-2">
+              <span className="text-sm font-medium">Total{order.paymentMethod === 'cod' ? ' · cash on delivery' : ''}</span>
+              <span className="text-sm font-semibold"><Money eur={order.totalAmount} /></span>
+            </div>
           </CardContent>
         </Card>
 

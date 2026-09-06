@@ -578,6 +578,32 @@ recovery from that: the webhook handling `payment_intent.canceled` is 403'd
 by the org policy. Cash on delivery still takes stock at placement — that
 order is committed the moment it is made.
 
+**Money on an order goes through `src/lib/order-money.ts`.** `totalAmount`
+is what the buyer pays — merchandise + delivery − discount — and the delivery
+fee inside it is the courier's, not revenue. Commission and seller earnings
+are owed on **merchandise** (`orderMerchandise`), and the finance page, the
+dashboard, the seller earnings page and the admin order view all read it
+through the helper. Before this the finance page charged 15% on delivery,
+the dashboard summed every order whatever its status, and `/profile/earnings`
+multiplied the *whole order* by a hardcoded 0.85 — delivery and other
+sellers' items included. Orders created since 2026-09-06 store `subtotal`
+and `shippingFee`; `orderShipping()` derives the fee for older ones from the
+total. Only `completed` counts as settled: on cash on delivery a shipped
+parcel can still be refused at the door.
+
+**Cash on delivery, end to end.** `/api/create-order` writes the order as
+`confirmed` and *then* takes stock (`decrementStockForItems`: quantity → 0
+flips the listing to `reserved`; a sized listing also decrements the
+variant). From then on the product page disables the buy button, the cart
+refuses to add it and both checkout routes reject it, until an admin marks
+the order `completed` (→ `sold`, `salesCount` +1) or `cancelled` / `refunded`
+(→ released to `active`). The seller walks `confirmed → in_preparation →
+prepared → shipped` from `/profile/listings/sales/[orderId]`; buyer and
+seller can only *request* a cancellation (`cancel_requested` /
+`sellerCancelRequested`), which touches no stock — the admin decides. Status
+changes raise in-app notifications; `sendOrderShipped` / `sendOrderDelivered`
+/ `sendOrderCancelled` exist in `src/lib/email` but **nothing calls them**.
+
 Client: Stripe Elements in `components/checkout/payment-step.tsx`, wrapped by `components/providers/stripe-provider.tsx`.
 
 Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from Secret Manager — `STRIPE_SECRET_KEY`, `STRIPE_WH_SECRET`, `APP_URL`):
@@ -944,7 +970,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (654 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (664 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
@@ -990,6 +1016,14 @@ SITE_URL                      # optional; overrides the marigoapp.com default
   smart-search down for free. All eight spending routes now call
   `applyRateLimit` **before** the model call. A new AI or Stripe route inherits
   this requirement.
+- **`array-contains` + `orderBy` on another field is a composite query** and
+  needs an index in `firestore.indexes.json` — which declares none for
+  `orders`. The seller wallet and earnings pages did exactly that and failed
+  with `failed-precondition`, i.e. a seller saw no sales at all. They now
+  read unordered and sort with `newestFirst()` (`src/lib/order-money.ts`). A
+  new query that filters on one field and orders on another needs its index
+  added *and deployed* (`firebase deploy --only firestore:indexes`), or the
+  same in-memory sort.
 - **`toDate()` does not accept a plain `Date`.** It handles a string, a
   Firestore `Timestamp` (`.toDate()`) and `{seconds}` — a bare `Date` has none
   of those and comes back `null`. Test fixtures built from `new Date()`

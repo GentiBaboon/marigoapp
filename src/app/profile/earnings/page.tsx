@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, query, where, limit, doc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getMarigoFunctions } from '@/firebase/functions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +30,8 @@ import {
 } from 'recharts';
 import { format, subDays, isWithinInterval, startOfDay } from 'date-fns';
 import Link from 'next/link';
-import { type FirestoreOrder, toDate } from '@/lib/types';
+import { type FirestoreOrder, type FirestoreSettings, DEFAULT_COMMISSION_RATE, toDate } from '@/lib/types';
+import { isSettled, newestFirst, sellerNet } from '@/lib/order-money';
 
 export default function SellerEarningsPage() {
     const { user } = useUser();
@@ -46,15 +47,26 @@ export default function SellerEarningsPage() {
     // Fetch Seller's Orders for History & Chart
     const salesQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
+        // No `orderBy`: with `array-contains` that is a composite query whose
+        // index is not deployed, and the page threw `failed-precondition`.
         return query(
             collection(firestore, 'orders'),
             where('sellerIds', 'array-contains', user.uid),
-            orderBy('createdAt', 'desc'),
             limit(100)
         );
     }, [user, firestore]);
 
-    const { data: sales, isLoading: isSalesLoading } = useCollection<FirestoreOrder>(salesQuery);
+    const { data: rawSales, isLoading: isSalesLoading } = useCollection<FirestoreOrder>(salesQuery);
+    const sales = useMemo(() => newestFirst(rawSales, (o) => toDate(o.createdAt)), [rawSales]);
+
+    // The live rate, not a hardcoded 0.85 — and applied to *this seller's*
+    // lines only. The page used to multiply the whole order's `totalAmount`,
+    // which included the delivery fee and, on a multi-seller order, the other
+    // sellers' items.
+    const settingsRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'global') : null), [firestore]);
+    const { data: settings } = useDoc<FirestoreSettings>(settingsRef);
+    const commissionRate = settings?.commissionRate ?? DEFAULT_COMMISSION_RATE;
+    const myNet = (sale: FirestoreOrder) => (user ? sellerNet(sale, user.uid, commissionRate) : 0);
 
     // Fetch Balance from Stripe via Cloud Function
     useEffect(() => {
@@ -117,7 +129,9 @@ export default function SellerEarningsPage() {
         }).reverse();
 
         sales.forEach(sale => {
-            if (sale.status === 'completed' || sale.status === 'delivered' || sale.status === 'shipped') {
+            // Earned means delivered and closed. A shipped parcel can still
+            // be refused at the door on cash on delivery.
+            if (isSettled(sale.status)) {
                 const saleDate = toDate(sale.createdAt);
                 if (!saleDate) return;
                 const dayMatch = days.find(d => 
@@ -127,20 +141,17 @@ export default function SellerEarningsPage() {
                     })
                 );
                 if (dayMatch) {
-                    dayMatch.amount += sale.totalAmount * 0.85; // Net 85%
+                    dayMatch.amount += myNet(sale);
                 }
             }
         });
 
         return days;
-    }, [sales]);
+    }, [sales, commissionRate, user]);
 
     const totalLifetimeEarnings = useMemo(() => {
-        return sales?.reduce((sum, s) => {
-            if (s.status === 'completed') return sum + (s.totalAmount * 0.85);
-            return sum;
-        }, 0) || 0;
-    }, [sales]);
+        return sales?.reduce((sum, s) => (isSettled(s.status) ? sum + myNet(s) : sum), 0) || 0;
+    }, [sales, commissionRate, user]);
 
     if (!user) return null;
 
@@ -171,7 +182,7 @@ export default function SellerEarningsPage() {
                         <div className="text-3xl font-bold">
                             {isSalesLoading ? <Skeleton className="h-9 w-32 bg-primary-foreground/20" /> : formatPrice(totalLifetimeEarnings)}
                         </div>
-                        <p className="text-xs text-primary-foreground/70 mt-1">Total revenue after 15% commission</p>
+                        <p className="text-xs text-primary-foreground/70 mt-1">Your items on delivered orders, after {Math.round(commissionRate * 100)}% commission</p>
                     </CardContent>
                 </Card>
 
@@ -296,11 +307,15 @@ export default function SellerEarningsPage() {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="font-bold text-sm">{formatPrice(sale.totalAmount * 0.85)}</p>
+                                        <p className="font-bold text-sm">{formatPrice(myNet(sale))}</p>
                                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                                            sale.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                                            isSettled(sale.status) ? 'bg-green-100 text-green-700'
+                                            : ['cancelled', 'refunded'].includes(sale.status) ? 'bg-muted text-muted-foreground'
+                                            : 'bg-orange-100 text-orange-700'
                                         }`}>
-                                            {sale.status === 'completed' ? 'Paid' : 'In Escrow'}
+                                            {isSettled(sale.status) ? 'Earned'
+                                             : ['cancelled', 'refunded'].includes(sale.status) ? 'Reversed'
+                                             : 'Awaiting delivery'}
                                         </span>
                                     </div>
                                 </div>

@@ -2,6 +2,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { useCurrency } from '@/context/CurrencyContext';
+import { isSettled, orderMerchandise } from '@/lib/order-money';
 import { collection, query, where, doc } from 'firebase/firestore';
 import {
   useFirestore,
@@ -93,13 +94,17 @@ export default function AdminDashboardPage() {
 
     const totalProducts = safeProducts.length;
     const activeListings = safeProducts.filter(p => p.status === 'active').length;
-    const soldItems = safeOrders.reduce((sum, order) => sum + order.items.length, 0);
+    // Money and "sold" count only settled orders, on merchandise: an order
+    // just placed, or later cancelled, is not revenue, and the delivery fee
+    // inside `totalAmount` is the courier's, not ours.
+    const settledOrders = safeOrders.filter(o => isSettled(o.status));
+    const soldItems = settledOrders.reduce((sum, order) => sum + (order.items?.length ?? 0), 0);
 
     const totalOrders = safeOrders.length;
     const ordersInPeriod = safeOrders.filter(o => { const d = toDate(o.createdAt); return d && d > periodAgo; }).length;
 
-    const totalRevenue = safeOrders.reduce((sum, order) => sum + order.totalAmount, 0);
-    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    const totalRevenue = settledOrders.reduce((sum, order) => sum + orderMerchandise(order), 0);
+    const avgOrderValue = settledOrders.length > 0 ? totalRevenue / settledOrders.length : 0;
     const commissionEarned = totalRevenue * commissionRate;
 
     const activeUsers = safeUsers.filter(u => { const d = toDate(u.lastLoginAt); return d && d > periodAgo; }).length;

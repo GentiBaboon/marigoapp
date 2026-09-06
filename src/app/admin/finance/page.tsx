@@ -5,12 +5,13 @@ import { useCurrency } from '@/context/CurrencyContext';
 import { collection, query, orderBy, limit, doc } from 'firebase/firestore';
 import { useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { type FirestoreOrder, type FirestoreSettings, toDate } from '@/lib/types';
+import { isReversed, isSettled, orderMerchandise, orderShipping } from '@/lib/order-money';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Download } from 'lucide-react';
 import Link from 'next/link';
 
 import { StatCard } from '@/components/admin/stat-card';
-import { DollarSign, Percent, Banknote, Undo, Receipt } from 'lucide-react';
+import { DollarSign, Percent, Banknote, Undo, Receipt, Truck } from 'lucide-react';
 import { DataTable } from '@/components/admin/finance/data-table';
 import { columns } from '@/components/admin/finance/columns';
 import FinanceLoading from './loading';
@@ -33,23 +34,30 @@ export default function AdminFinancePage() {
     useCollection<FirestoreOrder>(ordersQuery);
 
   // Stats are derived from the orders collection directly. `order.status` is
-  // the single source of truth: completed → revenue + commission, refunded /
-  // cancelled → counted in Total Refunds and subtracted from pending payouts.
-  // No ledger query is needed — every refunded order shows up automatically
-  // without requiring a separate `refund` or `transaction` doc to exist.
+  // the single source of truth: completed → revenue + commission; refunded /
+  // cancelled → Total Refunds. No ledger query is needed.
+  //
+  // Everything is on **merchandise** (`orderMerchandise`), not `totalAmount`:
+  // the total includes the delivery fee, which is passed through to the
+  // courier, and commission used to be charged on it. Delivery is shown on
+  // its own card so the money is still visible — just not as revenue.
   const financialStats = useMemo(() => {
     const safeOrders = orders || [];
 
-    const completedOrders = safeOrders.filter(o => o.status === 'completed');
-    const refundedOrders = safeOrders.filter(o => o.status === 'refunded' || o.status === 'cancelled');
+    const completedOrders = safeOrders.filter(o => isSettled(o.status));
+    const refundedOrders = safeOrders.filter(o => isReversed(o.status));
 
-    const totalRevenue = completedOrders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0);
+    const totalRevenue = completedOrders.reduce((sum, order) => sum + orderMerchandise(order), 0);
+    const deliveryCollected = completedOrders.reduce((sum, order) => sum + orderShipping(order), 0);
     const commissionEarned = totalRevenue * commissionRate;
-    const totalRefunds = refundedOrders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0);
-    const pendingPayouts = totalRevenue - commissionEarned - totalRefunds;
+    const totalRefunds = refundedOrders.reduce((sum, order) => sum + orderMerchandise(order), 0);
+    // Sellers are owed the merchandise less commission on settled orders.
+    // Reversed orders are not settled, so they are already outside this sum
+    // rather than subtracted from it a second time.
+    const pendingPayouts = totalRevenue - commissionEarned;
     const taxCollected = safeOrders.reduce((sum, o) => sum + ((o as any).taxAmount || 0), 0);
 
-    return { totalRevenue, commissionEarned, pendingPayouts, totalRefunds, taxCollected };
+    return { totalRevenue, deliveryCollected, commissionEarned, pendingPayouts, totalRefunds, taxCollected };
   }, [orders, commissionRate]);
 
   if (isLoading) {
@@ -101,17 +109,25 @@ export default function AdminFinancePage() {
             </Button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <StatCard
             title="Total Revenue"
             value={formatPrice(financialStats.totalRevenue)}
             icon={<DollarSign className="text-muted-foreground h-4 w-4" />}
+            description="Merchandise on completed orders"
+            isLoading={isLoading}
+            />
+            <StatCard
+            title="Delivery Collected"
+            value={formatPrice(financialStats.deliveryCollected)}
+            icon={<Truck className="h-4 w-4 text-muted-foreground" />}
+            description="Courier fees on completed orders — not revenue"
             isLoading={isLoading}
             />
              <StatCard
             title="Commission Earned"
             value={formatPrice(financialStats.commissionEarned)}
-            description={`at ${commissionRate * 100}% rate`}
+            description={`${commissionRate * 100}% of merchandise, never of delivery`}
             icon={<Percent className="text-muted-foreground h-4 w-4" />}
             isLoading={isLoading}
             />

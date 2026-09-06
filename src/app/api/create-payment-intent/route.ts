@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
     }
 
-    const { total, sellerIds, discount, validatedItems } = await calculateOrderTotal(
+    const { total, subtotal, shippingFee, sellerIds, discount, validatedItems } = await calculateOrderTotal(
       items,
       couponCode,
       idToken,
@@ -237,6 +237,8 @@ export async function POST(req: NextRequest) {
         sellerIds,
         items: validatedItems,
         totalAmount: total,
+        subtotal,
+        shippingFee,
         discountAmount: discount,
         couponCode: couponCode || null,
         status: 'pending_payment',
