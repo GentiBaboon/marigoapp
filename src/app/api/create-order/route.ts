@@ -25,6 +25,8 @@ async function calculateOrderTotal(
   buyerId?: string,
 ) {
   let subtotal = 0;
+  /** The coupon to mark as used once the order actually exists. */
+  let couponToSpend: { id: string; usedCount: number } | null = null;
   const sellerIds = new Set<string>();
   const validatedItems: any[] = [];
   const shippableLines: ShippableLine[] = [];
@@ -103,29 +105,28 @@ async function calculateOrderTotal(
       });
       if (result.ok) {
         discount = result.discount;
-        // Best effort, like /api/confirm-order. This runs with the *buyer's*
-        // token (there is no service account), and until the coupons rule
-        // allowed a +1 on `usedCount` it was a 403 — which, awaited here,
-        // failed the whole cash-on-delivery order for anyone presenting
-        // WELCOME10. A counter must never stand between a buyer and their
-        // order; `firstOrderOnly` is enforced from the buyer's own order
-        // history above, not from this number.
-        try {
-          await firestoreUpdate(
-            'coupons',
-            couponDocId,
-            { usedCount: (coupon.usedCount || 0) + 1 },
-            idToken
-          );
-        } catch (e) {
-          console.warn('[create-order] coupon usage not recorded', e);
-        }
+        // Not spent here: the order does not exist yet. It used to be, and
+        // a failure writing the order then left the coupon's counter bumped
+        // for a sale that never happened. The caller spends it after the
+        // order document is created — and best-effort, because a counter
+        // must never stand between a buyer and their order (`firstOrderOnly`
+        // is enforced from the buyer's own order history above, not this).
+        couponToSpend = { id: couponDocId, usedCount: Number(coupon.usedCount) || 0 };
       }
     }
   }
 
   const total = Math.max(0, subtotal + shippingFee - discount);
-  return { subtotal, shippingFee, discount, total, sellerIds: Array.from(sellerIds), validatedItems, shippingGroups };
+  // A non-finite figure here has always meant a bug upstream, never a real
+  // price — the last one was `'use client'` on `src/lib/types.ts` turning the
+  // shipping constant into a proxy object on the server. Firestore rejects
+  // NaN as "Value with type unset", which names nothing; say what happened.
+  if (![subtotal, shippingFee, discount, total].every(Number.isFinite)) {
+    throw new Error(
+      `Could not price this order (subtotal=${subtotal}, delivery=${shippingFee}, discount=${discount}).`,
+    );
+  }
+  return { subtotal, shippingFee, discount, total, sellerIds: Array.from(sellerIds), validatedItems, shippingGroups, couponToSpend };
 }
 
 export async function POST(req: NextRequest) {
@@ -156,7 +157,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
     }
 
-    const { total, subtotal, shippingFee, sellerIds, discount, validatedItems } = await calculateOrderTotal(
+    const { total, subtotal, shippingFee, sellerIds, discount, validatedItems, couponToSpend } = await calculateOrderTotal(
       items,
       couponCode,
       idToken,
@@ -188,6 +189,12 @@ export async function POST(req: NextRequest) {
       },
       idToken
     );
+
+    // The coupon is spent only now that the order exists (see above).
+    if (couponToSpend) {
+      firestoreUpdate('coupons', couponToSpend.id, { usedCount: couponToSpend.usedCount + 1 }, idToken)
+        .catch((e) => console.warn('[create-order] coupon usage not recorded', e));
+    }
 
     // Stock comes off *after* the order exists, never before.
     //

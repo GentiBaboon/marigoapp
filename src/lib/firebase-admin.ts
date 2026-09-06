@@ -48,21 +48,27 @@ function fromFirestore(value: any): any {
 }
 
 /** Convert a plain JS value to Firestore REST value format */
-function toFirestore(value: any): any {
+function toFirestore(value: any, path = ''): any {
   if (value === null || value === undefined) return { nullValue: null };
   if (typeof value === 'string') return { stringValue: value };
   if (typeof value === 'boolean') return { booleanValue: value };
   if (typeof value === 'number') {
+    // NaN and ±Infinity become `null` inside the wrapper once JSON-encoded,
+    // and Firestore answers "Cannot convert firestore.v1.Value with type
+    // unset" — which names no field. Fail here, naming it.
+    if (!Number.isFinite(value)) {
+      throw new Error(`Cannot store non-finite number ${String(value)} at "${path || '<root>'}"`);
+    }
     return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
   }
   if (Array.isArray(value)) {
-    return { arrayValue: { values: value.map(toFirestore) } };
+    return { arrayValue: { values: value.map((v, i) => toFirestore(v, `${path}[${i}]`)) } };
   }
   if (value instanceof Date) return { timestampValue: value.toISOString() };
   if (typeof value === 'object') {
     const fields: Record<string, any> = {};
     for (const [k, v] of Object.entries(value)) {
-      fields[k] = toFirestore(v);
+      fields[k] = toFirestore(v, path ? `${path}.${k}` : k);
     }
     return { mapValue: { fields } };
   }
@@ -143,7 +149,7 @@ export async function firestoreUpdate(
 ): Promise<void> {
   const fields: Record<string, any> = {};
   for (const [k, v] of Object.entries(data)) {
-    fields[k] = toFirestore(v);
+    fields[k] = toFirestore(v, k);
   }
   const updateMask = Object.keys(data)
     .map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`)
@@ -171,7 +177,7 @@ export async function firestoreCreate(
 ): Promise<string> {
   const fields: Record<string, any> = {};
   for (const [k, v] of Object.entries(data)) {
-    if (v !== undefined) fields[k] = toFirestore(v);
+    if (v !== undefined) fields[k] = toFirestore(v, k);
   }
 
   const res = await fetch(`${BASE}/${collection}`, {

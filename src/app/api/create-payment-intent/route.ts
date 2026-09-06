@@ -124,6 +124,13 @@ async function calculateOrderTotal(
   }
 
   const total = Math.max(0, subtotal + shippingFee - discount);
+  // Same guard as /api/create-order: a non-finite figure is a bug, not a
+  // price, and must not reach Stripe as the amount to authorise.
+  if (![subtotal, shippingFee, discount, total].every(Number.isFinite)) {
+    throw new Error(
+      `Could not price this order (subtotal=${subtotal}, delivery=${shippingFee}, discount=${discount}).`,
+    );
+  }
   return {
     subtotal,
     shippingFee,

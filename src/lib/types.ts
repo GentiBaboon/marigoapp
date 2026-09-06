@@ -1,4 +1,3 @@
-'use client';
 import { z } from "zod";
 import { Timestamp, FieldValue } from "firebase/firestore";
 

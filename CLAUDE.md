@@ -975,7 +975,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (664 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (664 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
@@ -1029,6 +1029,18 @@ SITE_URL                      # optional; overrides the marigoapp.com default
   new query that filters on one field and orders on another needs its index
   added *and deployed* (`firebase deploy --only firestore:indexes`), or the
   same in-memory sort.
+- **Never put `'use client'` on a module an API route imports.** Next turns
+  every export of a client module into a *client reference proxy* when server
+  code imports it: constants, functions and Zod schemas all arrive as `{}`.
+  Vitest and the browser never notice. `src/lib/types.ts` carried the
+  directive from the project scaffold, so `DEFAULT_SHIPPING_FEE_EUR` was `{}`
+  inside `/api/create-order`, the delivery fee became `"0[object Object]"`,
+  the total `NaN`, and Firestore rejected every cash order with the
+  nameless "Cannot convert firestore.v1.Value with type unset" — from the
+  day per-city shipping landed until 2026-09-06. `toFirestore()` now throws
+  naming the field on a non-finite number, both checkout routes refuse a
+  non-finite total, and `src/__tests__/lib/server-safe-libs.test.ts` walks
+  the import graph from every route and fails on any client-marked module.
 - **`toDate()` does not accept a plain `Date`.** It handles a string, a
   Firestore `Timestamp` (`.toDate()`) and `{seconds}` — a bare `Date` has none
   of those and comes back `null`. Test fixtures built from `new Date()`
