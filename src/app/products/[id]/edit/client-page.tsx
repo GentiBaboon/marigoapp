@@ -330,6 +330,12 @@ export default function EditListingPage() {
         vintage,
         price: resolveEurFromInput(price, currency, rate, product?.price) ?? product?.price,
         shippingFromAddressId: selectedAddressId,
+        // Stamped like ReviewStep does at publish, so checkout can group by
+        // origin without reading this address book. Listings published before
+        // the field existed have none; re-saving one here repairs it. Left
+        // undefined (and so omitted) when no address is selected.
+        shippingFromCity: selectedAddress?.city,
+        shippingFromCountry: selectedAddress?.country,
         updatedAt: serverTimestamp(),
       }));
       toast({ title: 'Listing updated', description: 'Your changes have been saved.' });

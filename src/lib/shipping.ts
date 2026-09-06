@@ -101,7 +101,7 @@ export function groupShippingByCity(
     });
   }
 
-  return [...groups.entries()].map(([key, g]) => {
+  const resolved: ShippingGroup[] = [...groups.entries()].map(([key, g]) => {
     const originKey = normalizeCity(g.country);
     // Only charge the border rate when both ends are actually known. An
     // unrecorded origin or a checkout with no address yet must not silently
@@ -120,6 +120,27 @@ export function groupShippingByCity(
       feeEur: isCrossBorder ? CROSS_BORDER_SHIPPING_FEE_EUR : DEFAULT_SHIPPING_FEE_EUR,
     };
   });
+
+  // A line with no recorded city rides along with a known one rather than
+  // being billed as a city of its own. Every stamped listing so far ships from
+  // Tirana, and the un-stamped ones are the same sellers' older stock — so a
+  // basket of one stamped and one legacy item was quoted (and charged) two
+  // courier runs for what is almost certainly one. Overcharging for missing
+  // data is worse than undercharging. Unknown lines only form their own group
+  // when nothing in the basket names a city at all.
+  // Tested on the key, not the label: `normalizeCity` lowercases, so the
+  // sentinel would never equal itself after a round-trip.
+  const hasNoCity = (g: ShippingGroup) => g.key.endsWith(`|${UNKNOWN_CITY}`);
+  const known = resolved.filter(g => !hasNoCity(g));
+  const unknown = resolved.filter(hasNoCity);
+  if (known.length === 0 || unknown.length === 0) return resolved;
+
+  // Prefer a domestic run: folding into a cross-border one would attach the
+  // legacy line to the dearer parcel for no reason.
+  const host = known.find(g => !g.isCrossBorder) ?? known[0];
+  const sellerIds = new Set(host.sellerIds);
+  for (const g of unknown) g.sellerIds.forEach(id => sellerIds.add(id));
+  return known.map(g => (g === host ? { ...g, sellerIds: [...sellerIds] } : g));
 }
 
 export function calculateShipping(

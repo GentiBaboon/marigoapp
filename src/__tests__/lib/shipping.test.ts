@@ -64,9 +64,18 @@ describe('calculateShipping', () => {
     expect(totalEur).toBeCloseTo(ALL(200));
   });
 
-  it('separates known cities from unknown ones', () => {
+  it('folds a listing with no recorded city into the known one', () => {
+    // A legacy line must not be billed as a second city beside a stamped one.
     const { totalEur, groups } = calculateShipping([line('s1', 'Tirana'), line('s2')]);
-    expect(groups).toHaveLength(2);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe('Tirana');
+    expect(groups[0].sellerIds).toEqual(expect.arrayContaining(['s1', 's2']));
+    expect(totalEur).toBeCloseTo(ALL(200));
+  });
+
+  it('still charges per known city with a legacy line in the basket', () => {
+    const { totalEur, groups } = calculateShipping([line('s1', 'Tirana'), line('s2', 'Durres'), line('s3')]);
+    expect(groups.map(g => g.label).sort()).toEqual(['Durres', 'Tirana']);
     expect(totalEur).toBeCloseTo(ALL(400));
   });
 
@@ -178,6 +187,16 @@ describe('cross-border delivery', () => {
       { destinationCountry: 'Albania' },
     );
     expect(totalEur).toBeCloseTo(ALL(200));
+  });
+
+  it('folds a legacy line into the domestic run, not the cross-border one', () => {
+    const { groups } = calculateShipping(
+      [line('s1', 'Pristina', 'Kosovo'), line('s2', 'Tirana', 'Albania'), line('s3')],
+      { destinationCountry: 'Albania' },
+    );
+    const host = groups.find(g => g.sellerIds.includes('s3'));
+    expect(host?.label).toBe('Tirana');
+    expect(host?.isCrossBorder).toBe(false);
   });
 
   it('waives the border fee under free delivery', () => {

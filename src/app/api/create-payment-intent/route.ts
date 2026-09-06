@@ -11,6 +11,7 @@ import {
 import { paymentIntentLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { validateCoupon } from '@/lib/coupons';
 import { acceptedOfferPrice } from '@/lib/offer-pricing';
+import { calculateShipping, type ShippableLine } from '@/lib/shipping';
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY || '';
@@ -22,6 +23,9 @@ async function calculateOrderTotal(
   items: any[],
   couponCode: string | undefined,
   idToken: string,
+  /** Delivery country, from the address being shipped to. Decides whether each
+   *  parcel pays the domestic or the cross-border rate. */
+  destinationCountry?: string | null,
   /** The buyer, so an accepted offer on a line can be honoured. */
   buyerId?: string,
   /**
@@ -36,6 +40,7 @@ async function calculateOrderTotal(
   let subtotal = 0;
   const sellerIds = new Set<string>();
   const validatedItems: any[] = [];
+  const shippableLines: ShippableLine[] = [];
 
   for (const item of items) {
     const lookupId = item.productId || item.id;
@@ -59,14 +64,28 @@ async function calculateOrderTotal(
     const linePrice = agreed ?? pData.price ?? 0;
     subtotal += linePrice;
     if (pData.sellerId) sellerIds.add(pData.sellerId);
+    // Origin read off the stored product, never from the basket payload —
+    // same reasoning as /api/create-order.
+    shippableLines.push({
+      sellerId: pData.sellerId || '',
+      shippingFromCity: pData.shippingFromCity ?? null,
+      shippingFromCountry: pData.shippingFromCountry ?? null,
+    });
     validatedItems.push({ ...item, price: linePrice, offerApplied: agreed != null });
   }
 
   const settings = await firestoreGet('settings', 'global', idToken);
-  let shippingFee = items.length * 10.9;
-  if (settings?.isFreeDeliveryActive && subtotal >= (settings?.freeDeliveryThreshold || 0)) {
-    shippingFee = 0;
-  }
+  // One fee per distinct origin city, through the same helper the basket
+  // quotes with and /api/create-order charges with. This used to be a flat
+  // €10.90 per item — so a card buyer was quoted 200 ALL and authorised for
+  // about 1.000 ALL per item, while cash on delivery paid the quoted figure.
+  const isFreeDelivery = Boolean(
+    settings?.isFreeDeliveryActive && subtotal >= (settings?.freeDeliveryThreshold || 0),
+  );
+  const { totalEur: shippingFee } = calculateShipping(shippableLines, {
+    isFree: isFreeDelivery,
+    destinationCountry,
+  });
 
   // Coupon eligibility is decided here, not in the browser. validateCoupon()
   // is the same function the cart calls for instant feedback, but only this
@@ -148,6 +167,7 @@ export async function POST(req: NextRequest) {
       items,
       couponCode,
       idToken,
+      shippingAddress?.country ?? null,
       buyerId,
       // Validated and discounted, but not spent — the card has not been
       // confirmed yet. /api/confirm-order spends it.
