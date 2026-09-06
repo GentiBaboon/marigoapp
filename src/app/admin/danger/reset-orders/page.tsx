@@ -12,9 +12,13 @@
  *   2. For each order, calls `releaseOrderItems` so every product gets its
  *      stock back AND any listing that had been flipped to `sold` returns to
  *      `active` on the marketplace.
- *   3. Decrements `salesCount` on each seller in the order so badge tiers
- *      recompute correctly.
- *   4. Deletes the order doc itself.
+ *   3. Deletes the order doc itself.
+ *   4. Sets `salesCount` to 0 on every seller who appeared in any order.
+ *      `salesCount` only ever rises when an order reaches `completed`, and
+ *      after this pass no order exists, so 0 is the recomputed truth. It used
+ *      to *decrement* once per order instead — with no floor anywhere, despite
+ *      a comment claiming one — so a seller whose orders had never completed
+ *      went negative, and further with every reset (one reached −6).
  *   5. Deletes the related side-collection records (returns, refunds,
  *      disputes, transactions tied to the order's id/orderNumber) so the
  *      admin pages aren't left showing dangling refs.
@@ -25,7 +29,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { collection, getDocs, query, where, doc, deleteDoc, updateDoc, increment } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { releaseOrderItems } from '@/lib/order-inventory';
 import { Button } from '@/components/ui/button';
@@ -105,6 +109,9 @@ export default function ResetOrdersPage() {
       const ordersSnap = await getDocs(collection(firestore, 'orders'));
       const orderIds: string[] = [];
       const orderNumbers: string[] = [];
+      // Every seller touched by any order — their counter is rewritten after
+      // the orders are gone, once each, not nudged per order.
+      const affectedSellers = new Set<string>();
 
       // 2. + 3. Restock and bump seller counters per order, then delete the order doc.
       for (const orderDoc of ordersSnap.docs) {
@@ -119,19 +126,10 @@ export default function ResetOrdersPage() {
           summary.errors.push(`restock for order ${orderDoc.id}: ${e?.message || 'unknown'}`);
         }
 
-        // Decrement salesCount once per unique seller in the order. We don't
-        // know whether the order was ever marked completed; the safe thing
-        // is to roll back any counter bump that may have happened. We floor
-        // at 0 server-side via the rule.
-        const sellerIds = Array.from(new Set((data.items || []).map((it: any) => it?.sellerId).filter(Boolean)));
-        for (const sellerId of sellerIds) {
-          try {
-            await updateDoc(doc(firestore, 'users', sellerId as string), { salesCount: increment(-1) });
-            summary.sellerCountersFixed++;
-          } catch (e: any) {
-            // Best-effort — likely zero/missing field. Don't spam errors.
-          }
-        }
+        // Both places a seller can be named: the denormalised `sellerIds`
+        // (what the completed-order bump reads) and the line items.
+        for (const id of data.sellerIds || []) if (id) affectedSellers.add(String(id));
+        for (const it of data.items || []) if (it?.sellerId) affectedSellers.add(String(it.sellerId));
 
         try {
           await deleteDoc(orderDoc.ref);
@@ -142,6 +140,19 @@ export default function ResetOrdersPage() {
       }
 
       // 4. Wipe side collections that reference these orders.
+      // 4. Recompute, don't decrement. With every order deleted, no seller has
+      // a completed order left, so the counter is simply 0 — an absolute write
+      // that also repairs any value an earlier decrement-based reset left
+      // negative.
+      for (const sellerId of affectedSellers) {
+        try {
+          await updateDoc(doc(firestore, 'users', sellerId), { salesCount: 0 });
+          summary.sellerCountersFixed++;
+        } catch (e: any) {
+          summary.errors.push(`salesCount reset for seller ${sellerId}: ${e?.message || 'unknown'}`);
+        }
+      }
+
       const rResults = await deleteWhere('returns', 'orderId', orderIds);
       summary.returnsDeleted = rResults.deleted;
       summary.errors.push(...rResults.errors);
@@ -200,7 +211,7 @@ export default function ResetOrdersPage() {
               <CardDescription className="mt-1 text-sm">
                 Every order document is permanently deleted. Products that were sold or reserved are flipped back to
                 <code className="mx-1 px-1 rounded bg-muted">active</code> and their <code className="px-1 rounded bg-muted">quantity</code> is incremented by the number of line items they appeared in.
-                Sellers&apos; <code className="px-1 rounded bg-muted">salesCount</code> is decremented accordingly so badges reflect the new state.
+                Sellers&apos; <code className="px-1 rounded bg-muted">salesCount</code> is set back to 0 (it only counts completed orders, and none will remain) so badges reflect the new state.
                 Returns, refunds, disputes and finance-ledger rows tied to those orders are removed too.
               </CardDescription>
             </div>
@@ -242,7 +253,7 @@ export default function ResetOrdersPage() {
             <div className="grid grid-cols-2 gap-2 max-w-md">
               <div>Orders deleted</div><div className="font-mono">{result.ordersDeleted}</div>
               <div>Product line items restocked</div><div className="font-mono">{result.productsRestocked}</div>
-              <div>Seller counters decremented</div><div className="font-mono">{result.sellerCountersFixed}</div>
+              <div>Seller counters reset to 0</div><div className="font-mono">{result.sellerCountersFixed}</div>
               <div>Returns deleted</div><div className="font-mono">{result.returnsDeleted}</div>
               <div>Refunds deleted</div><div className="font-mono">{result.refundsDeleted}</div>
               <div>Disputes deleted</div><div className="font-mono">{result.disputesDeleted}</div>

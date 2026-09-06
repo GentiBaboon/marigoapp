@@ -224,7 +224,7 @@ Admin (`/admin/*`, role-gated, and **behind the masked gate in §6c**). Sidebar 
 - **`/admin/analytics`** — live visitors (Redis, §9b) plus registration history
   by date (Firestore). Two halves, two stores, on purpose: presence is
   ephemeral and expires itself, signup history is durable.
-- **`/admin/danger/reset-orders`** — unlinked destructive operator tool: wipes every order, restocks products, decrements seller `salesCount`, and deletes the related returns/refunds/disputes/transactions. Two confirmation gates + typing `RESET`. Deliberately absent from navigation.
+- **`/admin/danger/reset-orders`** — unlinked destructive operator tool: wipes every order, restocks products, **sets** every affected seller's `salesCount` to 0, and deletes the related returns/refunds/disputes/transactions. Two confirmation gates + typing `RESET`. Deliberately absent from navigation. The counter is an absolute write, not a decrement: `salesCount` only rises when an order reaches `completed`, and nothing floors it — a comment used to claim a rule did — so the old per-order `increment(-1)` drove sellers whose orders never completed negative, further with every reset (one reached −6). Note the restock step (`releaseOrderItems`) is a blind `increment`, so a listing the refund flow already released is restocked twice — check quantities on one-off items after a reset.
 
 API routes (`src/app/api/`):
 
