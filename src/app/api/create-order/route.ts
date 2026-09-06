@@ -103,12 +103,23 @@ async function calculateOrderTotal(
       });
       if (result.ok) {
         discount = result.discount;
-        await firestoreUpdate(
-          'coupons',
-          couponDocId,
-          { usedCount: (coupon.usedCount || 0) + 1 },
-          idToken
-        );
+        // Best effort, like /api/confirm-order. This runs with the *buyer's*
+        // token (there is no service account), and until the coupons rule
+        // allowed a +1 on `usedCount` it was a 403 — which, awaited here,
+        // failed the whole cash-on-delivery order for anyone presenting
+        // WELCOME10. A counter must never stand between a buyer and their
+        // order; `firstOrderOnly` is enforced from the buyer's own order
+        // history above, not from this number.
+        try {
+          await firestoreUpdate(
+            'coupons',
+            couponDocId,
+            { usedCount: (coupon.usedCount || 0) + 1 },
+            idToken
+          );
+        } catch (e) {
+          console.warn('[create-order] coupon usage not recorded', e);
+        }
       }
     }
   }

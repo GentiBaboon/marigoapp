@@ -11,9 +11,10 @@
 // Not part of `npm test`: CI has no JVM. Run it whenever firestore.rules
 // changes, and before `firebase deploy --only firestore:rules`.
 //
-// Coverage today is the account-ban and role-lock rules (CLAUDE.md §6d) —
-// the two things a member could previously undo about themselves. Add a
-// case per rule you touch; the harness is the part that was missing.
+// Coverage: the account-ban and role-lock rules (CLAUDE.md §6d) — the two
+// things a member could previously undo about themselves — and the coupon
+// counter grant that checkout depends on. Add a case per rule you touch;
+// the harness is the part that was missing.
 
 const PROJECT = 'demo-marigo';
 const HOST = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080';
@@ -72,9 +73,22 @@ await create('conversations/c1', { participants: ['banned', 'seller'] }, 'owner'
 await create('products/p1/offers/o-open', { buyerId: 'banned', sellerId: 'seller', offerAmount: 40, amount: 40, status: 'pending' }, 'owner');
 
 const offer = (buyer) => ({ buyerId: buyer, sellerId: 'seller', offerAmount: 50, amount: 50, status: 'pending' });
+await create('coupons/w10', { code: 'WELCOME10', usedCount: 0, value: 10, isActive: true, firstOrderOnly: true }, 'owner');
 
 // ── cases ───────────────────────────────────────────────────────────────────
 const cases = [
+  // Coupons: checkout spends one with the buyer's own token, so a member may
+  // move `usedCount` by exactly +1 and nothing else. The first real
+  // cash-on-delivery order died on a 403 here.
+  ['buyer can spend a coupon (usedCount +1)', 200, () => update('coupons/w10', { usedCount: 1 }, 'buyer')],
+  ['buyer cannot jump the counter (+2)', 403, () => update('coupons/w10', { usedCount: 3 }, 'buyer')],
+  ['buyer cannot wind the counter back', 403, () => update('coupons/w10', { usedCount: 0 }, 'buyer')],
+  ['buyer cannot change a coupon\'s value', 403, () => update('coupons/w10', { value: 90 }, 'buyer')],
+  ['buyer cannot bump the counter and the value together', 403, () => update('coupons/w10', { usedCount: 2, value: 90 }, 'buyer')],
+  ['banned member cannot spend a coupon', 403, () => update('coupons/w10', { usedCount: 2 }, 'banned')],
+  ['buyer cannot create a coupon', 403, () => create('coupons/fake', { code: 'FREE', usedCount: 0, value: 100 }, 'buyer')],
+  ['buyer cannot delete a coupon', 403, () => del('coupons/w10', 'buyer')],
+  ['admin can still edit a coupon freely', 200, () => update('coupons/w10', { value: 15, usedCount: 7 }, 'admin1')],
   // The bug that started this
   ['active buyer can make an offer', 200, () => create('products/p1/offers/a1', offer('buyer'), 'buyer')],
   ['banned buyer cannot make an offer', 403, () => create('products/p2/offers/b1', offer('banned'), 'banned')],

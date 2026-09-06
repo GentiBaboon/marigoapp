@@ -263,7 +263,18 @@ service cloud.firestore {
     // This prevents unauthenticated enumeration while allowing checkout validation.
     match /coupons/{couponId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      // Checkout spends a coupon with the *buyer's* token — the API routes
+      // have no service account (CLAUDE.md §6) — so a member may bump
+      // `usedCount` by exactly one and touch nothing else. Every other
+      // field, and any other step, stays admin-only. Same shape as the
+      // `views` counter on products.
+      allow update: if isAdmin() || (
+        isActiveUser()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount'])
+        && request.resource.data.usedCount is int
+        && request.resource.data.usedCount == resource.data.get('usedCount', 0) + 1
+      );
+      allow create, delete: if isAdmin();
     }
 
     match /orders/{orderId} {

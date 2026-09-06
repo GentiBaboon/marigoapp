@@ -269,7 +269,7 @@ Types in `src/lib/types.ts` (~855 lines — the single source of truth for both 
 | `reports/{id}` | User-filed reports (moderation) | `pending`, `resolved` |
 | `reviews/{id}` | Seller/product reviews | — |
 | `refunds/{id}`, `disputes/{id}`, `returns/{id}` | Post-purchase workflows (returns have a buyer-driven → seller-driven transition ladder enforced in rules) | — |
-| `coupons/{id}` | Discount codes (admin-writable, signed-in read) | — |
+| `coupons/{id}` | Discount codes (admin-writable, signed-in read). **Members may increment `usedCount` by exactly 1** — checkout spends the coupon with the buyer's token, and before that grant the first cash-on-delivery order with `WELCOME10` died on a 403. Both routes now treat the bump as best-effort; `firstOrderOnly` is enforced from the buyer's order history, not this counter | — |
 | `categories`, `brands`, `conditions`, `materials`, `colors`, `patterns`, `size_charts` | Catalog metadata (public read, admin write). **These do not share a field name**: `conditions` has `value`, the rest have `slug` — see §9 | — |
 | `settings/global` | `commissionRate`, `payoutHoldHours`, `refundWindowDays` (full-admin write) | — |
 | `settings/{banners,macro_filters,homepage_blocks,badges}` | Merchandising + badge config (admin write) | — |
@@ -425,7 +425,7 @@ either; the first-login bootstrap may create only `buyer` / `active`.
 
 Rules changes ship with `firebase deploy --only firestore:rules`; the function
 with `firebase deploy --only functions:syncBanToAuth`. **`npm run test:rules`**
-runs `scripts/test-firestore-rules.mjs` against the Firestore emulator — 34
+runs `scripts/test-firestore-rules.mjs` against the Firestore emulator — 43
 allow/deny cases over plain REST, no extra dependencies, needs a JVM. Not in
 CI. Add a case for any rule you touch.
 
