@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { notifyAdmin } from '@/lib/admin-notify';
+import { notifyOrderEmail } from '@/lib/order-notify';
 import { collection, query, orderBy, doc, updateDoc, addDoc, getDoc, setDoc, increment, serverTimestamp, arrayUnion, Timestamp } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import type { FirestoreDispute, DisputeMessage, FirestoreOrder } from '@/lib/types';
@@ -212,6 +213,8 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
               // A dispute resolution is the third way an order reaches
               // 'cancelled'; the reason the admin typed is worth carrying into
               // the alert, since it is the only record of *why*.
+              // Buyer's email for the cancellation, once — the route checks the stored status.
+              void notifyOrderEmail(user, { orderId: dispute.orderId, status: nextStatus });
               if (nextStatus === 'cancelled') {
                 void notifyAdmin(user, {
                   event: 'order_cancelled',

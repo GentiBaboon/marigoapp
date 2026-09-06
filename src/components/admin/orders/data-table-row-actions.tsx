@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { notifyAdmin } from '@/lib/admin-notify';
+import { notifyOrderEmail } from '@/lib/order-notify';
 import { Row } from '@tanstack/react-table';
 import Link from 'next/link';
 import { MoreHorizontal, View, Truck, Undo, MessageSquare, Loader2 } from 'lucide-react';
@@ -81,6 +82,8 @@ export function DataTableRowActions<TData>({
       } else if (newStatus === 'completed' && order.status !== 'completed') {
         await markOrderItemsSoldIfDepleted(firestore, order.items as any);
       }
+
+      void notifyOrderEmail(adminUser, { orderId: order.id, status: newStatus });
 
       // Notify buyer + every seller so the status change shows up in the bell
       // immediately, regardless of which admin surface triggered it.

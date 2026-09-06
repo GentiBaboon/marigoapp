@@ -213,7 +213,7 @@ export function orderDeliveredEmail(a: {
 }
 
 export function orderCancelledEmail(a: {
-  buyerName?: string; orderNumber: string; orderId: string; reason?: string;
+  buyerName?: string; orderNumber: string; orderId: string; reason?: string; paymentMethod?: 'cod' | 'card';
 }): RenderedEmail {
   return {
     subject: `Order #${a.orderNumber} cancelled`,
@@ -223,7 +223,9 @@ export function orderCancelledEmail(a: {
       body: `
         <p style="margin:0 0 14px;">${greeting(a.buyerName)}</p>
         <p style="margin:0 0 6px;">Order <strong>#${escapeHtml(a.orderNumber)}</strong> has been cancelled${a.reason ? `: ${escapeHtml(a.reason)}` : '.'}</p>
-        <p style="margin:0 0 6px;">Any amount authorised on your card is released — depending on your bank it can take a few working days to disappear from your statement.</p>
+        ${a.paymentMethod === 'cod'
+          ? `<p style="margin:0 0 6px;">Nothing has been charged — this order was to be paid on delivery.</p>`
+          : `<p style="margin:0 0 6px;">Any amount authorised on your card is released — depending on your bank it can take a few working days to disappear from your statement.</p>`}
         ${button('View order', absoluteUrl(`/profile/orders/${a.orderId}`))}`,
     }),
   };

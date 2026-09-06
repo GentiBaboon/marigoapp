@@ -24,6 +24,7 @@ import {
 import { Loader2, Package, PackageCheck, Truck } from 'lucide-react';
 import type { FirestoreOrder } from '@/lib/types';
 import { notifyOrderStatus, notifyUser } from '@/lib/notifications';
+import { notifyOrderEmail } from '@/lib/order-notify';
 import { nextSellerTransition, statusLabel } from '@/lib/order-status';
 
 const ICONS: Record<string, any> = {
@@ -247,6 +248,9 @@ export function SellerOrderActions({ order }: { order: FirestoreOrder }) {
       setSubmitting(false);
       return;
     }
+
+    // Buyer's email for "shipped"; the route ignores the other steps.
+    void notifyOrderEmail(user, { orderId: order.id, status: transition.status });
 
     const firstItem = order.items?.[0];
     const productTitle = firstItem?.title;

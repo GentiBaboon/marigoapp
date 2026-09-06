@@ -93,9 +93,9 @@ sets) for what happened after.
 | **Activation code (6-digit OTP)** | **new account** | `sendEmailOtp` |
 | Order placed | buyer | `sendOrderConfirmation` |
 | Order placed | seller | `sendSellerOrderNotification` |
-| Order shipped | buyer | `sendOrderShipped` |
-| Order delivered | buyer | `sendOrderDelivered` |
-| Order cancelled | buyer | `sendOrderCancelled` |
+| Order shipped | buyer | `sendOrderShipped` — via `/api/orders/notify` when the seller (or an admin) marks it shipped |
+| Order delivered | buyer | `sendOrderDelivered` — via `/api/orders/notify` when an admin marks it `completed`; quotes the live `refundWindowDays` |
+| Order cancelled | buyer | `sendOrderCancelled` — via `/api/orders/notify` from the admin order screen, the row action and a dispute resolution; says "nothing charged" on cash on delivery |
 | Refund issued | buyer | `sendRefundIssued` |
 | Payout sent | seller | `sendPayoutSent` |
 | Listing approved | seller | `sendListingApproved` |
@@ -220,7 +220,16 @@ and it is spaced into two groups of three because nobody transcribes six
 unbroken digits reliably. The gap survives copy-paste: both the input and the
 server strip non-digits before checking.
 
-Still unwired: order shipped/delivered/cancelled, refund, payout, listing
-approved/rejected, new message, both returns, welcome and the link-based
-verify-email (superseded on the sign-up path by the OTP above). They are
-implemented and tested — their trigger points just need the same treatment.
+`/api/orders/notify` is the buyer-facing counterpart of `/api/admin/notify`:
+the status is written in the browser under Firestore rules, then the client
+calls the route with the order id and the new status. The route re-reads the
+order under the caller's token, **refuses unless the order is actually in
+that status** (so nobody can have a buyer told a parcel shipped when it did
+not), and records each status it has mailed in `orders.mailedStatuses` so an
+admin re-saving "completed" mails nobody twice. Call sites pass every
+transition; the route answers `skipped` for the ones that carry no email.
+
+Still unwired: refund, payout, listing approved/rejected, new message, both
+returns, welcome and the link-based verify-email (superseded on the sign-up
+path by the OTP above). They are implemented and tested — their trigger
+points just need the same treatment.

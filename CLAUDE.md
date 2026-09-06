@@ -244,6 +244,7 @@ API routes (`src/app/api/`):
 | `forgot-password` | — | Rate-limited; proxies the `sendPasswordResetLink` function with `RESET_SERVICE_SECRET` |
 | `auth/send-otp` | Bearer ID token | Rate-limited; mails a 6-digit activation code. The address comes from the **token's `email` claim**, never the body — otherwise a signed-in user could aim Marigo's mail at anyone |
 | `auth/verify-otp` | Bearer ID token | Rate-limited; checks the code and activates the account. Idempotent |
+| `orders/notify` | Bearer ID token | Rate-limited; mails the buyer for `shipped` / `completed` / `cancelled`. Re-reads the order with the caller's token, refuses unless it is in that status, one mail per status (`mailedStatuses`) |
 | `presence` | POST: none (Bearer optional) · GET: Bearer + `analytics.view` | Visitor heartbeat in, live view out. The **only** writer to the presence store, so the write path is rate-limited rather than open (§9b). GET answers **404** to anyone without the permission |
 
 ## 5. Data model (Firestore)
@@ -601,8 +602,12 @@ the order `completed` (→ `sold`, `salesCount` +1) or `cancelled` / `refunded`
 prepared → shipped` from `/profile/listings/sales/[orderId]`; buyer and
 seller can only *request* a cancellation (`cancel_requested` /
 `sellerCancelRequested`), which touches no stock — the admin decides. Status
-changes raise in-app notifications; `sendOrderShipped` / `sendOrderDelivered`
-/ `sendOrderCancelled` exist in `src/lib/email` but **nothing calls them**.
+changes raise in-app notifications, and `shipped` / `completed` / `cancelled`
+also email the buyer through **`/api/orders/notify`** (`src/lib/order-mail.ts`
+holds the rule): the route re-reads the order with the caller's token,
+refuses unless the order is really in that status, and records each mailed
+status in `orders.mailedStatuses` so no status is mailed twice — see
+`docs/email.md`.
 
 Client: Stripe Elements in `components/checkout/payment-step.tsx`, wrapped by `components/providers/stripe-provider.tsx`.
 
@@ -970,7 +975,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (664 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (664 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

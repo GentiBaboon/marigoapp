@@ -23,6 +23,7 @@ import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { notifyOrderStatus } from '@/lib/notifications';
+import { notifyOrderEmail } from '@/lib/order-notify';
 import { releaseOrderItems, markOrderItemsSoldIfDepleted } from '@/lib/order-inventory';
 
 const ORDER_STATUSES = [
@@ -173,6 +174,10 @@ export default function AdminOrderDetailPage() {
           ),
         );
       }
+
+      // Buyer's email for shipped / completed / cancelled — once per status,
+      // whichever admin surface got there first.
+      void notifyOrderEmail(adminUser, { orderId: order.id, status: newStatus });
 
       // Notify the buyer + every seller involved so the change is visible
       // immediately in the bell badge.

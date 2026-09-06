@@ -106,6 +106,13 @@ export const offerLimiter = createRateLimiter('offer', {
   windowSeconds: 60,
 });
 
+/** Order status emails (`/api/orders/notify`). One per human action; a burst
+ *  of these is a loop, not an operator. */
+export const orderMailLimiter = createRateLimiter('order-mail', {
+  limit: 30,
+  windowSeconds: 60,
+});
+
 /** Send an activation code: 5 per 15 minutes per IP. Each one costs an email,
  *  and a legitimate signup needs one. */
 export const otpSendLimiter = createRateLimiter('otp-send', {

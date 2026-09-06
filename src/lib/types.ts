@@ -410,6 +410,8 @@ export interface FirestoreOrder {
   taxRate?: number;
   /** Append-only log of status transitions for buyer/seller history view. */
   statusHistory?: Array<{ status: string; at: string; by?: string }>;
+  /** Statuses the buyer has been emailed about — `/api/orders/notify` sends once per status. */
+  mailedStatuses?: string[];
   /** Set when the seller has filed a cancellation request (pending admin review). */
   sellerCancelRequested?: boolean;
   sellerCancelReason?: string;

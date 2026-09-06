@@ -86,7 +86,7 @@ export const sendOrderDelivered = (a: {
 }) => deliver(a.buyerEmail, T.orderDeliveredEmail(a));
 
 export const sendOrderCancelled = (a: {
-  buyerEmail: string; buyerName?: string; orderNumber: string; orderId: string; reason?: string;
+  buyerEmail: string; buyerName?: string; orderNumber: string; orderId: string; reason?: string; paymentMethod?: 'cod' | 'card';
 }) => deliver(a.buyerEmail, T.orderCancelledEmail(a));
 
 export const sendRefundIssued = (a: {
