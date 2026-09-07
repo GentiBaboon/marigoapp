@@ -397,25 +397,30 @@ were the prompt. Four layers now, from friendly to firm:
    activate. The list is `src/lib/disposable-email-domains.ts`, **copied
    byte-for-byte to `functions/src/`** (a test compares them) for
    `blockDisposableSignups`, a `beforeUserCreated` blocking function that
-   stops the account being made at all. **Its state as of 2026-09-07:**
-   Identity Platform is initialized on the project (`POST
-   identitytoolkit.googleapis.com/v2/projects/<id>/identityPlatform:initializeAuth`
-   — the `/admin/v2` path 404s) and the function is deployed, but it is
-   **not invokable and not registered**. Identity Platform calls a blocking
-   function with no identity, so the CLI grants `allUsers` the Cloud Run
-   invoker role — and the org policy `iam.allowedPolicyMemberDomains`
-   (allowed customer `C046jf5kc` only) refuses that, the same wall that
-   blocks the Stripe webhook (§8). Until a project-level exception to that
-   policy exists, every `firebase deploy --only functions` reports this one
-   function as failed and deploys the rest. Once it does: redeploy, then
-   confirm `blockingFunctions.triggers.beforeCreate` on the Identity
-   Platform config names the function's Cloud Run URI (the deploy sets it;
-   `GET .../admin/v2/projects/<id>/config` to check — **read only the keys
-   you need**, the full document includes the password-hash signer key),
-   and test with a throwaway-domain signup *and* a real one. A registered
-   trigger that cannot be reached fails **every** signup. An env-gated
-   export was tried first and does not work: the CLI's discovery step does
-   not see `functions/.env` or the shell environment.
+   stops the account being made at all. **Live since 2026-09-07**, verified
+   with a real `accounts:signUp` from `mailinator.com` (refused with the
+   message, `BLOCKING_FUNCTION_ERROR_RESPONSE`) and an ordinary address
+   (created, then deleted). What it took, for the next person:
+   - Identity Platform initialized with `POST identitytoolkit.googleapis.com/
+     v2/projects/<id>/identityPlatform:initializeAuth` (the `/admin/v2` path
+     in some docs 404s).
+   - Identity Platform calls a blocking function with **no identity**, so
+     the deploy grants `allUsers` the Cloud Run invoker role. The org policy
+     `iam.allowedPolicyMemberDomains` (allowed customer `C046jf5kc`) refused
+     that — the same wall as the Stripe webhook — so a **project-level
+     exception** (`allowAll: true` on this project only) was set with
+     `gcloud org-policies set-policy`. That exception also unblocks the
+     webhook's invoker grant; see §8.
+   - The deploy registers the trigger itself: `blockingFunctions.triggers.
+     beforeCreate.functionUri` on the Identity Platform config names the
+     function's Cloud Run URL. Check with `GET .../admin/v2/projects/<id>/
+     config` — **read only the keys you need**, the full document includes
+     the password-hash signer key. A registered trigger that cannot be
+     reached fails **every** signup, so after any change test a throwaway
+     signup *and* a real one.
+   - An env-gated export was tried first and does not work: the CLI's
+     discovery step sees neither `functions/.env` nor the shell environment,
+     so the function is exported unconditionally.
 
 **Operator roles are exempt** (`VERIFICATION_EXEMPT_ROLES`: admin,
 super_admin, moderator, analyst — the roles `isAdmin()` accepts). `role` is
@@ -729,11 +734,11 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 | `sendPasswordResetLink` | HTTP | Backs `/api/forgot-password` |
 | `syncBanToAuth` | Firestore trigger on `users/{uid}` | Disables / re-enables the Auth user and revokes refresh tokens when `status` flips to or from `banned` (§6d) |
 | `purgeDeletedUser` | Firestore trigger, `users/{uid}` deleted | Deletes the Auth account and the owner-only subcollections after an admin deletes a profile (§6d) |
-| `blockDisposableSignups` | `beforeUserCreated` blocking function | Refuses account creation from a throwaway domain. Deployed but not invokable or registered — blocked by the same org policy as the webhook (§6b) |
+| `blockDisposableSignups` | `beforeUserCreated` blocking function | Refuses account creation from a throwaway domain, before the account exists. Live since 2026-09-07 (§6b) |
 
 `distributeOrderToSellers` computes each seller's net (`subtotal × (1 − commissionRate)`), transfers into their connected account, and writes ledger rows. **Idempotent** via a `payouts[sellerId].transferId` map on the order, so retried captures no-op. Sellers with no `stripeAccountId` are skipped and flagged for manual settlement.
 
-**Known blocker (see `docs/payments-status.md`):** the GCP org policy `constraints/iam.allowedPolicyMemberDomains` prevents granting `allUsers` invoker on Cloud Functions, so the Stripe webhook and the Firebase Hosting rewrite both return 403. The Connect-onboarding path was worked around with the same-origin `/api/stripe/create-connected-account` route; the webhook has no workaround yet. `docs/payments.md` is the operator runbook (dashboard setup, `functions/.env`, `settings/global` values).
+**Known blocker (see `docs/payments-status.md`):** the GCP org policy `constraints/iam.allowedPolicyMemberDomains` prevented granting `allUsers` invoker on Cloud Functions, so the Stripe webhook and the Firebase Hosting rewrite both return 403. **As of 2026-09-07 a project-level exception exists** (set for the sign-up blocking function, §6b), so `handleStripeWebhook` can now be granted the invoker role — a redeploy of it, then a webhook test, is the remaining work; nothing has been redeployed yet. The Connect-onboarding path was worked around with the same-origin `/api/stripe/create-connected-account` route; the webhook has no workaround yet. `docs/payments.md` is the operator runbook (dashboard setup, `functions/.env`, `settings/global` values).
 
 ## 9. Frontend patterns
 
@@ -1122,7 +1127,7 @@ UPSTASH_REDIS_REST_TOKEN
 SITE_URL                      # optional; overrides the marigoapp.com default
 ```
 
-`src/lib/env.ts` validates these with Zod (`clientEnv` for the browser bundle, `getServerEnv()` server-side). Functions read `STRIPE_SECRET_KEY` / `STRIPE_WH_SECRET` / `APP_URL` from Secret Manager, falling back to `functions/.env` (untracked; `STRIPE_SK` is also accepted). `blockDisposableSignups` deploys with the rest but cannot be made invokable until the org-policy exception in §6b exists.
+`src/lib/env.ts` validates these with Zod (`clientEnv` for the browser bundle, `getServerEnv()` server-side). Functions read `STRIPE_SECRET_KEY` / `STRIPE_WH_SECRET` / `APP_URL` from Secret Manager, falling back to `functions/.env` (untracked; `STRIPE_SK` is also accepted). `blockDisposableSignups` deploys with the rest; its `allUsers` invoker grant needs the project-level org-policy exception set 2026-09-07 (§6b).
 
 ## 13. Known gotchas
 

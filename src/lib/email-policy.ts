@@ -12,8 +12,9 @@
  *    an activation code, and an unactivated account is refused by every
  *    route that spends money (`src/lib/verified-account.ts`).
  * 3. `blockDisposableSignups` in `functions/src/index.ts` — refuses creation
- *    itself. Deployed, but not invokable until the org-policy exception in
- *    CLAUDE.md §6b exists. Until then layer 2 is the enforcement.
+ *    itself, before the account exists. Live since 2026-09-07 (CLAUDE.md
+ *    §6b); layers 1 and 2 remain for a domain that reaches the list later
+ *    than the deploy.
  *
  * The domain list lives in `src/lib/disposable-email-domains.ts`; see the
  * note there about its twin in `functions/`.

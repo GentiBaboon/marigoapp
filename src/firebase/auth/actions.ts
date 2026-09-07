@@ -29,7 +29,29 @@ type AuthResult = {
   redirecting?: boolean;
 };
 
+/**
+ * A refusal from `blockDisposableSignups` (functions/src/index.ts) reaches
+ * the client as `auth/internal-error` whose message wraps the function's
+ * own JSON: `... {"error":{"message":"Temporary or disposable ..."}}`. Pull
+ * that sentence out so the person reads it, not "An unexpected error".
+ */
+const blockingFunctionMessage = (error: any): string | null => {
+    const raw = String(error?.message ?? '');
+    if (!raw.includes('BLOCKING_FUNCTION_ERROR_RESPONSE') && !raw.includes('Cloud Function returned an error')) return null;
+    const start = raw.indexOf('{');
+    if (start < 0) return null;
+    try {
+        const parsed = JSON.parse(raw.slice(start));
+        const msg = parsed?.error?.message;
+        return typeof msg === 'string' && msg ? msg : null;
+    } catch {
+        return null;
+    }
+};
+
 const getErrorMessage = (error: any): string => {
+    const blocked = blockingFunctionMessage(error);
+    if (blocked) return blocked;
     if (error.code) {
         switch (error.code) {
             case 'auth/user-not-found':
