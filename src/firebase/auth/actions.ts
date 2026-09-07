@@ -153,6 +153,10 @@ async function signInWithProvider(auth: Auth, provider: AuthProvider): Promise<A
       return { success: false, error: getErrorMessage(error) };
     }
     try {
+      // Remembered so the return trip can tell "nothing pending" from "the
+      // provider sent us back but the result was lost" — which is what
+      // Safari's storage partitioning does when the authDomain is not ours.
+      markRedirectPending();
       // Navigates away; this promise does not resolve on success.
       await signInWithRedirect(auth, provider);
       return { success: false, redirecting: true };
@@ -171,12 +175,46 @@ async function signInWithProvider(auth: Auth, provider: AuthProvider): Promise<A
  * every mount; it resolves to null when there is no pending redirect.
  */
 export async function completeOAuthRedirect(auth: Auth): Promise<AuthResult> {
+  const wasPending = takeRedirectPending();
   try {
     const result = await getRedirectResult(auth);
-    if (!result) return { success: false };
-    return { success: true, user: result.user };
+    if (result) return { success: true, user: result.user };
+    if (wasPending) {
+      // We left for the provider and came back with nothing. On iPhone Safari
+      // this is the third-party authDomain being partitioned away, not the
+      // user changing their mind — say so instead of silently re-rendering
+      // the sign-in form, which reads as "it stays loading".
+      return {
+        success: false,
+        error: 'Google or Apple sign-in could not finish in this browser. Please sign in with your email and password, or try again from Chrome.',
+      };
+    }
+    return { success: false };
   } catch (error: any) {
     return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+const REDIRECT_PENDING_KEY = 'marigo_oauth_redirect_pending';
+
+function markRedirectPending() {
+  try {
+    window.sessionStorage.setItem(REDIRECT_PENDING_KEY, String(Date.now()));
+  } catch {
+    /* storage unavailable — the safety net simply does not fire */
+  }
+}
+
+/** Reads and clears the marker. Ignores one older than ten minutes: a stale
+ *  tab must not accuse a fresh visit of a failed sign-in. */
+function takeRedirectPending(): boolean {
+  try {
+    const raw = window.sessionStorage.getItem(REDIRECT_PENDING_KEY);
+    if (!raw) return false;
+    window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+    return Date.now() - Number(raw) < 10 * 60 * 1000;
+  } catch {
+    return false;
   }
 }
 

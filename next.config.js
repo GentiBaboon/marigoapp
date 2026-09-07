@@ -91,6 +91,33 @@ const nextConfig = {
       },
     ],
   },
+  /**
+   * Serve Firebase Auth's handler from our own origin.
+   *
+   * Google / Apple sign-in on iPhone goes through `signInWithRedirect`, which
+   * bounces via the `authDomain`. With the default `<project>.firebaseapp.com`
+   * that is a third-party origin, and Safari's storage partitioning (ITP,
+   * 16.1+) stops the handler passing the result back — the user picks their
+   * Google account and lands on the sign-in page again, or on a spinner that
+   * never ends. That is what the first seller trying to open a sale from the
+   * "Prepare the order" email hit on 2026-09-06.
+   *
+   * Firebase's documented fix: set `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` to the
+   * site's own host and reverse-proxy `/__/auth/*` to the project's
+   * firebaseapp.com. Then everything is first-party. The rewrite is harmless
+   * while the env still names firebaseapp.com — nothing requests these paths.
+   * Switching the env also needs two console changes (docs/vercel-deploy.md §2b).
+   */
+  async rewrites() {
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    if (!projectId) return [];
+    return [
+      {
+        source: '/__/auth/:path*',
+        destination: `https://${projectId}.firebaseapp.com/__/auth/:path*`,
+      },
+    ];
+  },
   async headers() {
     // In dev, allow connections to the Firebase emulator suite + the
     // Stripe-CLI forwarder. Production keeps the strict CSP.
@@ -178,6 +205,28 @@ const nextConfig = {
           },
         ],
       },
+      // The proxied Firebase Auth handler (see `rewrites`). It is Google's
+      // page, not ours: it loads its scripts from apis.google.com / gstatic
+      // and runs inside a hidden iframe on our own pages, so the site-wide
+      // `X-Frame-Options: DENY` and `frame-ancestors 'none'` above must not
+      // reach it. In practice Next serves an external rewrite with the
+      // upstream's headers (verified: neither rule lands on these paths), so
+      // this is belt and braces for the day that changes. Later rules win
+      // for the same header key.
+      {
+        source: '/__/auth/:path*',
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self' https: 'unsafe-inline' 'unsafe-eval'",
+              "img-src 'self' https: data:",
+              "frame-ancestors 'self'",
+            ].join('; '),
+          },
+        ],
+      },
     ];
   },
 };
@@ -188,6 +237,8 @@ const nextConfig = {
 // meta tag in the app shell.
 if (isNative) {
   delete nextConfig.headers;
+  // `output: 'export'` cannot rewrite, and the WebView has no OAuth anyway.
+  delete nextConfig.rewrites;
 }
 
 module.exports = isNative ? nextConfig : withPWA(nextConfig);

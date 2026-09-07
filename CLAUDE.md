@@ -802,6 +802,13 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
     **edit page** now stamps the origin from the selected pickup address, so
     a seller repairs their own legacy stock by opening and saving it; the
     admin page cannot, because it cannot read the seller's address book.
+  - **Countries are compared through `normalizeCountry()`**, not as text.
+    Addresses hold whatever the form of the day wrote ("Shqipëri", "Kosovë",
+    a code) while listings stamp the picker's English name, and the first
+    real cash order — Tirana to Tirana, address country "Shqiperi" — was
+    billed the 500 ALL border rate for it. Add any new spelling to
+    `COUNTRY_ALIASES`; an unknown one passes through folded, so it is
+    compared with itself but not with its translation.
   - `/api/create-order` **and `/api/create-payment-intent`** recompute from the
     server's own copy of each product and the address on the order. The
     client's basket payload never decides a price. The card route used to
@@ -1029,6 +1036,17 @@ SITE_URL                      # optional; overrides the marigoapp.com default
   new query that filters on one field and orders on another needs its index
   added *and deployed* (`firebase deploy --only firestore:indexes`), or the
   same in-memory sort.
+- **Google / Apple sign-in on iPhone needs the auth handler on our own host.**
+  Mobile Safari blocks the popup, so `signInWithProvider` falls back to
+  `signInWithRedirect` via the `authDomain`; with the default
+  `<project>.firebaseapp.com` Safari's storage partitioning loses the result
+  and the user lands back on the sign-in page (the first seller opening a sale
+  from the "Prepare the order" email hit this, 2026-09-06). `next.config.js`
+  proxies `/__/auth/*` to firebaseapp.com with its own frame headers; setting
+  `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=www.marigoapp.com` plus the two console
+  steps in `docs/vercel-deploy.md` §2b makes the whole round trip first-party.
+  `completeOAuthRedirect()` keeps a session marker so a lost result shows a
+  clear message instead of a silent re-render.
 - **Never put `'use client'` on a module an API route imports.** Next turns
   every export of a client module into a *client reference proxy* when server
   code imports it: constants, functions and Zod schemas all arrive as `{}`.

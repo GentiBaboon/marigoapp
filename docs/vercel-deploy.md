@@ -22,7 +22,7 @@ Set all of these in **Project → Settings → Environment Variables** for the P
 | Variable | Needed at | Notes |
 |---|---|---|
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | build | |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | build | |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | build | **`www.marigoapp.com`** once §2b is done; the default `<project>.firebaseapp.com` breaks Google/Apple sign-in on iPhone |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | build + runtime | also used by the REST shim |
 | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | build | |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | build | |
@@ -54,6 +54,31 @@ This is the step that most often breaks a first deploy. In
 - your custom domain, once attached
 
 Sign-in silently fails on any domain not in that list.
+
+## 2b. Google / Apple sign-in on iPhone (authDomain on our own host)
+
+On iPhone the popup is blocked, so social sign-in falls back to a full-page
+redirect through the `authDomain`. With the default `<project>.firebaseapp.com`
+that is a third-party origin, and Safari's storage partitioning stops the
+handler passing the result back: the user picks their Google account and
+lands on the sign-in page again. Firebase's fix is to serve the handler from
+our own domain. `next.config.js` already proxies `/__/auth/*` to
+`https://<project>.firebaseapp.com/__/auth/*`; the rest is configuration:
+
+1. **Google Cloud Console → APIs & Services → Credentials** → the OAuth 2.0
+   client Firebase created ("Web client (auto created by Google Service)") →
+   **Authorised redirect URIs** → add `https://www.marigoapp.com/__/auth/handler`.
+   Without this Google answers `redirect_uri_mismatch`.
+2. **Apple Developer → Services ID** used for Sign in with Apple → Return URLs →
+   add the same `https://www.marigoapp.com/__/auth/handler`.
+3. **Vercel → Environment Variables** → `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` =
+   `www.marigoapp.com` → **redeploy** (it is inlined at build time).
+4. `www.marigoapp.com` must be in Firebase's Authorized domains (§2) — it already
+   is if sign-in works on desktop.
+
+Do steps 1–2 **before** step 3: the moment the env flips, every social sign-in
+uses the new redirect URI. Verify afterwards that
+`https://www.marigoapp.com/__/auth/handler` answers 200 with Firebase's page.
 
 ## 3. Firestore rules and indexes
 
