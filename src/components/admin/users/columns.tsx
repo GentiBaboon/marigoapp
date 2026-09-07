@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { FirestoreUser, getSellerLevel, type BadgeSettings, toDate } from '@/lib/types';
 import { format } from 'date-fns';
 import { DataTableRowActions } from './data-table-row-actions';
-import { ArrowUpDown } from 'lucide-react';
+import { ArrowUpDown, BadgeCheck, MailWarning } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const getInitials = (name?: string | null) => {
@@ -138,6 +138,31 @@ function columnsFor(badgeSettings: Partial<BadgeSettings> | null): ColumnDef<Fir
       const d = toDate(createdAt);
       return d ? format(d, 'd MMM, yyyy') : 'N/A';
     },
+  },
+  {
+    // Whether the address was ever confirmed — by the 6-digit code, or by
+    // Google / Apple at sign-in. `true` is the only value that counts:
+    // `false` is a sign-up that stopped at the code screen, and a missing
+    // field is an account from before the flag existed, which has never
+    // confirmed either. Both read "Not verified" here, and both are sent
+    // through the code before they can buy, sell or message. A UI hint, not
+    // proof (FirestoreUser.emailVerified) — enough to spot strays in a list.
+    id: 'emailVerified',
+    accessorFn: (row) => (row.emailVerified === true ? 'verified' : 'unverified'),
+    header: 'Email',
+    cell: ({ row }) => {
+      const verified = row.original.emailVerified === true;
+      return verified ? (
+        <Badge variant="outline" className="gap-1 whitespace-nowrap">
+          <BadgeCheck className="h-3 w-3 text-emerald-600" /> Verified
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="gap-1 whitespace-nowrap text-amber-700 border-amber-300">
+          <MailWarning className="h-3 w-3" /> Not verified
+        </Badge>
+      );
+    },
+    filterFn: (row, id, value) => value.includes(row.getValue(id)),
   },
   {
     accessorKey: 'status',

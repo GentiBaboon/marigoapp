@@ -1,6 +1,7 @@
 
 'use client'; 
 
+import { isEmailUnverifiedResponse, verifyEmailHref } from '@/lib/account-verification';
 import * as React from 'react';
 import Image from 'next/image';
 import { ProductGallery } from '@/components/product/ProductGallery';
@@ -214,6 +215,10 @@ export default function ProductDetailPage() {
                 }),
             });
             const data = await res.json();
+            if (isEmailUnverifiedResponse(data)) {
+                router.push(verifyEmailHref(`/products/${product.id}`));
+                return;
+            }
             if (!res.ok) throw new Error(data.error);
             router.push(`/messages/${data.conversationId}`);
         } catch (err: any) {

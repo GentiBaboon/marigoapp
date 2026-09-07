@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyIdToken } from '@/lib/firebase-admin';
+import { checkVerifiedEmail } from '@/lib/verified-account';
 import { uploadLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { PRODUCT_IMAGES_BUCKET as BUCKET } from '@/lib/supabase';
 
@@ -35,6 +36,15 @@ export async function POST(request: NextRequest) {
       decoded = await verifyIdToken(idToken);
     } catch {
       return NextResponse.json({ error: 'Invalid or expired auth token' }, { status: 401 });
+    }
+
+    // Only a confirmed address may upload listing photos. Checked here, not in the
+    // browser, because account creation is a client-side Firebase call this
+    // server never sees — an unactivated (or throwaway-inbox) account is real
+    // and signed in, and this is where it stops. See src/lib/verified-account.ts.
+    const verified = await checkVerifiedEmail(decoded, idToken);
+    if (!verified.ok) {
+      return NextResponse.json(verified.body, { status: verified.status });
     }
 
     const authenticatedUid = decoded.sub;

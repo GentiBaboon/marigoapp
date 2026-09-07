@@ -8,6 +8,7 @@ import {
   firestoreUpdate,
   firestoreCreate,
 } from '@/lib/firebase-admin';
+import { checkVerifiedEmail } from '@/lib/verified-account';
 import { paymentIntentLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { validateCoupon } from '@/lib/coupons';
 import { acceptedOfferPrice } from '@/lib/offer-pricing';
@@ -158,6 +159,15 @@ export async function POST(req: NextRequest) {
       decoded = await verifyIdToken(idToken);
     } catch {
       return NextResponse.json({ error: 'Invalid or expired auth token.' }, { status: 401 });
+    }
+
+    // Only a confirmed address may pay. Checked here, not in the
+    // browser, because account creation is a client-side Firebase call this
+    // server never sees — an unactivated (or throwaway-inbox) account is real
+    // and signed in, and this is where it stops. See src/lib/verified-account.ts.
+    const verified = await checkVerifiedEmail(decoded, idToken);
+    if (!verified.ok) {
+      return NextResponse.json(verified.body, { status: verified.status });
     }
 
     const buyerId = decoded.sub;

@@ -101,6 +101,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
                 profileImage: firebaseUser.photoURL,
                 role: 'buyer', // Default role
                 status: 'active',
+                // What Firebase Auth knows at creation: true for Google and
+                // Apple (the provider vouched), false for a password account
+                // until /api/auth/verify-otp flips it. Written explicitly so
+                // the admin list can tell "not yet" from "before the flag
+                // existed" — a UI hint only, see FirestoreUser.emailVerified.
+                emailVerified: firebaseUser.emailVerified === true,
                 createdAt: serverTimestamp(),
                 lastLoginAt: serverTimestamp()
               }, { merge: true }).then(() => {
@@ -112,8 +118,19 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
                 void notifyAdmin(firebaseUser, { event: 'user_registered' });
               });
             } else {
-              // Update last login
-              return setDoc(userDocRef, { lastLoginAt: serverTimestamp() }, { merge: true });
+              // Update last login. A Google / Apple account from before the
+              // flag existed carries the provider's verification on the Auth
+              // user but nothing on the document; stamp it now so the admin
+              // list stops showing them as unconfirmed.
+              const providerVerified =
+                firebaseUser.emailVerified === true && docSnap.data()?.emailVerified !== true;
+              return setDoc(
+                userDocRef,
+                providerVerified
+                  ? { lastLoginAt: serverTimestamp(), emailVerified: true, emailVerifiedAt: serverTimestamp() }
+                  : { lastLoginAt: serverTimestamp() },
+                { merge: true },
+              );
             }
           }).catch((err) => {
             console.error("FirebaseProvider: Error creating/updating user document:", err);

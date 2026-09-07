@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyIdToken, firestoreGet, firestoreUpdate } from '@/lib/firebase-admin';
 import { otpSendLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { sendEmailOtp } from '@/lib/email';
+import { DISPOSABLE_EMAIL_MESSAGE, isDisposableEmail } from '@/lib/email-policy';
 import {
   canSendOtp,
   generateOtp,
@@ -58,6 +59,15 @@ export async function POST(req: NextRequest) {
     // A token with no email claim means a sign-in method that carries no
     // address (anonymous, phone). There is nothing to send a code to.
     return NextResponse.json({ error: 'This account has no email address.' }, { status: 400 });
+  }
+
+  // The sign-up form refuses these too, but the form runs in the browser and
+  // the account is created by a client-side Firebase call. Someone who scripts
+  // past the form still gets an account; what they must not get is a code,
+  // because the code is what turns the account into one that can buy, sell
+  // and message (src/lib/verified-account.ts). Refused before any write.
+  if (isDisposableEmail(email)) {
+    return NextResponse.json({ error: DISPOSABLE_EMAIL_MESSAGE, reason: 'email_blocked' }, { status: 403 });
   }
 
   let secret: string;

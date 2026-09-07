@@ -8,9 +8,10 @@ import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 import { loginSchema, type LoginValues } from '@/lib/types';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { usePostAuthRedirect, useRedirectIfSignedIn } from '@/hooks/use-post-auth-redirect';
 import { signInWithEmail } from '@/firebase/auth/actions';
+import { postLoginDestination } from '@/firebase/auth/post-login';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,6 +31,7 @@ export function LoginForm() {
   // Someone who is already signed in should never be shown this form.
   useRedirectIfSignedIn();
   const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
 
   const form = useForm<LoginValues>({
@@ -43,8 +45,10 @@ export function LoginForm() {
   async function onSubmit(data: LoginValues) {
     setLoading(true);
     const result = await signInWithEmail(auth, data.email, data.password);
-    if (result.success) {
-      router.push(nextPath);
+    if (result.success && result.user) {
+      // An account that never entered its activation code is sent to the
+      // code screen, not into the app — see post-login.ts.
+      router.push(await postLoginDestination(firestore, result.user, nextPath));
     } else {
       toast({
         variant: 'destructive',

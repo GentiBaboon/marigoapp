@@ -3,8 +3,10 @@ import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError, onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {onDocumentWritten} from "firebase-functions/v2/firestore";
+import {beforeUserCreated, HttpsError as AuthBlockingError} from "firebase-functions/v2/identity";
 import {defineSecret} from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
+import {emailDomain, isDisposableEmailDomain} from "./disposable-email-domains";
 import Stripe from "stripe";
 
 // Secrets pulled from Google Secret Manager at runtime. Bind these on each
@@ -860,3 +862,43 @@ export const syncBanToAuth = onDocumentWritten({document: "users/{uid}", region:
     throw error;
   }
 });
+
+// ─── Sign-up blocking ────────────────────────────────────────────────────────
+
+/**
+ * Refuse account creation from a throwaway inbox, before the account exists.
+ *
+ * The Next app cannot do this: sign-up is a client-side Firebase call that no
+ * server of ours sees, so its checks are the form (bypassable) and
+ * `/api/auth/send-otp` (which withholds the activation code, so the account
+ * can never buy, sell or message — but it still exists and still shows up in
+ * the admin list). This is the only layer that stops the account being made.
+ *
+ * Blocking functions need **Identity Platform** enabled on the project, and a
+ * deploy of one on a project without it fails. So it is registered only when
+ * `AUTH_BLOCKING_ENABLED=true` is in `functions/.env` at deploy time; until
+ * then this export is `undefined` and the CLI ignores it. Enable it:
+ *   1. Firebase console → Authentication → upgrade to Identity Platform.
+ *   2. `AUTH_BLOCKING_ENABLED=true` in `functions/.env`.
+ *   3. `firebase deploy --only functions:blockDisposableSignups`.
+ *   4. Authentication → Settings → Blocking functions → "Before account
+ *      creation" → pick it. (The deploy registers the function; the console
+ *      is where it is switched on.)
+ *
+ * The domain list is a copy of `src/lib/disposable-email-domains.ts` and a
+ * test in the app fails if the two drift. The message is the same one the
+ * form shows, so a person sees one sentence whichever layer caught them.
+ */
+export const blockDisposableSignups = process.env.AUTH_BLOCKING_ENABLED === "true"
+  ? beforeUserCreated({region: "europe-west1"}, (event) => {
+    const email = event.data?.email ?? "";
+    if (email && isDisposableEmailDomain(emailDomain(email))) {
+      logger.warn("Refused sign-up from a disposable domain", {domain: emailDomain(email)});
+      throw new AuthBlockingError(
+        "invalid-argument",
+        "Temporary or disposable email addresses cannot be used. Please sign up with an address you keep.",
+      );
+    }
+    return;
+  })
+  : undefined;

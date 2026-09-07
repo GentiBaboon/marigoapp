@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { Loader2 } from 'lucide-react';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
+import { postLoginDestination } from '@/firebase/auth/post-login';
 import { usePostAuthRedirect } from '@/hooks/use-post-auth-redirect';
 import {
   signInWithGoogle,
@@ -68,6 +69,7 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
   const router = useRouter();
   const nextPath = usePostAuthRedirect();
   const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
 
   // Claims the credential waiting after a full-page redirect. Without this the
@@ -79,8 +81,10 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
     completeOAuthRedirect(auth)
       .then((result) => {
         if (cancelled) return;
-        if (result.success) {
-          router.push(nextPath);
+        if (result.success && result.user) {
+          postLoginDestination(firestore, result.user, nextPath).then((to) => {
+            if (!cancelled) router.push(to);
+          });
           return;
         }
         if (result.error) {
@@ -97,7 +101,7 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
     return () => {
       cancelled = true;
     };
-  }, [auth, router, nextPath, toast]);
+  }, [auth, firestore, router, nextPath, toast]);
 
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
     setLoading(provider);
@@ -105,8 +109,8 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
     try {
       const result = await action(auth);
 
-      if (result.success) {
-        router.push(nextPath);
+      if (result.success && result.user) {
+        router.push(await postLoginDestination(firestore, result.user, nextPath));
         setLoading(null);
         return;
       }

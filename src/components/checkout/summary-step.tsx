@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/firebase';
+import { isEmailUnverifiedResponse, verifyEmailHref } from '@/lib/account-verification';
 import type { FirestoreAddress } from '@/lib/types';
 import { useCurrency } from '@/context/CurrencyContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -73,6 +74,10 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
         });
 
         const data = await res.json();
+        if (isEmailUnverifiedResponse(data)) {
+          router.push(verifyEmailHref('/checkout'));
+          return;
+        }
         if (!res.ok) throw new Error(data.error || 'Order creation failed.');
 
         // Navigate to success FIRST. Calling clearCart() before navigation
@@ -99,6 +104,10 @@ export function SummaryStep({ onPrevStep, shippingAddress, paymentMethod, savedM
       });
 
       const intentData = await res.json();
+      if (isEmailUnverifiedResponse(intentData)) {
+        router.push(verifyEmailHref('/checkout'));
+        return;
+      }
       if (!res.ok) throw new Error(intentData.error || 'Failed to create payment intent.');
 
       const { clientSecret, orderId } = intentData;

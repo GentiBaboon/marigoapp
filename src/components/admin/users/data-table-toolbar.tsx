@@ -29,6 +29,11 @@ const statuses = [
     { label: 'Banned', value: 'banned' }
 ]
 
+const emailStates = [
+    { label: 'Verified', value: 'verified' },
+    { label: 'Not verified', value: 'unverified' },
+]
+
 const badges = [
     { label: 'Trusted Seller', value: 'trusted' },
     { label: 'Expert Seller', value: 'expert' },
@@ -102,6 +107,13 @@ export function DataTableToolbar<TData>({
             column={table.getColumn('badge')}
             title="Badge"
             options={badges}
+          />
+        )}
+        {table.getColumn('emailVerified') && (
+          <DataTableFacetedFilter
+            column={table.getColumn('emailVerified')}
+            title="Email"
+            options={emailStates}
           />
         )}
         {table.getColumn('status') && (

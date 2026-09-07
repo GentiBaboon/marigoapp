@@ -234,15 +234,15 @@ API routes (`src/app/api/`):
 | `ai/draft-listing` | Bearer ID token | Multimodal: photos + a hint → a `Partial<SellFormValues>` snapped to the live taxonomy (§7). Spends model quota, so it is not open to anonymous callers |
 | `ai/suggest-price` | Bearer ID token | Rate-limited. Photos + the details filled in so far → a min/max/recommended price **in EUR** and one line of reasoning. Backs the suggestion panel in `PricingStep`, which converts for display; the panel it replaced was hardcoded |
 | `chat` | — | Genkit chatbot; CSRF-exempt |
-| `create-payment-intent` | Bearer ID token | Rate-limited; creates the Stripe PI and a `pending_payment` order. Takes **no** stock, spends no coupon and sends no mail — it runs before the card is confirmed |
+| `create-payment-intent` | Bearer ID token + confirmed email (§6b) | Rate-limited; creates the Stripe PI and a `pending_payment` order. Takes **no** stock, spends no coupon and sends no mail — it runs before the card is confirmed |
 | `confirm-order` | Bearer ID token | Rate-limited; called after `confirmCardPayment` succeeds. Re-reads the intent from Stripe (never trusts the client), moves the order to `processing`, then takes stock, spends the coupon and sends the confirmations. Idempotent — the order's status is the guard |
-| `create-order` | Bearer ID token | Rate-limited; sends buyer + seller mail |
+| `create-order` | Bearer ID token + confirmed email (§6b) | Rate-limited; sends buyer + seller mail |
 | `stripe/create-connected-account` | Bearer ID token | Same-origin mirror of the `createStripeConnectedAccount` function — exists because org policy blocks `allUsers` invoker on the deployed function (§8) |
-| `upload` | Bearer ID token | Rate-limited; service-role Supabase upload to `product-images` |
+| `upload` | Bearer ID token + confirmed email (§6b) | Rate-limited; service-role Supabase upload to `product-images` |
 | `admin/upload`, `admin/product-upload` | Bearer ID token + admin role check | Admin-side image ingest |
-| `start-conversation` | Bearer ID token | Rate-limited; writes via Firestore REST |
+| `start-conversation` | Bearer ID token + confirmed email (§6b) | Rate-limited; writes via Firestore REST |
 | `forgot-password` | — | Rate-limited; proxies the `sendPasswordResetLink` function with `RESET_SERVICE_SECRET` |
-| `auth/send-otp` | Bearer ID token | Rate-limited; mails a 6-digit activation code. The address comes from the **token's `email` claim**, never the body — otherwise a signed-in user could aim Marigo's mail at anyone |
+| `auth/send-otp` | Bearer ID token | Rate-limited; mails a 6-digit activation code. The address comes from the **token's `email` claim**, never the body — otherwise a signed-in user could aim Marigo's mail at anyone. Refuses a disposable domain (403 `email_blocked`) — §6b |
 | `auth/verify-otp` | Bearer ID token | Rate-limited; checks the code and activates the account. Idempotent |
 | `orders/notify` | Bearer ID token | Rate-limited; mails the buyer for `shipped` / `completed` / `cancelled`. Re-reads the order with the caller's token, refuses unless it is in that status, one mail per status (`mailedStatuses`) |
 | `presence` | POST: none (Bearer optional) · GET: Bearer + `analytics.view` | Visitor heartbeat in, live view out. The **only** writer to the presence store, so the write path is rate-limited rather than open (§9b). GET answers **404** to anyone without the permission |
@@ -357,7 +357,57 @@ decoration.
   response: a response field is one config slip from handing every caller in
   production a valid code.
 - Google and Apple sign-in do not pass through this — those providers verify
-  the address themselves.
+  the address themselves. Their ID tokens carry `email_verified: true`, which
+  the server gate below accepts without a read.
+
+### Verification is enforced, not just recorded
+
+For two weeks after the code shipped it was only a stage inside `SignupForm`:
+close the tab at the keypad, sign in again, and nothing ever asked — and no
+route read the proof. Two banned sign-ups from throwaway inboxes (2026-09-07)
+were the prompt. Four layers now, from friendly to firm:
+
+1. **Sign-in** (`src/firebase/auth/post-login.ts`): every successful sign-in
+   — password, Google, Apple, a returning redirect — resolves its destination
+   through `postLoginDestination()`, which sends an unconfirmed password
+   account to `/auth/verify-email?next=…`. A failed read lets them through:
+   the routes still refuse anything that matters, and the same outage would
+   break the code screen too.
+2. **`RequireVerifiedEmail`** (root layout) bounces an unconfirmed account off
+   `/checkout`, `/sell`, `/messages` and the listing editor to the code
+   screen, so the person is told on arrival rather than by a 403 at the end
+   of a form. The list is `VERIFICATION_GATED_PREFIXES` in
+   `src/lib/account-verification.ts`; browsing, the cart, favourites and the
+   profile stay open. It waits for `useEmailVerification()` to *settle* —
+   `useDoc` begins with `isLoading: false`, so redirecting on the first frame
+   would bounce every verified password account once per page.
+3. **The API routes** — the layer that holds. `/api/create-order`,
+   `create-payment-intent`, `start-conversation` and `upload` call
+   `checkVerifiedEmail()` (`src/lib/verified-account.ts`) right after the
+   token check and answer **403 `{ reason: 'email_unverified' }`**. It
+   accepts the token's `email_verified` claim or a recomputed
+   `emailVerificationProof`, never the boolean; a missing secret fails
+   **closed** (503). A test lists the gated routes by name — add a spending
+   route, add it there. Clients route on the `reason`
+   (`isEmailUnverifiedResponse()`).
+4. **Throwaway inboxes are refused** (`src/lib/email-policy.ts`): the sign-up
+   schema rejects a listed domain before Firebase is asked to create
+   anything, and `/api/auth/send-otp` refuses to mail one (403
+   `email_blocked`), so an account scripted past the form can never
+   activate. The list is `src/lib/disposable-email-domains.ts`, **copied
+   byte-for-byte to `functions/src/`** (a test compares them) for
+   `blockDisposableSignups`, a `beforeUserCreated` blocking function that
+   stops the account being made at all. Blocking functions need **Identity
+   Platform**, and deploying one without it fails, so it registers only with
+   `AUTH_BLOCKING_ENABLED=true` in `functions/.env`; the enable steps are in
+   its docblock.
+
+**Legacy accounts** (before 2026-08-25) have neither flag nor proof and go
+through the code once, at their next checkout, listing or message. The
+bootstrap in `provider.tsx` now writes `emailVerified` at creation (true for
+Google / Apple) and stamps it on a later sign-in for a provider account that
+predates the flag, so `/admin/users` — which gained an **Email** column and
+facet — can tell "never confirmed" from "confirmed by Google".
 
 ## 6c. The masked `/admin` door
 
@@ -625,6 +675,7 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 | `getSellerBalance`, `requestPayout` | callable | Seller wallet (`/profile/wallet`, `/profile/earnings`) |
 | `sendPasswordResetLink` | HTTP | Backs `/api/forgot-password` |
 | `syncBanToAuth` | Firestore trigger on `users/{uid}` | Disables / re-enables the Auth user and revokes refresh tokens when `status` flips to or from `banned` (§6d) |
+| `blockDisposableSignups` | `beforeUserCreated` blocking function | Refuses account creation from a throwaway domain. Registered only with `AUTH_BLOCKING_ENABLED=true`, which needs Identity Platform (§6b) |
 
 `distributeOrderToSellers` computes each seller's net (`subtotal × (1 − commissionRate)`), transfers into their connected account, and writes ledger rows. **Idempotent** via a `payouts[sellerId].transferId` map on the order, so retried captures no-op. Sellers with no `stripeAccountId` are skipped and flagged for manual settlement.
 
@@ -982,7 +1033,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (664 passing): unit — `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (701 passing): unit — `account-verification`, `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
@@ -1017,7 +1068,7 @@ UPSTASH_REDIS_REST_TOKEN
 SITE_URL                      # optional; overrides the marigoapp.com default
 ```
 
-`src/lib/env.ts` validates these with Zod (`clientEnv` for the browser bundle, `getServerEnv()` server-side). Functions read `STRIPE_SECRET_KEY` / `STRIPE_WH_SECRET` / `APP_URL` from Secret Manager, falling back to `functions/.env` (untracked; `STRIPE_SK` is also accepted).
+`src/lib/env.ts` validates these with Zod (`clientEnv` for the browser bundle, `getServerEnv()` server-side). Functions read `STRIPE_SECRET_KEY` / `STRIPE_WH_SECRET` / `APP_URL` from Secret Manager, falling back to `functions/.env` (untracked; `STRIPE_SK` is also accepted). `AUTH_BLOCKING_ENABLED=true` there registers the `blockDisposableSignups` blocking function — only once the project is on Identity Platform (§6b).
 
 ## 13. Known gotchas
 

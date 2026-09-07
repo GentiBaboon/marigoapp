@@ -1,3 +1,4 @@
+import { DISPOSABLE_EMAIL_MESSAGE, isDisposableEmail } from './email-policy';
 import { z } from "zod";
 import { Timestamp, FieldValue } from "firebase/firestore";
 
@@ -85,7 +86,13 @@ export type LoginValues = z.infer<typeof loginSchema>;
 
 export const signupSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters long." }),
-  email: z.string().email({ message: "Please enter a valid email address." }),
+  // Throwaway inboxes are refused before Firebase is asked to create anything.
+  // The same list backs `/api/auth/send-otp`, which is the check that holds
+  // when this form is bypassed — see src/lib/email-policy.ts.
+  email: z
+    .string()
+    .email({ message: "Please enter a valid email address." })
+    .refine((value) => !isDisposableEmail(value), { message: DISPOSABLE_EMAIL_MESSAGE }),
   password: z.string().min(8, { message: "Password must be at least 8 characters long." }),
   terms: z.boolean().refine(val => val === true, {
     message: "You must accept the terms and conditions.",
