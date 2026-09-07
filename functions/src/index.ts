@@ -917,31 +917,30 @@ export const purgeDeletedUser = onDocumentDeleted({document: "users/{uid}", regi
  * can never buy, sell or message — but it still exists and still shows up in
  * the admin list). This is the only layer that stops the account being made.
  *
- * Blocking functions need **Identity Platform** enabled on the project, and a
- * deploy of one on a project without it fails. So it is registered only when
- * `AUTH_BLOCKING_ENABLED=true` is in `functions/.env` at deploy time; until
- * then this export is `undefined` and the CLI ignores it. Enable it:
- *   1. Firebase console → Authentication → upgrade to Identity Platform.
- *   2. `AUTH_BLOCKING_ENABLED=true` in `functions/.env`.
- *   3. `firebase deploy --only functions:blockDisposableSignups`.
- *   4. Authentication → Settings → Blocking functions → "Before account
- *      creation" → pick it. (The deploy registers the function; the console
- *      is where it is switched on.)
+ * Blocking functions need **Identity Platform** on the project. It was
+ * initialized 2026-09-07 (`POST identitytoolkit.googleapis.com/v2/projects/
+ * <id>/identityPlatform:initializeAuth` — the `/admin/v2` path in some docs
+ * 404s), so this is exported unconditionally like every other function. An
+ * env-gated export was tried first and did not work: the CLI's discovery
+ * step does not see `functions/.env`, so the function was never found.
+ *
+ * Deploying registers the function; the *trigger* is separate — the
+ * project's Identity Platform config must name it under
+ * `blockingFunctions.triggers.beforeCreate`, which the deploy sets when it
+ * can and which CLAUDE.md §6b shows how to verify and set by hand.
  *
  * The domain list is a copy of `src/lib/disposable-email-domains.ts` and a
  * test in the app fails if the two drift. The message is the same one the
  * form shows, so a person sees one sentence whichever layer caught them.
  */
-export const blockDisposableSignups = process.env.AUTH_BLOCKING_ENABLED === "true"
-  ? beforeUserCreated({region: "europe-west1"}, (event) => {
-    const email = event.data?.email ?? "";
-    if (email && isDisposableEmailDomain(emailDomain(email))) {
-      logger.warn("Refused sign-up from a disposable domain", {domain: emailDomain(email)});
-      throw new AuthBlockingError(
-        "invalid-argument",
-        "Temporary or disposable email addresses cannot be used. Please sign up with an address you keep.",
-      );
-    }
-    return;
-  })
-  : undefined;
+export const blockDisposableSignups = beforeUserCreated({region: "europe-west1"}, (event) => {
+  const email = event.data?.email ?? "";
+  if (email && isDisposableEmailDomain(emailDomain(email))) {
+    logger.warn("Refused sign-up from a disposable domain", {domain: emailDomain(email)});
+    throw new AuthBlockingError(
+      "invalid-argument",
+      "Temporary or disposable email addresses cannot be used. Please sign up with an address you keep.",
+    );
+  }
+  return;
+});

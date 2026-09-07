@@ -12,8 +12,8 @@
  *    an activation code, and an unactivated account is refused by every
  *    route that spends money (`src/lib/verified-account.ts`).
  * 3. `blockDisposableSignups` in `functions/src/index.ts` — refuses creation
- *    itself, once the project is on Identity Platform (blocking functions
- *    need it). Until then layer 2 is the enforcement.
+ *    itself. Deployed, but not invokable until the org-policy exception in
+ *    CLAUDE.md §6b exists. Until then layer 2 is the enforcement.
  *
  * The domain list lives in `src/lib/disposable-email-domains.ts`; see the
  * note there about its twin in `functions/`.
