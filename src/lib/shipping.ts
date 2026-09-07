@@ -52,6 +52,28 @@ export function normalizeCity(city: string | null | undefined): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+/**
+ * Every spelling of the two countries we ship between, folded onto one key.
+ *
+ * Addresses hold whatever the form of the day wrote — the English name from
+ * today's picker, but also "Shqipëri", "Kosovë", a code — while listings
+ * stamp the picker's English name. Compared as plain text, "Shqiperi" ≠
+ * "Albania" and a Tirana-to-Tirana parcel was billed the 500 ALL border rate.
+ * That is what happened on the very first cash order (2026-09-06).
+ */
+const COUNTRY_ALIASES: Record<string, string> = {
+  albania: 'albania', shqiperi: 'albania', shqiperia: 'albania', al: 'albania', alb: 'albania',
+  kosovo: 'kosovo', kosova: 'kosovo', kosove: 'kosovo', 'republic of kosovo': 'kosovo',
+  'republika e kosoves': 'kosovo', xk: 'kosovo', ks: 'kosovo', rks: 'kosovo',
+};
+
+/** Canonical key for a country name or code; unknown spellings pass through folded. */
+export function normalizeCountry(country: string | null | undefined): string {
+  const key = normalizeCity(country);
+  if (key === UNKNOWN_CITY) return key;
+  return COUNTRY_ALIASES[key] ?? key;
+}
+
 export interface ShippingGroup {
   /** Normalised key used for grouping. */
   key: string;
@@ -78,12 +100,12 @@ export function groupShippingByCity(
 ): ShippingGroup[] {
   if (lines.length === 0) return [];
 
-  const destination = normalizeCity(destinationCountry);
+  const destination = normalizeCountry(destinationCountry);
   const groups = new Map<string, { label: string; country: string; sellerIds: Set<string> }>();
 
   for (const line of lines) {
     const cityKey = normalizeCity(line.shippingFromCity);
-    const countryKey = normalizeCity(line.shippingFromCountry);
+    const countryKey = normalizeCountry(line.shippingFromCountry);
     // Keyed on both: the same city name in two countries is two origins, and
     // the rate depends on the country.
     const key = `${countryKey}|${cityKey}`;
@@ -102,7 +124,7 @@ export function groupShippingByCity(
   }
 
   const resolved: ShippingGroup[] = [...groups.entries()].map(([key, g]) => {
-    const originKey = normalizeCity(g.country);
+    const originKey = normalizeCountry(g.country);
     // Only charge the border rate when both ends are actually known. An
     // unrecorded origin or a checkout with no address yet must not silently
     // more-than-double the quote.

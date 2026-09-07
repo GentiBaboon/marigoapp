@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateShipping, groupShippingByCity, normalizeCity, UNKNOWN_CITY } from '@/lib/shipping';
+import { calculateShipping, groupShippingByCity, normalizeCity, normalizeCountry, UNKNOWN_CITY } from '@/lib/shipping';
 import { DEFAULT_SHIPPING_FEE_ALL, DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
 
 const line = (sellerId: string, city?: string | null, country?: string | null) =>
@@ -179,6 +179,32 @@ describe('cross-border delivery', () => {
       { destinationCountry: XK },
     );
     expect(totalEur).toBeCloseTo(ALL(200));
+  });
+
+  it('treats the Albanian name of the country as the same country', () => {
+    // The first real cash order: address said "Shqiperi", listing said
+    // "Albania", Tirana to Tirana — and it was billed the border rate.
+    const { totalEur, groups } = calculateShipping(
+      [line('s1', 'Tirana', 'Albania')],
+      { destinationCountry: 'Shqiperi' },
+    );
+    expect(groups[0].isCrossBorder).toBe(false);
+    expect(totalEur).toBeCloseTo(ALL(200));
+  });
+
+  it('folds every spelling and code of both countries onto one key', () => {
+    for (const s of ['Albania', 'Shqipëri', 'Shqiperia', 'AL', ' albania ']) expect(normalizeCountry(s)).toBe('albania');
+    for (const s of ['Kosovo', 'Kosova', 'Kosovë', 'XK', 'KS', 'Republic of Kosovo']) expect(normalizeCountry(s)).toBe('kosovo');
+    expect(normalizeCountry('')).toBe(UNKNOWN_CITY);
+    expect(normalizeCountry('Italy')).toBe('italy');
+  });
+
+  it('still charges the border rate between the two countries whatever the spelling', () => {
+    const { totalEur } = calculateShipping(
+      [line('s1', 'Prishtinë', 'Kosovë')],
+      { destinationCountry: 'Shqipëri' },
+    );
+    expect(totalEur).toBeCloseTo((DEFAULT_SHIPPING_FEE_EUR / DEFAULT_SHIPPING_FEE_ALL) * 500);
   });
 
   it('ignores country spelling and case', () => {
