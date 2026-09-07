@@ -6,6 +6,7 @@ import {
   firestoreGet,
   firestoreUpdate,
 } from '@/lib/firebase-admin';
+import { checkAccountStanding } from '@/lib/verified-account';
 
 // Same-origin Next.js API route that mirrors the `createStripeConnectedAccount`
 // cloud function. Exists so the browser can hit it without the deployed
@@ -41,6 +42,10 @@ export async function POST(req: NextRequest) {
     } catch {
       return NextResponse.json({ error: 'Invalid or expired auth token.' }, { status: 401 });
     }
+    // A banned account is refused before anything is spent — see
+    // checkAccountStanding in src/lib/verified-account.ts.
+    const standing = await checkAccountStanding(decoded, idToken);
+    if (!standing.ok) return NextResponse.json(standing.body, { status: standing.status });
 
     const uid = decoded.sub;
     const stripe = getStripe();

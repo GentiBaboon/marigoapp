@@ -5,6 +5,7 @@ import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { Loader2 } from 'lucide-react';
 import { useAuth, useFirestore } from '@/firebase';
 import { postLoginDestination } from '@/firebase/auth/post-login';
+import { SUSPENDED_MESSAGE } from '@/lib/account-verification';
 import { usePostAuthRedirect } from '@/hooks/use-post-auth-redirect';
 import {
   signInWithGoogle,
@@ -82,8 +83,10 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
       .then((result) => {
         if (cancelled) return;
         if (result.success && result.user) {
-          postLoginDestination(firestore, result.user, nextPath).then((to) => {
-            if (!cancelled) router.push(to);
+          postLoginDestination(firestore, auth, result.user, nextPath).then((outcome) => {
+            if (cancelled) return;
+            if (outcome.kind === 'go') router.push(outcome.to);
+            else toast({ variant: 'destructive', title: 'Account suspended', description: SUSPENDED_MESSAGE });
           });
           return;
         }
@@ -110,7 +113,9 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
       const result = await action(auth);
 
       if (result.success && result.user) {
-        router.push(await postLoginDestination(firestore, result.user, nextPath));
+        const outcome = await postLoginDestination(firestore, auth, result.user, nextPath);
+        if (outcome.kind === 'go') router.push(outcome.to);
+        else toast({ variant: 'destructive', title: 'Account suspended', description: SUSPENDED_MESSAGE });
         setLoading(null);
         return;
       }

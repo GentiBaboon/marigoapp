@@ -12,6 +12,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyIdToken } from '@/lib/firebase-admin';
+import { checkAccountStanding } from '@/lib/verified-account';
 import { offerLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { decodeFirestoreDoc } from '@/lib/firestore-rest';
 import { buildProductPath } from '@/lib/product-slug';
@@ -52,13 +53,17 @@ export async function POST(req: NextRequest) {
   // The uid lives in `sub`; `uid` is not a claim Firebase actually sets, so
   // reading it returns undefined and 401s every legitimate caller.
   let uid = '';
+  let decoded: Awaited<ReturnType<typeof verifyIdToken>> | null = null;
   try {
-    const decoded = await verifyIdToken(idToken);
+    decoded = await verifyIdToken(idToken);
     uid = decoded.sub || decoded.uid || '';
   } catch {
     uid = '';
   }
-  if (!uid) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+  if (!uid || !decoded) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+  // A banned party sends no mail through us — see checkAccountStanding.
+  const standing = await checkAccountStanding(decoded, idToken);
+  if (!standing.ok) return NextResponse.json(standing.body, { status: standing.status });
 
   const { productId, offerId, event } = await req.json().catch(() => ({} as any));
   if (!productId || !offerId || !EVENTS.includes(event)) {

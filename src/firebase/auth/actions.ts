@@ -1,5 +1,6 @@
 'use client';
 
+import { SUSPENDED_MESSAGE } from '@/lib/account-verification';
 import {
   Auth,
   User,
@@ -73,7 +74,7 @@ const getErrorMessage = (error: any): string => {
             // a banned member re-entering the same password ten times learns
             // nothing, and support then hears it as a login bug.
             case 'auth/user-disabled':
-                return 'This account has been suspended. Contact hello@marigoapp.com if you think this is a mistake.';
+                return SUSPENDED_MESSAGE;
             case 'auth/network-request-failed':
                 return 'Network error. Please check your connection and try again.';
             default:

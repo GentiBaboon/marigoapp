@@ -26,7 +26,7 @@
 import type { JWTPayload } from 'jose';
 import { firestoreGet } from './firebase-admin';
 import { getOtpSecret, hasVerifiedEmail, normalizeEmail } from './otp';
-import { isVerificationExempt } from './account-verification';
+import { ACCOUNT_BANNED_REASON, SUSPENDED_MESSAGE, isBannedDoc, isVerificationExempt } from './account-verification';
 
 /** The `reason` on a refusal. Clients route on it, so it is a constant. */
 export const EMAIL_UNVERIFIED_REASON = 'email_unverified' as const;
@@ -42,6 +42,42 @@ type Token = JWTPayload & { uid?: string; sub: string; email?: unknown; email_ve
 export type VerifiedCheck =
   | { ok: true }
   | { ok: false; status: 403 | 503; body: { error: string; reason: string; verifyPath?: string } };
+
+/**
+ * A ban, enforced where the money is.
+ *
+ * `firestore.rules` already refuses every write a banned member could make,
+ * and `syncBanToAuth` disables their sign-in — but an ID token already
+ * issued stays valid for up to an hour, several routes spend something
+ * *before* they touch Firestore (a Stripe intent, a Supabase upload, a
+ * model call, an email), and the function only helps once it is deployed.
+ * So every Bearer route reads the document and refuses a banned caller
+ * first, with 403 `account_banned`. One read per call; the document is
+ * handed on to the verification check so it is not read twice.
+ */
+export async function checkAccountStanding(
+  token: Token,
+  idToken: string,
+  user?: Record<string, unknown> | null,
+): Promise<VerifiedCheck & { user?: Record<string, unknown> | null }> {
+  const uid = String(token.uid || token.sub || '');
+  const doc = user === undefined ? await firestoreGet('users', uid, idToken).catch(() => null) : user;
+  if (isBannedDoc(doc)) {
+    return { ok: false, status: 403, body: { error: SUSPENDED_MESSAGE, reason: ACCOUNT_BANNED_REASON } };
+  }
+  return { ok: true, user: doc ?? null };
+}
+
+/**
+ * Ban first, then the confirmed-address check — the gate the four spending
+ * routes call. A banned caller is answered `account_banned` even if their
+ * address was confirmed; there is nothing to send them to.
+ */
+export async function checkAccountAccess(token: Token, idToken: string): Promise<VerifiedCheck> {
+  const standing = await checkAccountStanding(token, idToken);
+  if (!standing.ok) return standing;
+  return checkVerifiedEmail(token, idToken, standing.user);
+}
 
 /** True when the identity provider itself vouched for the address. */
 export function isEmailVerifiedToken(token: Token): boolean {

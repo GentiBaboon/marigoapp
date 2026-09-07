@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyIdToken, firestoreGet, firestoreUpdate } from '@/lib/firebase-admin';
+import { checkAccountStanding } from '@/lib/verified-account';
 import { otpVerifyLimiter, applyRateLimit } from '@/lib/rate-limit';
 import {
   checkOtp,
@@ -59,6 +60,9 @@ export async function POST(req: NextRequest) {
     uid = (token.uid || token.sub) as string;
     email = normalizeEmail(String((token as any).email ?? ''));
     tokenName = ((token as any).name as string) || undefined;
+    // A banned account cannot activate itself out of the ban.
+    const standing = await checkAccountStanding(token, idToken);
+    if (!standing.ok) return NextResponse.json(standing.body, { status: standing.status });
   } catch {
     return NextResponse.json({ error: 'Your session has expired. Sign in again.' }, { status: 401 });
   }

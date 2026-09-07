@@ -10,7 +10,19 @@
 
 /** Sent to a refused caller by the API routes; see `verified-account.ts`. */
 export const EMAIL_UNVERIFIED_REASON = 'email_unverified';
+export const ACCOUNT_BANNED_REASON = 'account_banned';
 export const VERIFY_EMAIL_PATH = '/auth/verify-email';
+
+/** One sentence, everywhere a suspended account is turned away: the Auth
+ *  error on sign-in, the API routes, and the client gate. */
+export const SUSPENDED_MESSAGE =
+  'This account has been suspended. Contact hello@marigoapp.com if you think this is a mistake.';
+
+/** `users/{uid}.status == 'banned'`. `status` is admin-only writable
+ *  (firestore.rules), so the document is evidence here. */
+export function isBannedDoc(userDoc: { status?: unknown } | null | undefined): boolean {
+  return userDoc?.status === 'banned';
+}
 
 /**
  * Screens an unconfirmed account is turned away from, as path prefixes.
@@ -81,4 +93,9 @@ export function verifyEmailHref(next?: string | null): string {
 /** Did an API route refuse for want of a confirmed address? */
 export function isEmailUnverifiedResponse(body: unknown): boolean {
   return !!body && typeof body === 'object' && (body as { reason?: unknown }).reason === EMAIL_UNVERIFIED_REASON;
+}
+
+/** Did an API route refuse because the account is suspended? */
+export function isAccountBannedResponse(body: unknown): boolean {
+  return !!body && typeof body === 'object' && (body as { reason?: unknown }).reason === ACCOUNT_BANNED_REASON;
 }

@@ -3,35 +3,37 @@
 import { useEffect, useRef } from 'react';
 import { doc } from 'firebase/firestore';
 import { useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { isEmailVerifiedClient } from '@/lib/account-verification';
+import { isBannedDoc, isEmailVerifiedClient } from '@/lib/account-verification';
 
-export type EmailVerificationStatus = 'loading' | 'signed_out' | 'verified' | 'unverified';
+export type AccountStatus = 'loading' | 'signed_out' | 'banned' | 'verified' | 'unverified';
 
 /**
- * Is the signed-in member's address confirmed, as far as the browser can tell?
+ * The signed-in member's standing, as far as the browser can tell.
  *
- * Answers from Firebase Auth first (Google and Apple accounts are verified by
- * their provider, no read needed) and only opens the `users/{uid}` listener
- * for a password account. `loading` covers both the auth handshake and that
- * read, so a caller never redirects on a document that has not arrived.
+ * One live listener on `users/{uid}`, opened for every signed-in visitor:
+ * a ban lives on that document and must be seen the moment it lands, not on
+ * the next sign-in. `banned` outranks everything. Then verified — from
+ * Firebase Auth (Google and Apple accounts are verified by their provider)
+ * or from the document — and otherwise `unverified`. `loading` covers both
+ * the auth handshake and the read, so a caller never acts on a document
+ * that has not arrived.
  *
  * `useDoc` starts with `isLoading: false` and only flips it on in its effect,
  * so on the first render with a reference it looks *finished* with no data.
- * Redirecting on that frame would bounce every verified password account
- * once per page. `seenLoading` remembers that the read actually started, and
- * the answer is withheld until it has both started and stopped.
+ * Acting on that frame would bounce every account once per page.
+ * `seenLoading` remembers that the read actually started, and the answer is
+ * withheld until it has both started and stopped.
  */
-export function useEmailVerification(): { status: EmailVerificationStatus; email: string | null } {
+export function useEmailVerification(): { status: AccountStatus; email: string | null } {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
 
-  const needsDoc = !!user && user.emailVerified !== true;
   const uid = user?.uid;
   const ref = useMemoFirebase(
-    () => (needsDoc && firestore && uid ? doc(firestore, 'users', uid) : null),
-    [needsDoc, firestore, uid],
+    () => (firestore && uid ? doc(firestore, 'users', uid) : null),
+    [firestore, uid],
   );
-  const { data, isLoading } = useDoc<{ emailVerified?: boolean; role?: string }>(ref);
+  const { data, isLoading } = useDoc<{ emailVerified?: boolean; role?: string; status?: string }>(ref);
 
   const seenLoading = useRef(false);
   useEffect(() => {
@@ -43,9 +45,9 @@ export function useEmailVerification(): { status: EmailVerificationStatus; email
 
   if (isUserLoading) return { status: 'loading', email: null };
   if (!user) return { status: 'signed_out', email: null };
-  if (user.emailVerified === true) return { status: 'verified', email: user.email };
   if (isLoading || !seenLoading.current) return { status: 'loading', email: user.email };
 
+  if (isBannedDoc(data)) return { status: 'banned', email: user.email };
   return {
     status: isEmailVerifiedClient(user.emailVerified, data) ? 'verified' : 'unverified',
     email: user.email,

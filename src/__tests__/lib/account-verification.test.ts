@@ -15,7 +15,8 @@ vi.mock('@/lib/firebase-admin', () => ({
   firestoreGet: (...a: any[]) => mockGet(...a),
 }));
 
-import { checkVerifiedEmail, EMAIL_UNVERIFIED_REASON } from '@/lib/verified-account';
+import { checkAccountAccess, checkAccountStanding, checkVerifiedEmail, EMAIL_UNVERIFIED_REASON } from '@/lib/verified-account';
+import { ACCOUNT_BANNED_REASON, isAccountBannedResponse, isBannedDoc, SUSPENDED_MESSAGE } from '@/lib/account-verification';
 
 const ROOT = resolve(__dirname, '../../..');
 const SECRET = 'a-secret-long-enough-for-the-check';
@@ -139,14 +140,77 @@ describe('checkVerifiedEmail (server)', () => {
   });
 });
 
+describe('checkAccountStanding / checkAccountAccess (server)', () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+    process.env.OTP_SECRET = SECRET;
+  });
+  const token = (extra: Record<string, unknown> = {}) => ({ sub: 'u1', uid: 'u1', email: 'a@b.com', ...extra }) as any;
+
+  it('refuses a banned account with the suspension notice', async () => {
+    mockGet.mockResolvedValue({ status: 'banned', emailVerified: true });
+    const r = await checkAccountStanding(token(), 'tok');
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.status).toBe(403);
+      expect(r.body.reason).toBe(ACCOUNT_BANNED_REASON);
+      expect(r.body.error).toBe(SUSPENDED_MESSAGE);
+      expect(isAccountBannedResponse(r.body)).toBe(true);
+    }
+  });
+
+  it('passes an active account and hands the document on', async () => {
+    mockGet.mockResolvedValue({ status: 'active' });
+    const r = await checkAccountStanding(token(), 'tok');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r as any).user).toEqual({ status: 'active' });
+  });
+
+  it('bans outrank a verified provider token', async () => {
+    mockGet.mockResolvedValue({ status: 'banned' });
+    const r = await checkAccountAccess(token({ email_verified: true }), 'tok');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.body.reason).toBe(ACCOUNT_BANNED_REASON);
+  });
+
+  it('reads the document once for both checks', async () => {
+    mockGet.mockResolvedValue({ status: 'active', emailVerificationProof: verificationProof(SECRET, 'u1', 'a@b.com') });
+    const r = await checkAccountAccess(token(), 'tok');
+    expect(r.ok).toBe(true);
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('isBannedDoc only trusts the exact status', () => {
+    expect(isBannedDoc({ status: 'banned' })).toBe(true);
+    expect(isBannedDoc({ status: 'active' })).toBe(false);
+    expect(isBannedDoc(null)).toBe(false);
+  });
+});
+
+describe('every Bearer route refuses a banned caller', () => {
+  // Rules stop a banned member's Firestore writes, but several routes spend
+  // before they write — a Stripe intent, an upload, a model call, an email.
+  // Listing them by name means a new Bearer route without the check fails a
+  // test rather than being found by the next banned account.
+  const BEARER = [
+    'ai/draft-listing', 'ai/suggest-price', 'auth/send-otp', 'auth/verify-otp', 'confirm-order',
+    'create-order', 'create-payment-intent', 'offers/notify', 'orders/notify',
+    'start-conversation', 'stripe/create-connected-account', 'upload',
+  ];
+  it.each(BEARER)('/api/%s calls checkAccountStanding or checkAccountAccess', (name) => {
+    const src = readFileSync(join(ROOT, 'src/app/api', name, 'route.ts'), 'utf8');
+    expect(src).toMatch(/await checkAccount(Standing|Access)\(/);
+  });
+});
+
 describe('every route that spends on the caller runs the gate', () => {
   // The gate is decoration unless the routes actually call it. Listing them
   // here means adding a spending route without the gate fails a test rather
   // than being noticed in production.
   const GATED = ['create-order', 'create-payment-intent', 'start-conversation', 'upload'];
-  it.each(GATED)('/api/%s calls checkVerifiedEmail', (name) => {
+  it.each(GATED)('/api/%s calls checkAccountAccess', (name) => {
     const src = readFileSync(join(ROOT, 'src/app/api', name, 'route.ts'), 'utf8');
     expect(src).toMatch(/from '@\/lib\/verified-account'/);
-    expect(src).toMatch(/await checkVerifiedEmail\(/);
+    expect(src).toMatch(/await checkAccountAccess\(/);
   });
 });

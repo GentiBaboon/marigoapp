@@ -17,6 +17,7 @@ import { aiDraftListingLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
 import { generateText } from '@/ai/models';
 import { verifyIdToken } from '@/lib/firebase-admin';
+import { checkAccountStanding } from '@/lib/verified-account';
 import { loadListingTaxonomy, matchOption } from '@/lib/listing-taxonomy';
 import { normalizeSize, SIZE_SYSTEMS } from '@/lib/size-options';
 
@@ -57,11 +58,17 @@ export async function POST(request: NextRequest) {
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'You must be signed in to use the AI assistant.' }, { status: 401 });
     }
+    const idToken = authHeader.slice(7);
+    let decoded;
     try {
-      await verifyIdToken(authHeader.slice(7));
+      decoded = await verifyIdToken(idToken);
     } catch {
       return NextResponse.json({ error: 'Your session has expired. Please sign in again.' }, { status: 401 });
     }
+    // A banned account is refused before anything is spent — see
+    // checkAccountStanding in src/lib/verified-account.ts.
+    const standing = await checkAccountStanding(decoded, idToken);
+    if (!standing.ok) return NextResponse.json(standing.body, { status: standing.status });
 
     const parsed = RequestSchema.safeParse(await request.json());
     if (!parsed.success) {

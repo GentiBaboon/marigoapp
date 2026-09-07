@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyIdToken, firestoreGet, firestoreUpdate, firestoreCreate, firestoreQuery } from '@/lib/firebase-admin';
+import { checkAccountStanding } from '@/lib/verified-account';
 import { sendOrderConfirmation, sendSellerOrderNotification, sendAdminNewOrder } from '@/lib/email';
 import { decrementStockForItems } from '@/lib/inventory-server';
 import { paymentIntentLimiter, applyRateLimit } from '@/lib/rate-limit';
@@ -46,6 +47,10 @@ export async function POST(req: NextRequest) {
     if (!buyerId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    // A banned account is refused before anything is spent — see
+    // checkAccountStanding in src/lib/verified-account.ts.
+    const standing = await checkAccountStanding(decoded, idToken);
+    if (!standing.ok) return NextResponse.json(standing.body, { status: standing.status });
 
     const { orderId } = await req.json();
     if (!orderId || typeof orderId !== 'string') {

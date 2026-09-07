@@ -12,6 +12,7 @@ import { useAuth, useFirestore } from '@/firebase';
 import { usePostAuthRedirect, useRedirectIfSignedIn } from '@/hooks/use-post-auth-redirect';
 import { signInWithEmail } from '@/firebase/auth/actions';
 import { postLoginDestination } from '@/firebase/auth/post-login';
+import { SUSPENDED_MESSAGE } from '@/lib/account-verification';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,9 +47,14 @@ export function LoginForm() {
     setLoading(true);
     const result = await signInWithEmail(auth, data.email, data.password);
     if (result.success && result.user) {
-      // An account that never entered its activation code is sent to the
-      // code screen, not into the app — see post-login.ts.
-      router.push(await postLoginDestination(firestore, result.user, nextPath));
+      // A banned account is signed straight back out; one that never entered
+      // its activation code goes to the code screen — see post-login.ts.
+      const outcome = await postLoginDestination(firestore, auth, result.user, nextPath);
+      if (outcome.kind === 'go') {
+        router.push(outcome.to);
+      } else {
+        toast({ variant: 'destructive', title: 'Account suspended', description: SUSPENDED_MESSAGE });
+      }
     } else {
       toast({
         variant: 'destructive',

@@ -16,6 +16,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyIdToken, firestoreGet, firestoreUpdate } from '@/lib/firebase-admin';
+import { checkAccountStanding } from '@/lib/verified-account';
 import { orderMailLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { sendOrderShipped, sendOrderDelivered, sendOrderCancelled } from '@/lib/email';
 import { alreadyMailed, isOrderMailStatus, withMailed } from '@/lib/order-mail';
@@ -29,13 +30,17 @@ export async function POST(req: NextRequest) {
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   if (!idToken) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
 
+  let decoded;
   try {
-    // The uid lives in `sub`; only the token's validity matters here — the
-    // order read below is what decides whether this caller may see it.
-    await verifyIdToken(idToken);
+    // The uid lives in `sub`; the order read below is what decides whether
+    // this caller may see it.
+    decoded = await verifyIdToken(idToken);
   } catch {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
+  // A banned party sends no mail through us — see checkAccountStanding.
+  const standing = await checkAccountStanding(decoded, idToken);
+  if (!standing.ok) return NextResponse.json(standing.body, { status: standing.status });
 
   const body = await req.json().catch(() => ({} as any));
   const orderId = typeof body?.orderId === 'string' ? body.orderId : '';

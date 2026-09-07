@@ -472,7 +472,7 @@ no login check ever read it. Two layers now enforce it, in this order:
    admin branches are not, so an operator can still act on the account's
    data and the other party can still message or decline. Reads are not
    gated — the helper is a document read, and every public page would pay
-   it. **This layer is the one that matters**: an ID token already issued
+   it. **Layers 1 and 3 are the ones that hold**: an ID token already issued
    stays valid for up to an hour and cannot be recalled.
 2. **`syncBanToAuth` (Cloud Function, `users/{uid}` write trigger).** The
    Next app has no service-account key and cannot touch Firebase Auth, so
@@ -480,6 +480,21 @@ no login check ever read it. Two layers now enforce it, in this order:
    the status flips to `banned`, and re-enables on unban. Sign-in then fails
    with `auth/user-disabled`, which `getErrorMessage()` renders as a
    suspension notice rather than "check your credentials".
+3. **Every Bearer API route** calls `checkAccountStanding()`
+   (`src/lib/verified-account.ts`) straight after the token check and
+   answers 403 `{ reason: 'account_banned' }`. Added 2026-09-07 because the
+   rules only bite when a route *writes*, and several spend first — a Stripe
+   intent, a Supabase upload, a model call, an email — and because layer 2
+   only exists once the function is deployed. A test names every Bearer
+   route; a new one without the check fails it. `send-otp` / `verify-otp`
+   are included so a banned account cannot activate its way out.
+4. **The browser.** `postLoginDestination()` reads the document on *every*
+   sign-in (password, Google, Apple, returning redirect) and signs a banned
+   account straight back out with `SUSPENDED_MESSAGE`; `RequireVerifiedEmail`
+   in the root layout watches the document live and ends an already-open
+   session the moment `status` flips, so a ban lands in seconds rather than
+   when the hour-old token expires. Reads are still not gated — a signed-out
+   visitor can see the same public pages.
 
 **`role` and `status` are admin-only fields.** The owner update rule used to
 allow any field, and `isAdmin()` falls back to the *stored* role — so any
