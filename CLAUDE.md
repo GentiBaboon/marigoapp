@@ -402,6 +402,12 @@ were the prompt. Four layers now, from friendly to firm:
    `AUTH_BLOCKING_ENABLED=true` in `functions/.env`; the enable steps are in
    its docblock.
 
+**Operator roles are exempt** (`VERIFICATION_EXEMPT_ROLES`: admin,
+super_admin, moderator, analyst — the roles `isAdmin()` accepts). `role` is
+admin-only writable (§6d), so a stored one is better evidence than a code,
+and admin@marigoapp.com must never be locked out of its own panel by one.
+All three layers read it; the users table shows such an account as "Staff".
+
 **Legacy accounts** (before 2026-08-25) have neither flag nor proof and go
 through the code once, at their next checkout, listing or message. The
 bootstrap in `provider.tsx` now writes `emailVerified` at creation (true for

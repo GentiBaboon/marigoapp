@@ -15,6 +15,8 @@
  *    `hasVerifiedEmail()` — the record the 6-digit code flow writes. The
  *    boolean `emailVerified` beside it is never consulted: its owner can set
  *    it (CLAUDE.md §6b).
+ * 3. **An operator role on the same document** (`isVerificationExempt`).
+ *    `role` is admin-only writable, so unlike the boolean it is evidence.
  *
  * A missing signing secret fails **closed**. With no secret nobody can have
  * verified, so refusing is the only answer consistent with the OTP routes,
@@ -24,6 +26,7 @@
 import type { JWTPayload } from 'jose';
 import { firestoreGet } from './firebase-admin';
 import { getOtpSecret, hasVerifiedEmail, normalizeEmail } from './otp';
+import { isVerificationExempt } from './account-verification';
 
 /** The `reason` on a refusal. Clients route on it, so it is a constant. */
 export const EMAIL_UNVERIFIED_REASON = 'email_unverified' as const;
@@ -81,5 +84,7 @@ export async function checkVerifiedEmail(
   }
 
   const doc = user === undefined ? await firestoreGet('users', uid, idToken).catch(() => null) : user;
-  return hasVerifiedEmail(secret, uid, email, doc ?? null) ? { ok: true } : refusal;
+  if (hasVerifiedEmail(secret, uid, email, doc ?? null)) return { ok: true };
+  if (isVerificationExempt(doc)) return { ok: true };
+  return refusal;
 }

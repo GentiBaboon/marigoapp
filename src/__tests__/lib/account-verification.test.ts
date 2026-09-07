@@ -43,6 +43,12 @@ describe('isEmailVerifiedClient', () => {
     expect(isEmailVerifiedClient(undefined, undefined)).toBe(false);
     expect(isEmailVerifiedClient(false, { emailVerified: 'true' })).toBe(false);
   });
+  it('exempts operator roles, which a member cannot self-assign', () => {
+    expect(isEmailVerifiedClient(false, { role: 'admin' })).toBe(true);
+    expect(isEmailVerifiedClient(false, { role: 'super_admin' })).toBe(true);
+    expect(isEmailVerifiedClient(false, { role: 'seller' })).toBe(false);
+    expect(isEmailVerifiedClient(false, { role: 'buyer' })).toBe(false);
+  });
 });
 
 describe('verifyEmailHref', () => {
@@ -95,6 +101,12 @@ describe('checkVerifiedEmail (server)', () => {
       expect(r.body.reason).toBe(EMAIL_UNVERIFIED_REASON);
       expect(r.body.verifyPath).toBe(VERIFY_EMAIL_PATH);
     }
+  });
+
+  it('lets an operator through on their stored role alone', async () => {
+    mockGet.mockResolvedValue({ role: 'admin', emailVerified: false });
+    const r = await checkVerifiedEmail(token({ email_verified: false }), 'tok');
+    expect(r.ok).toBe(true);
   });
 
   it('refuses a proof minted for another address', async () => {

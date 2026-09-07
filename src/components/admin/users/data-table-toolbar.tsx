@@ -32,6 +32,7 @@ const statuses = [
 const emailStates = [
     { label: 'Verified', value: 'verified' },
     { label: 'Not verified', value: 'unverified' },
+    { label: 'Staff (exempt)', value: 'exempt' },
 ]
 
 const badges = [

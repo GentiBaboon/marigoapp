@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { FirestoreUser, getSellerLevel, type BadgeSettings, toDate } from '@/lib/types';
 import { format } from 'date-fns';
 import { DataTableRowActions } from './data-table-row-actions';
-import { ArrowUpDown, BadgeCheck, MailWarning } from 'lucide-react';
+import { ArrowUpDown, BadgeCheck, MailWarning, ShieldCheck } from 'lucide-react';
+import { isVerificationExempt } from '@/lib/account-verification';
 import { Button } from '@/components/ui/button';
 
 const getInitials = (name?: string | null) => {
@@ -147,11 +148,21 @@ function columnsFor(badgeSettings: Partial<BadgeSettings> | null): ColumnDef<Fir
     // confirmed either. Both read "Not verified" here, and both are sent
     // through the code before they can buy, sell or message. A UI hint, not
     // proof (FirestoreUser.emailVerified) — enough to spot strays in a list.
+    // Operator roles are exempt from the code (VERIFICATION_EXEMPT_ROLES),
+    // so an admin who never took it is "Staff", not a stray.
     id: 'emailVerified',
-    accessorFn: (row) => (row.emailVerified === true ? 'verified' : 'unverified'),
+    accessorFn: (row) =>
+      row.emailVerified === true ? 'verified' : isVerificationExempt(row) ? 'exempt' : 'unverified',
     header: 'Email',
     cell: ({ row }) => {
       const verified = row.original.emailVerified === true;
+      if (!verified && isVerificationExempt(row.original)) {
+        return (
+          <Badge variant="outline" className="gap-1 whitespace-nowrap">
+            <ShieldCheck className="h-3 w-3" /> Staff
+          </Badge>
+        );
+      }
       return verified ? (
         <Badge variant="outline" className="gap-1 whitespace-nowrap">
           <BadgeCheck className="h-3 w-3 text-emerald-600" /> Verified

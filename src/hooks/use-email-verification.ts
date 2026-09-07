@@ -31,7 +31,7 @@ export function useEmailVerification(): { status: EmailVerificationStatus; email
     () => (needsDoc && firestore && uid ? doc(firestore, 'users', uid) : null),
     [needsDoc, firestore, uid],
   );
-  const { data, isLoading } = useDoc<{ emailVerified?: boolean }>(ref);
+  const { data, isLoading } = useDoc<{ emailVerified?: boolean; role?: string }>(ref);
 
   const seenLoading = useRef(false);
   useEffect(() => {

@@ -35,19 +35,36 @@ export function needsVerifiedEmail(pathname: string): boolean {
 }
 
 /**
+ * Roles that never see the code screen.
+ *
+ * Operator accounts (admin@marigoapp.com and the like) are provisioned by
+ * hand, not self-signed-up, and `role` is an admin-only field in the rules —
+ * a member cannot give themselves one from the console (CLAUDE.md §6d). So
+ * a stored admin role is stronger evidence of who is behind the account than
+ * a code ever was, and demanding one anyway just locks an operator out of
+ * their own panel. Matches the roles `isAdmin()` accepts in firestore.rules.
+ */
+export const VERIFICATION_EXEMPT_ROLES: readonly string[] = ['admin', 'super_admin', 'moderator', 'analyst'];
+
+export function isVerificationExempt(userDoc: { role?: unknown } | null | undefined): boolean {
+  return typeof userDoc?.role === 'string' && VERIFICATION_EXEMPT_ROLES.includes(userDoc.role);
+}
+
+/**
  * Verified as far as the browser can tell.
  *
  * `authEmailVerified` is `User.emailVerified` from Firebase Auth — true for
  * Google and Apple accounts, whose provider vouched for the address. The
- * document flag is what the 6-digit code flow writes. Either suffices;
- * `undefined` on both (an account from before the code existed) is "not
- * verified", which sends that member through the code once.
+ * document flag is what the 6-digit code flow writes, and an operator role
+ * stands in for it (`isVerificationExempt`). Any one suffices; `undefined`
+ * throughout (an account from before the code existed) is "not verified",
+ * which sends that member through the code once.
  */
 export function isEmailVerifiedClient(
   authEmailVerified: boolean | null | undefined,
-  userDoc: { emailVerified?: unknown } | null | undefined,
+  userDoc: { emailVerified?: unknown; role?: unknown } | null | undefined,
 ): boolean {
-  return authEmailVerified === true || userDoc?.emailVerified === true;
+  return authEmailVerified === true || userDoc?.emailVerified === true || isVerificationExempt(userDoc);
 }
 
 /**
