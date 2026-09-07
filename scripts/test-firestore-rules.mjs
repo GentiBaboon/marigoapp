@@ -66,6 +66,7 @@ await create('users/seller', { role: 'buyer', status: 'active', name: 'Seller' }
 await create('users/buyer', { role: 'buyer', status: 'active', name: 'Buyer' }, 'owner');
 await create('users/banned', { role: 'buyer', status: 'banned', name: 'Banned' }, 'owner');
 await create('users/admin1', { role: 'admin', status: 'active', name: 'Admin' }, 'owner');
+await create('users/doomed', { role: 'buyer', status: 'banned', name: 'Doomed' }, 'owner');
 await create('products/p1', { sellerId: 'seller', price: 100, quantity: 1, status: 'active', title: 'Bag' }, 'owner');
 await create('products/p2', { sellerId: 'seller', price: 100, quantity: 1, status: 'active', title: 'Bag 2' }, 'owner');
 await create('products/p3', { sellerId: 'banned', price: 100, quantity: 1, status: 'active', title: 'Banned seller bag' }, 'owner');
@@ -102,6 +103,9 @@ const cases = [
   ['banned owner cannot edit their profile', 403, () => update('users/banned', { name: 'New name' }, 'banned')],
   ['owner can still edit their profile', 200, () => update('users/buyer', { name: 'Renamed', phone: '1' }, 'buyer')],
   ['owner can still record lastLoginAt', 200, () => update('users/buyer', { lastLoginAt: 'now' }, 'buyer')],
+  ['owner cannot delete their own account document', 403, () => del('users/buyer', 'buyer')],
+  ['another member cannot delete a user', 403, () => del('users/doomed', 'seller')],
+  ['full admin can delete a user', 200, () => del('users/doomed', 'admin1')],
   ['first login bootstrap (buyer/active) is allowed', 200, () => create('users/newbie', { role: 'buyer', status: 'active', name: 'N' }, 'newbie')],
   ['first login cannot bootstrap as admin', 403, () => create('users/newbie2', { role: 'admin', status: 'active' }, 'newbie2')],
   ['first login cannot bootstrap without role/status (defaults apply)', 200, () => create('users/newbie3', { name: 'N3' }, 'newbie3')],

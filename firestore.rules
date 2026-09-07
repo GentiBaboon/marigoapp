@@ -87,6 +87,12 @@ service cloud.firestore {
         && resource.data.get('status', 'active') != 'banned'
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status'])
       );
+      // A real delete, full admins only. `purgeDeletedUser` (Cloud Function)
+      // then removes the Auth account and the owner-only subcollections
+      // below, which a document delete leaves behind. Nobody may delete
+      // their own account this way — "use another email" at sign-up deletes
+      // the Auth user, not the document, and that is the only self-delete.
+      allow delete: if isFullAdmin();
 
       match /wishlist/{productId} { allow read, write: if isOwner(userId); }
       match /cart/{productId} { allow read, write: if isOwner(userId); }

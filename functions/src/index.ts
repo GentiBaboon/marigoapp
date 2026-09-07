@@ -2,7 +2,7 @@ import * as admin from "firebase-admin";
 import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError, onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
-import {onDocumentWritten} from "firebase-functions/v2/firestore";
+import {onDocumentDeleted, onDocumentWritten} from "firebase-functions/v2/firestore";
 import {beforeUserCreated, HttpsError as AuthBlockingError} from "firebase-functions/v2/identity";
 import {defineSecret} from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
@@ -861,6 +861,49 @@ export const syncBanToAuth = onDocumentWritten({document: "users/{uid}", region:
     logger.error("syncBanToAuth failed", {uid, message: error?.message, code: error?.code});
     throw error;
   }
+});
+
+// ─── Account deletion ────────────────────────────────────────────────────────
+
+/**
+ * Finish what an admin's "Delete" started.
+ *
+ * `/admin/users` deletes `users/{uid}` (firestore.rules lets a full admin,
+ * and nobody else). That leaves two things the Next app cannot touch: the
+ * Firebase Auth account — no service-account key on that side — and the
+ * owner-only subcollections (wishlist, cart, addresses, paymentMethods),
+ * which a document delete does not cascade to. Both are removed here.
+ *
+ * Listings, orders, messages and the finance ledger are deliberately left:
+ * they are shared records with another party on them, and an order does not
+ * stop having happened because the buyer's profile is gone. Their `sellerId`
+ * / `buyerId` simply points at an id with no document behind it, which the
+ * UI already tolerates (a banned account can be in the same state).
+ *
+ * Deleting the Auth account frees the address to register again. An admin
+ * who wants an address *kept out* should ban instead — a banned account
+ * holds its address, and `syncBanToAuth` keeps its sign-in disabled.
+ */
+export const purgeDeletedUser = onDocumentDeleted({document: "users/{uid}", region: "europe-west1"}, async (event) => {
+  const uid = event.params.uid;
+
+  try {
+    await admin.auth().deleteUser(uid);
+    logger.info("Auth user deleted after profile delete", {uid});
+  } catch (error: any) {
+    if (error?.code === "auth/user-not-found") {
+      logger.warn("Profile deleted for a user with no Auth account", {uid});
+    } else {
+      logger.error("purgeDeletedUser: Auth delete failed", {uid, message: error?.message, code: error?.code});
+      throw error; // retried by the trigger — a deleted profile must not keep a live sign-in
+    }
+  }
+
+  // The parent document is already gone; recursiveDelete on its reference
+  // walks whatever subcollections were left under the path.
+  const db = admin.firestore();
+  await db.recursiveDelete(db.doc(`users/${uid}`));
+  logger.info("Subcollections purged after profile delete", {uid});
 });
 
 // ─── Sign-up blocking ────────────────────────────────────────────────────────

@@ -19,7 +19,7 @@
  */
 export const DISPOSABLE_EMAIL_DOMAINS: readonly string[] = [
   '10minutemail.com', '10minutemail.net', '10minmail.com', '10minutemail.org',
-  '20minutemail.com', '33mail.com', 'anonaddy.me', 'anonbox.net',
+  '20minutemail.com', '33mail.com', 'anonaddy.me', 'anonbox.net', 'atomicmail.io',
   'binkmail.com', 'bobmail.info', 'bugmenot.com', 'burnermail.io',
   'byom.de', 'chammy.info', 'crazymailing.com', 'cuvox.de',
   'dayrep.com', 'deadaddress.com', 'despam.it', 'discard.email',

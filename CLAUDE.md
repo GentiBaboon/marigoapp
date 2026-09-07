@@ -452,8 +452,16 @@ wordlist, and a scanner cannot follow a door it never sees.
 
 ## 6d. Account bans
 
-A ban is `users/{uid}.status == 'banned'`, set from `/admin/users` (the
-"delete" action there is the same write). For a long time that was the whole
+A ban is `users/{uid}.status == 'banned'`, set from `/admin/users`. **Delete
+is separate and real** (since 2026-09-07; before that it was the same write
+as ban, logged as "soft-deleted"): the row action calls `deleteDoc` on
+`users/{uid}`, which the rules allow a **full admin** only, and the
+`purgeDeletedUser` function then removes the Firebase Auth account and the
+owner-only subcollections a document delete leaves behind. Listings, orders,
+messages and the ledger are kept — shared records with another party on
+them. **Deleting frees the address to register again; banning holds it.**
+For an address that should stay out, ban (and add its domain to
+`disposable-email-domains.ts` if it is a throwaway provider). For a long time that was the whole
 of it — a label the admin table could filter on — and a banned buyer went on
 making offers, buying and messaging exactly as before: no rule, no route and
 no login check ever read it. Two layers now enforce it, in this order:
@@ -681,6 +689,7 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 | `getSellerBalance`, `requestPayout` | callable | Seller wallet (`/profile/wallet`, `/profile/earnings`) |
 | `sendPasswordResetLink` | HTTP | Backs `/api/forgot-password` |
 | `syncBanToAuth` | Firestore trigger on `users/{uid}` | Disables / re-enables the Auth user and revokes refresh tokens when `status` flips to or from `banned` (§6d) |
+| `purgeDeletedUser` | Firestore trigger, `users/{uid}` deleted | Deletes the Auth account and the owner-only subcollections after an admin deletes a profile (§6d) |
 | `blockDisposableSignups` | `beforeUserCreated` blocking function | Refuses account creation from a throwaway domain. Registered only with `AUTH_BLOCKING_ENABLED=true`, which needs Identity Platform (§6b) |
 
 `distributeOrderToSellers` computes each seller's net (`subtotal × (1 − commissionRate)`), transfers into their connected account, and writes ledger rows. **Idempotent** via a `payouts[sellerId].transferId` map on the order, so retried captures no-op. Sellers with no `stripeAccountId` are skipped and flagged for manual settlement.

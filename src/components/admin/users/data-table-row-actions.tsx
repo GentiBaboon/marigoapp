@@ -19,7 +19,7 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { useFirestore, useUser } from '@/firebase';
-import { doc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestoreUser, type SellerBadgeLevel, getSellerLevel } from '@/lib/types';
 import { useBadgeSettings } from '@/hooks/use-badge-settings';
@@ -140,16 +140,22 @@ export function DataTableRowActions<TData>({
     if (!firestore || !adminUser) return;
     setIsLoading(true);
     try {
-      await updateDoc(doc(firestore, 'users', targetUser.id), { status: 'banned' });
+      // The log entry goes first: once the document is gone there is no
+      // record of who this was, and the rules let a full admin write
+      // admin_logs whatever happens next. A real delete — the rule is
+      // `isFullAdmin()`, and `purgeDeletedUser` then removes the Auth
+      // account and the owner-only subcollections. Before 2026-09-07 this
+      // wrote `status: 'banned'` and called it "soft-deleted".
       await addDoc(collection(firestore, 'admin_logs'), {
         adminId: adminUser.uid,
         adminName: adminUser.displayName || 'Admin',
         actionType: 'user_deleted',
-        details: `Soft-deleted user "${displayName}" (ID: ${targetUser.id})`,
+        details: `Deleted user "${displayName}" <${targetUser.email ?? 'no email'}> (ID: ${targetUser.id})`,
         targetId: targetUser.id,
         timestamp: serverTimestamp(),
       });
-      toast({ title: 'User Removed' });
+      await deleteDoc(doc(firestore, 'users', targetUser.id));
+      toast({ title: 'User deleted', description: 'Their sign-in and profile are being removed.' });
     } catch {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete user.' });
     } finally {
@@ -249,7 +255,7 @@ export function DataTableRowActions<TData>({
       open={confirmDeleteOpen}
       onOpenChange={setConfirmDeleteOpen}
       title="Delete User"
-      description={`Are you sure you want to remove "${displayName}"? This will ban their account.`}
+      description={`Permanently delete "${displayName}"? Their profile and sign-in are removed; listings, orders and messages are kept. The email address becomes free to register again — ban instead to keep it locked out.`}
       actionLabel="Delete"
       variant="destructive"
       onConfirm={handleDelete}
