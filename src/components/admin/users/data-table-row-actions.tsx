@@ -74,6 +74,10 @@ export function DataTableRowActions<TData>({
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to update user status.' });
     } finally {
         setIsLoading(false);
+        // The dialog does not close itself on confirm. Left open, Radix keeps
+        // `pointer-events: none` on <body>, and once the toast fades the page
+        // looks normal but nothing on it can be clicked.
+        setConfirmBanOpen(false);
     }
   };
 
@@ -160,6 +164,7 @@ export function DataTableRowActions<TData>({
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete user.' });
     } finally {
       setIsLoading(false);
+      setConfirmDeleteOpen(false);
     }
   };
 

@@ -480,6 +480,15 @@ no login check ever read it. Two layers now enforce it, in this order:
    the status flips to `banned`, and re-enables on unban. Sign-in then fails
    with `auth/user-disabled`, which `getErrorMessage()` renders as a
    suspension notice rather than "check your credentials".
+   **Its runtime service account needs `roles/firebaseauth.admin`** — the
+   default `329665870351-compute@developer.gserviceaccount.com` did not
+   have it, so from the day the function shipped every ban logged
+   `auth/insufficient-permission` and no login was ever disabled. Granted
+   2026-09-07; `purgeDeletedUser` needs the same role. Check
+   `firebase functions:log --only syncBanToAuth` after a ban if in doubt.
+   Also: a function's trigger type cannot change in place — the first
+   `syncBanToAuth` had to be deleted and recreated
+   (`firebase functions:delete syncBanToAuth --region europe-west1`).
 3. **Every Bearer API route** calls `checkAccountStanding()`
    (`src/lib/verified-account.ts`) straight after the token check and
    answers 403 `{ reason: 'account_banned' }`. Added 2026-09-07 because the
