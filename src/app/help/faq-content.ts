@@ -5,6 +5,7 @@ import {
   DEFAULT_SHIPPING_FEE_ALL,
   CROSS_BORDER_SHIPPING_FEE_ALL,
 } from '@/lib/types';
+import { CARD_PAYMENTS_ENABLED } from '@/lib/payment-options';
 
 /**
  * @fileOverview The Help Centre's questions and answers.
@@ -69,12 +70,19 @@ export const FAQ_SECTIONS: FaqSection[] = [
     items: [
       {
         q: 'How can I pay?',
-        a: 'By card, or with cash on delivery where it is available for your address. Card payments are handled by Stripe — MarigoApp never sees or stores your card number.',
+        a: CARD_PAYMENTS_ENABLED
+          ? 'By card, or with cash on delivery where it is available for your address. Card payments are handled by Stripe — MarigoApp never sees or stores your card number.'
+          : 'With cash on delivery: you pay the courier when the parcel arrives. Card payments are switched off for the moment and will return.',
       },
-      {
-        q: 'When is my card actually charged?',
-        a: `Not at checkout. Your card is authorised when you order, which reserves the amount without taking it. The money is only captured and released to the seller after the item is delivered and a short hold has passed — ${DEFAULT_PAYOUT_HOLD_HOURS} hours by default. That gap is your protection: if the order is cancelled or refunded before then, the authorisation is simply released.`,
-      },
+      // Only worth asking while a card can be charged at all.
+      ...(CARD_PAYMENTS_ENABLED
+        ? [
+            {
+              q: 'When is my card actually charged?',
+              a: `Not at checkout. Your card is authorised when you order, which reserves the amount without taking it. The money is only captured and released to the seller after the item is delivered and a short hold has passed — ${DEFAULT_PAYOUT_HOLD_HOURS} hours by default. That gap is your protection: if the order is cancelled or refunded before then, the authorisation is simply released.`,
+            },
+          ]
+        : []),
       {
         q: 'Which currency are prices in?',
         a: 'Prices are stored in euro and shown in Albanian lek by default. You can switch between lek and euro from the menu under your profile picture. The currency you pick changes what you see, not what you are charged — the underlying amount is the same.',

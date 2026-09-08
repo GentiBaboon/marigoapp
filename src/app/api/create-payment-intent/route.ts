@@ -10,6 +10,7 @@ import {
 } from '@/lib/firebase-admin';
 import { checkAccountAccess } from '@/lib/verified-account';
 import { paymentIntentLimiter, applyRateLimit } from '@/lib/rate-limit';
+import { CARD_PAYMENTS_ENABLED } from '@/lib/payment-options';
 import { validateCoupon } from '@/lib/coupons';
 import { acceptedOfferPrice } from '@/lib/offer-pricing';
 import { calculateShipping, type ShippableLine } from '@/lib/shipping';
@@ -143,6 +144,14 @@ async function calculateOrderTotal(
 }
 
 export async function POST(req: NextRequest) {
+  // Card checkout is switched off (src/lib/payment-options.ts). The hidden
+  // radio button is not the guard; this is.
+  if (!CARD_PAYMENTS_ENABLED) {
+    return NextResponse.json(
+      { error: 'Card payments are not available at the moment. Please choose cash on delivery.' },
+      { status: 403 },
+    );
+  }
   // Rate limit: 10 requests per minute per IP
   const rateLimitResponse = applyRateLimit(req, paymentIntentLimiter);
   if (rateLimitResponse) return rateLimitResponse;

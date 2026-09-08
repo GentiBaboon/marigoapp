@@ -13,6 +13,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { collection } from 'firebase/firestore';
 import type { FirestorePaymentMethod } from '@/lib/types';
 import { useCart } from '@/context/CartContext';
+import { CARD_PAYMENTS_ENABLED } from '@/lib/payment-options';
 
 type PaymentStepProps = {
   onNextStep: (paymentMethod: string, savedMethodId?: string) => void;
@@ -44,7 +45,7 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
   const firestore = useFirestore();
   const { grandTotal } = useCart();
   
-  const [selectedMethod, setSelectedMethod] = useState('card');
+  const [selectedMethod, setSelectedMethod] = useState(CARD_PAYMENTS_ENABLED ? 'card' : 'cod');
   const [selectedSavedCardId, setSelectedSavedCardId] = useState<string | null>(null);
   const [paymentRequest, setPaymentRequest] = useState<any>(null);
 
@@ -56,7 +57,7 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
   const { data: savedCards, isLoading: isCardsLoading } = useCollection<FirestorePaymentMethod>(paymentMethodsCol);
 
   useEffect(() => {
-    if (stripe && grandTotal > 0) {
+    if (CARD_PAYMENTS_ENABLED && stripe && grandTotal > 0) {
       const pr = stripe.paymentRequest({
         country: 'IT', // Changed from AL to IT because AL is not currently supported for Stripe PaymentRequest
         currency: 'eur',
@@ -77,7 +78,7 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
   }, [stripe, grandTotal]);
 
   useEffect(() => {
-    if (savedCards && savedCards.length > 0 && !selectedSavedCardId) {
+    if (CARD_PAYMENTS_ENABLED && savedCards && savedCards.length > 0 && !selectedSavedCardId) {
         const defaultCard = savedCards.find(c => c.isDefault) || savedCards[0];
         setSelectedSavedCardId(defaultCard.id);
         setSelectedMethod('saved_card');
@@ -96,7 +97,11 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
     <div className="space-y-6">
         <div className="space-y-1">
             <h2 className="text-2xl font-bold font-headline">Payment Method</h2>
-            <p className="text-muted-foreground text-sm">Choose your preferred payment option.</p>
+            <p className="text-muted-foreground text-sm">
+              {CARD_PAYMENTS_ENABLED
+                ? 'Choose your preferred payment option.'
+                : 'Card payments are switched off for the moment — you pay the courier on delivery.'}
+            </p>
         </div>
         
         {paymentRequest && (
@@ -116,7 +121,7 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
           className="grid gap-4"
         >
           {/* Saved Cards */}
-          {!isCardsLoading && savedCards && savedCards.length > 0 && (
+          {CARD_PAYMENTS_ENABLED && !isCardsLoading && savedCards && savedCards.length > 0 && (
               <div className="space-y-3">
                   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Saved Methods</p>
                   {savedCards.map((card) => (
@@ -152,6 +157,10 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
               </div>
           )}
 
+          {/* Every non-cash option lives behind the flag — see
+              src/lib/payment-options.ts. */}
+          {CARD_PAYMENTS_ENABLED && (
+          <>
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-2">More Options</p>
           
           <Label
@@ -191,6 +200,8 @@ export function PaymentStep({ onNextStep, onPrevStep }: PaymentStepProps) {
               <Globe className={cn("h-6 w-6", selectedMethod === 'paypal' ? "text-primary" : "text-muted-foreground")} />
             </div>
           </Label>
+          </>
+          )}
 
           <Label
             htmlFor="cod"

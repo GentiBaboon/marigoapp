@@ -7,18 +7,19 @@ import { useAuth, useFirestore } from '@/firebase';
 import { postLoginDestination } from '@/firebase/auth/post-login';
 import { SUSPENDED_MESSAGE } from '@/lib/account-verification';
 import { usePostAuthRedirect } from '@/hooks/use-post-auth-redirect';
-import {
-  signInWithGoogle,
-  signInWithApple,
-  completeOAuthRedirect,
-} from '@/firebase/auth/actions';
+import { signInWithGoogle, completeOAuthRedirect } from '@/firebase/auth/actions';
 import { useToast } from '@/hooks/use-toast';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { IS_NATIVE_BUILD } from '@/lib/platform/native';
 
 /**
- * Whether to offer Google / Apple sign-in at all on this build.
+ * Whether to offer Google sign-in at all on this build.
+ *
+ * Sign in with Apple was withdrawn from the website on 2026-09-08 — the
+ * button is gone, `signInWithApple` in `firebase/auth/actions.ts` is kept so
+ * it can come back without being rewritten. An account that was created with
+ * Apple can no longer sign in until it does; none is known to exist.
  *
  * Off in the native bundle. Neither provider can complete inside a WebView:
  * Google refuses OAuth from an embedded browser outright (`disallowed_useragent`,
@@ -50,20 +51,8 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-const AppleIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    role="img"
-    viewBox="0 0 24 24"
-    xmlns="http://www.w3.org/2000/svg"
-    {...props}
-  >
-    <title>Apple</title>
-    <path d="M12.032 17.84a5.053 5.053 0 0 1-2.203-1.636c-1.393-1.353-2.313-3.64-2.313-6.196 0-2.954 1.32-5.432 3.235-5.432 1.03 0 2.03.62 2.793 1.565-1.12.986-1.681 2.37-1.681 3.867 0 1.64.63 2.918 1.83 3.753-1.079 1.65-2.502 2.91-4.66 3.079zM19.78 12.72c.036-.18.06-.363.06-.546 0-3.35-2.05-5.918-4.99-5.918-1.079 0-2.312.63-3.34 1.595-1.176 1.048-2.051 2.58-2.051 4.355 0 3.32 2.22 6.095 5.038 6.095 1.032 0 2.21-.59 3.23-1.595a.8.8 0 0 0 .15-.75 3.518 3.518 0 0 0-1.118-1.22.821.821 0 0 0-.826-.01c-.3.17-2.03 1.25-2.03 3.38.01 1.01.44 1.83.88 2.31-1.03.6-2.1.9-3.21.9-3.13 0-6.28-2.22-6.28-6.09 0-3.58 2.62-5.83 5.38-5.83 2.54 0 4.14 1.74 4.14 1.74a5.454 5.454 0 0 1-3.67 1.48c.03.01.06.01.09.01 2.27 0 3.92-1.48 3.92-3.68a.86.86 0 0 0-.05-.33c1.03-.07 2.31-.63 3.19-1.95a10.95 10.95 0 0 0-3.79 5.86z" />
-  </svg>
-);
-
 export function SocialButtons({ variant = 'outline', className }: { variant?: ButtonProps['variant'], className?: string}) {
-  const [loading, setLoading] = useState<null | 'google' | 'apple'>(null);
+  const [loading, setLoading] = useState<null | 'google'>(null);
   // True while a returning redirect is being claimed, so the buttons stay
   // disabled instead of inviting a second sign-in on top of one completing.
   const [resumingRedirect, setResumingRedirect] = useState(true);
@@ -106,11 +95,10 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
     };
   }, [auth, firestore, router, nextPath, toast]);
 
-  const handleSocialLogin = async (provider: 'google' | 'apple') => {
+  const handleSocialLogin = async (provider: 'google') => {
     setLoading(provider);
-    const action = provider === 'google' ? signInWithGoogle : signInWithApple;
     try {
-      const result = await action(auth);
+      const result = await signInWithGoogle(auth);
 
       if (result.success && result.user) {
         const outcome = await postLoginDestination(firestore, auth, result.user, nextPath);
@@ -151,19 +139,6 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
 
   return (
     <div className="space-y-4">
-       <Button
-        variant={variant}
-        className={cn("w-full", className)}
-        onClick={() => handleSocialLogin('apple')}
-        disabled={!!loading || resumingRedirect}
-      >
-        {loading === 'apple' ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
-          <AppleIcon className="mr-2 h-4 w-4 fill-current" />
-        )}
-        Continue with Apple
-      </Button>
       <Button
         variant={variant}
         className={cn("w-full", className)}

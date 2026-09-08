@@ -369,7 +369,10 @@ decoration.
   production a valid code.
 - Google and Apple sign-in do not pass through this — those providers verify
   the address themselves. Their ID tokens carry `email_verified: true`, which
-  the server gate below accepts without a read.
+  the server gate below accepts without a read. **The Apple button was removed
+  from `SocialButtons` on 2026-09-08**; `signInWithApple` in
+  `src/firebase/auth/actions.ts` is kept for when it returns, and the
+  post-login and verification code still handles an Apple-created account.
 
 ### Verification is enforced, not just recorded
 
@@ -685,6 +688,14 @@ that for `code === 'permission-denied'`.
   act** — see `docs/email.md`.
 
 ## 8. Payments & escrow
+
+**Card payments are switched off on the live site (since 2026-09-08).**
+`CARD_PAYMENTS_ENABLED` in `src/lib/payment-options.ts` is `false`: the
+payment step shows cash on delivery only (preselected, no express buttons,
+no saved or new card, no PayPal), `/api/create-payment-intent` answers 403,
+and the Help Centre and the assistant's knowledge describe cash on delivery
+as the way to pay. Flip the one constant to bring cards back — everything
+below still deploys and is unchanged.
 
 **Model: manual-capture escrow.** The buyer's card is *authorized* at checkout (`capture_method: 'manual'`), funds are captured only after delivery + a hold window, then split to sellers over Stripe Connect.
 

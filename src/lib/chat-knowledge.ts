@@ -1,3 +1,5 @@
+import { CARD_PAYMENTS_ENABLED } from '@/lib/payment-options';
+
 /**
  * @fileOverview What MarigoAI knows about MarigoApp.
  *
@@ -172,9 +174,14 @@ English.
   the product page ("Make an offer"). Offers are pending, accepted, rejected or
   expired, and are tracked at ${KNOWN_ROUTES.offers}.
 - Saved items live at ${KNOWN_ROUTES.favorites}.
-- Payment is by card (Stripe). Card payments are held in escrow: the buyer's
+${
+  CARD_PAYMENTS_ENABLED
+    ? `- Payment is by card (Stripe). Card payments are held in escrow: the buyer's
   card is authorised at checkout but the money only reaches the seller after
-  delivery plus a short hold window. Cash on delivery is available in some areas.
+  delivery plus a short hold window. Cash on delivery is available in some areas.`
+    : `- Payment is cash on delivery: the buyer pays the courier when the parcel
+  arrives. Card payments are switched off for the moment; do not offer them.`
+}
 - Track an order at ${KNOWN_ROUTES.orders}. Order stages are: pending payment →
   processing → shipped → delivered → completed. An order can also be cancelled
   or refunded.
