@@ -19,6 +19,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { getAuth } from 'firebase/auth';
 import { cn } from '@/lib/utils';
+import { DEFAULT_BLOCK_CTA } from '@/components/home/HomepageBlocks';
 import type { HomepageBlock, HomepageBlocksConfig, BlockImage } from '@/components/home/HomepageBlocks';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -55,6 +56,7 @@ const emptyBlock = (): HomepageBlock => ({
   images: [],
   title: '',
   subtitle: '',
+  ctaLabel: '',
   url: '',
   visible: false,
   order: 0,
@@ -496,6 +498,19 @@ export function HomepageBlocksTab() {
                 value={formData.subtitle ?? ''}
                 onChange={(e) => setFormData((p) => ({ ...p, subtitle: e.target.value }))}
                 placeholder="e.g. New arrivals every week"
+              />
+            </div>
+
+            {/* Button label */}
+            <div className="space-y-2">
+              <Label>
+                Button label{' '}
+                <span className="font-normal text-muted-foreground text-xs">(shown in capitals)</span>
+              </Label>
+              <Input
+                value={formData.ctaLabel ?? ''}
+                onChange={(e) => setFormData((p) => ({ ...p, ctaLabel: e.target.value }))}
+                placeholder={DEFAULT_BLOCK_CTA}
               />
             </div>
 

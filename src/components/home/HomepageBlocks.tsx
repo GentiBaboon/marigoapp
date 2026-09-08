@@ -18,6 +18,8 @@ export interface HomepageBlock {
   images?: BlockImage[];
   title?: string;
   subtitle?: string;
+  /** Button text; rendered upper-case. Defaults to "Shop now". */
+  ctaLabel?: string;
   url: string;
   visible: boolean;
   order: number;
@@ -30,7 +32,18 @@ export interface HomepageBlocksConfig {
   blocks: HomepageBlock[];
 }
 
-function BlockCard({ block, full }: { block: HomepageBlock; full: boolean }) {
+export const DEFAULT_BLOCK_CTA = 'Shop now';
+
+/**
+ * One editorial hero, in the shape of Farfetch's homepage banner: copy on the
+ * left and a single tall image on the right from `md` up; on a phone the image
+ * comes first and the copy sits underneath it. The copy is never laid over the
+ * photo, so there is no scrim and the focal point only decides the crop.
+ *
+ * A block carrying several images keeps them, one at a time, inside the image
+ * frame — swipe on touch, dots everywhere.
+ */
+function HeroBlock({ block }: { block: HomepageBlock }) {
   const [current, setCurrent] = React.useState(0);
   const touchStartX = React.useRef<number | null>(null);
   const wasSwiped = React.useRef(false);
@@ -46,6 +59,8 @@ function BlockCard({ block, full }: { block: HomepageBlock; full: boolean }) {
 
   const title = block.title ?? block.text ?? '';
   const subtitle = block.subtitle ?? '';
+  const cta = (block.ctaLabel ?? '').trim() || DEFAULT_BLOCK_CTA;
+  const hasCopy = Boolean(title || subtitle);
   const count = images.length;
 
   const prev = () => setCurrent((i) => (i - 1 + count) % count);
@@ -66,6 +81,7 @@ function BlockCard({ block, full }: { block: HomepageBlock; full: boolean }) {
     touchStartX.current = null;
   };
 
+  // A swipe that ends on the link must not also follow it.
   const handleLinkClick = (e: React.MouseEvent) => {
     if (wasSwiped.current) {
       e.preventDefault();
@@ -73,24 +89,9 @@ function BlockCard({ block, full }: { block: HomepageBlock; full: boolean }) {
     }
   };
 
-  // A block carrying several images is treated as a poster set: one swipeable
-  // frame on phones, every poster visible side by side from `sm` up. A single
-  // image keeps the wide cinematic crop.
-  const multi = count > 1;
-
-  const inner = (
+  const picture = (
     <div
-      className={cn(
-        'relative w-full',
-        multi
-          ? 'aspect-[4/5] sm:aspect-auto sm:flex sm:gap-4 md:gap-6'
-          : cn(
-              'overflow-hidden bg-muted',
-              full
-                ? 'aspect-[3/2] sm:aspect-[2/1] lg:aspect-[21/9]'
-                : 'aspect-[3/2] sm:aspect-video',
-            ),
-      )}
+      className="relative aspect-[4/5] w-full overflow-hidden bg-muted md:aspect-square"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -98,82 +99,30 @@ function BlockCard({ block, full }: { block: HomepageBlock; full: boolean }) {
         <div
           key={i}
           className={cn(
-            'overflow-hidden bg-muted',
-            multi
-              ? cn(
-                  // Phone: every poster stacked in the same frame, only the
-                  // current one visible. Desktop: normal flow, all visible.
-                  'absolute inset-0 transition-opacity duration-300',
-                  'sm:static sm:flex-1 sm:aspect-[4/5] sm:opacity-100',
-                  i === current ? 'opacity-100' : 'opacity-0 pointer-events-none sm:pointer-events-auto',
-                )
-              : 'absolute inset-0',
+            'absolute inset-0 transition-opacity duration-300',
+            i === current ? 'opacity-100' : 'opacity-0 pointer-events-none',
           )}
         >
-          <div className="relative h-full w-full">
-            <Image
-              src={img.url}
-              alt={i === 0 ? title : ''}
-              fill
-              className="object-cover"
-              style={{ objectPosition: `${img.x}% ${img.y}%` }}
-              sizes={multi ? '(max-width: 640px) 100vw, 50vw' : full ? '100vw' : '(max-width: 640px) 100vw, 50vw'}
-              priority={i === 0}
-            />
-          </div>
+          <Image
+            src={img.url}
+            alt={i === 0 ? title : ''}
+            fill
+            className="object-cover"
+            style={{ objectPosition: `${img.x}% ${img.y}%` }}
+            sizes={hasCopy ? '(max-width: 768px) 100vw, 50vw' : '100vw'}
+            priority={i === 0}
+          />
         </div>
       ))}
-
-      {/* Bottom overlay: gradient + text + dots.
-          For a poster set this belongs to the single mobile frame only — from
-          `sm` up the posters sit side by side and each carries its own artwork,
-          so a gradient spanning the whole row (and swipe dots) makes no sense. */}
-      <div
-        className={cn(
-          'absolute inset-0 flex flex-col justify-end pointer-events-none',
-          'p-4 sm:p-6',
-          full && 'lg:p-10',
-          multi && 'sm:hidden',
-          // The scrim exists to keep overlay text legible. With no title or
-          // subtitle it would just grey out the lower half of the artwork.
-          (title || subtitle) && 'bg-gradient-to-t from-black/70 via-black/15 to-transparent',
-        )}
-      >
-        {/* Text */}
-        <div>
-          {title && (
-            <p
-              className={cn(
-                'text-white font-bold leading-tight drop-shadow-sm',
-                full ? 'text-xl sm:text-3xl lg:text-4xl' : 'text-lg sm:text-xl lg:text-2xl',
-              )}
-            >
-              {title}
-            </p>
-          )}
-          {subtitle && (
-            <p
-              className={cn(
-                'text-white/80 mt-1 drop-shadow-sm',
-                full ? 'text-sm sm:text-base lg:text-lg' : 'text-sm lg:text-base',
-              )}
-            >
-              {subtitle}
-            </p>
-          )}
-        </div>
-
-      </div>
     </div>
   );
 
-  // Swipe dots live under the frame rather than on top of it: the artwork is
-  // self-contained and an overlaid pill covered the poster's own CTA.
   const dots = count > 1 && (
-    <div className="flex gap-1.5 justify-center mt-3 sm:hidden">
+    <div className="mt-3 flex justify-center gap-1.5">
       {images.map((_, i) => (
         <button
           key={i}
+          type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCurrent(i); }}
           className={cn(
             'h-[3px] rounded-full transition-all duration-200',
@@ -185,17 +134,52 @@ function BlockCard({ block, full }: { block: HomepageBlock; full: boolean }) {
     </div>
   );
 
-  return (
-    <div>
+  const frame = (
+    <div className={cn(hasCopy && 'md:order-2')}>
       {block.url ? (
-        <Link href={block.url} className="block" onClick={handleLinkClick}>
-          {inner}
+        <Link href={block.url} className="block" onClick={handleLinkClick} aria-label={title || cta}>
+          {picture}
         </Link>
       ) : (
-        inner
+        picture
       )}
       {dots}
     </div>
+  );
+
+  // No copy at all: the photo is the whole banner, edge to edge.
+  if (!hasCopy) return frame;
+
+  return (
+    <section className="grid grid-cols-1 gap-6 md:grid-cols-2 md:items-center md:gap-10 lg:gap-16">
+      {frame}
+
+      <div className="flex flex-col items-start gap-4 md:order-1 md:items-center md:px-6 md:text-center lg:px-12">
+        {title && (
+          <h1 className="font-headline text-3xl leading-tight tracking-tight text-foreground sm:text-4xl lg:text-5xl">
+            {title}
+          </h1>
+        )}
+        {subtitle && (
+          <p className="text-lg leading-snug text-foreground/80 sm:text-xl lg:text-2xl">
+            {subtitle}
+          </p>
+        )}
+        {block.url && (
+          <Link
+            href={block.url}
+            className={cn(
+              'mt-2 inline-flex h-12 w-full items-center justify-center border border-foreground px-8',
+              'text-sm font-semibold uppercase tracking-wide text-foreground transition-colors',
+              'hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              'md:w-auto',
+            )}
+          >
+            {cta}
+          </Link>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -214,15 +198,11 @@ export function HomepageBlocks() {
 
   if (visible.length === 0) return null;
 
-  // With a single block the two-column grid left half the row empty on
-  // desktop, which is what made the banner look undersized. Only split into
-  // columns once there is actually something to put beside it.
-  const isSingle = visible.length === 1;
-
+  // Each block is a full-width hero row; several of them stack.
   return (
-    <div className={cn('grid gap-4 md:gap-6', isSingle ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2')}>
+    <div className="space-y-10 md:space-y-16">
       {visible.map((block) => (
-        <BlockCard key={block.id} block={block} full={isSingle} />
+        <HeroBlock key={block.id} block={block} />
       ))}
     </div>
   );

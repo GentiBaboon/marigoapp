@@ -102,6 +102,17 @@ message by `detectChatLanguage()`, not by this setting.
 Public:
 - `/` (splash) → `/home`. Section order is deliberate and lives in `src/app/home/page.tsx`: MacroFilters → HomepageBlocks → **Shop by Category** → **New In** → **50% OFF Preloved** → Personalized Picks → **Last Viewed**. Last Viewed is pinned last — it is a way back to something already seen, so it sits below everything still being discovered. Every section returns `null` when it has nothing to show, so the page has no empty headings.
   - Component names lag the headings: `NewArrivalsSection` renders "New In" and `RecentlyViewedSection` renders "Last Viewed".
+  - **`HomepageBlocks` is the editorial hero, in the Farfetch shape** (since
+    2026-09-08): copy on the left and one tall photo on the right from `md`
+    up, photo first and copy underneath on a phone. The copy is never laid
+    over the photo, so there is no scrim; the admin's focal point only sets
+    the crop (`aspect-[4/5]`, square on desktop — re-check the focal point
+    when swapping a photo, a 50/50 default cuts heads off). Content comes
+    from `settings/homepage_blocks` via the **Homepage Blocks** tab in
+    `/admin/settings`: `title`, `subtitle`, `ctaLabel` (rendered in
+    capitals, default "Shop now") and `url`. A block with several images
+    keeps them inside the photo frame, one at a time; a block with no copy
+    renders the photo alone, full width. Several visible blocks stack.
   - `DiscountedSection` ("50% OFF Preloved") filters on a **computed** discount, which Firestore cannot query — it pulls a 100-row pool and works out `(originalPrice − price) / originalPrice` per item, deepest markdown first. Threshold is **≥49%**, not 50, so an item at 35 ← 69 (49.3%) still qualifies. Sold listings are excluded here, unlike other rails: a half-price item you cannot buy is worse than one fewer card.
   - Passing `?macroFilter=<id>` replaces the whole stack with `MacroFilteredProducts`.
     That component fetches by `documentId() in [...]` and filters status **in
