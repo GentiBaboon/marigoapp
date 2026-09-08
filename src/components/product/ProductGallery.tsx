@@ -74,8 +74,13 @@ export function ProductGallery({
       {/* ── Desktop: thumbnail rail + main image ────────────────────────── */}
       <div className="hidden gap-4 md:flex">
         {count > 1 && (
+          // The rail is exactly as tall as the main image and every thumbnail
+          // shares that height, shrinking as the listing gains photos. It used
+          // to be a fixed-height scroll box with the overlay scrollbar hidden,
+          // so a listing with more than five photos showed five and silently
+          // kept the rest — nothing hinted that there was anything to scroll.
           <div
-            className="flex max-h-[560px] w-20 shrink-0 flex-col gap-3 overflow-y-auto pr-1"
+            className="flex w-20 shrink-0 flex-col gap-2"
             role="listbox"
             aria-label="Product photos"
           >
@@ -91,7 +96,10 @@ export function ProductGallery({
                 // and silently overrides the choice.
                 onClick={() => setActive(i)}
                 className={cn(
-                  'relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded-md bg-muted transition',
+                  // The whole photo, never a crop: a thumbnail exists to show
+                  // which angle it is, and `object-cover` on a 3:4 frame was
+                  // slicing the heel off every landscape and square shot.
+                  'relative min-h-0 w-full flex-1 basis-0 max-h-[106px] overflow-hidden rounded-md bg-muted transition',
                   // A ring rather than a border: a border would resize the
                   // thumbnail as it activates and shuffle the whole rail.
                   i === active
@@ -108,7 +116,7 @@ export function ProductGallery({
                     src={url}
                     alt=""
                     fill
-                    className="object-cover"
+                    className="object-contain"
                     sizes="80px"
                     unoptimized={url.startsWith('data:')}
                     onError={() => setFailed(prev => new Set(prev).add(i))}
