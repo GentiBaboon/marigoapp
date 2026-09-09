@@ -193,6 +193,10 @@ Authenticated (gated by middleware §6):
     cuts between the section cards so no photo is split — re-run it after
     changing the PDF rather than editing either by hand. The link sits
     *outside* the dropzone, where a click would also open the file picker.
+    **The guide's own text still mentions the AI background remover** (and a
+    3D render) although the remover is switched off — the team decided on
+    2026-09-09 to leave the PDF as it is. Don't flag it again; the guide is
+    updated by replacing the PDF when the remover returns.
 - `/products/[id]/edit` — edit an existing listing. It **mirrors the sell
   wizard but is a separate implementation**, and that gap is this codebase's
   most reliable source of bugs: within one week it shipped empty
