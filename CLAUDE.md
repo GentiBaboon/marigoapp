@@ -436,6 +436,15 @@ were the prompt. Four layers now, from friendly to firm:
      discovery step sees neither `functions/.env` nor the shell environment,
      so the function is exported unconditionally.
 
+**The welcome email is sent once, after the address is proven**
+(`src/lib/welcome-mail.ts`, live since 2026-09-09). `/api/auth/verify-otp`
+sends it when a password account's code is accepted; a Google account —
+which never sees a code — gets it from `/api/auth/welcome`, called by the
+first-login bootstrap in `provider.tsx` only when the provider vouched for
+the address. `users.welcomeMailedAt` makes both paths idempotent; it is
+stamped after a successful send, never before. Neither path lets the mail
+decide the response.
+
 **Operator roles are exempt** (`VERIFICATION_EXEMPT_ROLES`: admin,
 super_admin, moderator, analyst — the roles `isAdmin()` accepts). `role` is
 admin-only writable (§6d), so a stored one is better evidence than a code,

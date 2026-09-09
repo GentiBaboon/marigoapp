@@ -120,6 +120,14 @@ export const otpSendLimiter = createRateLimiter('otp-send', {
   windowSeconds: 15 * 60,
 });
 
+/** Welcome email for a provider-verified account: 5 per 15 minutes per IP.
+ *  One per account ever (`welcomeMailedAt`), so this only bounds the cost of
+ *  a caller who keeps asking for a mail they will never get again. */
+export const welcomeLimiter = createRateLimiter('welcome', {
+  limit: 5,
+  windowSeconds: 15 * 60,
+});
+
 /**
  * Submit an activation code: 15 per 10 minutes per IP.
  *

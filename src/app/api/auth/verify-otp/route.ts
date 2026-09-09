@@ -7,11 +7,13 @@
  * `emailVerifiedAt`, and `emailVerificationProof` — the last being the only
  * one server code should trust. See the header of `src/lib/otp.ts` for why the
  * boolean alone is not evidence in an architecture with no service-account key.
+ * It then sends the welcome email (`src/lib/welcome-mail.ts`), once.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyIdToken, firestoreGet, firestoreUpdate } from '@/lib/firebase-admin';
 import { checkAccountStanding } from '@/lib/verified-account';
 import { otpVerifyLimiter, applyRateLimit } from '@/lib/rate-limit';
+import { sendWelcomeOnce } from '@/lib/welcome-mail';
 import {
   checkOtp,
   getOtpSecret,
@@ -165,6 +167,13 @@ export async function POST(req: NextRequest) {
       { codeHash: '', consumedAt: now, attempts: 0 },
       idToken,
     ).catch((err) => console.error('[otp] challenge cleanup failed:', err?.message ?? err));
+
+    // The welcome goes out here, and not at sign-up, so it only ever reaches
+    // an address that has just proved it can receive mail. Awaited — a
+    // serverless function does not outlive its response, so a promise left
+    // dangling is a mail that may never send — but never allowed to decide
+    // the outcome: the account is activated whatever happens to the mail.
+    await sendWelcomeOnce({ uid, email, idToken, tokenName, user: { ...(user ?? {}), ...activation } });
 
     return NextResponse.json({ success: true, verified: true });
   } catch (err: any) {

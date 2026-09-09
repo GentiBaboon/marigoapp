@@ -152,6 +152,9 @@ export interface FirestoreUser {
   /** HMAC over `uid|email` keyed with OTP_SECRET. The evidence behind
    *  `emailVerified`; unforgeable without the server key. */
   emailVerificationProof?: string;
+  /** When the welcome email went out. Stamped after a successful send by
+   *  `src/lib/welcome-mail.ts`; its presence is what stops a second one. */
+  welcomeMailedAt?: FirestoreTimestamp;
   hasAcceptedChatRules?: boolean;
   emailPreferences?: {
     marketing: boolean;

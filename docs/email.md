@@ -87,7 +87,7 @@ sets) for what happened after.
 
 | Event | Recipient | Sender function |
 |---|---|---|
-| Signup | buyer/seller | `sendWelcomeEmail` |
+| Signup | buyer/seller | `sendWelcomeEmail` — once per account, via `src/lib/welcome-mail.ts`: from `/api/auth/verify-otp` when a password account's code is accepted, from `/api/auth/welcome` (called by the first-login bootstrap) for a Google account. `users.welcomeMailedAt` is the ledger |
 | Password reset | either | `sendPasswordResetMail` |
 | Email verification (link) | either | `sendEmailVerification` |
 | **Activation code (6-digit OTP)** | **new account** | `sendEmailOtp` |
@@ -230,6 +230,6 @@ admin re-saving "completed" mails nobody twice. Call sites pass every
 transition; the route answers `skipped` for the ones that carry no email.
 
 Still unwired: refund, payout, listing approved/rejected, new message, both
-returns, welcome and the link-based verify-email (superseded on the sign-up
-path by the OTP above). They are implemented and tested — their trigger
+returns, and the link-based verify-email (superseded on the sign-up path by
+the OTP above). The welcome went live on 2026-09-09 — see the Signup row. They are implemented and tested — their trigger
 points just need the same treatment.

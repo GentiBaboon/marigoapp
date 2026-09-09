@@ -193,7 +193,7 @@ describe('every Bearer route refuses a banned caller', () => {
   // Listing them by name means a new Bearer route without the check fails a
   // test rather than being found by the next banned account.
   const BEARER = [
-    'ai/draft-listing', 'ai/suggest-price', 'auth/send-otp', 'auth/verify-otp', 'confirm-order',
+    'ai/draft-listing', 'ai/suggest-price', 'auth/send-otp', 'auth/verify-otp', 'auth/welcome', 'confirm-order',
     'create-order', 'create-payment-intent', 'offers/notify', 'orders/notify',
     'start-conversation', 'stripe/create-connected-account', 'upload',
   ];
@@ -207,7 +207,7 @@ describe('every route that spends on the caller runs the gate', () => {
   // The gate is decoration unless the routes actually call it. Listing them
   // here means adding a spending route without the gate fails a test rather
   // than being noticed in production.
-  const GATED = ['create-order', 'create-payment-intent', 'start-conversation', 'upload'];
+  const GATED = ['auth/welcome', 'create-order', 'create-payment-intent', 'start-conversation', 'upload'];
   it.each(GATED)('/api/%s calls checkAccountAccess', (name) => {
     const src = readFileSync(join(ROOT, 'src/app/api', name, 'route.ts'), 'utf8');
     expect(src).toMatch(/from '@\/lib\/verified-account'/);

@@ -9,6 +9,7 @@
  */
 import { absoluteUrl } from '@/lib/site';
 import { renderEmail, button, detailRows, highlight, escapeHtml } from './layout';
+import { CARD_PAYMENTS_ENABLED } from '@/lib/payment-options';
 
 export interface RenderedEmail {
   subject: string;
@@ -56,7 +57,11 @@ export function welcomeEmail(a: { name?: string }): RenderedEmail {
       preheader: 'Authenticated pre-owned luxury, bought and sold safely.',
       body: `
         <p style="margin:0 0 14px;">${greeting(a.name)}</p>
-        <p style="margin:0 0 14px;">Marigo is a marketplace for authenticated pre-owned luxury fashion. Every listing is reviewed before it goes live, and every payment is held securely until your order is delivered.</p>
+        <p style="margin:0 0 14px;">Marigo is a marketplace for authenticated pre-owned luxury fashion. Every listing is reviewed before it goes live, and ${
+          CARD_PAYMENTS_ENABLED
+            ? 'every payment is held securely until your order is delivered'
+            : 'you pay the courier only when your order is in your hands'
+        }.</p>
         ${button('Start browsing', absoluteUrl('/'))}
         <p style="margin:0;color:#6b7280;font-size:13px;">Got something to sell? Listing takes a few minutes — the assistant can even write it for you from your photos.</p>`,
     }),

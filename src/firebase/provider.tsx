@@ -5,6 +5,7 @@ import React, { DependencyList, createContext, useContext, ReactNode, useMemo, u
 import { FirebaseApp } from 'firebase/app';
 import { Firestore, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { notifyAdmin } from '@/lib/admin-notify';
+import { requestWelcomeMail } from '@/lib/welcome-notify';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseStorage } from 'firebase/storage';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
@@ -116,6 +117,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
                 // duplicated. Fire-and-forget: a failed alert must not break
                 // the sign-in that triggered it.
                 void notifyAdmin(firebaseUser, { event: 'user_registered' });
+                // A provider account (Google) never receives a code, so this
+                // is its welcome. Password accounts are welcomed by
+                // /api/auth/verify-otp when their code is accepted; the route
+                // would refuse them here anyway (email_unverified), so the
+                // check only saves a request. Once per account server-side.
+                if (firebaseUser.emailVerified === true) void requestWelcomeMail(firebaseUser);
               });
             } else {
               // Update last login. A Google / Apple account from before the
