@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import imageCompression from 'browser-image-compression';
 import { removeBackground } from '@/ai/flows/remove-background';
+import { BACKGROUND_REMOVER_ENABLED } from '@/lib/listing-features';
+import { PhotoGuideDialog } from '@/components/sell/PhotoGuideDialog';
 
 export function PhotosStep() {
   const { formData, setFormData, nextStep } = useSellForm();
@@ -133,7 +135,9 @@ export function PhotosStep() {
             Photo Upload
         </h3>
         <p className="text-sm text-muted-foreground mt-1 px-4 leading-relaxed">
-          Add at least 3 photos. Use our AI to remove backgrounds for a premium look.
+          {BACKGROUND_REMOVER_ENABLED
+            ? 'Add at least 3 photos. Use our AI to remove backgrounds for a premium look.'
+            : 'Add at least 3 photos. Clear, well-lit shots from every angle sell faster.'}
         </p>
       </div>
 
@@ -162,6 +166,12 @@ export function PhotosStep() {
         )}
       </div>
 
+      {/* Outside the dropzone on purpose: a click inside it opens the file
+          picker, so a link there would do both. */}
+      <div className="flex justify-center -mt-2">
+        <PhotoGuideDialog />
+      </div>
+
       {localImages.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {localImages.map((img, index) => (
@@ -185,6 +195,8 @@ export function PhotosStep() {
                   <X className="h-4 w-4" />
                 </Button>
                 
+                {/* Hidden while the remover is off — see src/lib/listing-features.ts. */}
+                {BACKGROUND_REMOVER_ENABLED && (
                 <Button 
                     variant="secondary" 
                     size="sm" 
@@ -199,6 +211,7 @@ export function PhotosStep() {
                     )}
                     STUDIO MODE
                 </Button>
+                )}
               </div>
               
               {index === 0 && (

@@ -1,4 +1,5 @@
 import { CARD_PAYMENTS_ENABLED } from '@/lib/payment-options';
+import { BACKGROUND_REMOVER_ENABLED } from '@/lib/listing-features';
 
 /**
  * @fileOverview What MarigoAI knows about MarigoApp.
@@ -194,7 +195,11 @@ ${
   review → done. There is no separate address step; the pickup address is
   chosen on the review screen.
 - AI helps while listing: it can write the description for you and suggest a
-  price from the item's details. There is also a background remover for photos.
+  price from the item's details.${
+    BACKGROUND_REMOVER_ENABLED
+      ? ' There is also a background remover for photos.'
+      : ' There is no background remover at the moment; do not offer one.'
+  }
 - New listings may go to "pending review" before appearing publicly. Statuses
   are draft, pending review, active, reserved, sold, expired, removed.
 - Manage your listings at ${KNOWN_ROUTES.listings}.

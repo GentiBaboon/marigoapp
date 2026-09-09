@@ -185,6 +185,14 @@ Auth (`/auth/*`): `login`, `signup`, `forgot-password`, `reset-password`, `verif
 Authenticated (gated by middleware §6):
 - `/profile`, `/profile/addresses`, `/profile/listings`, `/profile/listings/sales/[orderId]`, `/profile/orders`, `/profile/orders/[orderId]`, `/profile/offers`, `/profile/earnings`, `/profile/wallet`, `/profile/payments`, `/profile/settings`, `/profile/stripe-onboarding`
 - `/sell` — listing wizard. Entry is a **mode choice** (`ListingModeStep`): manual, or the AI assistant (§7). The wizard itself is 6 numbered steps + success, rendered by `switch (currentStep)` in `src/app/sell/page.tsx`: 1 Photos → 2 Category → 3 Description → 4 Details → 5 Pricing → 6 Review → 7 Success. State lives in `SellFormContext` (localStorage drafts, `marigo_sell_drafts_v7`); server actions in `src/app/sell/actions.ts`. There is no separate Address step — the pickup address is chosen inside `ReviewStep`, which also uploads the images and writes the product as `pending_review`.
+  - **"The perfect pictures guide"** is a text link under the dropzone in
+    `PhotosStep` that opens `PhotoGuideDialog`: the team's designed how-to
+    (Albanian, with reference photos), kept as a PDF and shown as four JPEG
+    strips from `public/guides/` listed in `src/lib/photo-guide.ts`. Both are
+    **generated** by `scripts/render-photo-guide.py` (needs `pymupdf`), which
+    cuts between the section cards so no photo is split — re-run it after
+    changing the PDF rather than editing either by hand. The link sits
+    *outside* the dropzone, where a click would also open the file picker.
 - `/products/[id]/edit` — edit an existing listing. It **mirrors the sell
   wizard but is a separate implementation**, and that gap is this codebase's
   most reliable source of bugs: within one week it shipped empty
@@ -582,7 +590,7 @@ Flows in `src/ai/flows/` (each exports a Zod input/output schema pair plus an as
 - `generate-description.ts` → `generateDescription` — listing copy
 - `get-recommendations.ts` → `getRecommendations` — product recommendations
 - `smart-search.ts` → `smartSearch` — semantic search backing `/search`
-- `remove-background.ts` → `removeBackground` — product-image cleanup
+- `remove-background.ts` → `removeBackground` — product-image cleanup. **Switched off on the live site since 2026-09-09**: `BACKGROUND_REMOVER_ENABLED` in `src/lib/listing-features.ts` hides the photo step's STUDIO MODE button and its copy, and drops the mention from the Help Centre and the assistant's knowledge. The flow and route remain
 - `ai-chat.ts` → types + `chatWithAI` client helper; the logic lives in `src/app/api/chat/route.ts`
 
 **Description generation is dead code.** `/api/ai/generate-description` holds

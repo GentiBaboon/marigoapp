@@ -6,6 +6,7 @@ import {
   CROSS_BORDER_SHIPPING_FEE_ALL,
 } from '@/lib/types';
 import { CARD_PAYMENTS_ENABLED } from '@/lib/payment-options';
+import { BACKGROUND_REMOVER_ENABLED } from '@/lib/listing-features';
 
 /**
  * @fileOverview The Help Centre's questions and answers.
@@ -127,7 +128,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
       },
       {
         q: 'What do I need to fill in?',
-        a: 'Photos, category, description, details (brand, size, condition, colour, material), price, and the address the item ships from. The AI can write the description and suggest a price from the details, and there is a background remover for your photos. Your first photo is the one shoppers see in search, so make it the honest one.',
+        a: `Photos, category, description, details (brand, size, condition, colour, material), price, and the address the item ships from. The AI can write the description and suggest a price from the details${BACKGROUND_REMOVER_ENABLED ? ', and there is a background remover for your photos' : ''}. Your first photo is the one shoppers see in search, so make it the honest one.`,
       },
       {
         q: 'Why does my listing say "pending review"?',
