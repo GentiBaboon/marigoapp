@@ -256,6 +256,7 @@ API routes (`src/app/api/`):
 | `auth/send-otp` | Bearer ID token | Rate-limited; mails a 6-digit activation code. The address comes from the **token's `email` claim**, never the body — otherwise a signed-in user could aim Marigo's mail at anyone. Refuses a disposable domain (403 `email_blocked`) — §6b |
 | `auth/verify-otp` | Bearer ID token | Rate-limited; checks the code and activates the account. Idempotent |
 | `orders/notify` | Bearer ID token | Rate-limited; mails the buyer for `shipped` / `completed` / `cancelled`. Re-reads the order with the caller's token, refuses unless it is in that status, one mail per status (`mailedStatuses`) |
+| `newsletter/subscribe` | none (CSRF token) | Rate-limited; the footer's Subscribe form. Refuses disposable domains and upserts the address into **SendGrid Marketing Contacts** (`src/lib/newsletter.ts`) — not Firestore, which the server cannot write for an anonymous visitor. The API key needs Marketing → Contacts access (the production key has it); one without makes every submit a 503 with `forbidden` in the log. SendGrid imports contacts asynchronously, so a new address takes a few minutes to appear in the dashboard. Was a form with no handler until 2026-09-09 |
 | `presence` | POST: none (Bearer optional) · GET: Bearer + `analytics.view` | Visitor heartbeat in, live view out. The **only** writer to the presence store, so the write path is rate-limited rather than open (§9b). GET answers **404** to anyone without the permission |
 
 ## 5. Data model (Firestore)
@@ -1148,6 +1149,7 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY  + STRIPE_SECRET_KEY
 NEXT_PUBLIC_SUPABASE_URL / ANON_KEY + SUPABASE_SERVICE_ROLE_KEY
 GOOGLE_GENAI_API_KEY
 SENDGRID_API_KEY / SENDGRID_FROM_EMAIL / SENDGRID_FROM_NAME
+SENDGRID_NEWSLETTER_LIST_ID   # optional; Marketing Contacts list for the footer newsletter form
 MAILTRAP_TOKEN                 # legacy, superseded
 RESET_SERVICE_SECRET
 OTP_SECRET                    # signs the email activation codes; falls back to RESET_SERVICE_SECRET

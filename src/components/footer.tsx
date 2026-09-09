@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Logo } from '@/components/logo';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { NewsletterForm } from '@/components/footer/NewsletterForm';
 import { Separator } from '@/components/ui/separator';
 import { PartnerLogos } from '@/components/PartnerLogos';
 import { buildCategoryPath } from '@/lib/category-url';
@@ -47,10 +46,7 @@ export function Footer() {
           <div>
             <h3 className="font-semibold mb-4">Newsletter</h3>
             <p className="text-muted-foreground mb-4">Subscribe for updates and offers.</p>
-            <div className="flex w-full max-w-sm items-center space-x-2">
-              <Input type="email" placeholder="Email" />
-              <Button type="submit">Subscribe</Button>
-            </div>
+            <NewsletterForm />
           </div>
         </div>
         <Separator className="my-8" />

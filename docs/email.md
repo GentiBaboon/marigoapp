@@ -233,3 +233,19 @@ Still unwired: refund, payout, listing approved/rejected, new message, both
 returns, and the link-based verify-email (superseded on the sign-up path by
 the OTP above). The welcome went live on 2026-09-09 — see the Signup row. They are implemented and tested — their trigger
 points just need the same treatment.
+
+## Newsletter sign-ups
+
+The footer's Subscribe form posts to `/api/newsletter/subscribe`, which upserts
+the address into **SendGrid Marketing Contacts** (`PUT /v3/marketing/contacts`)
+via `src/lib/newsletter.ts`. Set `SENDGRID_NEWSLETTER_LIST_ID` to file them
+under a list; otherwise they sit in All Contacts.
+
+**The API key must have Marketing → Contacts access** (the production key
+does). With a key that lacks it SendGrid answers 403 — the route logs
+`forbidden` and the visitor sees "could not save your subscription"; edit the
+key under Settings → API Keys and redeploy. SendGrid imports contacts
+asynchronously, so a new subscriber takes up to a few minutes to appear under
+Marketing → Contacts. Sending a newsletter from that list should use the
+`SENDGRID_UNSUBSCRIBE_GROUP_ID` group so the footer's unsubscribe link applies.
+
