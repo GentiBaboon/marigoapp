@@ -185,6 +185,18 @@ Auth (`/auth/*`): `login`, `signup`, `forgot-password`, `reset-password`, `verif
 Authenticated (gated by middleware §6):
 - `/profile`, `/profile/addresses`, `/profile/listings`, `/profile/listings/sales/[orderId]`, `/profile/orders`, `/profile/orders/[orderId]`, `/profile/offers`, `/profile/earnings`, `/profile/wallet`, `/profile/payments`, `/profile/settings`, `/profile/stripe-onboarding`
 - `/sell` — listing wizard. Entry is a **mode choice** (`ListingModeStep`): manual, or the AI assistant (§7). The wizard itself is 6 numbered steps + success, rendered by `switch (currentStep)` in `src/app/sell/page.tsx`: 1 Photos → 2 Category → 3 Description → 4 Details → 5 Pricing → 6 Review → 7 Success. State lives in `SellFormContext` (localStorage drafts, `marigo_sell_drafts_v7`); server actions in `src/app/sell/actions.ts`. There is no separate Address step — the pickup address is chosen inside `ReviewStep`, which also uploads the images and writes the product as `pending_review`.
+  - **Photo limits live in `src/lib/listing-photos.ts`**: `MIN_LISTING_PHOTOS`
+    3, `MAX_LISTING_PHOTOS` 9, `photoCountProblem()` the sentence to show.
+    Enforced at the photo step (Continue), the AI assistant (Create my
+    draft), the publish guard in `ReviewStep` (the one that holds against a
+    stale draft or a scripted client) and the seller edit page's save. The
+    caption had said "at least 3" since March 2026 while the button let one
+    through and a "Skip for now" link let none, and the AI path never saw the
+    caption at all — two one-photo listings from a real seller on 2026-09-11
+    were the result. The admin product page is not capped (10 slots, it
+    repairs rather than creates) but badges a listing under the minimum, and
+    the products table marks it in amber. A test asserts the four seller
+    paths import the module and carry no literal limit of their own.
   - **"The perfect pictures guide"** is a text link under the dropzone in
     `PhotosStep` that opens `PhotoGuideDialog`: the team's designed how-to
     (Albanian, with reference photos), kept as a PDF and shown as four JPEG
@@ -610,13 +622,13 @@ exist — wire it up like `/api/ai/suggest-price` or delete all three.
 
 ### AI-assisted listing (`/api/ai/draft-listing` + `components/sell/AiListingAssistant`)
 
-The seller picks **List with AI Assistant** at the top of `/sell`, adds up to 9 photos and a one-line hint ("Zara Black Satin Dress"), and gets a pre-filled draft to review.
+The seller picks **List with AI Assistant** at the top of `/sell`, adds 3 to 9 photos and a one-line hint ("Zara Black Satin Dress"), and gets a pre-filled draft to review.
 
 - **Two image sizes, on purpose.** The photos kept for publishing are compressed like the manual Photos step (0.8 MB / 1200px); a much smaller copy (0.12 MB / 640px) is what goes to the model. Nine full-size photos would exceed the request body limit and the 30s Vercel ceiling, and the extra detail buys nothing.
 - **Output is snapped to the live catalog, never trusted raw.** `src/lib/listing-taxonomy.ts` loads brands/categories/sub-categories/conditions/colours/materials/patterns (1h cache) and `matchOption()` maps the model's wording onto real stored values — "Burnt Orange" → `burnt-orange`, "Very Good" → `very-good-condition`. **Anything unmatched is left blank** rather than guessed, so the wizard never shows a value its selects cannot bind.
 - Nothing is written to Firestore by the route. It returns a `Partial<SellFormValues>`; the client calls `startNewDraft({ formData, step: 6 })` so the seller lands directly on **Review** and publishes through the normal path.
 - Sizes are only filled when a label is legible in a photo — the prompt forbids guessing one.
-- Note: this path allows 9 photos while the manual `PhotosStep` caps at 8.
+- Photo limits are the same as the manual path — `src/lib/listing-photos.ts`, see the `/sell` notes above.
 
 Firestore REST plumbing shared by the chatbot and the taxonomy loader lives in `src/lib/firestore-rest.ts`.
 

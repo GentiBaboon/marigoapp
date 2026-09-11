@@ -12,6 +12,7 @@
  * from a leather boot.
  */
 
+import { MAX_LISTING_PHOTOS, MIN_LISTING_PHOTOS, photoCountProblem } from '@/lib/listing-photos';
 import * as React from 'react';
 import Image from 'next/image';
 import imageCompression from 'browser-image-compression';
@@ -29,7 +30,7 @@ import {
 } from 'lucide-react';
 
 /** The brief says up to nine photos on this path. */
-const MAX_IMAGES = 9;
+const MAX_IMAGES = MAX_LISTING_PHOTOS;
 
 /** What goes into the draft — matches the manual Photos step's settings. */
 const STORAGE_COMPRESSION = { maxSizeMB: 0.8, maxWidthOrHeight: 1200, useWebWorker: true };
@@ -113,7 +114,9 @@ export function AiListingAssistant({ onBack, onDrafted }: AiListingAssistantProp
   };
 
   const handleSend = async () => {
-    if (images.length === 0 || isWorking) return;
+    // Same floor as the manual wizard: the draft lands directly on Review,
+    // so this is the only place the AI path can insist on it.
+    if (images.length < MIN_LISTING_PHOTOS || isWorking) return;
     setIsWorking(true);
     setError(null);
 
@@ -183,7 +186,7 @@ export function AiListingAssistant({ onBack, onDrafted }: AiListingAssistantProp
           <div className="space-y-1 text-sm">
             <p className="font-medium">How this works</p>
             <p className="text-muted-foreground">
-              Add up to {MAX_IMAGES} clear photos and a short note with the brand — for
+              Add {MIN_LISTING_PHOTOS} to {MAX_IMAGES} clear photos and a short note with the brand — for
               example <span className="font-medium text-foreground">&ldquo;Zara Black Satin Dress&rdquo;</span>.
               The assistant reads the photos, fills in the details and suggests a price.
               It saves as a draft for you to check before anything is published.
@@ -263,11 +266,15 @@ export function AiListingAssistant({ onBack, onDrafted }: AiListingAssistantProp
         </p>
       )}
 
+      {images.length > 0 && images.length < MIN_LISTING_PHOTOS && (
+        <p className="text-center text-sm text-muted-foreground">{photoCountProblem(images.length)}</p>
+      )}
+
       <Button
         size="lg"
         className="w-full gap-2"
         onClick={handleSend}
-        disabled={images.length === 0 || isWorking}
+        disabled={images.length < MIN_LISTING_PHOTOS || isWorking}
       >
         {isWorking ? (
           <>

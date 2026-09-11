@@ -11,6 +11,7 @@ import imageCompression from 'browser-image-compression';
 import { removeBackground } from '@/ai/flows/remove-background';
 import { BACKGROUND_REMOVER_ENABLED } from '@/lib/listing-features';
 import { PhotoGuideDialog } from '@/components/sell/PhotoGuideDialog';
+import { MAX_LISTING_PHOTOS, MIN_LISTING_PHOTOS, photoCountProblem, photoRoom } from '@/lib/listing-photos';
 
 export function PhotosStep() {
   const { formData, setFormData, nextStep } = useSellForm();
@@ -21,8 +22,8 @@ export function PhotosStep() {
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const currentCount = localImages.length;
-    if (currentCount + acceptedFiles.length > 8) {
-      toast({ variant: "destructive", title: "Maximum 8 photos allowed" });
+    if (currentCount + acceptedFiles.length > MAX_LISTING_PHOTOS) {
+      toast({ variant: "destructive", title: `Maximum ${MAX_LISTING_PHOTOS} photos allowed` });
       return;
     }
 
@@ -60,7 +61,7 @@ export function PhotosStep() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': ['.jpeg', '.jpg', '.png', '.webp'] },
-    maxFiles: 8 - localImages.length,
+    maxFiles: photoRoom(localImages.length),
     disabled: !!isProcessing
   });
 
@@ -121,11 +122,12 @@ export function PhotosStep() {
     }
   };
 
-  // Continue is enabled as soon as the seller has at least one photo. Skipping
-  // the photo step entirely is still allowed via the "Skip for now" link
-  // below — the final publish guard in ReviewStep blocks zero-photo listings,
-  // so the requirement is enforced at the right moment rather than this step.
-  const canContinue = localImages.length >= 1;
+  // The caption has always said "at least 3"; from 2026-05 to 2026-09 the
+  // button let a seller through with one, and a "Skip for now" link with
+  // none, on the theory that ReviewStep would enforce it — which only refused
+  // zero. Enforced here now, and again at publish (src/lib/listing-photos.ts).
+  const photoProblem = photoCountProblem(localImages.length);
+  const canContinue = photoProblem === null;
 
   return (
     <div className="space-y-6">
@@ -136,8 +138,8 @@ export function PhotosStep() {
         </h3>
         <p className="text-sm text-muted-foreground mt-1 px-4 leading-relaxed">
           {BACKGROUND_REMOVER_ENABLED
-            ? 'Add at least 3 photos. Use our AI to remove backgrounds for a premium look.'
-            : 'Add at least 3 photos. Clear, well-lit shots from every angle sell faster.'}
+            ? `Add ${MIN_LISTING_PHOTOS} to ${MAX_LISTING_PHOTOS} photos. Use our AI to remove backgrounds for a premium look.`
+            : `Add ${MIN_LISTING_PHOTOS} to ${MAX_LISTING_PHOTOS} photos. Clear, well-lit shots from every angle sell faster.`}
         </p>
       </div>
 
@@ -161,7 +163,7 @@ export function PhotosStep() {
                     <Camera className="h-8 w-8 text-muted-foreground" />
                 </div>
                 <p className="font-bold text-lg">Drag & drop or click</p>
-                <p className="text-xs text-muted-foreground mt-1 uppercase tracking-widest font-bold">Max 8 photos • HQ only</p>
+                <p className="text-xs text-muted-foreground mt-1 uppercase tracking-widest font-bold">Max {MAX_LISTING_PHOTOS} photos • HQ only</p>
             </>
         )}
       </div>
@@ -237,18 +239,10 @@ export function PhotosStep() {
           disabled={!canContinue || !!isProcessing}
           onClick={nextStep}
         >
-          Continue ({localImages.length}/8)
+          Continue ({localImages.length}/{MAX_LISTING_PHOTOS})
         </Button>
-        {!canContinue && (
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full h-12 text-sm font-bold text-muted-foreground hover:text-foreground"
-            disabled={!!isProcessing}
-            onClick={nextStep}
-          >
-            Skip for now
-          </Button>
+        {photoProblem && (
+          <p className="text-center text-sm text-muted-foreground">{photoProblem}</p>
         )}
       </div>
     </div>

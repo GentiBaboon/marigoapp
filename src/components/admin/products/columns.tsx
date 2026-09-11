@@ -1,4 +1,5 @@
 'use client';
+import { MIN_LISTING_PHOTOS } from '@/lib/listing-photos';
 import { ColumnDef } from '@tanstack/react-table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -50,7 +51,16 @@ export const columns: ColumnDef<FirestoreProduct>[] = [
                 className="rounded-md object-cover bg-muted"
             />
           </div>
-          <span className="font-medium">{product.title}</span>
+          <div className="grid">
+            <span className="font-medium">{product.title}</span>
+            {(product.images?.length ?? 0) < MIN_LISTING_PHOTOS && (
+              // Under the seller minimum — predates the rule, or was thinned
+              // by an admin. Worth a glance before approving.
+              <span className="text-xs text-amber-700">
+                {product.images?.length ?? 0} photo{(product.images?.length ?? 0) === 1 ? '' : 's'} (min {MIN_LISTING_PHOTOS})
+              </span>
+            )}
+          </div>
         </div>
       );
     },

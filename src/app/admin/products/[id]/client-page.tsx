@@ -1,5 +1,6 @@
 'use client';
 
+import { MIN_LISTING_PHOTOS } from '@/lib/listing-photos';
 import { stockRestoreForStatusChange } from '@/lib/stock';
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
@@ -54,16 +55,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Combobox } from '@/components/ui/combobox';
-import {
-  ArrowLeft,
-  Loader2,
-  Star,
-  Trash2,
-  Save,
-  ImagePlus,
-  X,
-  GripVertical,
-} from 'lucide-react';
+import { ArrowLeft, Loader2, Star, Trash2, Save, ImagePlus, X, GripVertical, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -658,7 +650,20 @@ export default function AdminProductReviewPage() {
 
       {/* ══ Images ══ */}
       <Card>
-        <CardHeader><CardTitle>Images</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex flex-wrap items-center gap-2">
+            Images
+            {images.length < MIN_LISTING_PHOTOS && (
+              // Sellers cannot publish or save below the minimum; a listing
+              // that arrives here under it predates the rule or was thinned
+              // by an admin. Shown, not blocked — an admin may be mid-repair.
+              <Badge variant="outline" className="gap-1 border-amber-300 text-amber-700 font-normal">
+                <AlertTriangle className="h-3 w-3" />
+                {images.length} of {MIN_LISTING_PHOTOS} photos sellers must provide
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">Drag to reorder. First image is the main listing photo.</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">

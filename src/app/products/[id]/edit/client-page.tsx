@@ -1,5 +1,6 @@
 'use client';
 
+import { MAX_LISTING_PHOTOS, photoCountProblem, photoRoom } from '@/lib/listing-photos';
 import * as React from 'react';
 import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
 import { useRouteParams as useParams } from '@/lib/platform/use-route-param';
@@ -263,8 +264,18 @@ export default function EditListingPage() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length || !user) return;
+    const picked = Array.from(e.target.files ?? []);
+    if (!picked.length || !user) return;
+    // The picker allows any number; the listing does not.
+    const room = photoRoom(images.length);
+    if (room === 0) {
+      toast({ variant: 'destructive', title: `Maximum ${MAX_LISTING_PHOTOS} photos allowed` });
+      return;
+    }
+    const files = picked.slice(0, room);
+    if (files.length < picked.length) {
+      toast({ title: `Only ${room} more photo${room === 1 ? '' : 's'} can be added`, description: `Listings hold up to ${MAX_LISTING_PHOTOS}.` });
+    }
 
     setIsUploadingImage(true);
     try {
@@ -305,6 +316,12 @@ export default function EditListingPage() {
     if (!productRef || !user) return;
     if (user.uid !== product?.sellerId) {
       toast({ variant: 'destructive', title: 'Unauthorized', description: 'You can only edit your own listings.' });
+      return;
+    }
+    // A listing published with three photos must not be trimmed to one here.
+    const photoProblem = photoCountProblem(images.length);
+    if (photoProblem) {
+      toast({ variant: 'destructive', title: 'Not enough photos', description: photoProblem });
       return;
     }
     setIsSaving(true);
@@ -422,7 +439,7 @@ export default function EditListingPage() {
               </div>
             ))}
 
-            {images.length < 8 && (
+            {images.length < MAX_LISTING_PHOTOS && (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}

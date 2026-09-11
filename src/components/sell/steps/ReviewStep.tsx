@@ -1,5 +1,6 @@
 'use client';
 
+import { photoCountProblem } from '@/lib/listing-photos';
 import * as React from 'react';
 import { useSellForm } from '../SellFormContext';
 import { Button } from '@/components/ui/button';
@@ -108,7 +109,10 @@ export function ReviewStep() {
       const productId = activeDraft?.id || `prod_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const images = formData.images || [];
       
-      if (images.length === 0) throw new Error("At least one photo is required to publish.");
+      // The guard that holds when a stale draft or a scripted client skips
+      // the photo step. Same rule as PhotosStep — src/lib/listing-photos.ts.
+      const photoProblem = photoCountProblem(images.length);
+      if (photoProblem) throw new Error(photoProblem);
 
       // 1. Server-Side Validation
       const validation = await validateListingData({
