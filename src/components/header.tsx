@@ -128,7 +128,10 @@ function HeaderContent() {
             {/* Desktop only — the bottom MobileNav already carries a Sell entry. */}
             <Button
               asChild
-              className="hidden md:inline-flex bg-primary text-white hover:bg-primary/90 rounded-md px-5 font-medium"
+              // No `text-white`: white on the brand purple is 2.75:1 and was
+              // the last contrast failure in the desktop audit. The default
+              // variant's near-black `text-primary-foreground` is 7.2:1.
+              className="hidden md:inline-flex bg-primary hover:bg-primary/90 rounded-md px-5 font-medium"
             >
               <Link href="/sell">Sell</Link>
             </Button>
