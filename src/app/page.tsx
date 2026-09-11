@@ -1,5 +1,6 @@
 import { HomeClient } from './home/client-page';
 import { fetchHomepageBlocks } from '@/lib/homepage-blocks';
+import { fetchMacroFilters } from '@/lib/macro-filters';
 
 /**
  * `/` serves the homepage directly.
@@ -18,6 +19,6 @@ import { fetchHomepageBlocks } from '@/lib/homepage-blocks';
  * to `/`.
  */
 export default async function RootPage() {
-  const initialBlocks = await fetchHomepageBlocks();
-  return <HomeClient initialBlocks={initialBlocks} />;
+  const [initialBlocks, initialFilters] = await Promise.all([fetchHomepageBlocks(), fetchMacroFilters()]);
+  return <HomeClient initialBlocks={initialBlocks} initialFilters={initialFilters} />;
 }

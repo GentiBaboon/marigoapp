@@ -1,27 +1,29 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
+import { enabledFilters, type MacroFilter, type MacroFiltersConfig } from '@/lib/macro-filters';
 
-export interface MacroFilter {
-  id: string;
-  label: string;
-  enabled: boolean;
-  productIds: string[];
-  memberIds: string[];
+// Types live in `src/lib/macro-filters.ts` so the server can read the same
+// document; re-exported for existing importers.
+export type { MacroFilter, MacroFiltersConfig };
+
+interface MacroFiltersProps {
+  /** The chip in the URL, owned by the page. Passed in rather than read with
+   *  `useSearchParams()` here: on a statically prerendered page that hook
+   *  makes Next drop everything up to the nearest Suspense boundary out of
+   *  the HTML, and this row sits above the hero. */
+  activeFilter: string | null;
+  /** The server's copy of the document, so the row is in the first HTML and
+   *  the hero below it does not move when the chips arrive. */
+  initialFilters?: MacroFilter[] | null;
 }
 
-export interface MacroFiltersConfig {
-  filters: MacroFilter[];
-}
-
-export function MacroFilters() {
+export function MacroFilters({ activeFilter, initialFilters = null }: MacroFiltersProps) {
   const firestore = useFirestore();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const activeFilter = searchParams.get('macroFilter');
 
   const filtersRef = useMemoFirebase(
     () => (firestore ? doc(firestore, 'settings', 'macro_filters') : null),
@@ -29,7 +31,7 @@ export function MacroFilters() {
   );
   const { data } = useDoc<MacroFiltersConfig>(filtersRef);
 
-  const visible = data?.filters?.filter((f) => f.enabled) ?? [];
+  const visible = data?.filters ? enabledFilters(data.filters) : (initialFilters ?? []);
   if (visible.length === 0) return null;
 
   const handleSelect = (filterId: string) => {

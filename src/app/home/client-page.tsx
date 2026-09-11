@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { NewArrivalsSection } from '@/components/home/NewArrivalsSection';
@@ -14,6 +15,7 @@ import { HomepageProductsProvider } from '@/components/home/HomepageProductsProv
 import { MacroFilteredProducts } from '@/components/home/MacroFilteredProducts';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { HomepageBlock } from '@/lib/homepage-blocks';
+import type { MacroFilter } from '@/lib/macro-filters';
 
 function SectionSkeleton() {
   return (
@@ -36,18 +38,41 @@ function SectionSkeleton() {
 interface HomeProps {
   /** The hero, read on the server so it is in the first HTML. */
   initialBlocks?: HomepageBlock[] | null;
+  /** The filter chips, read on the server for the same reason. */
+  initialFilters?: MacroFilter[] | null;
 }
 
-function HomePageContent({ initialBlocks }: HomeProps) {
+/**
+ * Reports `?macroFilter=` to the page without suspending the page.
+ *
+ * `useSearchParams()` in a statically prerendered route makes Next render the
+ * nearest Suspense fallback *instead of* the subtree that called it. When
+ * `HomePageContent` called it directly, that boundary was the one wrapping
+ * the whole page — so the prerendered HTML on Vercel held no hero at all,
+ * while `npm run dev` (which renders per request) showed it fine. Reading
+ * the param in this leaf keeps the bail-out to an empty component; the page
+ * renders the default stack on the server and swaps to the filtered view
+ * once this reports a value.
+ */
+function MacroFilterSync({ onChange }: { onChange: (filterId: string | null) => void }) {
   const searchParams = useSearchParams();
   const activeFilter = searchParams.get('macroFilter');
+  React.useEffect(() => {
+    onChange(activeFilter);
+  }, [activeFilter, onChange]);
+  return null;
+}
+
+function HomePageContent({ initialBlocks, initialFilters }: HomeProps) {
+  const [activeFilter, setActiveFilter] = React.useState<string | null>(null);
 
   return (
     <div className="flex flex-col bg-background">
+      <Suspense fallback={null}>
+        <MacroFilterSync onChange={setActiveFilter} />
+      </Suspense>
       <div className="container mx-auto px-4 pt-2">
-        <Suspense fallback={null}>
-          <MacroFilters />
-        </Suspense>
+        <MacroFilters activeFilter={activeFilter} initialFilters={initialFilters} />
       </div>
 
       {activeFilter ? (
@@ -102,10 +127,6 @@ function HomePageContent({ initialBlocks }: HomeProps) {
  * file and `src/app/page.tsx`), which are the same page under two URLs — the
  * canonical is `/`.
  */
-export function HomeClient({ initialBlocks = null }: HomeProps) {
-  return (
-    <Suspense fallback={null}>
-      <HomePageContent initialBlocks={initialBlocks} />
-    </Suspense>
-  );
+export function HomeClient({ initialBlocks = null, initialFilters = null }: HomeProps) {
+  return <HomePageContent initialBlocks={initialBlocks} initialFilters={initialFilters} />;
 }

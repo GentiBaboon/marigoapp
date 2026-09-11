@@ -1,5 +1,6 @@
 import { HomeClient } from './client-page';
 import { fetchHomepageBlocks } from '@/lib/homepage-blocks';
+import { fetchMacroFilters } from '@/lib/macro-filters';
 
 /**
  * `/home` — the same page as `/` (see `src/app/page.tsx`), kept because the
@@ -10,6 +11,6 @@ import { fetchHomepageBlocks } from '@/lib/homepage-blocks';
  * body is the client tree in `client-page.tsx`.
  */
 export default async function HomePage() {
-  const initialBlocks = await fetchHomepageBlocks();
-  return <HomeClient initialBlocks={initialBlocks} />;
+  const [initialBlocks, initialFilters] = await Promise.all([fetchHomepageBlocks(), fetchMacroFilters()]);
+  return <HomeClient initialBlocks={initialBlocks} initialFilters={initialFilters} />;
 }

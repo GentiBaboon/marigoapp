@@ -120,6 +120,18 @@ Public:
     edits are live; the server copy is only the first paint, which is what
     puts the LCP image (and its `priority` preload) in the HTML. Types and
     the pure helpers live in that module — the component re-exports them.
+    `src/lib/macro-filters.ts` does the same for the filter chips
+    (`settings/macro_filters`), which sit *above* the hero and used to push
+    it down when they arrived.
+  - **Nothing above the hero may call `useSearchParams()`.** On a statically
+    prerendered route that hook makes Next render the nearest Suspense
+    *fallback* instead of the subtree — so when the page body called it, the
+    HTML on Vercel held no hero at all while `npm run dev` (per-request
+    rendering) showed it fine. `?macroFilter=` is read by the `MacroFilterSync`
+    leaf in `client-page.tsx` and reported into state; the chips take
+    `activeFilter` as a prop. Verify this class of change against the
+    prerendered file (`.next-check/server/app/index.html`), not the dev
+    server.
   - **The three catalogue sections share one listener**
     (`HomepageProductsProvider` / `useHomepageProducts()`): the newest 100
     public listings, newest first. "Shop by Category" sorts it by views in
@@ -1195,7 +1207,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (740 passing): unit — `account-verification`, `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `listing-options`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (754 passing): unit — `account-verification`, `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `listing-options`, `macro-filters`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

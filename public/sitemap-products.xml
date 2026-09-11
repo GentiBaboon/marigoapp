@@ -52,11 +52,6 @@
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://www.marigoapp.com/women/handbag</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
     <loc>https://www.marigoapp.com/women/knitwear</loc>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
@@ -72,7 +67,37 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://www.marigoapp.com/women/handbag</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://www.marigoapp.com/women/skirt</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/women/blazer</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/women/pyjama</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/women/sets</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/women/shirts-and-blouses</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/women/shorts</loc>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
@@ -97,8 +122,18 @@
     </image:image>
   </url>
   <url>
+    <loc>https://www.marigoapp.com/products/stradivarius-pastel-pink-flower-detailed-heels-baby-pink-37</loc>
+    <lastmod>2026-09-06T11:07:42.610Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/J7Kdip4O2AM7NuiEz1bav2WwJlE2/draft_1786018072001616/img_1786303838957_4.jpeg</image:loc>
+      <image:title>Stradivarius Pastel Pink Flower Detailed Heels</image:title>
+    </image:image>
+  </url>
+  <url>
     <loc>https://www.marigoapp.com/products/vintage-gucci-heels-dark-brown-38</loc>
-    <lastmod>2026-08-09T19:30:25.663Z</lastmod>
+    <lastmod>2026-08-28T19:23:04.906Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
     <image:image>
@@ -118,7 +153,7 @@
   </url>
   <url>
     <loc>https://www.marigoapp.com/products/zara-red-stripe-t-shirt-small</loc>
-    <lastmod>2026-08-09T19:29:50.629Z</lastmod>
+    <lastmod>2026-08-28T19:22:42.397Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
     <image:image>
@@ -174,16 +209,6 @@
     <image:image>
       <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/p2a9Zpts8eYe9MYUIiQYsRT9eVB2/draft_1786382257262498/img_1786395884166_7.png</image:loc>
       <image:title>Calvin Klein Jeans</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.marigoapp.com/products/guess-bag-light-brown-medium</loc>
-    <lastmod>2026-08-16T10:16:41.602Z</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/p2a9Zpts8eYe9MYUIiQYsRT9eVB2/draft_1786382261245618/img_1786396164713_9.png</image:loc>
-      <image:title>Guess Bag</image:title>
     </image:image>
   </url>
   <url>
@@ -298,12 +323,162 @@
   </url>
   <url>
     <loc>https://www.marigoapp.com/products/zara-snake-print-bag-brown-small</loc>
-    <lastmod>2026-08-25T06:25:04.056Z</lastmod>
+    <lastmod>2026-08-28T19:21:56.694Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
     <image:image>
       <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/p2a9Zpts8eYe9MYUIiQYsRT9eVB2/draft_1786382294372776/img_1786395409494_8.png</image:loc>
       <image:title>Zara Snake Print Bag</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/anna-danni-medium-length-sleeve-jacket-black-36</loc>
+    <lastmod>2026-09-05T15:19:54.164Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067001/img_1788461885309_4.png</image:loc>
+      <image:title>Medium Length Sleeve Jacket</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/emporio-armani-pyjama-shirt-dress-grey</loc>
+    <lastmod>2026-09-05T15:19:11.860Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067002/img_1788461831632_6.png</image:loc>
+      <image:title>Pyjama Shirt/Dress</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/armani-leather-jacket-black-38</loc>
+    <lastmod>2026-09-05T15:21:06.541Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067003/img_1788462667762_7.png</image:loc>
+      <image:title>Leather Jacket</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/dilvin-blue-jeans-denim-blue-36</loc>
+    <lastmod>2026-09-05T15:18:21.261Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067004/img_1788461995602_5.png</image:loc>
+      <image:title>Dilvin Blue Jeans</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/h-and-m-rib-knit-bodycon-dress-dark-brown-36</loc>
+    <lastmod>2026-09-05T15:17:17.747Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067005/img_1788462593156_5.png</image:loc>
+      <image:title>Rib-Knit Bodycon Dress</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/other-italian-leather-jacket-brown-36</loc>
+    <lastmod>2026-09-05T15:16:54.858Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067006/img_1788462357570_9.png</image:loc>
+      <image:title>Italian Leather Jacket</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/marella-set-multicolor-36</loc>
+    <lastmod>2026-09-06T09:47:41.279Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067007/img_1788462448574_7.png</image:loc>
+      <image:title>Marella Set</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/nakd-denim-skirt-denim-blue-36</loc>
+    <lastmod>2026-09-05T15:15:40.036Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067008/img_1788461765033_4.png</image:loc>
+      <image:title>NAKD Denim Skirt</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/pull-and-bear-short-jeans-beige-36</loc>
+    <lastmod>2026-09-05T15:15:19.086Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067009/img_1788461726451_4.png</image:loc>
+      <image:title>Pull and Bear Short Jeans</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/vero-moda-set-light-brown-36</loc>
+    <lastmod>2026-09-05T15:14:57.807Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067010/img_1788461686921_7.png</image:loc>
+      <image:title>Vero Moda Set</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/vintage-white-leather-jacket-36</loc>
+    <lastmod>2026-09-05T16:10:07.119Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067011/img_1788462293899_8.png</image:loc>
+      <image:title>White Leather Jacket</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/zara-light-brown-blazer-34</loc>
+    <lastmod>2026-09-05T15:13:34.204Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067012/img_1788461520224_7.png</image:loc>
+      <image:title>Zara Light Brown Blazer</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/zara-one-sleeve-shirt-forest-green-36</loc>
+    <lastmod>2026-09-05T15:13:05.612Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067013/img_1788461477996_4.png</image:loc>
+      <image:title>Zara One Sleeve Shirt</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/zara-short-trousers-white-36</loc>
+    <lastmod>2026-09-05T15:11:50.390Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067014/img_1788461432190_4.png</image:loc>
+      <image:title>Zara Short Trousers</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.marigoapp.com/products/zara-tennis-dress-beige</loc>
+    <lastmod>2026-09-05T15:37:53.170Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://degobqannokhholahyif.supabase.co/storage/v1/object/public/product-images/d8ZKRHD89ENQ4jIt1qFv55FowyK2/draft_1788456067015/img_1788461390058_4.png</image:loc>
+      <image:title>Zara Tennis Dress</image:title>
     </image:image>
   </url>
 </urlset>
