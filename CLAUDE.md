@@ -1284,17 +1284,22 @@ SITE_URL                      # optional; overrides the marigoapp.com default
   new query that filters on one field and orders on another needs its index
   added *and deployed* (`firebase deploy --only firestore:indexes`), or the
   same in-memory sort.
-- **Google / Apple sign-in on iPhone needs the auth handler on our own host.**
+- **Google / Apple sign-in on iPhone needs the auth handler on our own domain.**
   Mobile Safari blocks the popup, so `signInWithProvider` falls back to
   `signInWithRedirect` via the `authDomain`; with the default
   `<project>.firebaseapp.com` Safari's storage partitioning loses the result
   and the user lands back on the sign-in page (the first seller opening a sale
-  from the "Prepare the order" email hit this, 2026-09-06). `next.config.js`
-  proxies `/__/auth/*` to firebaseapp.com with its own frame headers; setting
-  `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=www.marigoapp.com` plus the two console
-  steps in `docs/vercel-deploy.md` §2b makes the whole round trip first-party.
-  `completeOAuthRedirect()` keeps a session marker so a lost result shows a
-  clear message instead of a silent re-render.
+  from the "Prepare the order" email hit this, 2026-09-06). **The live
+  `authDomain` is `auth.marigoapp.com`** (since 2026-09-11) — a Firebase
+  Hosting custom domain, so Firebase serves the handler there itself and it is
+  same-site with `www`. `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` names it, and
+  `next.config.js` feeds the same value into the CSP's `frame-src` — the
+  `*.firebaseapp.com` wildcard does not cover it, and a host missing there is
+  framed and blocked silently. The OAuth client's redirect URI and Firebase's
+  Authorized domains must both carry it: `docs/vercel-deploy.md` §2b. The
+  `/__/auth/*` proxy on the site is kept as the fallback route (env =
+  `www.marigoapp.com`). `completeOAuthRedirect()` keeps a session marker so a
+  lost result shows a clear message instead of a silent re-render.
 - **Never put `'use client'` on a module an API route imports.** Next turns
   every export of a client module into a *client reference proxy* when server
   code imports it: constants, functions and Zod schemas all arrive as `{}`.

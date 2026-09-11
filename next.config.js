@@ -92,7 +92,7 @@ const nextConfig = {
     ],
   },
   /**
-   * Serve Firebase Auth's handler from our own origin.
+   * Serve Firebase Auth's handler from our own origin — the fallback path.
    *
    * Google / Apple sign-in on iPhone goes through `signInWithRedirect`, which
    * bounces via the `authDomain`. With the default `<project>.firebaseapp.com`
@@ -102,11 +102,18 @@ const nextConfig = {
    * never ends. That is what the first seller trying to open a sale from the
    * "Prepare the order" email hit on 2026-09-06.
    *
-   * Firebase's documented fix: set `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` to the
-   * site's own host and reverse-proxy `/__/auth/*` to the project's
-   * firebaseapp.com. Then everything is first-party. The rewrite is harmless
-   * while the env still names firebaseapp.com — nothing requests these paths.
-   * Switching the env also needs two console changes (docs/vercel-deploy.md §2b).
+   * **The live fix (since 2026-09-11) is `auth.marigoapp.com`**: a Firebase
+   * Hosting custom domain, so Firebase serves `/__/auth/*` there itself, and
+   * `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` names it. Safari partitions storage by
+   * registrable domain, and `auth.marigoapp.com` shares `marigoapp.com` with
+   * the site, so the round trip is first-party without touching Vercel.
+   * Whatever host the env names has to be framable — see `frame-src` below.
+   *
+   * This rewrite is Firebase's *other* documented option, kept as the way
+   * back: point the env at `www.marigoapp.com` and the handler is proxied from
+   * here instead. Nothing requests these paths while the env names another
+   * host, so it costs nothing. Either host needs the console steps in
+   * docs/vercel-deploy.md §2b.
    */
   async rewrites() {
     const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
@@ -122,6 +129,17 @@ const nextConfig = {
     // In dev, allow connections to the Firebase emulator suite + the
     // Stripe-CLI forwarder. Production keeps the strict CSP.
     const isDev = process.env.NODE_ENV !== 'production';
+    /**
+     * The Firebase Auth handler runs in a hidden iframe from the
+     * `authDomain` (`/__/auth/iframe`), and `signInWithPopup` opens its
+     * handler page from there too. The wildcard covers the project default;
+     * the configured host is `auth.marigoapp.com` in production (see
+     * `rewrites`), which the wildcard does not match — so the env value goes
+     * in explicitly, or Google sign-in fails silently the moment the env is
+     * switched. `'self'` already covers the proxied `www` fallback.
+     */
+    const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+    const authFrameOrigin = authDomain ? ` https://${authDomain}` : '';
     const emulatorOrigins = isDev
       ? ' http://127.0.0.1:5001 http://localhost:5001 http://127.0.0.1:8080 http://localhost:8080 http://127.0.0.1:9099 http://localhost:9099 ws://127.0.0.1:9099 ws://localhost:9099'
       : '';
@@ -200,7 +218,7 @@ const nextConfig = {
               // Mailtrap is gone — superseded by SendGrid, which is called
               // server-side and needs no browser origin at all.
               "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.supabase.co wss://*.firebaseio.com wss://*.firestore.googleapis.com https://api.stripe.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com" + emulatorOrigins,
-              "frame-src 'self' https://js.stripe.com https://*.firebaseapp.com",
+              "frame-src 'self' https://js.stripe.com https://*.firebaseapp.com" + authFrameOrigin,
               // The PWA service worker and manifest, which default-src would
               // otherwise have to cover implicitly.
               "worker-src 'self' blob:",
