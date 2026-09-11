@@ -95,6 +95,23 @@ export function ChatInput({ conversationId, otherUserId }: ChatInputProps) {
       await updateDoc(conversationRef, updateData);
 
       form.reset();
+
+      // Tell the other party by email — after the writes above, because the
+      // route re-reads the conversation and mails only when this message is
+      // the first they have not read. Fire-and-forget: the SendGrid key is
+      // server-side, and a failed email must not fail the message.
+      if (otherUserId) {
+        user
+          .getIdToken()
+          .then((token) =>
+            fetch('/api/messages/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ conversationId }),
+            }),
+          )
+          .catch((err) => console.warn('[messages] notify failed:', err));
+      }
     } catch (error) {
       console.error('Error sending message:', error);
     }

@@ -194,7 +194,7 @@ describe('every Bearer route refuses a banned caller', () => {
   // test rather than being found by the next banned account.
   const BEARER = [
     'ai/draft-listing', 'ai/suggest-price', 'auth/send-otp', 'auth/verify-otp', 'auth/welcome', 'confirm-order',
-    'create-order', 'create-payment-intent', 'offers/notify', 'orders/notify',
+    'create-order', 'create-payment-intent', 'messages/notify', 'offers/notify', 'orders/notify',
     'start-conversation', 'stripe/create-connected-account', 'upload',
   ];
   it.each(BEARER)('/api/%s calls checkAccountStanding or checkAccountAccess', (name) => {

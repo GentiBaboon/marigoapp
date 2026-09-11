@@ -113,6 +113,14 @@ export const orderMailLimiter = createRateLimiter('order-mail', {
   windowSeconds: 60,
 });
 
+/** New-message emails (`/api/messages/notify`): 30 per minute per IP. The
+ *  route itself mails at most once per unread stretch, so this only catches
+ *  a loop. */
+export const messageMailLimiter = createRateLimiter('message-mail', {
+  limit: 30,
+  windowSeconds: 60,
+});
+
 /** Send an activation code: 5 per 15 minutes per IP. Each one costs an email,
  *  and a legitimate signup needs one. */
 export const otpSendLimiter = createRateLimiter('otp-send', {
