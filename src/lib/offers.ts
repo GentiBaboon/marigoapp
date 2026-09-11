@@ -11,7 +11,7 @@
  * tested without a Firestore instance.
  */
 import { Timestamp } from 'firebase/firestore';
-import { toDate, type FirestoreTimestamp } from '@/lib/types';
+import { toDate, type FirestoreTimestamp } from '@/lib/defaults';
 
 // ─── Status ───────────────────────────────────────────────────────────────────
 

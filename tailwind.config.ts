@@ -60,6 +60,8 @@ export default {
         primary: {
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
+          // Readable brand purple for text on light surfaces (globals.css).
+          deep: 'hsl(var(--primary-deep))',
         },
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',

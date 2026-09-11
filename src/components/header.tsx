@@ -10,7 +10,16 @@ import { Bell, Search, ShoppingCart, ArrowLeft } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { Skeleton } from './ui/skeleton';
 import { UserNav } from './user-nav';
-import { SearchOverlay } from './search/search-overlay';
+import dynamic from 'next/dynamic';
+
+// Loaded on first open, not on every page: the overlay is 570 lines of
+// search UI plus its Firestore and recent-search hooks, and it was in the
+// header's chunk — hydrated on every visit for a panel most visits never
+// open. Deferring it is one of the larger single cuts to blocking time.
+const SearchOverlay = dynamic(
+  () => import('./search/search-overlay').then((m) => m.SearchOverlay),
+  { ssr: false },
+);
 import { cn } from '@/lib/utils';
 
 // /browse/{slug} resolves a single segment against top-level CATEGORY slugs,

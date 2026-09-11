@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase';
 import { CartProvider } from '@/context/CartContext';
 import { WishlistProvider } from '@/context/WishlistContext';
-import { ShoppingPreferenceModal } from '@/components/home/ShoppingPreferenceModal';
 import { CurrencyProvider } from '@/context/CurrencyContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import dynamic from 'next/dynamic';
@@ -44,6 +43,13 @@ const poppins = Poppins({
   display: 'swap',
   variable: '--font-poppins',
 });
+
+// The first-visit preference sheet: Radix Sheet and its state, needed once
+// per device. Off the critical hydration path like the chatbot.
+const ShoppingPreferenceModal = dynamic(
+  () => import('@/components/home/ShoppingPreferenceModal').then((m) => m.ShoppingPreferenceModal),
+  { ssr: false },
+);
 
 const ChatbotWidget = dynamic(() => import('@/components/ai/ChatbotWidget').then(mod => mod.ChatbotWidget), {
   ssr: false,

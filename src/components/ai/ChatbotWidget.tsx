@@ -6,13 +6,11 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, SendHorizonal, User, X, ArrowRight } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, errorEmitter } from '@/firebase';
-import { chatWithAI } from '@/ai/flows/ai-chat';
+import { chatWithAI, type ChatLink, type ChatMessage as ChatTurn } from '@/ai/chat-client';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import type { FirestoreUser } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { z } from 'zod';
-import { MessageSchema, type ChatLink } from '@/ai/flows/ai-chat';
 import { useCart } from '@/context/CartContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import { useTranslation } from '@/context/LanguageContext';
@@ -242,7 +240,7 @@ export function ChatbotWidget() {
 
   const saveMessage = useCallback(async (
     chatId: string,
-    message: z.infer<typeof MessageSchema>,
+    message: ChatTurn,
     extra?: { products?: ChatProductCard[]; type?: string; productData?: ChatProductCard }
   ) => {
     if (!firestore) return;

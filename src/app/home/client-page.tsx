@@ -3,12 +3,27 @@
 import * as React from 'react';
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { NewArrivalsSection } from '@/components/home/NewArrivalsSection';
-import { RecentlyViewedSection } from '@/components/home/RecentlyViewedSection';
-import { PersonalizedPicks } from '@/components/home/PersonalizedPicks';
 import { CategoriesSection } from '@/components/home/CategoriesSection';
 import { DiscountedSection } from '@/components/home/DiscountedSection';
-import { FavoritesSection } from '@/components/home/FavoritesSection';
+
+// The three personal rails render nothing for a first-time or signed-out
+// visitor — which is who Lighthouse is — yet their code (the AI
+// recommendation client, favourites, history) hydrated with the page. Split
+// out so the first load carries only what it paints.
+const FavoritesSection = dynamic(
+  () => import('@/components/home/FavoritesSection').then((m) => m.FavoritesSection),
+  { ssr: false },
+);
+const PersonalizedPicks = dynamic(
+  () => import('@/components/home/PersonalizedPicks').then((m) => m.PersonalizedPicks),
+  { ssr: false },
+);
+const RecentlyViewedSection = dynamic(
+  () => import('@/components/home/RecentlyViewedSection').then((m) => m.RecentlyViewedSection),
+  { ssr: false },
+);
 import { MacroFilters } from '@/components/home/MacroFilters';
 import { HomepageBlocks } from '@/components/home/HomepageBlocks';
 import { HomepageProductsProvider } from '@/components/home/HomepageProductsProvider';

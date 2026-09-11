@@ -1,24 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 
+// No images: the two rows are text-only, and the placeholder catalogue this
+// used to import for them (16 KB of JSON) was never rendered.
 const preferences = [
-  {
-    id: 'womenswear',
-    label: 'Womenswear',
-    imageId: 'preference-women',
-  },
-  {
-    id: 'menswear',
-    label: 'Menswear',
-    imageId: 'preference-men',
-  },
+  { id: 'womenswear', label: 'Womenswear' },
+  { id: 'menswear', label: 'Menswear' },
 ];
 
 export function ShoppingPreferenceModal() {
@@ -75,7 +67,6 @@ export function ShoppingPreferenceModal() {
         </SheetHeader>
         <div className="space-y-2">
           {preferences.map((pref) => {
-            const imageData = PlaceHolderImages.find((p) => p.id === pref.imageId);
             const isSelected = selectedPreference === pref.id;
             return (
               <button

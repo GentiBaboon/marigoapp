@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { pageMetadata } from '@/lib/seo';
 import { LegalPage, Section, Bullets, DataTable } from '@/components/legal/legal-page';
-import { DEFAULT_REFUND_WINDOW_DAYS } from '@/lib/types';
+import { DEFAULT_REFUND_WINDOW_DAYS } from '@/lib/defaults';
 
 export const metadata = pageMetadata({
   title: 'Privacy Policy | MarigoApp',

@@ -7,7 +7,7 @@ import { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot, writeBatch, qu
 import { FirestorePermissionError } from '@/firebase/errors';
 import type { FirestoreCoupon, FirestoreSettings } from '@/lib/types';
 import { validateCoupon, computeDiscount } from '@/lib/coupons';
-import { DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
+import { DEFAULT_SHIPPING_FEE_EUR } from '@/lib/defaults';
 import { calculateShipping, type ShippingGroup } from '@/lib/shipping';
 
 export type ShippingMethod = 'direct' | 'authentication';

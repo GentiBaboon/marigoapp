@@ -15,6 +15,12 @@
        than the near-white it used to be. */
     --primary: 267.6 85% 73.9%;
     --primary-foreground: 240 10% 3.9%;
+    /* The brand purple as *text on white*: #B884F5 reads at 2.75:1, which
+       fails for small type (the mobile nav's active label was the last
+       contrast flag in Lighthouse). This is the same hue at 8.3:1 for
+       active/selected text on light surfaces; dark mode swaps it back to
+       the light purple, which is fine on a dark ground. */
+    --primary-deep: 262 83% 46%;
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
     --muted: 240 4.8% 95.9%;
@@ -41,6 +47,7 @@
        than the near-white it used to be. */
     --primary: 267.6 85% 73.9%;
     --primary-foreground: 240 10% 3.9%;
+    --primary-deep: 267.6 85% 73.9%;
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 210 40% 98%;
     --muted: 240 3.7% 15.9%;

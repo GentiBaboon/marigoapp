@@ -21,7 +21,7 @@
  * basket computable without opening up seller address books.
  */
 
-import { CROSS_BORDER_SHIPPING_FEE_EUR, DEFAULT_SHIPPING_FEE_EUR } from '@/lib/types';
+import { CROSS_BORDER_SHIPPING_FEE_EUR, DEFAULT_SHIPPING_FEE_EUR } from '@/lib/defaults';
 
 /** Anything the fee calculation needs to know about one basket line. */
 export interface ShippableLine {

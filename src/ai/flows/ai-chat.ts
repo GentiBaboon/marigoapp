@@ -47,23 +47,7 @@ export const ChatOutputSchema = z.object({
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
-export async function chatWithAI(input: ChatInput): Promise<ChatOutput> {
-  const res = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-
-  const data = await res.json().catch(() => ({} as any));
-
-  if (!res.ok) {
-    // The route still returns a usable `response` (and sometimes links) on
-    // failure — prefer showing that over a generic client-side error bubble.
-    if (typeof data?.response === 'string' && data.response) {
-      return { response: data.response, products: data.products, links: data.links };
-    }
-    throw new Error(data?.error || `AI chat request failed with status ${res.status}`);
-  }
-
-  return data;
-}
+// The fetch helper lives in `src/ai/chat-client.ts` (zod-free) so the widget
+// can import it without this module's schemas; re-exported for callers that
+// still reach it here.
+export { chatWithAI } from '../chat-client';

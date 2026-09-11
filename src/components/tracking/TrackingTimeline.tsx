@@ -1,6 +1,7 @@
 'use client';
 import { cn } from '@/lib/utils';
-import { type FirestoreDelivery, toDate } from '@/lib/types';
+import { toDate } from '@/lib/defaults';
+import type { FirestoreDelivery } from '@/lib/types';
 import { format } from 'date-fns';
 
 const TimelineDot = ({ state }: { state: 'completed' | 'current' | 'upcoming' }) => {

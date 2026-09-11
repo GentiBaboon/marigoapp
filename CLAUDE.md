@@ -13,6 +13,7 @@ Branding (`src/app/globals.css` CSS vars → `tailwind.config.ts`):
 | Token | Value | Notes |
 |---|---|---|
 | `--primary` | `267.6 85% 73.9%` ≈ `#B884F5` | Brand purple. `--primary-foreground` is near-black for contrast (light purple only hits 2.74:1 against white). |
+| `--primary-deep` | `262 83% 46%` ≈ `#5B13D6` (dark mode: the light purple) | The brand purple as **text on white**, 8.3:1. Use `text-primary-deep` for active/selected labels on light surfaces (the mobile nav) — `text-primary` at small sizes fails the contrast audit. |
 | `--accent` | `40.7 92.5% 54.1%` ≈ `#F59E0B` | Gold |
 | `--background` | `0 0% 100%` | White (dark mode swaps to `240 10% 3.9%`) |
 | `--ring` | `262.1 83.3% 57.8%` | Focus ring |
@@ -334,7 +335,7 @@ API routes (`src/app/api/`):
 
 ## 5. Data model (Firestore)
 
-Types in `src/lib/types.ts` (~855 lines — the single source of truth for both TS interfaces and Zod schemas).
+Types in `src/lib/types.ts` (~855 lines — the single source of truth for both TS interfaces and Zod schemas). **The zod-free constants and helpers live in `src/lib/defaults.ts`** (`toDate`, every `DEFAULT_*` figure, the shipping fees, the badge helpers, `disputeKindLabel`); `types.ts` re-exports them, so both import paths work. First-paint code — contexts, the header, product cards, `shipping.ts` — imports from `defaults` **directly**: importing `types.ts` evaluates every Zod schema at load, and that put zod (57 KB) into the first load of every page for a handful of constants. A test asserts `defaults.ts` never imports zod or `./types` as a value.
 
 | Collection | Purpose | Key statuses |
 |---|---|---|
@@ -666,7 +667,7 @@ Flows in `src/ai/flows/` (each exports a Zod input/output schema pair plus an as
 - `get-recommendations.ts` → `getRecommendations` — product recommendations
 - `smart-search.ts` → `smartSearch` — semantic search backing `/search`
 - `remove-background.ts` → `removeBackground` — product-image cleanup. **Switched off on the live site since 2026-09-09**: `BACKGROUND_REMOVER_ENABLED` in `src/lib/listing-features.ts` hides the photo step's STUDIO MODE button and its copy, and drops the mention from the Help Centre and the assistant's knowledge. The flow and route remain
-- `ai-chat.ts` → types + `chatWithAI` client helper; the logic lives in `src/app/api/chat/route.ts`
+- `ai-chat.ts` → types + schemas; the logic lives in `src/app/api/chat/route.ts`. **The browser calls `src/ai/chat-client.ts`** (`chatWithAI` + types via `import type`), and `PersonalizedPicks` calls `src/ai/recommendations-client.ts` — both zod-free. Importing a flow file from a client component drags zod (55 KB) into that page's chunks, and because the chatbot is mounted from the root layout it was in *every* page's. A test (`ai-clients`) asserts the two client modules have only type imports
 
 **Description generation is dead code.** `/api/ai/generate-description` holds
 the live logic and is rate-limited, but **nothing in the app calls it** — the
@@ -870,6 +871,17 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
   sign-in screen only. Any new popup/redirect call must pass it too, or the
   SDK throws `auth/argument-error`. The web persistence list is the same
   IndexedDB store `getAuth()` used, so sessions carried over.
+- **What hydrates on the first paint is deliberately small.** The chatbot,
+  the shopping-preference sheet, the header's search overlay, the three
+  signed-in header popovers (notifications / messages / cart) and the three
+  personal homepage rails are all `next/dynamic` with `ssr: false`: each
+  renders nothing, or only on interaction, for the first-time signed-out
+  visitor Lighthouse emulates, yet their code (Radix, date-fns, the AI
+  recommendation client, three Firestore listeners) was in the chunks
+  hydrated on every page. Anything new that is mounted in the root layout or
+  the homepage but not painted on first load should follow the same pattern.
+  Measure with `NEXT_DIST_DIR=.next-check npm run build`, then read
+  `.next-check/app-build-manifest.json` for `/page` + `/layout`.
 - **`useCollection` opens a live `onSnapshot` listener.** Every component that mounts one pays a full read of its result set, and two components reading the same collection pay twice. Use it for data that genuinely changes under the user — products, orders, messages, notifications.
 - **Catalog reference data goes through `useCatalog()`** (`src/hooks/use-catalog.ts`, backed by `src/lib/catalog-cache.ts`), never `useCollection`. `brands` (141), `categories` (127), `colors` (97), `materials` (107), `patterns` (92), `conditions` (4) and `size_charts` (20) total ~588 documents — twenty-plus times the product collection — and change only when an admin edits them. They are now fetched once per session with `getDocs`, shared by every consumer and persisted to `sessionStorage`. `/search` alone was reading ~836 documents per visit, including `brands` and `categories` **twice** in the same render.
   - Trade-off: catalog edits are not live in an open shopper tab; they land on the next session or after the 30-minute TTL. `/admin/settings` calls `invalidateCatalog()` on unmount so an admin sees their own edits, and admin screens keep live listeners.
@@ -1217,7 +1229,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (767 passing): unit — `account-verification`, `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `legacy-urls`, `listing-options`, `macro-filters`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (773 passing): unit — `account-verification`, `admin-permissions`, `ai-clients`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `defaults`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `legacy-urls`, `listing-options`, `macro-filters`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

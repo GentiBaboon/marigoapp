@@ -50,7 +50,7 @@ export function MobileNav() {
                     className="inline-flex flex-col items-center justify-center px-1 text-center hover:bg-muted group"
                 >
                     <span className="relative mb-1">
-                      <item.icon className={cn("w-6 h-6 text-muted-foreground group-hover:text-primary", isActive && "text-primary")} />
+                      <item.icon className={cn("w-6 h-6 text-muted-foreground group-hover:text-primary-deep", isActive && "text-primary-deep")} />
                       {/* A cart tab with no count makes people open it to find
                           out whether anything is in it. Mirrors the header badge. */}
                       {item.href === '/cart' && totalItems > 0 && (
@@ -59,7 +59,9 @@ export function MobileNav() {
                         </span>
                       )}
                     </span>
-                    <span className={cn("text-xs text-muted-foreground group-hover:text-primary", isActive && "text-primary")}>
+                    {/* primary-deep, not primary: the light brand purple is 2.75:1 on
+                        white and failed the contrast audit at this size. */}
+                    <span className={cn("text-xs text-muted-foreground group-hover:text-primary-deep", isActive && "text-primary-deep")}>
                         {item.label}
                     </span>
                 </Link>

@@ -2,7 +2,8 @@
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { disputeKindLabel, type FirestoreConversation } from '@/lib/types';
+import { disputeKindLabel } from '@/lib/defaults';
+import type { FirestoreConversation } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ShieldCheck, Lock } from 'lucide-react';

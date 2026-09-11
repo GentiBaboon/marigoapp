@@ -40,9 +40,24 @@ import { useTranslation, type Locale } from '@/context/LanguageContext';
 import { useCart } from '@/context/CartContext';
 import { doc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { FirestoreUser } from '@/lib/types';
-import { NotificationsPopover } from './header-popovers/NotificationsPopover';
-import { MessagesPopover } from './header-popovers/MessagesPopover';
-import { CartPopover } from './header-popovers/CartPopover';
+import dynamic from 'next/dynamic';
+
+// The three header popovers render only for a signed-in user, but their code
+// — Radix Popover, date-fns, three Firestore listeners — was in the header
+// chunk hydrated by every visitor, signed in or not. Deferred until they
+// actually mount.
+const NotificationsPopover = dynamic(
+  () => import('./header-popovers/NotificationsPopover').then((m) => m.NotificationsPopover),
+  { ssr: false },
+);
+const MessagesPopover = dynamic(
+  () => import('./header-popovers/MessagesPopover').then((m) => m.MessagesPopover),
+  { ssr: false },
+);
+const CartPopover = dynamic(
+  () => import('./header-popovers/CartPopover').then((m) => m.CartPopover),
+  { ssr: false },
+);
 
 
 const getInitials = (name: string | null | undefined) => {

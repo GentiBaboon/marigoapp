@@ -7,7 +7,7 @@ import { useShoppingPreference } from '@/hooks/use-shopping-preference';
 import type { FirestoreProduct } from '@/lib/types';
 import { ProductCard, toCardProduct } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getRecommendations, RecommendationInput } from '@/ai/flows/get-recommendations';
+import { getRecommendations, type RecommendationInput } from '@/ai/recommendations-client';
 import { useWishlist } from '@/context/WishlistContext';
 import { Loader2 } from 'lucide-react';
 

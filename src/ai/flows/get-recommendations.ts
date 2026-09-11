@@ -23,17 +23,5 @@ export const RecommendationOutputSchema = z.object({
 
 export type RecommendationOutput = z.infer<typeof RecommendationOutputSchema>;
 
-export async function getRecommendations(input: RecommendationInput): Promise<RecommendationOutput> {
-  const res = await fetch('/api/ai/recommendations', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || 'Failed to get recommendations');
-  }
-
-  return res.json();
-}
+// Fetch helper in `src/ai/recommendations-client.ts` (zod-free); see there.
+export { getRecommendations } from '../recommendations-client';

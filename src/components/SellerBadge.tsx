@@ -3,7 +3,8 @@
 import { ShieldCheck, Star, Sparkles, BadgeCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FirestoreUser } from '@/lib/types';
-import { getSellerLevel, type SellerBadgeLevel } from '@/lib/types';
+import { getSellerLevel } from '@/lib/defaults';
+import type { SellerBadgeLevel } from '@/lib/types';
 import { useBadgeSettings } from '@/hooks/use-badge-settings';
 
 const STYLES: Record<SellerBadgeLevel, { icon: React.ComponentType<{ className?: string }>; className: string }> = {

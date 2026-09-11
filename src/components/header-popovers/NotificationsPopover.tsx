@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { FirestoreNotification } from '@/lib/types';
-import { toDate } from '@/lib/types';
+import { toDate } from '@/lib/defaults';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Button } from '@/components/ui/button';
