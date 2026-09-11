@@ -2,8 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useHomepageProducts } from '@/components/home/HomepageProductsProvider';
 import { useShoppingPreference } from '@/hooks/use-shopping-preference';
 import type { FirestoreProduct } from '@/lib/types';
 import { ProductCard, toCardProduct } from '@/components/product-card';
@@ -16,10 +15,6 @@ import { Skeleton } from '@/components/ui/skeleton';
  * qualifies after rounding (79 → 160 is 50.6%, but 35 → 69 is 49.3%).
  */
 const MIN_DISCOUNT_PCT = 49;
-
-/** Rows pulled before filtering. Discount is computed per item, so Firestore
- *  cannot pre-filter it; this pool is what we search through. */
-const POOL_SIZE = 100;
 
 function ProductCardSkeleton() {
   return (
@@ -42,25 +37,17 @@ export function discountPercent(product: Pick<FirestoreProduct, 'price' | 'origi
 }
 
 export function DiscountedSection() {
-  const firestore = useFirestore();
   const gender = useShoppingPreference();
 
-  // Sold items are excluded: a markdown rail exists to be shopped, and a
-  // half-price listing you cannot buy is worse than one fewer card.
-  const productsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(
-      collection(firestore, 'products'),
-      where('status', 'in', ['active', 'reserved']),
-      orderBy('listingCreated', 'desc'),
-      limit(POOL_SIZE),
-    );
-  }, [firestore]);
-
-  const { data: rawProducts, isLoading } = useCollection<FirestoreProduct>(productsQuery);
+  // Discount is computed per item, so Firestore cannot pre-filter it; the
+  // shared homepage pool is what we search through.
+  const { products: rawProducts, isLoading } = useHomepageProducts();
 
   const products = React.useMemo(() => {
     return (rawProducts ?? [])
+      // Sold items are excluded: a markdown rail exists to be shopped, and a
+      // half-price listing you cannot buy is worse than one fewer card.
+      .filter(p => p.status !== 'sold')
       .filter(p => !gender || p.gender === gender || p.gender === 'unisex')
       .map(p => ({ product: p, discount: discountPercent(p) }))
       .filter((e): e is { product: FirestoreProduct; discount: number } =>

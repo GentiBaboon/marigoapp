@@ -1,5 +1,6 @@
 
 import type { Metadata, Viewport } from 'next';
+import { Inter, Poppins } from 'next/font/google';
 import './globals.css';
 import { Header } from '@/components/header';
 import { AnnouncementBar } from '@/components/AnnouncementBar';
@@ -20,6 +21,29 @@ import { NativeRouteBridge } from '@/components/platform/NativeRouteBridge';
 
 import { PresenceTracker } from '@/components/analytics/presence-tracker';
 import { RequireVerifiedEmail } from '@/components/auth/require-verified-email';
+
+/**
+ * Self-hosted through `next/font`. The old `<link>` to fonts.googleapis.com
+ * was a render-blocking request on a third-party origin — PageSpeed put it
+ * at 750 ms of the mobile critical path, ahead of a second hop to
+ * fonts.gstatic.com for the file itself. `next/font` downloads the faces at
+ * build time, serves them from `/_next/static` with the rest of the assets,
+ * and emits a size-matched fallback so the swap does not shift the layout.
+ * `latin-ext` covers ë and ç for the Albanian copy.
+ */
+const inter = Inter({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '500', '600'],
+  display: 'swap',
+  variable: '--font-inter',
+});
+
+const poppins = Poppins({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['700'],
+  display: 'swap',
+  variable: '--font-poppins',
+});
 
 const ChatbotWidget = dynamic(() => import('@/components/ai/ChatbotWidget').then(mod => mod.ChatbotWidget), {
   ssr: false,
@@ -146,7 +170,7 @@ export default function RootLayout({
   // suppresses it for English queries and misfiles it for Albanian ones. The
   // picker still switches the UI to Albanian client-side.
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={cn(inter.variable, poppins.variable)}>
       <head>
         <link rel="manifest" href="/manifest.json" />
         {/* No <link rel="icon"> here on purpose. `src/app/icon.png` and
@@ -154,12 +178,6 @@ export default function RootLayout({
             tags itself. A `src/app/favicon.ico` used to sit alongside them and
             won at /favicon.ico, which is why browsers kept showing the old
             orange mark no matter what this file said. */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@700&display=swap"
-          rel="stylesheet"
-        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

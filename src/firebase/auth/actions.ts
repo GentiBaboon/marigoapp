@@ -1,6 +1,7 @@
 'use client';
 
 import { SUSPENDED_MESSAGE } from '@/lib/account-verification';
+import { isNativeApp } from '@/lib/platform/native';
 import {
   Auth,
   User,
@@ -13,9 +14,20 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
+  browserPopupRedirectResolver,
   signOut,
   updateProfile,
 } from 'firebase/auth';
+
+/**
+ * Auth is initialised without a popup/redirect resolver (see
+ * `getPlatformAuth` in `src/firebase/index.ts`), so that the auth iframe is
+ * not loaded on every page. The resolver is supplied here, at the call, which
+ * is the only place it is needed. On device there is no popup to return to,
+ * so no resolver is passed and the SDK reports the flow as unsupported — the
+ * same outcome as before.
+ */
+const popupRedirectResolver = () => (isNativeApp() ? undefined : browserPopupRedirectResolver);
 
 type AuthResult = {
   success: boolean;
@@ -169,7 +181,7 @@ const POPUP_UNAVAILABLE_CODES = new Set([
  */
 async function signInWithProvider(auth: Auth, provider: AuthProvider): Promise<AuthResult> {
   try {
-    const result = await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, provider, popupRedirectResolver());
     return { success: true, user: result.user };
   } catch (error: any) {
     if (!POPUP_UNAVAILABLE_CODES.has(error?.code)) {
@@ -181,7 +193,7 @@ async function signInWithProvider(auth: Auth, provider: AuthProvider): Promise<A
       // Safari's storage partitioning does when the authDomain is not ours.
       markRedirectPending();
       // Navigates away; this promise does not resolve on success.
-      await signInWithRedirect(auth, provider);
+      await signInWithRedirect(auth, provider, popupRedirectResolver());
       return { success: false, redirecting: true };
     } catch (redirectError: any) {
       return { success: false, error: getErrorMessage(redirectError) };
@@ -200,7 +212,7 @@ async function signInWithProvider(auth: Auth, provider: AuthProvider): Promise<A
 export async function completeOAuthRedirect(auth: Auth): Promise<AuthResult> {
   const wasPending = takeRedirectPending();
   try {
-    const result = await getRedirectResult(auth);
+    const result = await getRedirectResult(auth, popupRedirectResolver());
     if (result) return { success: true, user: result.user };
     if (wasPending) {
       // We left for the provider and came back with nothing. On iPhone Safari

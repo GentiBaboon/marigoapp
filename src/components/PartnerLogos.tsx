@@ -43,11 +43,15 @@ export function PartnerLogos() {
             aria-label={SUPPORT_NOTE}
             className="mt-6 flex w-fit max-w-full flex-wrap items-center gap-4 rounded-md outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-ring"
           >
+            {/* `sizes` is the rendered width at `h-12`. Without it next/image
+                assumes the image may fill the viewport and the browser fetched a
+                640px-wide emblem for a 42px slot. */}
             <Image
               src="/partners/startup-albania.png"
               alt="Startup Albania Agency"
               width={646}
               height={226}
+              sizes="137px"
               className="h-12 w-auto"
             />
             <Image
@@ -55,6 +59,7 @@ export function PartnerLogos() {
               alt="Ministria e Ekonomisë dhe Inovacionit"
               width={420}
               height={475}
+              sizes="42px"
               className="h-12 w-auto dark:invert"
             />
           </div>

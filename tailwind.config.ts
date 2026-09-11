@@ -39,9 +39,12 @@ export default {
         'nav-safe': 'calc(4rem + env(safe-area-inset-bottom))',
       },
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
+        // The variables are set on <html> by next/font in src/app/layout.tsx;
+        // the plain names stay as the fallback for anything rendered outside
+        // that tree (a test, an email preview).
+        body: ['var(--font-inter)', 'Inter', 'sans-serif'],
         headline: ['Georgia', 'serif'],
-        logo: ['Poppins', 'sans-serif'],
+        logo: ['var(--font-poppins)', 'Poppins', 'sans-serif'],
       },
       colors: {
         background: 'hsl(var(--background))',

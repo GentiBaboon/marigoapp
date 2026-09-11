@@ -82,7 +82,10 @@ export function ShoppingPreferenceModal() {
                 key={pref.id}
                 onClick={() => setSelectedPreference(pref.id)}
                 className={cn(
-                  "flex w-full items-center justify-between p-2.5 border rounded-md cursor-pointer transition-all text-left",
+                  // Not `transition-all`: that also animates the focus outline, which the
+                  // compositor cannot handle and Lighthouse flags as a non-composited
+                  // animation. Only what actually changes on selection.
+                  "flex w-full items-center justify-between p-2.5 border rounded-md cursor-pointer transition-[background-color,border-color,box-shadow] text-left",
                   isSelected && "border-primary ring-1 ring-primary bg-primary/5"
                 )}
               >

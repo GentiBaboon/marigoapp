@@ -154,6 +154,15 @@ const nextConfig = {
             value: 'camera=(), microphone=(), geolocation=(self), interest-cohort=()',
           },
           {
+            // Isolates our window from cross-origin documents that open it,
+            // while keeping a reference to the popups *we* open — which is
+            // what Firebase's `signInWithPopup` needs to hand the credential
+            // back. `same-origin` would sever that and break Google sign-in;
+            // this is the value Firebase documents.
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups',
+          },
+          {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
@@ -174,7 +183,9 @@ const nextConfig = {
               // Inline event handlers (onclick="…") are a classic XSS sink and
               // React never emits them, so this costs nothing and closes one.
               "script-src-attr 'none'",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              // Fonts are self-hosted by next/font (src/app/layout.tsx), so the
+              // Google Fonts origins are gone from style-src and font-src.
+              "style-src 'self' 'unsafe-inline'",
               /**
                * `http:` is gone — there is no legitimate plaintext image source
                * and it was a mixed-content hole. `https:` deliberately stays:
@@ -185,7 +196,7 @@ const nextConfig = {
                */
               "img-src 'self' data: blob: https:",
               "media-src 'self' https: blob:",
-              "font-src 'self' https://fonts.gstatic.com",
+              "font-src 'self'",
               // Mailtrap is gone — superseded by SendGrid, which is called
               // server-side and needs no browser origin at all.
               "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.supabase.co wss://*.firebaseio.com wss://*.firestore.googleapis.com https://api.stripe.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com" + emulatorOrigins,

@@ -17,7 +17,7 @@ Branding (`src/app/globals.css` CSS vars → `tailwind.config.ts`):
 | `--background` | `0 0% 100%` | White (dark mode swaps to `240 10% 3.9%`) |
 | `--ring` | `262.1 83.3% 57.8%` | Focus ring |
 
-Fonts: `font-headline` Georgia serif, `font-body` Inter, `font-logo` Poppins 700. Design spec: `docs/blueprint.md`.
+Fonts: `font-headline` Georgia serif, `font-body` Inter, `font-logo` Poppins 700. Design spec: `docs/blueprint.md`. **Inter and Poppins are self-hosted through `next/font/google`** in `src/app/layout.tsx` (`--font-inter` / `--font-poppins` on `<html>`, `latin` + `latin-ext` for ë and ç); Tailwind reads the variables. The old `<link>` to fonts.googleapis.com was a render-blocking third-party request (750 ms of the mobile critical path), so the Google Fonts origins are gone from the CSP too — don't add the link back.
 
 Locale: `<html lang="en">` — it must match the *server-rendered* content, and `LanguageContext` **defaults to `en`** (it said `sq` while serving English, which misfiles the site for both languages).
 
@@ -97,11 +97,39 @@ message by `detectChatLanguage()`, not by this setting.
 
 ## 4. App Router map (`src/app/`)
 
-**`/` is a splash screen that `router.replace('/home')`** — `/home` is the real homepage (client component, reads `?macroFilter=`). Don't add homepage content to `src/app/page.tsx`.
+**`/` and `/home` are the same homepage.** Both `page.tsx` files are
+three-line server components that read the hero (`fetchHomepageBlocks()`) and
+mount `src/app/home/client-page.tsx` (`HomeClient`, reads `?macroFilter=`).
+The homepage *content* lives in `src/app/home/` only; `src/app/page.tsx`
+mounts it. Until 2026-09-11 `/` was a splash (logo + spinner) that
+`router.replace('/home')`d after hydration — and `/` is the URL Google
+measures, so PageSpeed timed the hero image at 11.8 s on mobile: it could only
+be requested after the splash loaded, hydrated, navigated client-side,
+fetched `/home`, mounted it and opened a Firestore listener. Don't bring the
+splash back; `/home` stays because the navigation, the native shells and
+inbound links point at it, canonical to `/`.
 
 Public:
-- `/` (splash) → `/home`. Section order is deliberate and lives in `src/app/home/page.tsx`: MacroFilters → HomepageBlocks → **Shop by Category** → **New In** → **50% OFF Preloved** → Personalized Picks → **Last Viewed**. Last Viewed is pinned last — it is a way back to something already seen, so it sits below everything still being discovered. Every section returns `null` when it has nothing to show, so the page has no empty headings.
+- `/` = `/home`. Section order is deliberate and lives in `src/app/home/client-page.tsx`: MacroFilters → HomepageBlocks → **Shop by Category** → **New In** → **50% OFF Preloved** → Personalized Picks → **Last Viewed**. Last Viewed is pinned last — it is a way back to something already seen, so it sits below everything still being discovered. Every section returns `null` when it has nothing to show, so the page has no empty headings.
   - Component names lag the headings: `NewArrivalsSection` renders "New In" and `RecentlyViewedSection` renders "Last Viewed".
+  - **The hero is server-rendered.** `src/lib/homepage-blocks.ts` reads
+    `settings/homepage_blocks` over Firestore REST (public-read, 60 s
+    revalidate, `null` on any failure, skipped in the native build) and the
+    page passes it to `HomepageBlocks` as `initialBlocks`. The client
+    listener still takes over the moment the document arrives, so admin
+    edits are live; the server copy is only the first paint, which is what
+    puts the LCP image (and its `priority` preload) in the HTML. Types and
+    the pure helpers live in that module — the component re-exports them.
+  - **The three catalogue sections share one listener**
+    (`HomepageProductsProvider` / `useHomepageProducts()`): the newest 100
+    public listings, newest first. "Shop by Category" sorts it by views in
+    memory, "New In" takes the first ten, the markdown rail drops `sold`.
+    They used to open three `onSnapshot`s over the same ~40 documents —
+    540 KiB to 990 KiB of Firestore traffic per homepage visit, parsed on the
+    main thread. The hook falls back to a private listener outside the
+    provider, so a section still works mounted alone. `isLoading` is true
+    until the first snapshot *including during SSR*, so the skeletons are in
+    the HTML and reserve their space.
   - **`HomepageBlocks` is the editorial hero, in the Farfetch shape** (since
     2026-09-08): copy on the left and one tall photo on the right from `md`
     up, photo first and copy underneath on a phone. The copy is never laid
@@ -343,7 +371,7 @@ Roles (`UserRoleEnum`): `buyer`, `seller`, `courier`, `admin`, `super_admin`, `m
 
 Client hooks `use-admin-auth` / `use-courier-auth` enforce this in the UI; Firestore rules enforce it on data.
 
-**HTTP headers (`next.config.js`):** `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS (2y, preload), `X-XSS-Protection`, `Permissions-Policy`, and a strict CSP allowing Stripe / Firebase / Supabase / GA / GTM / Mailtrap. **In dev the CSP additionally allows the Firebase emulator ports** (5001 / 8080 / 9099, http + ws).
+**HTTP headers (`next.config.js`):** `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS (2y, preload), `X-XSS-Protection`, `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin-allow-popups` (the value Firebase documents — plain `same-origin` severs the popup and breaks Google sign-in), and a strict CSP allowing Stripe / Firebase / Supabase / GA / GTM. **In dev the CSP additionally allows the Firebase emulator ports** (5001 / 8080 / 9099, http + ws).
 
 **Image hosts:** `**.supabase.co/storage/v1/object/public/**` is wildcarded on purpose — `next/image` *throws* on an unlisted host and takes down the whole page, so rotating `NEXT_PUBLIC_SUPABASE_URL` used to break every page still rendering an old image. Also allowed: `firebasestorage.googleapis.com`, `placehold.co`, `images.unsplash.com`, `picsum.photos`.
 
@@ -809,6 +837,16 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 - Path alias `@/*` → `src/*`.
 - Forms: React Hook Form + `zodResolver`; schemas colocated with types in `src/lib/types.ts`.
 - Data fetching: `src/firebase/firestore/use-collection.tsx` / `use-doc.tsx` (+ `useMemoFirebase` for stable refs); auth actions in `src/firebase/auth/actions.ts`; `FirebaseClientProvider` wraps the tree.
+- **Auth boots without the popup/redirect resolver** (`getPlatformAuth` in
+  `src/firebase/index.ts`, since 2026-09-11). `getAuth()`'s default resolver
+  loaded the authDomain's `/__/auth/iframe.js` (93 KiB) plus gapi (42 KiB) on
+  every page for every visitor to look for a pending redirect — the longest
+  request on the homepage's critical path. `browserPopupRedirectResolver` is
+  now passed *at the call* in `auth/actions.ts` (`signInWithPopup`,
+  `signInWithRedirect`, `getRedirectResult`), so the iframe loads on the
+  sign-in screen only. Any new popup/redirect call must pass it too, or the
+  SDK throws `auth/argument-error`. The web persistence list is the same
+  IndexedDB store `getAuth()` used, so sessions carried over.
 - **`useCollection` opens a live `onSnapshot` listener.** Every component that mounts one pays a full read of its result set, and two components reading the same collection pay twice. Use it for data that genuinely changes under the user — products, orders, messages, notifications.
 - **Catalog reference data goes through `useCatalog()`** (`src/hooks/use-catalog.ts`, backed by `src/lib/catalog-cache.ts`), never `useCollection`. `brands` (141), `categories` (127), `colors` (97), `materials` (107), `patterns` (92), `conditions` (4) and `size_charts` (20) total ~588 documents — twenty-plus times the product collection — and change only when an admin edits them. They are now fetched once per session with `getDocs`, shared by every consumer and persisted to `sessionStorage`. `/search` alone was reading ~836 documents per visit, including `brands` and `categories` **twice** in the same render.
   - Trade-off: catalog edits are not live in an open shopper tab; they land on the next session or after the 30-minute TTL. `/admin/settings` calls `invalidateCatalog()` on unmount so an admin sees their own edits, and admin screens keep live listeners.
@@ -1156,7 +1194,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (701 passing): unit — `account-verification`, `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `listing-options`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (740 passing): unit — `account-verification`, `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `listing-options`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
@@ -1253,7 +1291,7 @@ SITE_URL                      # optional; overrides the marigoapp.com default
   branch, not a drive-by.
 - **TS build errors are silenced** (`next.config.js` `typescript.ignoreBuildErrors: true`, `eslint.ignoreDuringBuilds: true`); CI typecheck is `continue-on-error`. Fix before flipping either flag.
 - `FirestoreTimestamp` is a union (`Timestamp | FieldValue | {seconds,nanoseconds}`) — use the `toDate()` helper in `src/lib/types.ts`, never `.toDate()` directly.
-- `src/app/page.tsx` is a splash redirect. Homepage work belongs in `src/app/home/page.tsx`.
+- `src/app/page.tsx` only mounts the homepage. Homepage work belongs in `src/app/home/client-page.tsx` (§4).
 - Dev server port is **3001** (`package.json` + `playwright.config.ts` + `.claude/launch.json`).
 - PWA is disabled in dev (`next-pwa` `disable: NODE_ENV === 'development'`).
 - Supabase now uses one bucket, `product-images`, from `src/lib/supabase.ts`. The `next.config.js` Supabase host is wildcarded — don't narrow it back to a project id.
@@ -1321,8 +1359,12 @@ npm run build:native → static export           (.next-native) → ios/ + andro
 
 `NEXT_PUBLIC_BUILD_TARGET=native` is the switch (`next.config.js`). The native
 target sets `output: 'export'`, `images.unoptimized`, `trailingSlash`, drops
-`headers()` and disables `next-pwa`. It writes to **`.next-native`**, never
-`.next`, so a native build can never take down a running dev server.
+`headers()` and disables `next-pwa`. The *export* lands in **`.next-native`**
+— but Next 14 still stages the build itself in `.next` (verified 2026-09-11:
+the `BUILD_ID` in `.next` matched the exported `_next/static/<id>` folder), so
+**`npm run build:native` clobbers a running dev server** exactly like
+`npm run build` does. Stop `npm run dev` first, or `rm -rf .next` and restart
+it afterwards. `NEXT_DIST_DIR` does not apply to the native target.
 
 **What the app carries vs. fetches.** The UI ships inside the binary. Firestore,
 Auth, Storage and Stripe are reached directly by the client SDKs exactly as on

@@ -2,7 +2,13 @@
 
 import { assertFirebaseConfig, firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, initializeAuth, indexedDBLocalPersistence, type Auth } from 'firebase/auth';
+import {
+  getAuth,
+  initializeAuth,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  type Auth,
+} from 'firebase/auth';
 import { getFirestore, initializeFirestore, type Firestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage';
 import { isNativeApp } from '@/lib/platform/native';
@@ -41,32 +47,45 @@ export function initializeFirebase() {
 }
 
 /**
- * Auth, initialised in a way the WebView can actually complete.
+ * Auth, initialised without the popup/redirect resolver — on every platform.
  *
- * `getAuth()` wires up `browserPopupRedirectResolver` by default. Resolving it
- * loads a hidden iframe against the project's authDomain to look for a pending
- * signInWithRedirect result — and under the `capacitor://` scheme that iframe
- * never finishes loading, so Auth never reaches a ready state.
+ * `getAuth()` wires up `browserPopupRedirectResolver` by default. At boot the
+ * resolver loads a hidden iframe from the project's authDomain
+ * (`/__/auth/iframe.js`, 93 KiB, plus `apis.google.com`'s gapi at another
+ * 42 KiB) to look for a pending `signInWithRedirect` result, on **every page
+ * for every visitor** — though almost nobody arrives from a redirect, and it
+ * only ever matters on the sign-in screen. PageSpeed measured that iframe as
+ * the longest critical-path request on the homepage (1.7 s on mobile) and
+ * the largest source of unused JavaScript.
  *
- * That alone would be survivable, except Firestore asks its app's auth provider
- * for a token *before* it sends anything. A promise that never settles means the
- * query is never issued: no request, no error, no timeout. Every list in the app
- * sat on its loading skeleton because of this, while Firestore itself was
- * healthy — a REST read of the same collection from the same origin returned in
- * well under a second, and the same query against an app with no Auth attached
- * returned 26 documents in 722ms.
+ * On the device it was worse than slow: under the `capacitor://` scheme that
+ * iframe never finishes loading, so Auth never reaches a ready state — and
+ * Firestore asks its app's auth provider for a token *before* it sends
+ * anything. A promise that never settles means the query is never issued: no
+ * request, no error, no timeout. Every list in the app sat on its loading
+ * skeleton because of this, while Firestore itself was healthy.
  *
- * Naming the persistence explicitly skips the resolver entirely. The cost is
- * that `signInWithPopup` / `signInWithRedirect` cannot work on device, which was
- * already true — a WebView has no popup to return to. Native Google sign-in
- * needs @capacitor-firebase/authentication regardless; email and password,
- * password reset and session persistence are all unaffected.
+ * Naming the persistence explicitly skips the resolver at boot. The popup and
+ * redirect flows still work on the web: `src/firebase/auth/actions.ts` hands
+ * `browserPopupRedirectResolver` to `signInWithPopup`, `signInWithRedirect`
+ * and `getRedirectResult` at the call, so the iframe is loaded on the sign-in
+ * screen only. On device those flows were never possible — a WebView has no
+ * popup to return to; native Google sign-in needs
+ * @capacitor-firebase/authentication regardless. Email and password, password
+ * reset and session persistence are unaffected: the web persistence list is
+ * the same IndexedDB store `getAuth()` used, so existing sessions carry over.
  */
 function getPlatformAuth(firebaseApp: FirebaseApp): Auth {
-  if (!isNativeApp()) return getAuth(firebaseApp);
+  // During SSR there is nothing to persist and no page to load an iframe
+  // into; the default instance is the cheapest thing that satisfies the tree.
+  if (typeof window === 'undefined') return getAuth(firebaseApp);
 
   try {
-    return initializeAuth(firebaseApp, { persistence: indexedDBLocalPersistence });
+    return initializeAuth(firebaseApp, {
+      persistence: isNativeApp()
+        ? indexedDBLocalPersistence
+        : [indexedDBLocalPersistence, browserLocalPersistence],
+    });
   } catch {
     // Already initialised on an earlier call — settings are fixed by now.
     return getAuth(firebaseApp);

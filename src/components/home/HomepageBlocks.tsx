@@ -6,33 +6,19 @@ import Link from 'next/link';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
+import {
+  DEFAULT_BLOCK_CTA,
+  blockImages,
+  visibleBlocks,
+  type BlockImage,
+  type HomepageBlock,
+  type HomepageBlocksConfig,
+} from '@/lib/homepage-blocks';
 
-export interface BlockImage {
-  url: string;
-  x: number;
-  y: number;
-}
-
-export interface HomepageBlock {
-  id: string;
-  images?: BlockImage[];
-  title?: string;
-  subtitle?: string;
-  /** Button text; rendered upper-case. Defaults to "Shop now". */
-  ctaLabel?: string;
-  url: string;
-  visible: boolean;
-  order: number;
-  // legacy
-  imageUrl?: string;
-  text?: string;
-}
-
-export interface HomepageBlocksConfig {
-  blocks: HomepageBlock[];
-}
-
-export const DEFAULT_BLOCK_CTA = 'Shop now';
+// The types and the pure helpers live in `src/lib/homepage-blocks.ts` so the
+// server can read the same document; re-exported for the admin tab's imports.
+export { DEFAULT_BLOCK_CTA };
+export type { BlockImage, HomepageBlock, HomepageBlocksConfig };
 
 /**
  * One editorial hero, in the shape of Farfetch's homepage banner: copy on the
@@ -48,12 +34,7 @@ function HeroBlock({ block }: { block: HomepageBlock }) {
   const touchStartX = React.useRef<number | null>(null);
   const wasSwiped = React.useRef(false);
 
-  const images: BlockImage[] =
-    block.images && block.images.length > 0
-      ? block.images.filter((i) => i.url)
-      : block.imageUrl
-      ? [{ url: block.imageUrl, x: 50, y: 50 }]
-      : [];
+  const images: BlockImage[] = blockImages(block);
 
   if (images.length === 0) return null;
 
@@ -183,7 +164,15 @@ function HeroBlock({ block }: { block: HomepageBlock }) {
   );
 }
 
-export function HomepageBlocks() {
+/**
+ * `initialBlocks` is the server's copy of the document (`fetchHomepageBlocks`),
+ * already filtered to the visible ones. It is what the HTML carries, so the
+ * hero — and with it the LCP image, preloaded by `priority` — is painted
+ * before the Firebase SDK has even loaded. The live document replaces it as
+ * soon as the listener delivers; until then (and on any read failure) the
+ * server copy stays up rather than flashing the hero out and back in.
+ */
+export function HomepageBlocks({ initialBlocks = null }: { initialBlocks?: HomepageBlock[] | null }) {
   const firestore = useFirestore();
 
   const blocksRef = useMemoFirebase(
@@ -192,9 +181,7 @@ export function HomepageBlocks() {
   );
   const { data } = useDoc<HomepageBlocksConfig>(blocksRef);
 
-  const visible = (data?.blocks ?? [])
-    .filter((b) => b.visible)
-    .sort((a, b) => a.order - b.order);
+  const visible = data?.blocks ? visibleBlocks(data.blocks) : (initialBlocks ?? []);
 
   if (visible.length === 0) return null;
 

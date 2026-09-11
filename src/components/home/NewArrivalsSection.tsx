@@ -1,10 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useHomepageProducts } from '@/components/home/HomepageProductsProvider';
 import { useShoppingPreference } from '@/hooks/use-shopping-preference';
-import type { FirestoreProduct } from '@/lib/types';
 import { ProductCard, toCardProduct } from '@/components/product-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -22,31 +20,23 @@ function ProductCardSkeleton() {
     )
 }
 
-export function NewArrivalsSection() {
-  const firestore = useFirestore();
+/** Cards on the rail. */
+const RAIL_SIZE = 10;
 
+export function NewArrivalsSection() {
   // Personalized feed: when the visitor picked a shopping preference, only
   // show products matching that gender. Unisex listings are included so they
   // don't disappear for either audience. Gender is applied client-side —
   // adding it to the Firestore query forces a composite index (gender + status
-  // + listingCreated) we haven't deployed; with only 10 rows fetched the
-  // post-filter cost is negligible. The fetch limit is bumped so we still
-  // have enough rows after filtering.
+  // + listingCreated) we haven't deployed. The pool is shared with the other
+  // homepage sections and already arrives newest first.
   const gender = useShoppingPreference();
-  const productsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(
-      collection(firestore, 'products'),
-      where('status', 'in', ['active', 'reserved', 'sold']),
-      orderBy('listingCreated', 'desc'),
-      limit(gender ? 30 : 10),
-    );
-  }, [firestore, gender]);
-
-  const { data: rawProducts, isLoading } = useCollection<FirestoreProduct>(productsQuery);
+  const { products: rawProducts, isLoading } = useHomepageProducts();
   const activeProducts = React.useMemo(
-    () => (gender
-      ? (rawProducts ?? []).filter(p => p.gender === gender || p.gender === 'unisex').slice(0, 10)
+    () => (rawProducts
+      ? rawProducts
+          .filter(p => !gender || p.gender === gender || p.gender === 'unisex')
+          .slice(0, RAIL_SIZE)
       : rawProducts),
     [rawProducts, gender],
   );

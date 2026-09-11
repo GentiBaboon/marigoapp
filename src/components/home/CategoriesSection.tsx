@@ -1,8 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useHomepageProducts } from '@/components/home/HomepageProductsProvider';
 import { useCatalog } from '@/hooks/use-catalog';
 import type { FirestoreProduct, FirestoreCategory } from '@/lib/types';
 import { useShoppingPreference } from '@/hooks/use-shopping-preference';
@@ -23,32 +22,23 @@ function ProductCardSkeleton() {
 }
 
 export function CategoriesSection() {
-  const firestore = useFirestore();
   const gender = useShoppingPreference();
 
   // Cached catalog read — this ran on every homepage visit for 127 docs of
   // data that changes when an admin edits it, not while you shop.
   const { data: categories, isLoading: categoriesLoading } = useCatalog<FirestoreCategory>('categories');
 
-  // Top 100 by views. Include reserved alongside active so shoppers see them
-  // labelled "Reserved" instead of vanishing from category tabs.
-  // Gender is applied client-side (filter below) — adding a second `in`
-  // clause here would require a new composite index (gender + status + views)
-  // that isn't deployed; with the result cap of 100 rows, post-filtering is
-  // effectively free.
-  const productsQuery = useMemoFirebase(
-    () => query(
-      collection(firestore, 'products'),
-      where('status', 'in', ['active', 'reserved', 'sold']),
-      orderBy('views', 'desc'),
-      limit(100)
-    ),
-    [firestore]
-  );
-  const { data: rawProducts, isLoading: productsLoading } = useCollection<FirestoreProduct>(productsQuery);
+  // The shared homepage pool, most viewed first. Reserved and sold stay in so
+  // shoppers see them labelled instead of vanishing from category tabs.
+  // Gender is applied client-side — a second `in` clause on the query would
+  // need a composite index (gender + status + views) that isn't deployed, and
+  // with at most 100 rows post-filtering is effectively free.
+  const { products: rawProducts, isLoading: productsLoading } = useHomepageProducts();
   const products = React.useMemo(
-    () => (gender
-      ? (rawProducts ?? []).filter(p => p.gender === gender || p.gender === 'unisex')
+    () => (rawProducts
+      ? rawProducts
+          .filter(p => !gender || p.gender === gender || p.gender === 'unisex')
+          .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
       : rawProducts),
     [rawProducts, gender],
   );

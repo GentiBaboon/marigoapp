@@ -64,6 +64,21 @@ export async function runFirestoreQuery(body: unknown): Promise<Record<string, a
     .filter((d): d is Record<string, any> => d !== null);
 }
 
+/**
+ * Read one document by path (`settings/homepage_blocks`). Resolves to `null`
+ * on 404; throws on any other HTTP error. `init` lets a server component set
+ * Next's fetch cache options (`next: { revalidate }`) or a timeout.
+ */
+export async function readDocument(
+  path: string,
+  init: Omit<RequestInit, 'method'> & { next?: { revalidate?: number | false } } = {},
+): Promise<Record<string, any> | null> {
+  const res = await fetch(`${FIRESTORE_REST_BASE}/${path}?key=${API_KEY}`, { method: 'GET', ...init });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Firestore read failed: ${res.status}`);
+  return decodeFirestoreDoc(await res.json());
+}
+
 /** Read an entire small collection (catalog/taxonomy shaped). */
 export function readCollection(collectionId: string, limit = 400) {
   return runFirestoreQuery({
