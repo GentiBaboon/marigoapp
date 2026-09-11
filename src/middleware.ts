@@ -7,6 +7,7 @@ import {
   signGateCookie,
   verifyGateCookie,
 } from '@/lib/admin-gate';
+import { isLegacyUrl } from '@/lib/legacy-urls';
 
 /**
  * Next.js Edge Middleware
@@ -103,6 +104,25 @@ export async function middleware(request: NextRequest) {
   // never be redirected by the auth gate below.
   if (request.method === 'OPTIONS' && pathname.startsWith('/api/')) {
     return applyCors(new NextResponse(null, { status: 204 }), origin);
+  }
+
+  // ── 0b. The previous site's URLs are gone ──
+  // Search Console still refreshes ~250K faceted URLs from the old platform
+  // (`/search?query=&size_shoes=…&brand=411`, `/category/84`), and `/search`
+  // was answering them 200 with the whole catalogue. 410 is what makes Google
+  // drop a URL for good; see src/lib/legacy-urls.ts for the exact shapes.
+  if (
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    isLegacyUrl(pathname, request.nextUrl.searchParams)
+  ) {
+    return new NextResponse('Gone', {
+      status: 410,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Robots-Tag': 'noindex',
+        'Cache-Control': 'public, max-age=86400',
+      },
+    });
   }
 
   const response = NextResponse.next();

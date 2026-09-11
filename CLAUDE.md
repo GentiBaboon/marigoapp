@@ -370,6 +370,16 @@ Roles (`UserRoleEnum`): `buyer`, `seller`, `courier`, `admin`, `super_admin`, `m
 ## 6. Security architecture
 
 **Edge middleware (`src/middleware.ts`):**
+0. **Answers the previous site's URLs with 410 Gone** (`src/lib/legacy-urls.ts`,
+   since 2026-09-11). Search Console showed ~251K non-indexed URLs and 272K
+   Googlebot requests in 90 days for a ~70-page site: almost all of them the
+   old platform's faceted navigation (`/search?query=&size_shoes=…&brand=411`,
+   `/category/84`, `/category/women-id-40`), which `/search` was answering 200
+   with the whole catalogue. The tells are `query=` / `size_shoes=` (the app
+   uses `q`) and purely numeric `brand` / `color` / `size` values — none occur
+   in a live URL. Don't add a robots.txt block for them: Google has to fetch
+   the 410 to drop the URL. Expect the "Duplicate" / "Crawled - currently not
+   indexed" counts to fall over weeks, not days.
 1. Redirects unauthenticated requests on `/profile`, `/sell`, `/cart`, `/checkout`, `/messages`, `/notifications`, `/favorites`, `/admin/*`, `/courier/*` to `/auth/login?redirect=...`. Presence check on `__session` or `marigo_auth` cookie only — full JWT verification happens per API route.
 2. CSRF: double-submit cookie (`__csrf` + `x-csrf-token` header) on `POST/PUT/PATCH/DELETE` to `/api/*`, except Bearer-token requests and stateless AI routes (`/api/chat`, `/api/ai/*`).
 3. Sets `__csrf` on page responses — not httpOnly (JS must read it), SameSite=strict, 24h.
@@ -1207,7 +1217,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (754 passing): unit — `account-verification`, `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `listing-options`, `macro-filters`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (759 passing): unit — `account-verification`, `admin-permissions`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `legacy-urls`, `listing-options`, `macro-filters`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
