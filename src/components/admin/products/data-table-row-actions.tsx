@@ -22,6 +22,7 @@ import { useFirestore, useUser } from '@/firebase';
 import { doc, updateDoc, deleteDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestoreProduct } from '@/lib/types';
+import { buildProductPath } from '@/lib/product-slug';
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog';
 
 interface DataTableRowActionsProps<TData> {
@@ -115,7 +116,9 @@ export function DataTableRowActions<TData>({
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuItem asChild>
-          <a href={`/product/${product.id}`} target="_blank" rel="noopener noreferrer">
+          {/* Through buildProductPath: listing URLs are slugs (§9), and
+              `/product/` (singular) was never a route — this 404'd for years. */}
+          <a href={buildProductPath(product)} target="_blank" rel="noopener noreferrer">
             <Eye className="mr-2 h-4 w-4" />
             View on Site
           </a>

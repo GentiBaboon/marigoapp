@@ -47,6 +47,7 @@ import { notifyUser } from '@/lib/notifications';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ImageInspectorDialog } from '@/components/admin/image-inspector-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -220,6 +221,8 @@ export default function AdminProductReviewPage() {
 
   // ── Form state ──
   const [images, setImages] = React.useState<ProductImage[]>([]);
+  // Which photo the inspector dialog has open; null when closed.
+  const [inspectIndex, setInspectIndex] = React.useState<number | null>(null);
   const [isUploadingImage, setIsUploadingImage] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -413,6 +416,17 @@ export default function AdminProductReviewPage() {
 
   const handleRemoveImage = (index: number) => {
     setImages(prev => prev.filter((_, i) => i !== index).map((img, i) => ({ ...img, position: i })));
+  };
+
+  const handleSetMainImage = (index: number) => {
+    setImages(prev => {
+      if (index <= 0 || index >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.unshift(moved);
+      return next.map((img, i) => ({ ...img, position: i }));
+    });
+    setInspectIndex(0);
   };
 
   // ── MacroFilter toggle ──
@@ -674,7 +688,12 @@ export default function AdminProductReviewPage() {
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={e => e.preventDefault()}
                 onDrop={() => handleDrop(index)}
-                className="relative aspect-square rounded-lg overflow-hidden bg-muted group cursor-grab active:cursor-grabbing border-2 border-transparent hover:border-primary/30 transition-colors"
+                onClick={() => setInspectIndex(index)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setInspectIndex(index); } }}
+                aria-label={`Inspect photo ${index + 1}`}
+                className="relative aspect-square rounded-lg overflow-hidden bg-muted group cursor-grab active:cursor-grabbing border-2 border-transparent hover:border-primary/30 focus-visible:border-primary transition-colors"
               >
                 <Image
                   src={img.url}
@@ -691,8 +710,10 @@ export default function AdminProductReviewPage() {
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                 <button
                   type="button"
-                  onClick={() => handleRemoveImage(index)}
-                  className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={e => { e.stopPropagation(); handleRemoveImage(index); }}
+                  aria-label={`Remove photo ${index + 1}`}
+                  // Always visible on touch screens, where there is no hover.
+                  className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -721,6 +742,15 @@ export default function AdminProductReviewPage() {
             )}
           </div>
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+          <p className="text-xs text-muted-foreground mt-3">Click a photo to see it at full quality with its size.</p>
+          <ImageInspectorDialog
+            images={images}
+            index={inspectIndex}
+            onClose={() => setInspectIndex(null)}
+            onChangeIndex={setInspectIndex}
+            onRemove={handleRemoveImage}
+            onSetMain={handleSetMainImage}
+          />
         </CardContent>
       </Card>
 

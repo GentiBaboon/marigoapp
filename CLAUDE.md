@@ -197,6 +197,14 @@ Authenticated (gated by middleware §6):
     repairs rather than creates) but badges a listing under the minimum, and
     the products table marks it in amber. A test asserts the four seller
     paths import the module and carry no literal limit of their own.
+    **Clicking a tile on the admin page opens `ImageInspectorDialog`**
+    (`src/components/admin/image-inspector-dialog.tsx`): the original file
+    in a plain `<img>` — not `next/image`, so nothing resizes or re-encodes
+    it — with pixel dimensions, file size and type (`src/lib/image-meta.ts`,
+    a HEAD to storage with a GET fallback), a 1:1 mode, prev/next, Set as
+    main and Remove. The grid's 150px thumbnails cannot show whether a photo
+    is sharp; this can. Edits there, like the tile's X and drag-reorder,
+    land on Save Changes.
   - **"The perfect pictures guide"** is a text link under the dropzone in
     `PhotosStep` that opens `PhotoGuideDialog`: the team's designed how-to
     (Albanian, with reference photos), kept as a PDF and shown as four JPEG
