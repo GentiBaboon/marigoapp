@@ -7,6 +7,7 @@ import { collection, query, orderBy, doc, updateDoc, addDoc, getDoc, setDoc, inc
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import type { FirestoreDispute, DisputeMessage, FirestoreOrder } from '@/lib/types';
 import { notifyOrderStatus } from '@/lib/notifications';
+import { requestMessageEmail } from '@/lib/message-mail-client';
 import { releaseOrderItems } from '@/lib/order-inventory';
 import { recordRefundForDispute, recordReturn } from '@/lib/order-lifecycle';
 import { toDate, disputeKindLabel } from '@/lib/types';
@@ -415,6 +416,9 @@ function DisputeCard({ dispute }: { dispute: FirestoreDispute }) {
               imageUrl: productImage || undefined,
             }).catch(() => null);
           });
+          // And their inboxes: the route mails each counterpart whose unread
+          // count this message just started, as "Marigo Support".
+          requestMessageEmail(user, convId);
         } catch (e) {
           console.warn('Could not mirror dispute message to conversation', e);
         }

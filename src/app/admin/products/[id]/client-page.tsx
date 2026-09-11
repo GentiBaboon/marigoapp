@@ -1,6 +1,7 @@
 'use client';
 
 import { MIN_LISTING_PHOTOS } from '@/lib/listing-photos';
+import { requestMessageEmail } from '@/lib/message-mail-client';
 import { stockRestoreForStatusChange } from '@/lib/stock';
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
@@ -1508,8 +1509,12 @@ function MessageSellerCard({
         },
       }).catch(() => null);
 
+      // And their inbox — the bell above only reaches a seller who is on
+      // the site. The route mails as "Marigo Support" for an admin sender.
+      requestMessageEmail(adminUser, convId);
+
       await logAction('admin_message_to_seller', `Messaged seller about "${product.title}"`);
-      toast({ title: 'Sent', description: 'The seller has been notified.' });
+      toast({ title: 'Sent', description: 'The seller has been notified in the app and by email.' });
       setText('');
     } catch (err) {
       console.warn('admin message send failed:', err);

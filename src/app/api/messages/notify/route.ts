@@ -10,13 +10,14 @@
  * way to make Marigo mail strangers, and it takes the recipient, the sender's
  * name and the preview from that document.
  *
- * **One email per unread stretch.** The seller is mailed only when this
- * message is the *first* they have not read — `unreadCount[recipient] == 1`
- * after the client's increment. A twenty-message conversation produces one
- * email, and the next comes only after they have opened the thread (which
- * resets the counter to 0). A recipient who is reading live never gets one.
- * No extra write, no extra field: the counter the header badge already
- * keeps is the ledger.
+ * **One email per unread stretch, per recipient.** Each other participant
+ * (a dispute thread has two) is mailed only when this message is the
+ * *first* they have not read — `unreadCount[recipient] == 1` after the
+ * client's increment. A twenty-message conversation produces one email,
+ * and the next comes only after they have opened the thread (which resets
+ * the counter to 0). A recipient who is reading live never gets one. No
+ * extra write, no extra field: the counter the header badge already keeps
+ * is the ledger.
  *
  * Until 2026-09-11 nothing sent this mail at all: the template existed and
  * had no caller, so a seller who was not on the site learned of a message
@@ -25,6 +26,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyIdToken, firestoreGet } from '@/lib/firebase-admin';
 import { checkAccountStanding } from '@/lib/verified-account';
+import { isVerificationExempt } from '@/lib/account-verification';
 import { messageMailLimiter, applyRateLimit } from '@/lib/rate-limit';
 import { sendMessageNotification } from '@/lib/email';
 
@@ -71,46 +73,66 @@ export async function POST(req: NextRequest) {
     }
     if (conv.caseClosed) return NextResponse.json({ ok: true, mailed: false, reason: 'closed' });
 
-    const recipientId = participants.find((p) => p !== uid);
-    if (!recipientId) return NextResponse.json({ ok: true, mailed: false, reason: 'no_recipient' });
-
-    const unread = Number(conv.unreadCount?.[recipientId] ?? 0);
-    if (unread !== 1) {
-      return NextResponse.json({ ok: true, mailed: false, reason: unread === 0 ? 'read' : 'already_unread' });
-    }
-
-    const recipient = await firestoreGet('users', recipientId, idToken);
-    const recipientEmail = typeof recipient?.email === 'string' ? recipient.email.trim() : '';
-    if (!recipientEmail) return NextResponse.json({ ok: true, mailed: false, reason: 'no_email' });
+    const recipientIds = participants.filter((p) => p !== uid);
+    if (recipientIds.length === 0) return NextResponse.json({ ok: true, mailed: false, reason: 'no_recipient' });
 
     const details: Array<{ userId?: string; name?: string }> = Array.isArray(conv.participantDetails)
       ? conv.participantDetails
       : [];
-    const senderName =
-      details.find((d) => d?.userId === uid)?.name ||
-      (typeof (decoded as any).name === 'string' && (decoded as any).name) ||
-      'A Marigo member';
-    const recipientName =
-      details.find((d) => d?.userId === recipientId)?.name ||
-      (typeof recipient?.displayName === 'string' && recipient.displayName) ||
-      (typeof recipient?.name === 'string' && recipient.name) ||
-      undefined;
+    // Members never see an operator's own name or address: an admin-role
+    // sender is "Marigo Support" in the email, as in the dispute console and
+    // the "Message seller" panel. `role` is admin-only writable, so the
+    // stored document is evidence enough (standing already read it).
+    const senderName = isVerificationExempt(standing.user)
+      ? 'Marigo Support'
+      : details.find((d) => d?.userId === uid)?.name ||
+        (typeof (decoded as any).name === 'string' && (decoded as any).name) ||
+        'A Marigo member';
     const preview = typeof conv.lastMessage === 'string' ? conv.lastMessage.slice(0, PREVIEW_CHARS) : undefined;
+    const productTitle = typeof conv.productTitle === 'string' ? conv.productTitle : undefined;
 
-    const result = await sendMessageNotification({
-      recipientEmail,
-      recipientName: recipientName || undefined,
-      senderName,
-      productTitle: typeof conv.productTitle === 'string' ? conv.productTitle : undefined,
-      preview,
-      conversationId,
-    });
+    let mailed = 0;
+    let failed = 0;
+    const skipped: string[] = [];
+    for (const recipientId of recipientIds) {
+      const unread = Number(conv.unreadCount?.[recipientId] ?? 0);
+      if (unread !== 1) {
+        skipped.push(unread === 0 ? 'read' : 'already_unread');
+        continue;
+      }
+      const recipient = await firestoreGet('users', recipientId, idToken);
+      const recipientEmail = typeof recipient?.email === 'string' ? recipient.email.trim() : '';
+      if (!recipientEmail) {
+        skipped.push('no_email');
+        continue;
+      }
+      const recipientName =
+        details.find((d) => d?.userId === recipientId)?.name ||
+        (typeof recipient?.displayName === 'string' && recipient.displayName) ||
+        (typeof recipient?.name === 'string' && recipient.name) ||
+        undefined;
 
-    if (!result.ok && !result.skipped) {
-      console.error('[messages/notify] send failed:', result.error);
+      const result = await sendMessageNotification({
+        recipientEmail,
+        recipientName: recipientName || undefined,
+        senderName,
+        productTitle,
+        preview,
+        conversationId,
+      });
+      if (result.skipped) skipped.push('transport_skipped');
+      else if (!result.ok) {
+        failed += 1;
+        console.error('[messages/notify] send failed:', result.error);
+      } else mailed += 1;
+    }
+
+    if (mailed === 0 && failed > 0) {
       return NextResponse.json({ ok: false, mailed: false, error: 'send failed' }, { status: 502 });
     }
-    return NextResponse.json({ ok: true, mailed: !result.skipped });
+    return NextResponse.json(
+      mailed > 0 ? { ok: true, mailed: true, recipients: mailed } : { ok: true, mailed: false, reason: skipped[0] ?? 'no_recipient' },
+    );
   } catch (err: any) {
     console.error('[messages/notify] error:', err?.message ?? err);
     return NextResponse.json({ ok: false, error: 'internal' }, { status: 500 });

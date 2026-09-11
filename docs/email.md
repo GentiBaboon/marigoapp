@@ -200,7 +200,7 @@ receipt and the finance dashboard.
 | `sendPasswordResetMail` | `/api/forgot-password` |
 | `sendEmailOtp` | `/api/auth/send-otp` |
 | `sendOfferReceived`, `sendOfferAccepted`, `sendOfferDeclined` | `/api/offers/notify` |
-| `sendMessageNotification` | `/api/messages/notify` — fire-and-forget from `ChatInput`; mails the other participant only when the new message is their first unread one, so a conversation is one email per unread stretch |
+| `sendMessageNotification` | `/api/messages/notify` — fire-and-forget via `requestMessageEmail()` from `ChatInput`, the admin "Message seller" panel and the dispute console; mails each other participant only when the new message is their first unread one, so a conversation is one email per unread stretch. An admin sender is "Marigo Support" |
 
 The offer route mails **the party who did not act**, which is not a fixed side:
 a seller accepting the buyer's offer reaches the buyer, but a buyer accepting

@@ -61,7 +61,7 @@ describe('POST /api/messages/notify', () => {
     docs();
     const res: any = await POST(req({ conversationId: 'c1' }));
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ ok: true, mailed: true });
+    expect(res.body).toEqual({ ok: true, mailed: true, recipients: 1 });
     expect(mockSend).toHaveBeenCalledWith({
       recipientEmail: 'seller@example.com',
       recipientName: 'Saras Closet',
@@ -70,6 +70,38 @@ describe('POST /api/messages/notify', () => {
       preview: 'Is this still available?',
       conversationId: 'c1',
     });
+  });
+
+  it('mails an admin sender as Marigo Support, never by their own name', async () => {
+    mockVerify.mockResolvedValue({ sub: 'admin1', uid: 'admin1', name: 'Gent Baboon' });
+    docs({
+      'users/admin1': { status: 'active', role: 'admin', email: 'ops@marigoapp.com' },
+      'conversations/c1': {
+        ...CONV,
+        participants: ['admin1', 'seller1'],
+        participantDetails: [{ userId: 'admin1', name: 'Gent Baboon' }, { userId: 'seller1', name: 'Saras Closet' }],
+      },
+    });
+    await POST(req({ conversationId: 'c1' }));
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSend.mock.calls[0][0].senderName).toBe('Marigo Support');
+  });
+
+  it('mails every other participant of a dispute thread who qualifies', async () => {
+    mockVerify.mockResolvedValue({ sub: 'admin1', uid: 'admin1' });
+    docs({
+      'users/admin1': { status: 'active', role: 'admin' },
+      'conversations/c1': {
+        ...CONV,
+        participants: ['admin1', 'seller1', 'buyer1'],
+        source: 'dispute',
+        unreadCount: { seller1: 1, buyer1: 3 },
+      },
+    });
+    const res: any = await POST(req({ conversationId: 'c1' }));
+    expect(res.body).toEqual({ ok: true, mailed: true, recipients: 1 });
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSend.mock.calls[0][0].recipientEmail).toBe('seller@example.com');
   });
 
   it('does not mail again while earlier messages are still unread', async () => {
