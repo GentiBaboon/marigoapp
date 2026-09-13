@@ -1,5 +1,7 @@
 import UIKit
 import Capacitor
+import FirebaseCore
+import FirebaseMessaging
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,9 +9,65 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        configureFirebase()
         return true
     }
+
+    /// Brings up the Firebase iOS SDK, which backs both push (FirebaseMessaging)
+    /// and Sign in with Apple (FirebaseAuth through
+    /// @capacitor-firebase/authentication).
+    ///
+    /// Guarded on the plist rather than called unconditionally: `configure()`
+    /// raises an uncatchable Objective-C exception when GoogleService-Info.plist
+    /// is missing, so a checkout without it — a fresh clone, CI, anyone who has
+    /// not downloaded the file from the Firebase console — would crash on launch
+    /// instead of merely going without push. The guard costs one bundle lookup
+    /// and turns a hard crash into a degraded feature.
+    private func configureFirebase() {
+        guard FirebaseApp.app() == nil else { return }
+        guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else {
+            NSLog("[Marigo] GoogleService-Info.plist is missing — push notifications and Apple sign-in are disabled in this build.")
+            return
+        }
+        FirebaseApp.configure()
+    }
+
+    // MARK: - Remote notifications
+    //
+    // @capacitor/push-notifications listens on NotificationCenter rather than
+    // implementing UIApplicationDelegate itself, so these two methods are the
+    // only bridge between APNs and the JavaScript `registration` /
+    // `registrationError` events. Without them `PushNotifications.register()`
+    // resolves and then nothing ever arrives — the failure mode is silence, not
+    // an error.
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        // APNs issues the device token; FCM issues the token the server actually
+        // sends to. Handing the APNs token to Messaging and forwarding the *FCM*
+        // token is what lets one firebase-admin call reach both platforms.
+        guard FirebaseApp.app() != nil else {
+            // No Firebase in this build. Forward the raw APNs token so the
+            // plugin still reports success — Capacitor accepts either Data or
+            // String here — rather than leaving the caller waiting forever.
+            NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+            return
+        }
+
+        Messaging.messaging().apnsToken = deviceToken
+        Messaging.messaging().token { token, error in
+            if let token = token {
+                NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: token)
+            } else {
+                NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+            }
+        }
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+    }
+
+    // MARK: - Lifecycle
 
     func applicationWillResignActive(_ application: UIApplication) {
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.

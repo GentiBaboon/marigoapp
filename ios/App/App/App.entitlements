@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Capabilities requested by the app. Every key here must ALSO be enabled on
+	  the App ID at developer.apple.com/account/resources/identifiers — the
+	  entitlements file only states what the binary asks for; the provisioning
+	  profile is what grants it. A key present here and absent there fails the
+	  build with "Provisioning profile doesn't include entitlement", which is
+	  the normal way this file goes wrong.
+	-->
+
+	<!--
+	  Push Notifications.
+
+	  'development' is correct even for a release build: Xcode rewrites it to
+	  'production' when the archive is signed with an App Store distribution
+	  profile. Hardcoding 'production' instead breaks every debug run on a
+	  device, because a development profile cannot grant it.
+	-->
+	<key>aps-environment</key>
+	<string>development</string>
+
+	<!--
+	  Sign in with Apple.
+
+	  Required by App Store guideline 4.8 because the app offers Google
+	  sign-in. 'Default' is the ordinary first-party flow; the other value
+	  exists only for apps that relay a sibling app's account.
+	-->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+
+	<!--
+	  Apple Pay.
+
+	  The merchant id is created at developer.apple.com under Identifiers →
+	  Merchant IDs and must match byte for byte. It is a separate identifier
+	  from the bundle id and does not inherit from it — the 'merchant.' prefix
+	  is required by Apple, the rest is convention.
+
+	  Declared so the capability travels with the binary. The checkout does not
+	  present an Apple Pay sheet yet: card payments are switched off site-wide
+	  (CARD_PAYMENTS_ENABLED in src/lib/payment-options.ts) and cash on
+	  delivery is the only method offered. When cards return, this entitlement
+	  is already in place and provisioned.
+	-->
+	<key>com.apple.developer.in-app-payments</key>
+	<array>
+		<string>merchant.com.marigoapp.marigo</string>
+	</array>
+</dict>
+</plist>

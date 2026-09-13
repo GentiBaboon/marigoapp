@@ -426,6 +426,7 @@ Types in `src/lib/types.ts` (~855 lines — the single source of truth for both 
 |---|---|---|
 | `users/{uid}` | Profile, role, KYC, `stripeAccountId`, `salesCount`, badge tier, preferences. `role` and `status` are admin-only fields (§6d) | `active` / `banned` |
 | `users/{uid}/{wishlist,cart,addresses,paymentMethods}` | Owner-only subcollections | — |
+| `users/{uid}/pushTokens/{token}` | One document per device, id = the FCM token. Owner-only, and deliberately **not** a field on the user document, which is world-readable | — |
 | `email_verifications/{uid}` | Live 6-digit activation challenge — HMAC'd code, expiry, attempt and send counters. Cleared in place when spent, never deleted | — |
 | ↳ `addresses/{id}` | `firstName` + `surname` are the inputs; **`fullName` is composed from them on save** and stays the stored value, because the delivery label, order confirmation, admin order view, courier pickup sheet and the order emails all read it. Plus optional `company` / `apartment`. Countries are Albania and Kosovo only (`src/lib/countries.ts`, Kosovo is `KS`) | — |
 | `products/{id}` | Listings (images, variants, quantity) | `draft`, `pending_review`, `active`, `sold`, `removed`, `expired`, `reserved` |
@@ -540,9 +541,11 @@ decoration.
 - Google and Apple sign-in do not pass through this — those providers verify
   the address themselves. Their ID tokens carry `email_verified: true`, which
   the server gate below accepts without a read. **The Apple button was removed
-  from `SocialButtons` on 2026-09-08**; `signInWithApple` in
-  `src/firebase/auth/actions.ts` is kept for when it returns, and the
-  post-login and verification code still handles an Apple-created account.
+  from the website on 2026-09-08 and came back on 2026-09-13 in the iOS app
+  only** — through the native sheet, not the WebView (§14). `signInWithApple`
+  in `src/firebase/auth/actions.ts` is the dormant *web* path; the live native
+  one is `src/firebase/auth/native-oauth.ts`. Google is still off natively, so
+  App Store guideline 4.8 is satisfied either way.
 
 ### Verification is enforced, not just recorded
 
@@ -935,6 +938,7 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 | `sendPasswordResetLink` | HTTP | Backs `/api/forgot-password` |
 | `syncBanToAuth` | Firestore trigger on `users/{uid}` | Disables / re-enables the Auth user and revokes refresh tokens when `status` flips to or from `banned` (§6d) |
 | `purgeDeletedUser` | Firestore trigger, `users/{uid}` deleted | Deletes the Auth account and the owner-only subcollections after an admin deletes a profile (§6d) |
+| `sendPushForNotification` | Firestore trigger on `notifications/{id}` created | Fans every in-app notification out to the member's devices over FCM and prunes tokens FCM reports dead. Best effort — a failed push never fails the write |
 | `blockDisposableSignups` | `beforeUserCreated` blocking function | Refuses account creation from a throwaway domain, before the account exists. Live since 2026-09-07 (§6b) |
 
 `distributeOrderToSellers` computes each seller's net (`subtotal × (1 − commissionRate)`), transfers into their connected account, and writes ledger rows. **Idempotent** via a `payouts[sellerId].transferId` map on the order, so retried captures no-op. Sellers with no `stripeAccountId` are skipped and flagged for manual settlement.
@@ -1314,7 +1318,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (773 passing): unit — `account-verification`, `admin-permissions`, `ai-clients`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `defaults`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `legacy-urls`, `listing-options`, `macro-filters`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (805 passing): unit — `account-verification`, `admin-permissions`, `ai-clients`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `defaults`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `legacy-urls`, `listing-options`, `macro-filters`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `push-tokens`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
@@ -1548,8 +1552,44 @@ aliased as `useRouter`), which the click bridge cannot see.
 - **Server Actions do not exist in a static export.** `src/app/sell/actions.ts`
   was one and is now a plain module. New server-side work goes in `src/app/api/`,
   which the app can reach; a Server Action it cannot.
-- `capacitor.config.ts` `appId` (`com.marigoapp.app`) is **permanent** once a
-  build reaches App Store Connect or the Play Console.
+- `capacitor.config.ts` `appId` (`com.marigoapp.marigo`) is **permanent** once a
+  build reaches App Store Connect or the Play Console. It has to agree with four
+  places at once: the Xcode `PRODUCT_BUNDLE_IDENTIFIER`, the Android
+  `namespace` + `applicationId`, the Apple App ID, and the Firebase iOS/Android
+  apps that issue the config files. A mismatch on either of the last two is a
+  *runtime* failure with no build error.
+- **`pod install` needs a UTF-8 locale here**, because the project path contains
+  a space: without `LANG=en_US.UTF-8` CocoaPods aborts with
+  `Encoding::CompatibilityError` from `unicode_normalize`. The npm scripts set
+  it; a bare `npx cap sync` does not.
+- **Android needs JDK 17**, not the Java 26 first on the PATH — Gradle 8.9 /
+  AGP 8.7.2 refuse to start on it.
+  `JAVA_HOME=$(/usr/libexec/java_home -v 17) ./gradlew bundleRelease`.
+- **Push is FCM on both platforms**, and the iOS half is the part that surprises
+  people: `@capacitor/push-notifications` hands back an *APNs* token, which no
+  `firebase-admin` call can address. `AppDelegate.swift` exchanges it for an FCM
+  token before forwarding it to Capacitor, so both platforms report the same
+  kind of string and one `sendEachForMulticast` reaches either. The Cloud
+  Function `sendPushForNotification` hangs off `notifications/{id}` creation
+  rather than each call site, so every existing `notifyUser()` became a push at
+  once and a new notification type inherits it.
+- **Push tokens live in `users/{uid}/pushTokens`, never on the user document.**
+  That document is world-readable (`allow get: if true` — the public seller
+  profile is built from it), so a token field there would publish a per-device
+  identifier for every member.
+- **Sign in with Apple goes through the native sheet, not the WebView.**
+  `signInWithPopup` has no popup on device and `signInWithRedirect` is severed
+  by Safari's storage partitioning, so `native-oauth.ts` takes Apple's
+  credential from `@capacitor-firebase/authentication` and completes the
+  sign-in with the JS SDK. `skipNativeAuth: true` in `capacitor.config.ts` is
+  load-bearing: without it the native SDK signs in too and there are two
+  sessions that drift. iOS only — on Android the plugin falls back to a web
+  flow needing an Apple Services ID this project has not configured.
+- **`GoogleService-Info.plist` must be added to the Xcode *target***, not merely
+  dropped in the folder, or it is absent from the bundle at runtime.
+  `AppDelegate` guards `FirebaseApp.configure()` on finding it — `configure()`
+  raises an uncatchable exception when it is missing, so the guard turns a
+  launch crash into push and Apple sign-in quietly not working.
 - Next prefetches RSC payloads for untranslated hrefs and 404s on them. Harmless:
   the WebView origin is local, so it costs no network.
 - Don't show web-install prompts in the app — `DownloadAppBanner` bails on

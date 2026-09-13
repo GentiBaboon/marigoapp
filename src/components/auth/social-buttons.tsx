@@ -8,8 +8,10 @@ import { postLoginDestination } from '@/firebase/auth/post-login';
 import { SUSPENDED_MESSAGE } from '@/lib/account-verification';
 import { usePostAuthRedirect } from '@/hooks/use-post-auth-redirect';
 import { signInWithGoogle, completeOAuthRedirect } from '@/firebase/auth/actions';
+import { isAppleSignInAvailable, signInWithAppleNative } from '@/firebase/auth/native-oauth';
 import { useToast } from '@/hooks/use-toast';
 import { Button, type ButtonProps } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { IS_NATIVE_BUILD } from '@/lib/platform/native';
 
@@ -34,10 +36,24 @@ import { IS_NATIVE_BUILD } from '@/lib/platform/native';
  * contains the markup, so there is no flash of a button that vanishes on
  * hydration. Email and password sign-in is unaffected on every platform.
  *
- * Restoring these on device means @capacitor-firebase/authentication, which
- * signs in through the native SDKs instead of the WebView.
+ * Restoring Google on device means routing it through
+ * @capacitor-firebase/authentication as well — the plugin is now installed and
+ * Apple already goes that way; Google additionally needs the GoogleSignIn pod
+ * and the reversed-client-id URL scheme, which is why it is still off here.
  */
 export const SOCIAL_SIGN_IN_AVAILABLE = !IS_NATIVE_BUILD;
+
+/**
+ * Apple's own mark. Solid black on white / white on black, per Apple's
+ * "Sign in with Apple" human interface guidelines — a coloured or outlined
+ * variant is a review finding, not a style choice.
+ */
+const AppleIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" {...props}>
+    <title>Apple</title>
+    <path d="M17.05 12.53c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3.01-.79-1.55.02-2.98.9-3.77 2.28-1.61 2.79-.41 6.92 1.15 9.19.77 1.11 1.68 2.35 2.87 2.31 1.15-.05 1.59-.74 2.98-.74 1.39 0 1.78.74 3 .72 1.24-.02 2.02-1.13 2.78-2.24.88-1.28 1.24-2.52 1.26-2.59-.03-.01-2.41-.92-2.42-3.71M14.8 5.09c.63-.77 1.06-1.83.94-2.89-.91.04-2.02.61-2.67 1.37-.58.68-1.09 1.77-.95 2.81 1.02.08 2.05-.52 2.68-1.29" />
+  </svg>
+);
 
 // Google's own four-colour "G", as specified in their sign-in branding
 // guidelines — not a monochrome glyph, which people do not recognise as the
@@ -58,8 +74,32 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export function SocialButtons({ variant = 'outline', className }: { variant?: ButtonProps['variant'], className?: string}) {
-  const [loading, setLoading] = useState<null | 'google'>(null);
+export function SocialButtons({
+  variant = 'outline',
+  className,
+  divider,
+}: {
+  variant?: ButtonProps['variant'];
+  className?: string;
+  /**
+   * Optional "Or sign in with" rule drawn above the buttons.
+   *
+   * Owned here rather than by the caller because which providers are on offer
+   * is decided here, and only at runtime: Apple appears on iOS alone. The two
+   * auth pages used to draw the divider themselves behind a build-time
+   * constant, so on device they hid the heading *and* the buttons underneath
+   * it — and the alternative, leaving the heading to the caller, is a lone
+   * "Or sign in with" over nothing the first time the conditions diverge again.
+   */
+  divider?: string;
+}) {
+  const [loading, setLoading] = useState<null | 'google' | 'apple'>(null);
+  // iOS only, and resolved after mount: `getPlatform()` reads `window.Capacitor`,
+  // which does not exist while the static export is being prerendered. Deciding
+  // during render would bake "no Apple button" into the HTML that ships inside
+  // the binary.
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  useEffect(() => setAppleAvailable(isAppleSignInAvailable()), []);
   // True while a returning redirect is being claimed, so the buttons stay
   // disabled instead of inviting a second sign-in on top of one completing.
   const [resumingRedirect, setResumingRedirect] = useState(true);
@@ -140,12 +180,67 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
     }
   };
 
+  const handleAppleLogin = async () => {
+    setLoading('apple');
+    try {
+      const result = await signInWithAppleNative(auth);
+
+      if (result.success && result.user) {
+        const outcome = await postLoginDestination(firestore, auth, result.user, nextPath);
+        if (outcome.kind === 'go') router.push(outcome.to);
+        else toast({ variant: 'destructive', title: 'Account suspended', description: SUSPENDED_MESSAGE });
+        setLoading(null);
+        return;
+      }
+
+      // No error and no user is a dismissed sheet — the person changed their
+      // mind, which is not something to tell them about.
+      if (result.error) {
+        toast({ variant: 'destructive', title: 'Sign in with Apple failed', description: result.error });
+      }
+      setLoading(null);
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Sign in failed',
+        description: 'An unexpected error occurred. Please try again.',
+      });
+      setLoading(null);
+    }
+  };
+
   // Belt and braces: callers also hide the surrounding divider, but a caller
   // that forgets should still render nothing rather than dead buttons.
-  if (!SOCIAL_SIGN_IN_AVAILABLE) return null;
+  if (!SOCIAL_SIGN_IN_AVAILABLE && !appleAvailable) return null;
 
   return (
     <div className="space-y-4">
+      {divider && (
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <Separator />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">{divider}</span>
+          </div>
+        </div>
+      )}
+      {appleAvailable && (
+        <Button
+          variant={variant}
+          className={cn('w-full', className)}
+          onClick={handleAppleLogin}
+          disabled={!!loading}
+        >
+          {loading === 'apple' ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <AppleIcon className="mr-2 h-[18px] w-[18px]" />
+          )}
+          Continue with Apple
+        </Button>
+      )}
+      {SOCIAL_SIGN_IN_AVAILABLE && (
       <Button
         variant={variant}
         className={cn("w-full", className)}
@@ -159,6 +254,7 @@ export function SocialButtons({ variant = 'outline', className }: { variant?: Bu
         )}
         Continue with Google
       </Button>
+      )}
     </div>
   );
 }

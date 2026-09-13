@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">MarigoApp</string>
     <string name="title_activity_main">MarigoApp</string>
-    <string name="package_name">com.marigoapp.app</string>
-    <string name="custom_url_scheme">com.marigoapp.app</string>
+    <string name="package_name">com.marigoapp.marigo</string>
+    <string name="custom_url_scheme">com.marigoapp.marigo</string>
 </resources>

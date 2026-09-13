@@ -17,8 +17,24 @@ import dynamic from 'next/dynamic';
 import { CookieBanner } from '@/components/CookieBanner';
 import { Footer } from '@/components/footer';
 import { NativeRouteBridge } from '@/components/platform/NativeRouteBridge';
+import { IS_NATIVE_BUILD } from '@/lib/platform/native';
 
 import { PresenceTracker } from '@/components/analytics/presence-tracker';
+
+/**
+ * Device push registration.
+ *
+ * Both halves matter. `ssr: false` keeps it off the server render, and the
+ * `IS_NATIVE_BUILD` guard at the mount below is what keeps it out of the web
+ * bundle altogether: the constant folds to `false` at build time, so webpack
+ * drops the dynamic import and @capacitor/push-notifications is never even
+ * emitted as a chunk. Without the guard the web still fetched a lazy chunk on
+ * every page load for a component that returns null there.
+ */
+const PushRegistrar = dynamic(
+  () => import('@/components/platform/PushRegistrar').then((m) => m.PushRegistrar),
+  { ssr: false },
+);
 import { RequireVerifiedEmail } from '@/components/auth/require-verified-email';
 
 /**
@@ -230,6 +246,7 @@ export default function RootLayout({
                         <main className="flex flex-1 flex-col pb-nav-safe md:pb-0">{children}</main>
                         <ChatbotWidget />
                         <PresenceTracker />
+                        {IS_NATIVE_BUILD && <PushRegistrar />}
                         <RequireVerifiedEmail />
                         <MobileNav />
                         <ShoppingPreferenceModal />

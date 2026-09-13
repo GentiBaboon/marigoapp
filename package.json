@@ -17,12 +17,13 @@
     "email:preview": "node scripts/preview-emails.mjs",
     "email:send": "node scripts/preview-emails.mjs --send",
     "build:native": "NEXT_PUBLIC_BUILD_TARGET=native next build",
-    "sync:native": "npm run build:native && npx cap sync",
-    "ios": "npm run sync:native && npx cap open ios",
+    "sync:native": "npm run build:native && LANG=en_US.UTF-8 npx cap sync",
+    "ios": "npm run sync:native && LANG=en_US.UTF-8 npx cap open ios",
     "android": "npm run sync:native && npx cap open android",
-    "cap:sync": "npx cap sync"
+    "cap:sync": "LANG=en_US.UTF-8 npx cap sync"
   },
   "dependencies": {
+    "@capacitor-firebase/authentication": "^6.3.1",
     "@capacitor/android": "^6.2.1",
     "@capacitor/app": "^6.0.3",
     "@capacitor/browser": "^6.0.6",

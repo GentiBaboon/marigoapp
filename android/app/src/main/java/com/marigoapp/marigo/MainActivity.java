@@ -1,4 +1,4 @@
-package com.marigoapp.app;
+package com.marigoapp.marigo;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -29,7 +29,7 @@ import {
  */
 const popupRedirectResolver = () => (isNativeApp() ? undefined : browserPopupRedirectResolver);
 
-type AuthResult = {
+export type AuthResult = {
   success: boolean;
   user?: User | null;
   error?: string;
@@ -61,7 +61,7 @@ const blockingFunctionMessage = (error: any): string | null => {
     }
 };
 
-const getErrorMessage = (error: any): string => {
+export const getErrorMessage = (error: any): string => {
     const blocked = blockingFunctionMessage(error);
     if (blocked) return blocked;
     if (error.code) {

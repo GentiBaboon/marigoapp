@@ -24,6 +24,25 @@
 
         </activity>
 
+        <!-- Push notification appearance.
+
+             Android draws a notification's small icon from its ALPHA CHANNEL
+             alone and fills the result with the accent colour, so pointing
+             this at @mipmap/ic_launcher — the default when it is absent —
+             produces a solid white square in the status bar. ic_stat_marigo is
+             the brand "m" as a transparent silhouette, which is what the
+             platform actually wants.
+
+             These are the defaults for a message whose payload does not name
+             its own icon or colour; sendPushForNotification sets the colour
+             explicitly as well, so the two agree either way. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_marigo" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/brandPurple" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

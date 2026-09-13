@@ -12,11 +12,13 @@ import type { CapacitorConfig } from '@capacitor/cli';
  *
  * ⚠️ `appId` is permanent. Once a build is uploaded to App Store Connect or the
  * Play Console the bundle id can never be changed for that listing — only
- * republished as a new app, losing reviews and installs. Change it now if
- * `com.marigoapp.app` is not what you want.
+ * republished as a new app, losing reviews and installs. It must also match
+ * the App ID at developer.apple.com and the Firebase iOS/Android apps that
+ * issue GoogleService-Info.plist and google-services.json, or push and
+ * Apple sign-in fail at runtime with no build error.
  */
 const config: CapacitorConfig = {
-  appId: 'com.marigoapp.app',
+  appId: 'com.marigoapp.marigo',
   appName: 'MarigoApp',
   webDir: '.next-native',
 
@@ -65,6 +67,19 @@ const config: CapacitorConfig = {
     },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
+    },
+    FirebaseAuthentication: {
+      // The app's auth state lives in the Firebase *JavaScript* SDK — every
+      // hook, guard and Firestore call reads from it. Letting the native SDK
+      // sign in as well would leave two sessions that drift apart, so the
+      // native layer is used only to obtain Apple's credential and the JS SDK
+      // completes the sign-in with it (see src/firebase/auth/native-oauth.ts).
+      skipNativeAuth: true,
+      // Only what the app actually offers. Each entry makes the plugin link
+      // and initialise that provider natively; listing one that is not
+      // configured in the Firebase console is a runtime failure, not a build
+      // one.
+      providers: ['apple.com'],
     },
   },
 };

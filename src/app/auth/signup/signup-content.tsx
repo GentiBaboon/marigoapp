@@ -5,9 +5,7 @@ import { useState } from 'react';
 import { SignupForm, type Stage } from '@/components/auth/signup-form';
 import {
   SocialButtons,
-  SOCIAL_SIGN_IN_AVAILABLE,
 } from '@/components/auth/social-buttons';
-import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
@@ -44,23 +42,9 @@ export function SignupContent() {
                 <SignupForm onStageChange={setStage} />
                 {!verifying && (
                 <>
-                {/* Divider and buttons travel together: with social sign-in
-                    off, a lone "Or sign up with" heading over nothing looks broken. */}
-                {SOCIAL_SIGN_IN_AVAILABLE && (
-                  <>
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <Separator />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">
-                          Or sign up with
-                        </span>
-                      </div>
-                    </div>
-                    <SocialButtons />
-                  </>
-                )}
+                {/* See login-content.tsx — the divider lives inside the
+                    component so it cannot outlive the buttons it introduces. */}
+                <SocialButtons divider="Or sign up with" />
                 <div className="text-center text-sm">
                   Already have an account?{' '}
                   <Link href={loginHref} className="underline">

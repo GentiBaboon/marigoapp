@@ -2,7 +2,7 @@ import * as admin from "firebase-admin";
 import {initializeApp} from "firebase-admin/app";
 import {onCall, HttpsError, onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
-import {onDocumentDeleted, onDocumentWritten} from "firebase-functions/v2/firestore";
+import {onDocumentCreated, onDocumentDeleted, onDocumentWritten} from "firebase-functions/v2/firestore";
 import {beforeUserCreated, HttpsError as AuthBlockingError} from "firebase-functions/v2/identity";
 import {defineSecret} from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
@@ -944,3 +944,112 @@ export const blockDisposableSignups = beforeUserCreated({region: "europe-west1"}
   }
   return;
 });
+
+/**
+ * Delivers every in-app notification to the member's phones as a push.
+ *
+ * Hung off the `notifications` collection rather than called from each place
+ * that raises one: there are dozens of those call sites across order status,
+ * offers, returns and disputes, they all already go through `notifyUser()`,
+ * and they run in the browser — where the FCM credential needed to send does
+ * not and must not exist. One trigger turns all of them into push at once, and
+ * a new notification type inherits it with no work.
+ *
+ * Tokens live in `users/{uid}/pushTokens`, one document per device, id = the
+ * token (see src/lib/push/tokens.ts). Reads here use admin credentials, which
+ * bypass the owner-only rule on that subcollection.
+ *
+ * Best effort throughout. A push that cannot be sent must never fail the write
+ * that triggered it — the in-app notification and the email are the durable
+ * channels, and this is the one that is allowed to be missed.
+ */
+export const sendPushForNotification = onDocumentCreated(
+  {document: "notifications/{notificationId}", region: "europe-west1"},
+  async (event) => {
+    const notification = event.data?.data();
+    if (!notification) return;
+
+    const userId = notification.userId;
+    if (typeof userId !== "string" || !userId) return;
+
+    const tokensSnap = await db.collection("users").doc(userId).collection("pushTokens").get();
+    const tokens = tokensSnap.docs
+      .map((doc) => doc.get("token"))
+      .filter((token): token is string => typeof token === "string" && token.length > 0);
+
+    if (tokens.length === 0) return;
+
+    const title = typeof notification.title === "string" ? notification.title : "MarigoApp";
+    const body = typeof notification.message === "string" ? notification.message : "";
+    // `data.link` is the in-app path the tap handler navigates to. Every value
+    // in an FCM data payload must be a string — a number or a nested object
+    // rejects the whole message.
+    const link = notification.data?.link;
+
+    let response;
+    try {
+      response = await admin.messaging().sendEachForMulticast({
+        tokens,
+        notification: {title, body},
+        data: {
+          ...(typeof link === "string" ? {link} : {}),
+          notificationId: event.params.notificationId,
+          type: typeof notification.type === "string" ? notification.type : "order_update",
+        },
+        apns: {
+          payload: {
+            aps: {
+              // Without this the notification is silent on iOS: no banner, no
+              // sound, and no `pushNotificationActionPerformed` to tap.
+              sound: "default",
+              badge: 1,
+            },
+          },
+        },
+        android: {
+          priority: "high",
+          notification: {
+            // Matches the brand purple used for the status bar and the PWA
+            // theme colour, so the icon tint is consistent with the app.
+            color: "#B884F5",
+            sound: "default",
+          },
+        },
+      });
+    } catch (error) {
+      logger.error("Push send failed", {userId, error});
+      return;
+    }
+
+    // FCM reports a dead token per-message rather than by any other means, so
+    // this is the only opportunity to prune one. A device that reinstalls or
+    // revokes permission would otherwise be retried on every notification
+    // forever.
+    const stale: string[] = [];
+    response.responses.forEach((result, index) => {
+      const code = result.error?.code;
+      if (
+        code === "messaging/registration-token-not-registered" ||
+        code === "messaging/invalid-registration-token" ||
+        code === "messaging/invalid-argument"
+      ) {
+        stale.push(tokens[index]);
+      }
+    });
+
+    if (stale.length > 0) {
+      const batch = db.batch();
+      stale.forEach((token) => {
+        batch.delete(db.collection("users").doc(userId).collection("pushTokens").doc(token));
+      });
+      await batch.commit().catch((error) => logger.warn("Could not prune stale push tokens", {userId, error}));
+    }
+
+    logger.info("Push delivered", {
+      userId,
+      sent: response.successCount,
+      failed: response.failureCount,
+      pruned: stale.length,
+    });
+  },
+);
