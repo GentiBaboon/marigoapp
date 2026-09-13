@@ -225,6 +225,26 @@ Auth (`/auth/*`): `login`, `signup`, `forgot-password`, `reset-password`, `verif
 
 Authenticated (gated by middleware §6):
 - `/profile`, `/profile/addresses`, `/profile/listings`, `/profile/listings/sales/[orderId]`, `/profile/orders`, `/profile/orders/[orderId]`, `/profile/offers`, `/profile/earnings`, `/profile/wallet`, `/profile/payments`, `/profile/settings`, `/profile/stripe-onboarding`
+  - **The shipping label** (`src/lib/shipping-label.ts`) prints from the
+    Fulfillment card on `/profile/listings/sales/[orderId]`, from
+    `in_preparation` onward — it stays available through `prepared` and
+    `shipped` so a smudged label can be reprinted without moving the order.
+    The module is pure: it builds the model (parties, lines, money, payment)
+    and renders a **self-contained HTML document**, which
+    `printHtmlDocument()` (`src/lib/print-document.ts`) writes into a blank
+    same-origin iframe and prints. No app CSS reaches it — no Tailwind
+    preflight, no dark mode, no fixed MobileNav across the page — so what is
+    authored is what comes out of the printer. Two traps that module
+    documents: the iframe is laid out **off-screen rather than hidden**
+    (a `display:none` document can print blank), and it **waits for images**
+    or the logo prints as a gap.
+  - **Only the seller's own lines, and the cash figure is the order's.** A
+    multi-seller order ships as separate packages, so another seller's items
+    would misdescribe the parcel and leak the rest of the basket. But the
+    courier collects the order total *once*, so when the order is not
+    single-seller the label says so rather than printing a cash amount each
+    seller appears to be owed. Every string is escaped — buyer names and
+    listing titles are user input going into an HTML document.
 - `/sell` — listing wizard. Entry is a **mode choice** (`ListingModeStep`): manual, or the AI assistant (§7). The wizard itself is 6 numbered steps + success, rendered by `switch (currentStep)` in `src/app/sell/page.tsx`: 1 Photos → 2 Category → 3 Description → 4 Details → 5 Pricing → 6 Review → 7 Success. State lives in `SellFormContext` (localStorage drafts, `marigo_sell_drafts_v7`); server actions in `src/app/sell/actions.ts`. There is no separate Address step — the pickup address is chosen inside `ReviewStep`, which also uploads the images and writes the product as `pending_review`.
   - **Photo limits live in `src/lib/listing-photos.ts`**: `MIN_LISTING_PHOTOS`
     3, `MAX_LISTING_PHOTOS` 9, `photoCountProblem()` the sentence to show.
