@@ -299,6 +299,34 @@ Authenticated (gated by middleware §6):
   modules rather than copying it.
 - `/products/[id]/offers/[offerId]` — offer detail / negotiation
 - `/cart`, `/checkout`, `/checkout/success/[orderId]`
+- **Order timelines** (buyer, seller, return) share `TimelineStep`
+  (`src/components/profile/timeline-rail.tsx`). Each row owns its marker and
+  the connector beneath it, in a flex column, so the line runs from the bottom
+  of one circle to the top of the next **by construction**. They used to draw
+  one full-height absolute line and drop absolutely positioned dots near it,
+  positioned by different rules (`left-2` vs `left-0` plus a translate), so
+  the circles sat beside the rail instead of on it. The connector takes its
+  step's own state, so the rail is green behind what is done. Cards inside a
+  row must not carry the old `-ml-4`: the rail column owns that space now.
+- **The seller's preparation card** (`seller-order-timeline.tsx`) was largely
+  mock furniture — a hardcoded BRT tracking number, `href="#"` links, and a
+  "Get printable label" button wired to nothing. It now prints the real label
+  (§4 shipping label), opens `PackingInstructionsDialog` from "instructions",
+  and its address controls open `UpdateShippingOriginDialog`. There is **no
+  drop-off network**, so the third step is "mark it prepared and a driver
+  collects within 1 to 2 days", not "bring it to a drop-off point". The
+  packing copy in that dialog is a **first draft pending the team's own
+  wording** — it is one array, replace it there.
+- **Changing where an order ships from re-prices it.** The seller picks a
+  pickup address on the sale page; `/api/orders/shipping-origin` verifies they
+  hold it (an address id, never a typed city, so nobody posts "Tirana" for a
+  parcel leaving Prishtina), recomputes delivery from the server's own copy of
+  every line through `recomputeOrderShipping()`
+  (`src/lib/order-shipping-origin.ts`), and stores the choice in
+  `orders.shippingOrigins[sellerId]`, which later recomputes layer over the
+  listing's own stamp. Refused after `prepared` — the run has been priced and
+  driven. **Cash orders only**: a card order is authorised for a fixed amount,
+  so the origin moves and the money does not.
 - `/messages`, `/messages/[conversationId]` — real-time chat. Sending a message writes it, bumps the recipient's `unreadCount` (the header badge) and calls `/api/messages/notify`, which emails them once per unread stretch (§4 API table). There is still no in-app `notifications` entry for a message — the badge is the in-app signal.
 - `/favorites`, `/notifications`
 
@@ -359,6 +387,7 @@ API routes (`src/app/api/`):
 | `auth/send-otp` | Bearer ID token | Rate-limited; mails a 6-digit activation code. The address comes from the **token's `email` claim**, never the body — otherwise a signed-in user could aim Marigo's mail at anyone. Refuses a disposable domain (403 `email_blocked`) — §6b |
 | `auth/verify-otp` | Bearer ID token | Rate-limited; checks the code and activates the account. Idempotent |
 | `messages/notify` | Bearer ID token | Rate-limited; mails the *other* participants about a new message. Called fire-and-forget through `requestMessageEmail()` (`src/lib/message-mail-client.ts`) by **every** path that writes a message: `ChatInput`, the admin's "Message seller" panel on a listing, and the dispute console — the panel used to write its own bell notification and stop, so nothing reached the seller's inbox. Re-reads the conversation under the caller's token (a non-participant gets 404) and mails each recipient **only when this is their first unread message** (`unreadCount == 1`), so a long chat is one email and the next comes after they open the thread. An admin-role sender is named **Marigo Support**, never by their own name. Nothing sent this mail before 2026-09-11 |
+| `orders/shipping-origin` | Bearer ID token | Rate-limited; a seller moves an order's pickup address. Takes an **address id**, reads it from the caller's own book, recomputes delivery and the total for cash orders, refuses after `prepared` (§4) |
 | `orders/notify` | Bearer ID token | Rate-limited; mails the buyer for `shipped` / `completed` / `cancelled`. Re-reads the order with the caller's token, refuses unless it is in that status, one mail per status (`mailedStatuses`) |
 | `newsletter/subscribe` | none (CSRF token) | Rate-limited; the footer's Subscribe form. Refuses disposable domains and upserts the address into **SendGrid Marketing Contacts** (`src/lib/newsletter.ts`) — not Firestore, which the server cannot write for an anonymous visitor. The API key needs Marketing → Contacts access (the production key has it); one without makes every submit a 503 with `forbidden` in the log. SendGrid imports contacts asynchronously, so a new address takes a few minutes to appear in the dashboard. Was a form with no handler until 2026-09-09 |
 | `presence` | POST: none (Bearer optional) · GET: Bearer + `analytics.view` | Visitor heartbeat in, live view out. The **only** writer to the presence store, so the write path is rate-limited rather than open (§9b). GET answers **404** to anyone without the permission |

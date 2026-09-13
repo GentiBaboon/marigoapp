@@ -123,7 +123,14 @@ export default function SaleDetailsPage() {
         return Date.now();
     })();
     const estimatedPaymentDate = addDays(new Date(createdMs), 10);
-    const shippingFromAddress = addresses?.find(a => a.isDefault) || addresses?.[0];
+    // The pickup address for this order: whatever the seller last chose on it
+    // (stored by /api/orders/shipping-origin), else their default. Without the
+    // first branch the card would keep showing the old city after a change.
+    const chosenOriginId = user?.uid ? order.shippingOrigins?.[user.uid]?.addressId : undefined;
+    const shippingFromAddress =
+        (chosenOriginId ? addresses?.find(a => a.id === chosenOriginId) : undefined)
+        || addresses?.find(a => a.isDefault)
+        || addresses?.[0];
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text).then(() => {

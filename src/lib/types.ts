@@ -392,6 +392,13 @@ export interface FirestoreOrder {
   disputeIds?: string[];
   returnIds?: string[];
   refundIds?: string[];
+  /**
+   * Where each seller ships this order from, when it differs from the origin
+   * stamped on their listings — set from the sale page's "Update shipping
+   * details" through `/api/orders/shipping-origin`, which re-prices delivery
+   * with it. Keyed by seller uid.
+   */
+  shippingOrigins?: Record<string, { city: string; country: string | null; addressId?: string; updatedAt?: string }>;
   // Running total of all refunds applied to this order (positive number).
   // When equals totalAmount → fully refunded; between 0 and totalAmount →
   // partially refunded.

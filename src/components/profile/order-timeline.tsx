@@ -7,20 +7,7 @@ import { MessageSquare, Clock, Truck, CheckCircle2 } from 'lucide-react';
 import type { FirestoreOrder } from '@/lib/types';
 import { format, addDays } from 'date-fns';
 import { STATUS_RANK, statusLabel, stepState, TIMELINE_STEPS } from '@/lib/order-status';
-
-const TimelineDot = ({ state }: { state: 'completed' | 'current' | 'upcoming' }) => {
-    return (
-        <div className={cn("absolute left-0 top-1 h-4 w-4 rounded-full bg-background flex items-center justify-center -translate-x-[calc(50%-1px)]", {
-            "z-10": state === 'current'
-        })}>
-            <div className={cn('h-full w-full rounded-full', {
-                'bg-green-500': state === 'completed',
-                'bg-blue-500 ring-4 ring-blue-200': state === 'current',
-                'border-2 border-gray-300 bg-background': state === 'upcoming'
-            })} />
-        </div>
-    )
-}
+import { TimelineStep } from '@/components/profile/timeline-rail';
 
 function toDate(ts: any): Date {
     if (!ts) return new Date();
@@ -68,9 +55,7 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
                     </p>
                 </div>
             )}
-            <div className="relative ml-2">
-                <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-200" />
-
+            <div className="ml-2">
                 {TIMELINE_STEPS.map((step, idx) => {
                     const stepRank = STATUS_RANK[step] ?? idx + 1;
                     // When the order is terminal, the last reached step is the
@@ -85,15 +70,14 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
                     const isCurrentCompleted = step === 'completed' && status === 'completed' && state === 'current';
 
                     return (
-                        <div key={step} className={cn("relative pl-8", idx === TIMELINE_STEPS.length - 1 ? "" : "pb-10")}>
-                            <TimelineDot state={state} />
+                        <TimelineStep key={step} state={state} tone="blue" isLast={idx === TIMELINE_STEPS.length - 1}>
                             {step === 'confirmed' && state !== 'upcoming' ? (
                                 <>
                                     <h4 className="font-semibold">{statusLabel('confirmed', 'buyer')}</h4>
                                     <p className="text-sm text-muted-foreground">On {format(toDate(order.createdAt), 'MMMM d, yyyy')}</p>
                                 </>
                             ) : isCurrentShipped ? (
-                                <Card className="shadow-md -ml-4 border-purple-500">
+                                <Card className="shadow-md border-purple-500">
                                     <CardContent className="p-4 space-y-2">
                                         <Badge variant="outline" className="border-purple-500 text-purple-700 bg-purple-50 font-semibold">
                                             <Truck className="mr-1.5 h-3 w-3" />
@@ -104,7 +88,7 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
                                     </CardContent>
                                 </Card>
                             ) : isCurrentCompleted ? (
-                                <Card className="shadow-md -ml-4 border-green-500">
+                                <Card className="shadow-md border-green-500">
                                     <CardContent className="p-4 space-y-2">
                                         <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50 font-semibold">
                                             <CheckCircle2 className="mr-1.5 h-3 w-3" />
@@ -115,7 +99,7 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
                                     </CardContent>
                                 </Card>
                             ) : isCurrentPrep ? (
-                                <Card className="shadow-md -ml-4">
+                                <Card className="shadow-md">
                                     <CardContent className="p-4 space-y-3">
                                         <Badge variant="outline" className="border-blue-500 text-blue-600 bg-blue-50 font-semibold">
                                             <Clock className="mr-1.5 h-3 w-3" />
@@ -135,7 +119,7 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
                                     {statusLabel(step, 'buyer')}
                                 </h4>
                             )}
-                        </div>
+                        </TimelineStep>
                     );
                 })}
             </div>

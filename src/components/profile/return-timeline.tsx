@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Package, PackageCheck, Truck, Clock, Info, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TimelineStep } from '@/components/profile/timeline-rail';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import type { FirestoreReturn } from '@/lib/types';
@@ -44,23 +45,6 @@ function rankOf(status: string): number {
       return 0;
   }
 }
-
-const TimelineDot = ({ state }: { state: 'completed' | 'current' | 'upcoming' }) => (
-  <div
-    className={cn(
-      'absolute left-0 top-1 h-4 w-4 rounded-full bg-background flex items-center justify-center -translate-x-[calc(50%-1px)]',
-      { 'z-10': state === 'current' },
-    )}
-  >
-    <div
-      className={cn('h-full w-full rounded-full', {
-        'bg-green-500': state === 'completed',
-        'bg-blue-500 ring-4 ring-blue-200': state === 'current',
-        'border-2 border-gray-300 bg-background': state === 'upcoming',
-      })}
-    />
-  </div>
-);
 
 interface ReturnTimelineProps {
   returnDoc: FirestoreReturn;
@@ -152,8 +136,7 @@ export function ReturnTimeline({ returnDoc, audience }: ReturnTimelineProps) {
         </div>
 
         {/* Timeline */}
-        <div className="relative ml-2 pt-2">
-          <div className="absolute left-2 top-2 h-[calc(100%-8px)] w-0.5 bg-gray-200" />
+        <div className="ml-2 pt-2">
           {STEPS.map((step, idx) => {
             const state: 'completed' | 'current' | 'upcoming' =
               rank > idx ? 'completed' : rank === idx ? 'current' : 'upcoming';
@@ -161,11 +144,7 @@ export function ReturnTimeline({ returnDoc, audience }: ReturnTimelineProps) {
             const showDate = state === 'completed' || state === 'current';
             const date = idx === 0 ? createdDate : updatedDate;
             return (
-              <div
-                key={step}
-                className={cn('relative pl-8', isLast ? '' : 'pb-6')}
-              >
-                <TimelineDot state={state} />
+              <TimelineStep key={step} state={state} tone="blue" isLast={isLast} gap="pb-6">
                 <div className="flex items-center justify-between gap-2">
                   <h4
                     className={cn(
@@ -181,7 +160,7 @@ export function ReturnTimeline({ returnDoc, audience }: ReturnTimelineProps) {
                     </span>
                   )}
                 </div>
-              </div>
+              </TimelineStep>
             );
           })}
         </div>

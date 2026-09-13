@@ -146,6 +146,10 @@ function addressLines(a: AddressFormValues | undefined): string[] {
 /**
  * The document sent to the printer.
  *
+ * No site URL is printed. Some browsers turn a bare domain in the body into
+ * a link, and a printed label is not a place anyone follows one — the logo
+ * already says whose parcel this is.
+ *
  * `formatMoney` comes from the currency context, so the figures read in the
  * same currency as the rest of the app — which for this market is lekë, and
  * on a cash order is the amount the courier actually collects. Values are
@@ -218,7 +222,7 @@ export function shippingLabelHtml(
          padding-top: 10px; }
   .collect { border: 2px solid #111; padding: 6px 10px; font-size: 14px; }
   .note { margin-top: 8px; font-size: 10px; color: #555; }
-  .foot { padding-top: 10px; font-size: 10px; color: #555; display: flex; justify-content: space-between; }
+  .foot { padding-top: 10px; font-size: 10px; color: #555; text-align: right; }
 </style></head>
 <body><div class="label">
 
@@ -268,8 +272,7 @@ export function shippingLabelHtml(
   ${sharedNote}
 
   <div class="foot">
-    <span>marigoapp.com</span>
-    <span>${model.placedAt ? esc(model.placedAt.toLocaleDateString('en-GB')) : ''}</span>
+    ${model.placedAt ? `<span>Ordered ${esc(model.placedAt.toLocaleDateString('en-GB'))}</span>` : ''}
   </div>
 
 </div></body></html>`;

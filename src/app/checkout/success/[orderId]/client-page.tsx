@@ -64,6 +64,10 @@ export default function OrderSuccessPage() {
 
   const { data: order, isLoading } = useDoc<FirestoreOrder>(orderRef);
 
+  // Cash on delivery is *placed*, not paid: the courier collects at the door.
+  // The page said "Total Paid" and "Paid by Cash on Delivery" either way.
+  const isCod = order?.paymentMethod === 'cod';
+
   return (
     <div className="relative container mx-auto max-w-xl py-12 px-4">
         {width && height && <Confetti width={width} height={height} recycle={false} numberOfPieces={200} />}
@@ -154,8 +158,11 @@ export default function OrderSuccessPage() {
                             <span>{formatPrice(order.taxAmount)}</span>
                         </div>
                     )}
+                    {/* Nothing has been paid on a cash order — the courier
+                        collects at the door — so "Total Paid" told the buyer
+                        the opposite of what they still owe. */}
                     <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                        <span>Total Paid</span>
+                        <span>{isCod ? 'Total to Pay' : 'Total Paid'}</span>
                         <span>{formatPrice(order.totalAmount)}</span>
                     </div>
                 </div>
@@ -177,10 +184,9 @@ export default function OrderSuccessPage() {
                     )}
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <CreditCard className="h-4 w-4 shrink-0" />
-                        <span>
-                            Paid by {order.paymentMethod === 'cod' ? 'Cash on Delivery' : 'Card'}
-                        </span>
-                        <Check className="h-3 w-3 text-green-600" />
+                        <span>{isCod ? 'Pay Cash on Delivery' : 'Paid by Card'}</span>
+                        {/* The tick means "settled", which a cash order is not. */}
+                        {!isCod && <Check className="h-3 w-3 text-green-600" />}
                     </div>
                 </div>
             </div>

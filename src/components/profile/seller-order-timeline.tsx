@@ -4,25 +4,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { MessageSquare, Clock, Copy, Pencil, Truck, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { MessageSquare, Clock, Pencil, Truck, CheckCircle2 } from 'lucide-react';
 import type { FirestoreOrder, FirestoreAddress } from '@/lib/types';
 import { format, addDays } from 'date-fns';
-import { useToast } from '@/hooks/use-toast';
 import { STATUS_RANK, statusLabel, stepState, TIMELINE_STEPS_SELLER } from '@/lib/order-status';
-
-const TimelineDot = ({ state }: { state: 'completed' | 'current' | 'upcoming' }) => {
-    return (
-        <div className={cn("absolute left-0 top-1 h-4 w-4 rounded-full bg-background flex items-center justify-center -translate-x-[calc(50%-1px)]", {
-            "z-10": state === 'current'
-        })}>
-            <div className={cn('h-full w-full rounded-full', {
-                'bg-green-500': state === 'completed',
-                'bg-orange-500 ring-4 ring-orange-200': state === 'current',
-                'border-2 border-gray-300 bg-background': state === 'upcoming'
-            })} />
-        </div>
-    )
-}
+import { TimelineStep } from '@/components/profile/timeline-rail';
+import { PrintShippingLabel } from '@/components/profile/print-shipping-label';
+import { PackingInstructionsDialog } from '@/components/profile/packing-instructions-dialog';
+import { UpdateShippingOriginDialog } from '@/components/profile/update-shipping-origin-dialog';
+import { useUser } from '@/firebase';
 
 interface SellerOrderTimelineProps {
     order: FirestoreOrder;
@@ -31,7 +22,12 @@ interface SellerOrderTimelineProps {
 
 export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderTimelineProps) {
     const { status } = order;
-    const { toast } = useToast();
+    const { user } = useUser();
+    const sellerUid = user?.uid;
+    // Where the driver is told to come. The parent resolves this: the address
+    // the seller last chose for this order, else their default one.
+    const pickup = shippingFromAddress;
+    const pickupAddressId = shippingFromAddress.id;
     const isTerminal = status === 'cancelled' || status === 'refunded';
     // A return flow runs after the order has been delivered + completed, so
     // every happy-path step must render as done. The active return progress
@@ -61,12 +57,6 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
 
     const isAwaitingShip = !isTerminal && (status === 'confirmed' || status === 'processing' || status === 'in_preparation' || status === 'prepared');
 
-    const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text).then(() => {
-            toast({ title: 'Copied to clipboard!' });
-        });
-    }
-
     return (
         <div>
             {isTerminal && (
@@ -75,9 +65,7 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                     <p className="text-xs text-red-700/80">Steps completed before this point remain marked done below.</p>
                 </div>
             )}
-            <div className="relative ml-2">
-                <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-200" />
-
+            <div className="ml-2">
                 {TIMELINE_STEPS_SELLER.map((step, idx) => {
                     const stepRank = STATUS_RANK[step] ?? idx + 1;
                     const state = stepState(rank, stepRank);
@@ -86,15 +74,14 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                     const isCurrentCompleted = step === 'completed' && status === 'completed' && state === 'current';
 
                     return (
-                        <div key={step} className={cn("relative pl-8", idx === TIMELINE_STEPS_SELLER.length - 1 ? "" : "pb-10")}>
-                            <TimelineDot state={state} />
+                        <TimelineStep key={step} state={state} tone="orange" isLast={idx === TIMELINE_STEPS_SELLER.length - 1}>
                             {step === 'confirmed' && state !== 'upcoming' ? (
                                 <>
                                     <h4 className="font-semibold">Sale confirmed</h4>
                                     <p className="text-sm text-muted-foreground">On {format(saleDate, 'MMMM d, yyyy')}</p>
                                 </>
                             ) : isCurrentShipped ? (
-                                <Card className="shadow-md -ml-4 border-purple-500">
+                                <Card className="shadow-md border-purple-500">
                                     <CardContent className="p-4 space-y-2">
                                         <Badge variant="outline" className="border-purple-500 text-purple-700 bg-purple-50 font-semibold">
                                             <Truck className="mr-1.5 h-3 w-3" />
@@ -102,10 +89,11 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                                         </Badge>
                                         <h4 className="font-semibold text-lg">{statusLabel('shipped', 'seller')}</h4>
                                         <p className="text-sm text-muted-foreground">Your package is on its way to the customer and you will be notified when they have received it. Delivery estimated in 24 h.</p>
+                                        <PrintShippingLabel order={order} sellerId={sellerUid} className="w-full" />
                                     </CardContent>
                                 </Card>
                             ) : isCurrentCompleted ? (
-                                <Card className="shadow-md -ml-4 border-green-500">
+                                <Card className="shadow-md border-green-500">
                                     <CardContent className="p-4 space-y-2">
                                         <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50 font-semibold">
                                             <CheckCircle2 className="mr-1.5 h-3 w-3" />
@@ -116,7 +104,7 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                                     </CardContent>
                                 </Card>
                             ) : renderActionCard ? (
-                                <Card className="shadow-md -ml-4 border-orange-500">
+                                <Card className="shadow-md border-orange-500">
                                     <CardContent className="p-4 space-y-4">
                                         <Badge variant="outline" className="border-orange-500 text-orange-600 bg-orange-50 font-semibold">
                                             <Clock className="mr-1.5 h-3 w-3" />
@@ -128,38 +116,48 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                                         <div className="bg-muted/50 p-3 rounded-lg space-y-2">
                                             <h5 className="font-semibold text-sm">NEXT STEPS</h5>
                                             <ul className="list-disc pl-5 text-sm space-y-1">
-                                                <li>Pack your item following our simple <a href="#" className="underline">instructions</a>.</li>
+                                                <li>
+                                                    Pack your item following our simple{' '}
+                                                    <PackingInstructionsDialog>
+                                                        <button type="button" className="underline font-medium">instructions</button>
+                                                    </PackingInstructionsDialog>.
+                                                </li>
                                                 <li>Print the shipping label and attach it to your package.</li>
-                                                <li>Bring your package to a drop-off-point.</li>
+                                                {/* No drop-off network yet — the driver comes to the
+                                                    seller, so the old "bring it to a drop-off point"
+                                                    step asked for something that does not exist. */}
+                                                <li>Mark your order as prepared and we will arrange the shipping. A driver picks it up within 1 to 2 days.</li>
                                             </ul>
                                         </div>
 
-                                        <div className="bg-muted/50 p-3 rounded-lg space-y-3">
-                                            <h5 className="font-semibold text-sm">BRT - Drop off</h5>
-                                            <p className="text-sm">See nearest <a href="#" className="underline">drop-off points</a> (view <a href="#" className="underline">carrier's website</a>).</p>
-                                            <div className="text-sm">
-                                                <span className="text-muted-foreground">Tracking: </span>
-                                                <span className="font-semibold">005125901002419 </span>
-                                                <Copy className="h-3 w-3 inline-block cursor-pointer" onClick={() => copyToClipboard('005125901002419')} />
-                                            </div>
-                                            <Button className="w-full bg-black hover:bg-black/90 text-white">Get printable label</Button>
-                                        </div>
+                                        <PrintShippingLabel
+                                            order={order}
+                                            sellerId={sellerUid}
+                                            className="w-full bg-black text-white hover:bg-black/90 hover:text-white border-black"
+                                        />
 
                                         <div className="border-t pt-4 space-y-3">
                                             <div className="flex justify-between items-start">
                                                 <div>
                                                     <p className="font-semibold text-sm">Shipping from</p>
-                                                    <p className="text-sm">{shippingFromAddress.fullName}</p>
-                                                    <p className="text-sm">{shippingFromAddress.address}, {shippingFromAddress.city}, {shippingFromAddress.postal} {shippingFromAddress.country}</p>
+                                                    <p className="text-sm">{pickup.fullName}</p>
+                                                    <p className="text-sm">{pickup.address}, {pickup.city}, {pickup.postal} {pickup.country}</p>
                                                 </div>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground"><Pencil className="h-4 w-4" /></Button>
+                                                <UpdateShippingOriginDialog order={order} currentAddressId={pickupAddressId}>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" aria-label="Change pickup address">
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                </UpdateShippingOriginDialog>
                                             </div>
-                                            <Button variant="outline" className="w-full">Update shipping details</Button>
-                                            <Button variant="outline" className="w-full">
-                                                <MessageSquare className="mr-2 h-4 w-4" />
-                                                Contact buyer
+                                            <UpdateShippingOriginDialog order={order} currentAddressId={pickupAddressId}>
+                                                <Button variant="outline" className="w-full">Update shipping details</Button>
+                                            </UpdateShippingOriginDialog>
+                                            <Button variant="outline" className="w-full" asChild>
+                                                <Link href="/messages">
+                                                    <MessageSquare className="mr-2 h-4 w-4" />
+                                                    Contact buyer
+                                                </Link>
                                             </Button>
-                                            <Button variant="link" className="w-full text-destructive">Cancel sale</Button>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -168,7 +166,7 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                                     {statusLabel(step, 'seller')}
                                 </h4>
                             )}
-                        </div>
+                        </TimelineStep>
                     );
                 })}
             </div>

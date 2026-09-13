@@ -26,7 +26,6 @@ import type { FirestoreOrder } from '@/lib/types';
 import { notifyOrderStatus, notifyUser } from '@/lib/notifications';
 import { notifyOrderEmail } from '@/lib/order-notify';
 import { nextSellerTransition, statusLabel } from '@/lib/order-status';
-import { LABEL_STATUSES, PrintShippingLabel } from '@/components/profile/print-shipping-label';
 
 const ICONS: Record<string, any> = {
   in_preparation: Package,
@@ -304,31 +303,22 @@ export function SellerOrderActions({ order }: { order: FirestoreOrder }) {
     );
   }
 
-  // The label outlives the last seller transition: `shipped` offers no next
-  // step, and that is exactly when a seller may need to reprint one.
-  const showLabel = LABEL_STATUSES.has(order.status);
-  if (!transition && !showLabel) return null;
-  const Icon = transition ? ICONS[transition.status] || Package : Package;
+  if (!transition) return null;
+  const Icon = ICONS[transition.status] || Package;
 
   return (
     <div className="bg-background p-4 rounded-lg space-y-3">
       <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
         Fulfillment
       </h2>
-      {transition && (
-        <Button className="w-full" size="lg" onClick={handleAdvance} disabled={submitting}>
-          {submitting ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Icon className="mr-2 h-4 w-4" />
-          )}
-          {transition.label}
-        </Button>
-      )}
-
-      {showLabel && (
-        <PrintShippingLabel order={order} sellerId={user?.uid} className="w-full" />
-      )}
+      <Button className="w-full" size="lg" onClick={handleAdvance} disabled={submitting}>
+        {submitting ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <Icon className="mr-2 h-4 w-4" />
+        )}
+        {transition.label}
+      </Button>
 
       {canRequestCancel && <SellerCancelRequest order={order} />}
       {order.sellerCancelRequested && (

@@ -13,18 +13,11 @@ import { toDate } from '@/lib/defaults';
 import type { FirestoreOrder } from '@/lib/types';
 
 /**
- * Order statuses where a package exists to label.
- *
- * From "Start preparation" onward: the seller is packing and needs the label
- * in front of them. It stays through `prepared` and `shipped` so a lost or
- * smudged label can be reprinted without changing the order's state.
+ * Rendered by the seller timeline's own cards — the preparation card from
+ * "Start preparation" through `prepared`, and the shipped card after that, so
+ * a smudged label can be reprinted without moving the order's state. One
+ * button per stage, always in the card the seller is already reading.
  */
-export const LABEL_STATUSES: ReadonlySet<string> = new Set([
-  'in_preparation',
-  'prepared',
-  'shipped',
-]);
-
 /** The name the app shows for an account, in the app's own order of preference. */
 function partyFrom(data: Record<string, unknown> | null | undefined, fallbackName: string): LabelParty {
   const pick = (key: string) => {
