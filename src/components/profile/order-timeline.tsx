@@ -85,7 +85,7 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
                                             ON ITS WAY
                                         </Badge>
                                         <h4 className="font-semibold text-lg">{statusLabel('shipped', 'buyer')}</h4>
-                                        <p className="text-sm text-muted-foreground">Your package is on its way and the courier will contact you in 24 hours. Please make sure to be available to pick up your order and not cause delays.</p>
+                                        <p className="text-sm text-muted-foreground">Your package is on its way and the courier will contact you within 24 to 48 hours. Please make sure to be available to pick up your order and not cause delays.</p>
                                     </CardContent>
                                 </Card>
                             ) : isCurrentCompleted ? (

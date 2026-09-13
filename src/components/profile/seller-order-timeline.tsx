@@ -89,7 +89,7 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                                             ON ITS WAY
                                         </Badge>
                                         <h4 className="font-semibold text-lg">{statusLabel('shipped', 'seller')}</h4>
-                                        <p className="text-sm text-muted-foreground">Your package is on its way to the customer and you will be notified when they have received it. Delivery estimated in 24 h.</p>
+                                        <p className="text-sm text-muted-foreground">Your package is on its way to the customer and you will be notified when they have received it. Delivery estimated in 24 to 48 hours.</p>
                                     </CardContent>
                                 </Card>
                             ) : isCurrentCompleted ? (
