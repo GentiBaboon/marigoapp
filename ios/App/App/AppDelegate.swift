@@ -19,10 +19,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     ///
     /// Guarded on the plist rather than called unconditionally: `configure()`
     /// raises an uncatchable Objective-C exception when GoogleService-Info.plist
-    /// is missing, so a checkout without it — a fresh clone, CI, anyone who has
-    /// not downloaded the file from the Firebase console — would crash on launch
-    /// instead of merely going without push. The guard costs one bundle lookup
-    /// and turns a hard crash into a degraded feature.
+    /// is missing, so the app would crash on launch rather than merely going
+    /// without push. The guard costs one bundle lookup and turns that into a
+    /// degraded feature.
+    ///
+    /// The plist is gitignored (it carries an unrestricted Google API key and
+    /// this repository is public — see .gitignore), and it is a member of the
+    /// App target's Resources phase, so a fresh clone fails at *build* time
+    /// with "Build input file cannot be found" until it is downloaded from the
+    /// Firebase console. This guard covers the other way it goes missing: the
+    /// file present on disk but not in the target, which builds cleanly and
+    /// ships an app that cannot register for push.
     private func configureFirebase() {
         guard FirebaseApp.app() == nil else { return }
         guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else {

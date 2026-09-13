@@ -19,6 +19,9 @@ further work.
 | Apple App ID, same identifier | developer.apple.com, team `6AF53HFAKG` | Push + Sign in with Apple + Apple Pay all enabled on it |
 | Apple Merchant ID `merchant.com.marigoapp.marigo` | same | Attached to the App ID's Apple Pay capability |
 | APNs auth key, **Key ID `PZ8K649282`** | same; `.p8` downloaded once | Sandbox **&** Production, team-scoped. Apple keeps no copy |
+| Firebase iOS + Android apps | console, project `marigoappcom-v10-6377709-d8775` | Both registered on `com.marigoapp.marigo`; config files installed locally and **gitignored** (§2.1) |
+| `GoogleService-Info.plist` in the Xcode **target** | `project.pbxproj` Resources phase | Verified present inside the built `.app`; on disk alone is not enough |
+| `google_app_id` in the Android bundle | compiled by the Google Services plugin | `1:329665870351:android:6550558d0186d9e350817a`, verified inside the `.aab` |
 | `App.entitlements` | `ios/App/App/` | `aps-environment`, `applesignin`, `in-app-payments` |
 | APNs → FCM exchange | `ios/App/App/AppDelegate.swift` | One `firebase-admin` call then reaches both platforms |
 | Device registration + token storage | `src/lib/push/`, `src/components/platform/PushRegistrar.tsx` | Owner-only `users/{uid}/pushTokens` |
@@ -39,32 +42,47 @@ further work.
 
 ## 2. Blockers — only you can clear these
 
-### 2.1 Firebase config files (blocks push on both platforms)
+### 2.1 Firebase console — two steps left
 
-The apps are registered with Apple but **not yet with Firebase**, and the two
-config files are not in the repo. Until they are, push registration fails at
-runtime and Sign in with Apple cannot complete — neither fails the build, which
-is what makes this easy to miss.
+The iOS and Android apps are registered and both config files are installed
+locally (`ios/App/App/GoogleService-Info.plist`,
+`android/app/google-services.json`), verified present in a built `.app` bundle
+and compiled into the `.aab`. Two console settings remain, and neither fails a
+build — push and Apple sign-in simply do not work without them:
 
-In the Firebase console for `marigoappcom-v10-6377709-d8775` → Project settings
-→ *Your apps*:
+1. **Cloud Messaging → Apple app configuration → APNs Authentication Key.**
+   Upload `AuthKey_PZ8K649282.p8`, Key ID `PZ8K649282`, Team ID `6AF53HFAKG`.
+   Until this is done an iOS device registers and receives a token that no send
+   can reach.
+2. **Authentication → Sign-in method → Apple → Enable.** Leave Services ID and
+   the OAuth code-flow fields empty: they serve the web and Android flows, and
+   the app offers Apple on iOS only.
 
-1. **Add app → iOS**, bundle id `com.marigoapp.marigo`.
-   Download `GoogleService-Info.plist` → `ios/App/App/`, then **add it to the
-   Xcode target** (drag into the `App` group, "Copy items if needed", target
-   *App* ticked). Being on disk is not enough; it has to be in the bundle.
-2. **Add app → Android**, package `com.marigoapp.marigo`.
-   Download `google-services.json` → `android/app/`. The Gradle plugin picks it
-   up on its own — `app/build.gradle` applies it only when the file exists.
-3. **Cloud Messaging → Apple app configuration → APNs Authentication Key**:
-   upload `AuthKey_PZ8K649282.p8`, Key ID `PZ8K649282`, Team ID `6AF53HFAKG`.
-   Without this, iOS devices get a token that no send can reach.
-4. **Authentication → Sign-in method → Apple → Enable.** Services ID and the
-   OAuth code-flow fields stay empty: they are only needed for the web and
-   Android flows, and the app offers Apple on iOS only.
+**Both config files are gitignored**, like `keystore.properties`. Google does
+not class them as secrets — the ids are meant to ship inside the app — but each
+carries its own Google API key and a newly created one is **unrestricted**,
+which on a public repository is a billable-API abuse surface rather than a mere
+identifier. Consequences to know:
 
-Then rebuild — `npm run sync:native` — because the plist is copied into the app
-bundle at build time.
+- A fresh clone **fails the iOS build** with "Build input file cannot be found"
+  until the plist is downloaded, because it is a member of the App target's
+  Resources build phase. Android degrades more quietly: Gradle skips the Google
+  Services plugin and produces a bundle in which push cannot initialise.
+- **Restrict both keys** in the Google Cloud console → APIs & Services →
+  Credentials: the iOS key to bundle id `com.marigoapp.marigo`, the Android key
+  to that package name plus the signing SHA-1. Do this regardless — it is the
+  fix for the underlying exposure, and it makes committing the files a much
+  smaller question if you would rather have them in the repo.
+
+Adding `GoogleService-Info.plist` to the Xcode target is not optional and not
+the same as putting it in the folder — it must be in the Resources build phase
+or it is absent from the bundle at runtime, with no build error. It is wired in
+`project.pbxproj` already; verify after any project regeneration with:
+
+```bash
+unzip -l "$(find ~/Library/Developer/Xcode/DerivedData -name App.app -print -quit)" 2>/dev/null \
+  || ls "<DerivedData>/Build/Products/Release-iphonesimulator/App.app/GoogleService-Info.plist"
+```
 
 ### 2.2 Xcode signing (blocks the iOS upload)
 
