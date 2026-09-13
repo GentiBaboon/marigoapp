@@ -236,9 +236,11 @@ Auth (`/auth/*`): `login`, `signup`, `forgot-password`, `reset-password`, `verif
 Authenticated (gated by middleware §6):
 - `/profile`, `/profile/addresses`, `/profile/listings`, `/profile/listings/sales/[orderId]`, `/profile/orders`, `/profile/orders/[orderId]`, `/profile/offers`, `/profile/earnings`, `/profile/wallet`, `/profile/payments`, `/profile/settings`, `/profile/stripe-onboarding`
   - **The shipping label** (`src/lib/shipping-label.ts`) prints from the
-    Fulfillment card on `/profile/listings/sales/[orderId]`, from
-    `in_preparation` onward — it stays available through `prepared` and
-    `shipped` so a smudged label can be reprinted without moving the order.
+    seller timeline's preparation card, from `in_preparation` through
+    `prepared` — while the parcel is still in the seller's hands, where a
+    smudged label can be replaced. Gone once the order ships: the label is on
+    a package the seller no longer holds. The button says "again" at
+    `prepared`, so a second press reads as a reprint rather than a step.
     The module is pure: it builds the model (parties, lines, money, payment)
     and renders a **self-contained HTML document**, which
     `printHtmlDocument()` (`src/lib/print-document.ts`) writes into a blank

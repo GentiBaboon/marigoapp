@@ -13,10 +13,12 @@ import { toDate } from '@/lib/defaults';
 import type { FirestoreOrder } from '@/lib/types';
 
 /**
- * Rendered by the seller timeline's own cards — the preparation card from
- * "Start preparation" through `prepared`, and the shipped card after that, so
- * a smudged label can be reprinted without moving the order's state. One
- * button per stage, always in the card the seller is already reading.
+ * Rendered by the seller timeline's preparation card, from "Start
+ * preparation" through `prepared` — while the parcel is still in the
+ * seller's hands and a smudged label can be replaced. Deliberately absent
+ * once the order ships: the label is on a package the seller no longer
+ * holds, so another copy is at best waste paper and at worst a second label
+ * on a parcel in transit.
  */
 /** The name the app shows for an account, in the app's own order of preference. */
 function partyFrom(data: Record<string, unknown> | null | undefined, fallbackName: string): LabelParty {
