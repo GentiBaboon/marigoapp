@@ -90,7 +90,7 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                                         </Badge>
                                         <h4 className="font-semibold text-lg">{statusLabel('shipped', 'seller')}</h4>
                                         <p className="text-sm text-muted-foreground">Your package is on its way to the customer and you will be notified when they have received it. Delivery estimated in 24 h.</p>
-                                        <PrintShippingLabel order={order} sellerId={sellerUid} className="w-full" />
+                                        <PrintShippingLabel order={order} sellerId={sellerUid} label="Print shipping label again" className="w-full" />
                                     </CardContent>
                                 </Card>
                             ) : isCurrentCompleted ? (
@@ -152,6 +152,7 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                                         <PrintShippingLabel
                                             order={order}
                                             sellerId={sellerUid}
+                                            label={isPrepared ? 'Print shipping label again' : 'Print shipping label'}
                                             className="w-full bg-black text-white hover:bg-black/90 hover:text-white border-black"
                                         />
 

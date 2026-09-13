@@ -41,10 +41,17 @@ export function PrintShippingLabel({
   order,
   sellerId,
   className,
+  /**
+   * Wording for the stage. Once the parcel is packed the button is a second
+   * chance rather than a step, and saying so stops a seller wondering whether
+   * pressing it again undoes something.
+   */
+  label = 'Print shipping label',
 }: {
   order: FirestoreOrder;
   sellerId: string | undefined;
   className?: string;
+  label?: string;
 }) {
   const firestore = useFirestore();
   const { formatPrice } = useCurrency();
@@ -86,7 +93,7 @@ export function PrintShippingLabel({
   return (
     <Button variant="outline" className={className} size="lg" onClick={handlePrint} disabled={busy || !sellerId}>
       {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-      Print shipping label
+      {label}
     </Button>
   );
 }
