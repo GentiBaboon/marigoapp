@@ -11,9 +11,9 @@ import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 
 
-const statusVariants: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
+const statusVariants: { [key: string]: 'default' | 'secondary' | 'destructive' | 'success' } = {
   processing: 'default',
-  completed: 'default',
+  completed: 'success',
   shipped: 'default',
   delivered: 'default',
   pending_payment: 'secondary',

@@ -13,9 +13,9 @@ import { doc } from 'firebase/firestore';
 import { statusLabel } from '@/lib/order-status';
 
 
-const statusVariants: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
+const statusVariants: { [key: string]: 'default' | 'secondary' | 'destructive' | 'success' } = {
   processing: 'default',
-  completed: 'default',
+  completed: 'success',
   shipped: 'default',
   delivered: 'default',
   pending_payment: 'secondary',
