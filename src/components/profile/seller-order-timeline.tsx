@@ -4,8 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
-import { MessageSquare, Clock, Pencil, Truck, CheckCircle2 } from 'lucide-react';
+import { Clock, PackageCheck, Pencil, Truck, CheckCircle2 } from 'lucide-react';
 import type { FirestoreOrder, FirestoreAddress } from '@/lib/types';
 import { format, addDays } from 'date-fns';
 import { STATUS_RANK, statusLabel, stepState, TIMELINE_STEPS_SELLER } from '@/lib/order-status';
@@ -13,6 +12,7 @@ import { TimelineStep } from '@/components/profile/timeline-rail';
 import { PrintShippingLabel } from '@/components/profile/print-shipping-label';
 import { PackingInstructionsDialog } from '@/components/profile/packing-instructions-dialog';
 import { UpdateShippingOriginDialog } from '@/components/profile/update-shipping-origin-dialog';
+import { ContactPartyButton } from '@/components/profile/contact-party-button';
 import { useUser } from '@/firebase';
 
 interface SellerOrderTimelineProps {
@@ -56,6 +56,7 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
     const shipByDate = addDays(saleDate, 7);
 
     const isAwaitingShip = !isTerminal && (status === 'confirmed' || status === 'processing' || status === 'in_preparation' || status === 'prepared');
+    const isPrepared = status === 'prepared';
 
     return (
         <div>
@@ -104,31 +105,49 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                                     </CardContent>
                                 </Card>
                             ) : renderActionCard ? (
-                                <Card className="shadow-md border-orange-500">
+                                <Card className={cn('shadow-md', isPrepared ? 'border-blue-500' : 'border-orange-500')}>
                                     <CardContent className="p-4 space-y-4">
-                                        <Badge variant="outline" className="border-orange-500 text-orange-600 bg-orange-50 font-semibold">
-                                            <Clock className="mr-1.5 h-3 w-3" />
-                                            ACTION NEEDED
-                                        </Badge>
+                                        {/* Once the seller has packed it there is nothing for them
+                                            to do, so the orange "ACTION NEEDED" and the auto-cancel
+                                            warning both stop applying. */}
+                                        {isPrepared ? (
+                                            <Badge variant="outline" className="border-blue-500 text-blue-600 bg-blue-50 font-semibold">
+                                                <PackageCheck className="mr-1.5 h-3 w-3" />
+                                                READY FOR PICKUP
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant="outline" className="border-orange-500 text-orange-600 bg-orange-50 font-semibold">
+                                                <Clock className="mr-1.5 h-3 w-3" />
+                                                ACTION NEEDED
+                                            </Badge>
+                                        )}
                                         <h4 className="font-semibold text-lg">{statusLabel(status, 'seller')}</h4>
-                                        <p className="text-sm text-muted-foreground">Ship by {format(shipByDate, 'EEEE, MMMM d, yyyy')} otherwise your sale will be automatically cancelled.</p>
 
-                                        <div className="bg-muted/50 p-3 rounded-lg space-y-2">
-                                            <h5 className="font-semibold text-sm">NEXT STEPS</h5>
-                                            <ul className="list-disc pl-5 text-sm space-y-1">
-                                                <li>
-                                                    Pack your item following our simple{' '}
-                                                    <PackingInstructionsDialog>
-                                                        <button type="button" className="underline font-medium">instructions</button>
-                                                    </PackingInstructionsDialog>.
-                                                </li>
-                                                <li>Print the shipping label and attach it to your package.</li>
-                                                {/* No drop-off network yet — the driver comes to the
-                                                    seller, so the old "bring it to a drop-off point"
-                                                    step asked for something that does not exist. */}
-                                                <li>Mark your order as prepared and we will arrange the shipping. A driver picks it up within 1 to 2 days.</li>
-                                            </ul>
-                                        </div>
+                                        {isPrepared ? (
+                                            <p className="text-sm text-muted-foreground">Great, you are one step closer to finalising your sale! Now relax — we will send a driver to pick up your order within 24 to 48 hours. Please make sure you are available at your address.</p>
+                                        ) : (
+                                            <>
+                                                <p className="text-sm text-muted-foreground">Ship by {format(shipByDate, 'EEEE, MMMM d, yyyy')} otherwise your sale will be automatically cancelled.</p>
+
+                                                <div className="bg-muted/50 p-3 rounded-lg space-y-2">
+                                                    <h5 className="font-semibold text-sm">NEXT STEPS</h5>
+                                                    <ul className="list-disc pl-5 text-sm space-y-1">
+                                                        <li>
+                                                            Pack your item following our simple{' '}
+                                                            <PackingInstructionsDialog>
+                                                                <button type="button" className="underline font-medium">instructions</button>
+                                                            </PackingInstructionsDialog>.
+                                                        </li>
+                                                        <li>Print the shipping label and attach it to your package.</li>
+                                                        {/* No drop-off network yet — the driver comes to
+                                                            the seller, so the old "bring it to a drop-off
+                                                            point" step asked for something that does not
+                                                            exist. */}
+                                                        <li>Mark your order as prepared and we will arrange the shipping. A driver picks it up within 1 to 2 days.</li>
+                                                    </ul>
+                                                </div>
+                                            </>
+                                        )}
 
                                         <PrintShippingLabel
                                             order={order}
@@ -152,12 +171,12 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                                             <UpdateShippingOriginDialog order={order} currentAddressId={pickupAddressId}>
                                                 <Button variant="outline" className="w-full">Update shipping details</Button>
                                             </UpdateShippingOriginDialog>
-                                            <Button variant="outline" className="w-full" asChild>
-                                                <Link href="/messages">
-                                                    <MessageSquare className="mr-2 h-4 w-4" />
-                                                    Contact buyer
-                                                </Link>
-                                            </Button>
+                                            <ContactPartyButton
+                                                order={order}
+                                                otherUserId={order.buyerId}
+                                                label="Contact buyer"
+                                                className="w-full"
+                                            />
                                         </div>
                                     </CardContent>
                                 </Card>

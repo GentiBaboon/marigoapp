@@ -3,11 +3,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { MessageSquare, Clock, Truck, CheckCircle2 } from 'lucide-react';
+import { Clock, PackageCheck, Truck, CheckCircle2 } from 'lucide-react';
 import type { FirestoreOrder } from '@/lib/types';
 import { format, addDays } from 'date-fns';
 import { STATUS_RANK, statusLabel, stepState, TIMELINE_STEPS } from '@/lib/order-status';
 import { TimelineStep } from '@/components/profile/timeline-rail';
+import { ContactPartyButton } from '@/components/profile/contact-party-button';
 
 function toDate(ts: any): Date {
     if (!ts) return new Date();
@@ -102,16 +103,27 @@ export function OrderTimeline({ order }: { order: FirestoreOrder }) {
                                 <Card className="shadow-md">
                                     <CardContent className="p-4 space-y-3">
                                         <Badge variant="outline" className="border-blue-500 text-blue-600 bg-blue-50 font-semibold">
-                                            <Clock className="mr-1.5 h-3 w-3" />
-                                            IN PROGRESS
+                                            {status === 'prepared' ? <PackageCheck className="mr-1.5 h-3 w-3" /> : <Clock className="mr-1.5 h-3 w-3" />}
+                                            {status === 'prepared' ? 'READY FOR PICKUP' : 'IN PROGRESS'}
                                         </Badge>
                                         <h4 className="font-semibold text-lg">{statusLabel(status, 'buyer')}</h4>
-                                        <p className="text-sm text-muted-foreground">Seller has until {format(shipByDate, 'EEEE, MMMM d, yyyy')} to ship the item.</p>
-                                        <p className="text-sm text-muted-foreground">If they do not ship on time, we'll automatically cancel your order on {format(cancelDate, 'EEEE, MMMM d, yyyy')} and issue a full refund.</p>
-                                        <Button variant="outline" className="w-full">
-                                            <MessageSquare className="mr-2 h-4 w-4" />
-                                            Contact seller
-                                        </Button>
+                                        {/* Once the seller has packed it, the ship-by deadline and
+                                            the auto-cancel warning are answered — repeating them
+                                            reads as a threat about something already done. */}
+                                        {status === 'prepared' ? (
+                                            <p className="text-sm text-muted-foreground">Your order has been prepared by the seller, and we will notify you when it is on its way.</p>
+                                        ) : (
+                                            <>
+                                                <p className="text-sm text-muted-foreground">Seller has until {format(shipByDate, 'EEEE, MMMM d, yyyy')} to ship the item.</p>
+                                                <p className="text-sm text-muted-foreground">If they do not ship on time, we&apos;ll automatically cancel your order on {format(cancelDate, 'EEEE, MMMM d, yyyy')} and issue a full refund.</p>
+                                            </>
+                                        )}
+                                        <ContactPartyButton
+                                            order={order}
+                                            otherUserId={order.sellerIds?.[0]}
+                                            label="Contact seller"
+                                            className="w-full"
+                                        />
                                     </CardContent>
                                 </Card>
                             ) : (

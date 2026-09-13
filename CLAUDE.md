@@ -317,6 +317,21 @@ Authenticated (gated by middleware §6):
   collects within 1 to 2 days", not "bring it to a drop-off point". The
   packing copy in that dialog is a **first draft pending the team's own
   wording** — it is one array, replace it there.
+- **"Contact seller" and "Contact buyer" were both buttons with no handler.**
+  `ContactPartyButton` now drives both through `openConversation()`
+  (`src/lib/open-conversation.ts`). `/api/start-conversation` was written for
+  the product page, where the caller is always the buyer, so it read the
+  counterparty from `sellerId` and a *seller* pressing the button would have
+  opened a thread with themselves; it takes `otherUserId` now and its lookup
+  is symmetric, so whoever presses first lands both parties in the same
+  thread. Threads are per **product**, not per order, so asking about an item
+  and then about the order stay in one place.
+- **`prepared` is not `in_preparation`.** Both timelines rendered one card for
+  the pair, so a seller who had already packed the parcel still saw
+  "ACTION NEEDED", a ship-by deadline and the packing checklist, and the buyer
+  still saw the auto-cancel warning. At `prepared` both now show a calm
+  "READY FOR PICKUP" card; the seller keeps the label, the pickup address and
+  the contact button, since the address may still change until collection.
 - **Changing where an order ships from re-prices it.** The seller picks a
   pickup address on the sale page; `/api/orders/shipping-origin` verifies they
   hold it (an address id, never a typed city, so nobody posts "Tirana" for a

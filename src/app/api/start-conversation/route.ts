@@ -49,12 +49,13 @@ async function getUser(userId: string, idToken: string) {
 }
 
 async function findExistingConversation(
-  buyerId: string,
-  sellerId: string,
+  callerId: string,
+  counterpartyId: string,
   productId: string,
   idToken: string
 ): Promise<string | null> {
-  // Query conversations where productId matches and buyer is a participant
+  // Conversations on this product that the caller is in — then check the
+  // other party is too. Works from either side, so both land on one thread.
   const body = {
     structuredQuery: {
       from: [{ collectionId: 'conversations' }],
@@ -73,7 +74,7 @@ async function findExistingConversation(
               fieldFilter: {
                 field: { fieldPath: 'participants' },
                 op: 'ARRAY_CONTAINS',
-                value: { stringValue: buyerId },
+                value: { stringValue: callerId },
               },
             },
           ],
@@ -102,7 +103,7 @@ async function findExistingConversation(
     const source = fromFS(fields.source);
     if (source === 'dispute' || fields.disputeId) continue;
     const participants = fromFS(fields.participants) as string[];
-    if (participants.includes(sellerId)) {
+    if (participants.includes(counterpartyId)) {
       return r.document.name.split('/').pop();
     }
   }
@@ -110,8 +111,8 @@ async function findExistingConversation(
 }
 
 async function createConversation(
-  buyerId: string,
-  sellerId: string,
+  callerId: string,
+  counterpartyId: string,
   productId: string,
   productTitle: string,
   productImage: string,
@@ -121,17 +122,17 @@ async function createConversation(
 ): Promise<string> {
   const fields: Record<string, any> = {};
   const data = {
-    participants: [buyerId, sellerId],
+    participants: [callerId, counterpartyId],
     participantDetails: [
-      { userId: buyerId, name: buyerDetails.name, avatar: buyerDetails.avatar || '' },
-      { userId: sellerId, name: sellerDetails.name, avatar: sellerDetails.avatar || '' },
+      { userId: callerId, name: buyerDetails.name, avatar: buyerDetails.avatar || '' },
+      { userId: counterpartyId, name: sellerDetails.name, avatar: sellerDetails.avatar || '' },
     ],
     productId,
     productTitle,
     productImage,
     lastMessage: '',
     lastMessageAt: new Date().toISOString(),
-    unreadCount: { [buyerId]: 0, [sellerId]: 0 },
+    unreadCount: { [callerId]: 0, [counterpartyId]: 0 },
     createdAt: new Date().toISOString(),
   };
 
@@ -178,37 +179,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(verified.body, { status: verified.status });
     }
 
-    const buyerId = decoded.sub;
-    const { productId, sellerId, productTitle, productImage } = await req.json();
+    const callerId = decoded.sub;
+    const { productId, sellerId, otherUserId, productTitle, productImage } = await req.json();
 
-    if (!productId || !sellerId) {
-      return NextResponse.json({ error: 'productId and sellerId are required' }, { status: 400 });
+    // Either party may open the thread. The route was written for the product
+    // page, where the caller is always the buyer and the counterparty is the
+    // listing's seller — so a *seller* pressing "Contact buyer" would have
+    // opened a conversation with themselves. `otherUserId` names the
+    // counterparty outright; `sellerId` stays accepted for the buyer flow.
+    const counterpartyId = typeof otherUserId === 'string' && otherUserId ? otherUserId : sellerId;
+
+    if (!productId || !counterpartyId) {
+      return NextResponse.json({ error: 'productId and a counterparty are required' }, { status: 400 });
     }
 
-    if (buyerId === sellerId) {
+    if (callerId === counterpartyId) {
       return NextResponse.json({ error: 'Cannot message yourself' }, { status: 400 });
     }
 
-    // Check for existing conversation
-    const existingId = await findExistingConversation(buyerId, sellerId, productId, idToken);
+    // Symmetric: the lookup is "a thread on this product that both of us are
+    // in", so whoever presses the button first lands both of them in the same
+    // one rather than opening a second thread from the other side.
+    const existingId = await findExistingConversation(callerId, counterpartyId, productId, idToken);
     if (existingId) {
       return NextResponse.json({ conversationId: existingId, isNew: false });
     }
 
-    // Fetch user profiles for participant details
-    const [buyerData, sellerData] = await Promise.all([
-      getUser(buyerId, idToken),
-      getUser(sellerId, idToken),
+    const [callerData, counterpartyData] = await Promise.all([
+      getUser(callerId, idToken),
+      getUser(counterpartyId, idToken),
     ]);
 
     const conversationId = await createConversation(
-      buyerId,
-      sellerId,
+      callerId,
+      counterpartyId,
       productId,
       productTitle || 'Item',
       productImage || '',
-      { name: buyerData?.name || 'Buyer', avatar: buyerData?.profileImage },
-      { name: sellerData?.name || 'Seller', avatar: sellerData?.profileImage },
+      { name: callerData?.name || 'Member', avatar: callerData?.profileImage },
+      { name: counterpartyData?.name || 'Member', avatar: counterpartyData?.profileImage },
       idToken
     );
 
