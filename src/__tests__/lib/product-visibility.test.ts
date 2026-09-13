@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isPubliclyViewable, canViewProduct, PUBLIC_PRODUCT_STATUSES } from '@/lib/product-visibility';
+import { isPubliclyViewable, canViewProduct, PUBLIC_PRODUCT_STATUSES, unavailableLabel } from '@/lib/product-visibility';
 
 describe('isPubliclyViewable', () => {
   it.each(['active', 'reserved', 'sold'])('allows %s', (s) => {
@@ -47,5 +47,24 @@ describe('canViewProduct', () => {
   it('does not treat a signed-out viewer as the seller', () => {
     expect(canViewProduct({ status: 'draft', sellerId: undefined, viewerId: undefined })).toBe(false);
     expect(canViewProduct({ status: 'draft', sellerId: null, viewerId: null })).toBe(false);
+  });
+});
+
+describe('unavailableLabel', () => {
+  it('never calls a sold listing reserved', () => {
+    expect(unavailableLabel('sold')).toBe('Sold');
+    expect(unavailableLabel('reserved')).toBe('Reserved');
+  });
+
+  it('is null for anything still buyable, so it reads as the condition', () => {
+    expect(unavailableLabel('active')).toBeNull();
+    expect(unavailableLabel(undefined)).toBeNull();
+    expect(unavailableLabel(null)).toBeNull();
+  });
+
+  it('says nothing about a listing no shopper can reach', () => {
+    for (const s of ['draft', 'pending_review', 'removed', 'expired']) {
+      expect(unavailableLabel(s)).toBeNull();
+    }
   });
 });

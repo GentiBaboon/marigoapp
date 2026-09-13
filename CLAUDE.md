@@ -201,6 +201,16 @@ Public:
     **names back to slugs**: products store display names in `brandId` and
     `categoryId` but a slug in `subcategoryId`. A crumb whose slug cannot be
     resolved renders as plain text rather than a link to an empty result set.
+  - **A sold listing says "Sold", not "Reserved"** (`unavailableLabel()` in
+    `src/lib/product-visibility.ts`). Both the card's overlay and the product
+    page's buy button printed "Reserved" for either status, so a completed
+    order left its listing looking like it was merely being held and might
+    come back. The pipeline behind it was always right — cash checkout takes
+    stock and flips the listing to `reserved`, `markOrderItemsSoldIfDepleted`
+    flips it to `sold` when an admin completes the order, and the JSON-LD has
+    always emitted `OutOfStock` for anything but `active` — only the visible
+    word lagged. One helper now decides it, because that label had already
+    drifted across two surfaces.
   - **Only `active` / `reserved` / `sold` are public** (`src/lib/product-visibility.ts`).
     A `draft`, `pending_review`, `removed` or `expired` listing used to serve 200
     with `index, follow` *and* Product JSON-LD — a moderation hole, not a

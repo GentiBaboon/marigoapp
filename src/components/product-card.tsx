@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
 import { buildProductPath } from '@/lib/product-slug';
+import { unavailableLabel } from '@/lib/product-visibility';
 import { Badge } from '@/components/ui/badge';
 import { useWishlist } from '@/context/WishlistContext';
 import React from 'react';
@@ -81,7 +82,8 @@ export const ProductCard = React.memo(function ProductCard({ product, className 
 
   const displayTitle = product.title || 'Untitled Product';
   const brandName = product.brandId || product.brand || 'Luxury Item';
-  const isReserved = product.status === 'reserved' || product.status === 'sold';
+  // 'Sold' or 'Reserved' — never the same word for both; see unavailableLabel.
+  const unavailable = unavailableLabel(product.status);
 
   return (
     <div className={cn('group', className)}>
@@ -93,7 +95,7 @@ export const ProductCard = React.memo(function ProductCard({ product, className 
               alt={displayTitle}
               fill
               sizes="(max-width: 768px) 50vw, 33vw"
-              className={cn('object-cover', isReserved && 'opacity-60')}
+              className={cn('object-cover', unavailable && 'opacity-60')}
               unoptimized={false}
             />
           ) : (
@@ -104,10 +106,10 @@ export const ProductCard = React.memo(function ProductCard({ product, className 
           {product.vintage && (
              <Badge variant="outline" className="absolute top-2 left-2 bg-background/80 font-normal text-[10px]">VINTAGE</Badge>
           )}
-          {isReserved && (
+          {unavailable && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <span className="bg-foreground text-background text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow">
-                Reserved
+                {unavailable}
               </span>
             </div>
           )}

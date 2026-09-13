@@ -31,6 +31,28 @@ export function isPubliclyViewable(status: ProductStatus | string | undefined | 
  * to see a draft or a pending item to work on it — and so do admins, who
  * moderate from links. Everyone else gets the not-available page.
  */
+/**
+ * The word a shopper sees on a listing that is public but cannot be bought.
+ *
+ * `sold` and `reserved` are **not** the same thing and the app used to print
+ * "Reserved" for both — on the card's overlay and on the product page's buy
+ * button — so a completed order left its listing looking like it was merely
+ * being held for someone. Reserved means a cash order is in flight and could
+ * still fall through; sold means it is gone. The structured data already drew
+ * the distinction (`OutOfStock` for both, but the status is in the document),
+ * and only the visible label lagged.
+ *
+ * `null` for anything a shopper can still buy, so a caller can use it as the
+ * whole condition rather than repeating the status list.
+ */
+export function unavailableLabel(
+  status: ProductStatus | string | undefined | null,
+): 'Sold' | 'Reserved' | null {
+  if (status === 'sold') return 'Sold';
+  if (status === 'reserved') return 'Reserved';
+  return null;
+}
+
 export function canViewProduct(args: {
   status: ProductStatus | string | undefined | null;
   sellerId?: string | null;

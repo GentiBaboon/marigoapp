@@ -2,6 +2,7 @@
 'use client'; 
 
 import { isEmailUnverifiedResponse, verifyEmailHref } from '@/lib/account-verification';
+import { unavailableLabel } from '@/lib/product-visibility';
 import * as React from 'react';
 import Image from 'next/image';
 import { ProductGallery } from '@/components/product/ProductGallery';
@@ -140,7 +141,9 @@ export default function ProductDetailPage() {
     const variantOutOfStock = hasVariants && !!selectedVariant && selectedVariant.quantity <= 0;
 
     const isSeller = user?.uid === product?.sellerId;
-    const isSoldOrReserved = product?.status === 'sold' || product?.status === 'reserved';
+    // 'Sold' or 'Reserved'; null while the listing can still be bought.
+    const unavailable = unavailableLabel(product?.status);
+    const isSoldOrReserved = unavailable !== null;
 
     // Remember this product for the shopper's own "Last Viewed" rail. Separate
     // from the counter below: that one is the listing's public view count, this
@@ -345,8 +348,8 @@ export default function ProductDetailPage() {
                             onClick={handleAddToCart}
                             disabled={isSoldOrReserved || (hasVariants && (!selectedSize || variantOutOfStock))}
                         >
-                            {isSoldOrReserved
-                              ? 'Reserved'
+                            {unavailable
+                              ? unavailable
                               : hasVariants && !selectedSize
                                 ? 'Select a size'
                                 : variantOutOfStock
