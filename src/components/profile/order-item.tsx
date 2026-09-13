@@ -5,7 +5,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { MoreVertical, ChevronRight, Package, Truck, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import * as React from 'react';
+import { useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { useAppRouter as useRouter } from '@/lib/platform/use-app-router';
+import { useToast } from '@/hooks/use-toast';
+import { openConversation } from '@/lib/open-conversation';
 import { doc } from 'firebase/firestore';
 
 import type { FirestoreOrder, FirestoreUser } from '@/lib/types';
@@ -35,7 +39,30 @@ const SellerInfo = ({ sellerId }: { sellerId: string }) => {
 
 export function OrderItem({ order }: { order: FirestoreOrder }) {
   const { formatPrice } = useCurrency();
+  const { user } = useUser();
+  const router = useRouter();
+  const { toast } = useToast();
+  const [contacting, setContacting] = React.useState(false);
   const item = order.items[0];
+
+  // Same thread the order page and the product page open — per product, so a
+  // buyer is never split across two conversations about one item.
+  const contactSeller = async () => {
+    if (contacting) return;
+    setContacting(true);
+    try {
+      const conversationId = await openConversation(user, {
+        productId: String(item?.id || (item as any)?.productId || ''),
+        otherUserId: order.sellerIds?.[0] || '',
+        productTitle: item?.title,
+        productImage: item?.image,
+      });
+      router.push(`/messages/${conversationId}`);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Could not open the chat', description: err?.message });
+      setContacting(false);
+    }
+  };
   
   const statusConfig: Record<string, { label: string, color: string, icon: any }> = {
       pending_payment: { label: 'Pending Payment', color: 'bg-orange-100 text-orange-700', icon: Package },
@@ -73,8 +100,14 @@ export function OrderItem({ order }: { order: FirestoreOrder }) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                     <DropdownMenuItem asChild><Link href={`/profile/orders/${order.id}`}>Track Order</Link></DropdownMenuItem>
-                    <DropdownMenuItem>Contact Seller</DropdownMenuItem>
-                    <DropdownMenuItem>Need Help?</DropdownMenuItem>
+                    {/* Both of these were items with no handler at all. */}
+                    <DropdownMenuItem
+                        disabled={contacting}
+                        onSelect={(e) => { e.preventDefault(); contactSeller(); }}
+                    >
+                        {contacting ? 'Opening chat…' : 'Contact Seller'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/help">Need Help?</Link></DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>

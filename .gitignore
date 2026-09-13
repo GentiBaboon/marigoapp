@@ -81,6 +81,7 @@ ImportPhotos/
 .next-native/
 # Scratch dist dir for NEXT_DIST_DIR builds
 .next-webcheck/
+.next-check/
 
 # Native platform build output. The ios/ and android/ project folders
 # themselves are committed — they hold signing config, icons and plugin

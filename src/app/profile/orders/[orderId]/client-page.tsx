@@ -147,9 +147,11 @@ export default function OrderDetailsPage() {
                 <OrderCustomerActions order={order} />
 
                 <div className="pt-8">
-                     <Button variant="outline" className="w-full bg-background">
-                        <HelpCircle className="mr-2 h-4 w-4"/>
-                        Help center
+                     <Button variant="outline" className="w-full bg-background" asChild>
+                        <Link href="/help">
+                            <HelpCircle className="mr-2 h-4 w-4"/>
+                            Help center
+                        </Link>
                     </Button>
                 </div>
             </main>

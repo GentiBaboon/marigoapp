@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2, XCircle, RotateCcw } from 'lucide-react';
 import type { FirestoreOrder } from '@/lib/types';
+import { ContactPartyButton } from '@/components/profile/contact-party-button';
 import { notifyOrderStatus, notifyUser } from '@/lib/notifications';
 
 const CANCEL_REASONS = [
@@ -56,11 +57,11 @@ export function OrderCustomerActions({ order }: { order: FirestoreOrder }) {
   const [refundReason, setRefundReason] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
 
-  const canCancel = CANCELLABLE.has(order.status);
-  const canRefund = order.status === 'completed';
+  const isTerminal = order.status === 'cancelled' || order.status === 'refunded';
+  const canCancel = !isTerminal && CANCELLABLE.has(order.status);
+  const canRefund = !isTerminal && order.status === 'completed';
   const alreadyRequestedCancel = order.status === 'cancel_requested';
   const alreadyRequestedRefund = order.status === 'refund_requested';
-  const isTerminal = order.status === 'cancelled' || order.status === 'refunded';
 
   const handleSubmit = async (kind: 'cancel' | 'refund') => {
     if (!firestore || !user) return;
@@ -168,14 +169,29 @@ export function OrderCustomerActions({ order }: { order: FirestoreOrder }) {
     }
   };
 
-  if (isTerminal) return null;
-
+  // Not `return null` on a terminal order any more: cancel and refund stop
+  // applying, but a buyer with a cancelled order is often exactly the one who
+  // needs to reach the seller.
   return (
     <div className="bg-background p-4 rounded-lg space-y-3">
       <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
         Need help with this order?
       </h2>
 
+      {/* Available at every status. The timeline's card carries one too, but
+          only while the order is being prepared. */}
+      <ContactPartyButton
+        order={order}
+        otherUserId={order.sellerIds?.[0]}
+        label="Contact seller"
+        className="w-full justify-start"
+      />
+
+      {isTerminal && (
+        <p className="text-sm text-muted-foreground">
+          This order was {order.status === 'cancelled' ? 'cancelled' : 'refunded'}.
+        </p>
+      )}
       {alreadyRequestedCancel && (
         <p className="text-sm text-muted-foreground">
           Cancellation request submitted. We'll email you once it's reviewed.
