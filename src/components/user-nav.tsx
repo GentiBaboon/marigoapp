@@ -39,7 +39,6 @@ import {
 import { useCurrency, type Currency } from '@/context/CurrencyContext';
 import { useTranslation, type Locale } from '@/context/LanguageContext';
 import { useCart } from '@/context/CartContext';
-import { useWishlist } from '@/context/WishlistContext';
 import { doc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { FirestoreUser } from '@/lib/types';
 import dynamic from 'next/dynamic';
@@ -92,10 +91,6 @@ export function UserNav() {
   const { currency, setCurrency } = useCurrency();
   const { t } = useTranslation();
   const { items: cartItems } = useCart();
-  // Reads the provider the root layout already mounts, so the badge costs no
-  // extra Firestore listener — the wishlist is live for the whole session.
-  const { wishlistItems } = useWishlist();
-  const wishlistCount = wishlistItems.length;
   // Sum of quantities — a single line with quantity 3 should show "3", not "1".
   const cartCount = React.useMemo(
     () => cartItems.reduce((sum, item) => sum + (item.quantity ?? 1), 0),
@@ -172,14 +167,9 @@ export function UserNav() {
           Desktop only — a fifth icon does not fit beside the logo at 375px
           (it pushed the bell on top of the wordmark), so the phone reaches
           the wishlist from the profile menu instead. */}
-      <Button asChild variant="ghost" size="icon" aria-label="Wishlist" className="relative hidden md:inline-flex">
+      <Button asChild variant="ghost" size="icon" aria-label="Wishlist" className="hidden md:inline-flex">
         <Link href="/favorites">
           <Heart className="h-6 w-6" />
-          {wishlistCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
-              {wishlistCount > 9 ? '9+' : wishlistCount}
-            </span>
-          )}
         </Link>
       </Button>
       <CartPopover />
