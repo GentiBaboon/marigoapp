@@ -38,6 +38,8 @@ import {
   LayoutDashboard,
   ShieldAlert,
   Coins,
+  Receipt,
+  Heart,
   Wallet,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -104,7 +106,15 @@ export default function ProfilePage() {
   const menuItems = [
     ...(isAdmin ? [{ href: '/admin', label: 'Admin Dashboard', icon: ShieldAlert }] : []),
     { href: '/profile/orders', label: 'My Orders', icon: Package },
+    // The phone's way into the wishlist: the header's heart is desktop-only
+    // (a fifth icon overlaps the logo at 375px) and the bottom nav has no
+    // slot for it, so without this row /favorites has no link on mobile.
+    { href: '/favorites', label: 'My Favorites', icon: Heart },
     { href: '/profile/listings', label: 'My Listings', icon: Tag },
+    // The "Sold" tab of the same page is the seller's order list. It had no
+    // entry of its own, so a sale was only reachable by opening Listings and
+    // knowing to switch tabs.
+    { href: '/profile/listings?tab=sold', label: 'My Sales', icon: Receipt },
     { href: '/profile/offers', label: 'My Offers', icon: Handshake },
     ...(isSeller ? [{ href: '/profile/earnings', label: 'My Earnings', icon: Coins }] : []),
     { href: '/profile/stripe-onboarding', label: 'Setup Payouts (Sellers)', icon: Landmark },

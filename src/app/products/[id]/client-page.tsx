@@ -29,6 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProductCard } from '@/components/product-card';
 import { cn } from '@/lib/utils';
 import { useRecordProductView } from '@/hooks/use-recently-viewed';
+import { markViewCounted, readLastCountedAt, shouldCountView } from '@/lib/view-throttle';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { MakeOfferSheet } from '@/components/product/make-offer-sheet';
@@ -150,15 +151,20 @@ export default function ProductDetailPage() {
     // one is personal history, and until now nothing recorded it at all.
     useRecordProductView(product?.id);
 
-    // Bump the product's view count once per browser session. Sellers don't
-    // inflate their own views, and a session-storage key per product means
-    // refreshes within the same tab session don't double-count.
+    // The listing's public view count: every opening of this page counts,
+    // including repeat visits by the same shopper — but at most once an hour
+    // per listing per browser, so a refresh or a back-and-forward doesn't
+    // inflate it. See src/lib/view-throttle.ts for the window itself.
+    //
+    // Sellers still don't count their own views. Anonymous visitors don't
+    // count either: `views` is guarded by `isActiveUser()` in firestore.rules,
+    // and opening it up would mean an unauthenticated write path.
     React.useEffect(() => {
         if (!firestore || !product?.id || !user) return;
         if (user.uid === product.sellerId) return;
-        const key = `marigo_viewed_${product.id}`;
-        if (typeof window === 'undefined' || sessionStorage.getItem(key)) return;
-        sessionStorage.setItem(key, '1');
+        if (typeof window === 'undefined') return;
+        if (!shouldCountView(readLastCountedAt(product.id))) return;
+        markViewCounted(product.id);
         updateDoc(doc(firestore, 'products', product.id), { views: increment(1) })
           .catch((err) => console.warn('views bump failed:', err));
     }, [firestore, product?.id, product?.sellerId, user]);
@@ -197,9 +203,11 @@ export default function ProductDetailPage() {
         addToCart(product, { selectedSize: selectedSize ?? undefined });
     };
 
+    const saved = isFavorite(product.id);
+
     const handleToggleFavorite = (e: React.MouseEvent) => {
         e.preventDefault(); e.stopPropagation();
-        isFavorite(product.id) ? removeFromWishlist(product.id) : addToWishlist(product.id);
+        saved ? removeFromWishlist(product.id) : addToWishlist(product.id);
     }
 
     const handleContactSeller = async () => {
@@ -255,9 +263,6 @@ export default function ProductDetailPage() {
                     <p className="text-base text-muted-foreground md:text-lg">{product.title}</p>
                     <AuthenticityBadge authenticityCheck={product.authenticityCheck} />
                 </div>
-                <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-destructive" onClick={handleToggleFavorite}>
-                    <Heart className={cn("h-6 w-6", isFavorite(product.id) && "fill-destructive text-destructive")} />
-                </Button>
             </div>
             
             <div className="space-y-1.5 text-sm">
@@ -355,6 +360,23 @@ export default function ProductDetailPage() {
                                 : variantOutOfStock
                                   ? 'Out of stock'
                                   : 'Add to bag'}
+                        </Button>
+                        {/* The wishlist toggle is a labelled button rather than
+                            the bare heart icon this replaced: the icon sat
+                            beside the title where it read as decoration, and
+                            nothing on the page said what it did or that the
+                            item was already saved. Stays enabled on a sold or
+                            reserved listing — saving something you just missed
+                            is exactly when a shopper reaches for it. */}
+                        <Button
+                            size="lg"
+                            variant="outline"
+                            className={cn('w-full', saved && 'border-destructive/40 text-destructive hover:text-destructive')}
+                            onClick={handleToggleFavorite}
+                            aria-pressed={saved}
+                        >
+                            <Heart className={cn('mr-2 h-4 w-4', saved && 'fill-current')} />
+                            {saved ? 'In wishlist' : 'Add to wishlist'}
                         </Button>
                         {/* `allowOffers` is the seller's switch in the sell
                             wizard and the edit page. It was written on every
