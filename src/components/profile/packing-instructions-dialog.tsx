@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { Box, ShieldCheck, Sparkles, Tag } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,35 +17,29 @@ import {
  * at `href="#"` — it looked like guidance existed and scrolled the page
  * instead.
  *
- * **The copy below is a first draft, pending the team's own wording.** It is
- * one array precisely so replacing it is an edit to this list and nothing
- * else; keep each step to a title and one or two plain sentences, which is
- * what a seller standing over a box will actually read.
+ * This is the team's own wording, replacing the placeholder draft that stood
+ * here. Numbered rather than iconned: step 4 depends on step 3 being done
+ * ("once the package is sealed"), so the order is part of the instruction and
+ * four abstract icons hid that. Keep each step to a title and one plain
+ * sentence — this is read by someone standing over a box.
  */
-const STEPS: Array<{ icon: React.ElementType; title: string; body: string }> = [
+const STEPS: Array<{ title: string; body: string }> = [
   {
-    icon: Sparkles,
-    title: 'Check the item one last time',
-    body:
-      'Make sure it matches your listing — same colour, same size, no marks you have not mentioned. A buyer who opens a surprise opens a dispute.',
+    title: 'Prepare your item',
+    body: 'Clean it, iron or polish it, and fold it.',
   },
   {
-    icon: ShieldCheck,
-    title: 'Protect it',
-    body:
-      'Fold clothing along its natural seams and wrap it in tissue or a clean bag so it cannot rub in transit. Stuff bags and shoes so they keep their shape, and wrap handles, buckles and heels separately.',
+    title: 'Find an appropriate packing bag',
+    body: 'Pick one the item fits into properly.',
   },
   {
-    icon: Box,
-    title: 'Use a box or mailer that closes properly',
+    title: 'Include everything in the product details',
     body:
-      'The parcel should be snug, with nothing shifting when you shake it, and sealed all the way along the opening. Reuse a box if it is sturdy, but cover any old labels.',
+      'Label, certificate, dustbag and anything else you mentioned in the listing has to go in the parcel.',
   },
   {
-    icon: Tag,
-    title: 'Attach the shipping label',
-    body:
-      'Print it, tape it flat to the largest face of the parcel, and keep the barcode and the order number clear of the seams. Put a second copy inside the parcel if you have one.',
+    title: 'Seal it, then attach the shipping label',
+    body: 'Once the package is sealed, stick the shipping label on it.',
   },
 ];
 
@@ -63,11 +56,11 @@ export function PackingInstructionsDialog({ children }: { children: React.ReactN
             A few minutes here is what keeps an item arriving as the buyer pictured it.
           </DialogDescription>
         </DialogHeader>
-        <ul className="space-y-4">
-          {STEPS.map(({ icon: Icon, title, body }) => (
+        <ol className="space-y-4">
+          {STEPS.map(({ title, body }, i) => (
             <li key={title} className="flex gap-3">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Icon className="h-4 w-4" />
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary-deep">
+                {i + 1}
               </span>
               <div className="min-w-0">
                 <p className="font-semibold text-sm">{title}</p>
@@ -75,7 +68,7 @@ export function PackingInstructionsDialog({ children }: { children: React.ReactN
               </div>
             </li>
           ))}
-        </ul>
+        </ol>
         <p className="text-xs text-muted-foreground border-t pt-3">
           Once it is packed, mark the order as prepared and we arrange the pickup.
         </p>

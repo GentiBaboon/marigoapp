@@ -317,8 +317,9 @@ Authenticated (gated by middleware §6):
   and its address controls open `UpdateShippingOriginDialog`. There is **no
   drop-off network**, so the third step is "mark it prepared and a driver
   collects within 1 to 2 days", not "bring it to a drop-off point". The
-  packing copy in that dialog is a **first draft pending the team's own
-  wording** — it is one array, replace it there.
+  packing copy in that dialog is the **team's own wording** (since
+  2026-09-15) — four numbered steps in one array, replace it there. Numbered,
+  not iconned: step 4 depends on step 3 ("once the package is sealed").
 - **Every "Contact seller" / "Contact buyer" was a button with no handler.**
   All of them now go through `openConversation()`
   (`src/lib/open-conversation.ts`), most via `ContactPartyButton`: the buyer's
