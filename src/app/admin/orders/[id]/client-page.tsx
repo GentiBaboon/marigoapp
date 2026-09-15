@@ -25,6 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { notifyOrderStatus } from '@/lib/notifications';
 import { notifyOrderEmail } from '@/lib/order-notify';
 import { releaseOrderItems, markOrderItemsSoldIfDepleted } from '@/lib/order-inventory';
+import { CashSettlementCard } from '@/components/admin/cash-settlement-card';
 
 const ORDER_STATUSES = [
   { value: 'confirmed', label: 'Processing' },
@@ -319,6 +320,8 @@ export default function AdminOrderDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        <CashSettlementCard order={order} />
 
         {/* Shipping Address */}
         <Card>

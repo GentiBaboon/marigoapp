@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import {
   Activity,
   Archive,
+  Banknote,
   Bot,
   ChevronLeft,
   ChevronRight,
@@ -41,6 +42,10 @@ const navItems = [
   { href: '/admin/users', label: 'Users', icon: Users, permission: 'users.view' as AdminPermission },
   { href: '/admin/analytics', label: 'Analytics', icon: Activity, permission: 'analytics.view' as AdminPermission },
   { href: '/admin/finance', label: 'Finance', icon: DollarSign, permission: 'finance.view' as AdminPermission },
+  // Its own entry rather than a tab inside Finance: this is a work queue
+  // someone clears, not a report someone reads, and it needs to be countable
+  // at a glance.
+  { href: '/admin/payouts', label: 'Payouts', icon: Banknote, permission: 'payouts.manage' as AdminPermission },
   { href: '/admin/marketing', label: 'Marketing', icon: Megaphone, permission: 'marketing.manage' as AdminPermission },
   { href: '/admin/logistics', label: 'Logistics', icon: Truck, permission: 'logistics.manage' as AdminPermission },
   { href: '/admin/moderation', label: 'Moderation', icon: ShieldAlert, permission: 'moderation.manage' as AdminPermission },

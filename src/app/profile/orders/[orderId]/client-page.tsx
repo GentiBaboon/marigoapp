@@ -109,7 +109,13 @@ export default function OrderDetailsPage() {
 
     return (
         <div className="bg-muted/40 min-h-screen">
-            <main className="p-4 space-y-4">
+            {/* pb-28 under md clears the fixed MobileNav (h-16 + safe area,
+                z-50). Without it the last element on the page — the Help
+                centre button — sat *underneath* the nav: visible, focusable,
+                and untappable, because the tap landed on the nav above it.
+                The link was never broken; it could not be reached. Same
+                reason /products/[id] carries pb-32. */}
+            <main className="p-4 space-y-4 pb-28 md:pb-8">
                  <div className="bg-background p-4 rounded-lg">
                     <h1 className="font-semibold text-lg mb-4">Ref #{order.orderNumber}</h1>
                     <div className="flex gap-4 items-center">

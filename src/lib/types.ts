@@ -403,6 +403,17 @@ export interface FirestoreOrder {
   // When equals totalAmount → fully refunded; between 0 and totalAmount →
   // partially refunded.
   refundedAmount?: number;
+  /**
+   * When the cash for this order actually reached Marigo from the logistics
+   * partner — set by an operator from /admin/orders/[id], admin-only in the
+   * rules. `completed` means the buyer has the parcel; this means the money
+   * is in hand, which is the only thing that makes a seller's earnings
+   * withdrawable. See `src/lib/payouts.ts` for why the two are separate.
+   * Card orders need no stamp: capture already moved the funds.
+   */
+  cashSettledAt?: FirestoreTimestamp;
+  /** uid of the operator who confirmed it — the ledger needs a name on it. */
+  cashSettledBy?: string;
 }
 
 // Append-only finance ledger. Every money movement (sale, refund, partial
@@ -432,6 +443,55 @@ export interface FirestoreTransaction {
   note?: string;
   createdAt: FirestoreTimestamp;
   createdBy?: string;
+}
+
+/**
+ * A seller asking to be paid out, and the bank details to pay them against.
+ *
+ * Nearly all money on the platform arrives as cash at the door, so there is
+ * no automatic rail out — an operator makes the transfer by hand and marks
+ * the row `paid`. `/admin/payouts` is that queue.
+ *
+ * The bank details live on the request rather than on the seller's profile:
+ * the user document is world-readable (the public seller profile is built
+ * from it), and a standing store of account numbers is a liability where a
+ * per-request copy is not. Each row also records the details the transfer was
+ * actually made against, which is what reconciliation needs.
+ *
+ * Amounts are EUR, like every stored money value. The 5.000 ALL floor lives
+ * in `src/lib/payouts.ts` and is converted, never hardcoded here.
+ */
+export interface FirestorePayoutRequest {
+  id: string;
+  sellerId: string;
+  /** Denormalised so the admin queue does not read a user doc per row. */
+  sellerName?: string;
+  sellerEmail?: string;
+  /** EUR. What the seller asked for — their whole available balance. */
+  amount: number;
+  status: 'pending' | 'approved' | 'paid' | 'rejected';
+  bank: {
+    accountHolder: string;
+    iban: string;
+    bankName: string;
+    swift?: string;
+  };
+  /** The seller's available/clearing/pending split when they asked, so a
+   *  later dispute can be read against what they were shown. */
+  balanceSnapshot?: {
+    available: number;
+    clearing: number;
+    pending: number;
+  };
+  createdAt: FirestoreTimestamp;
+  updatedAt?: FirestoreTimestamp;
+  /** Operator who moved it off `pending`. */
+  decidedBy?: string;
+  decidedAt?: FirestoreTimestamp;
+  /** Bank reference for a completed transfer; shown back to the seller. */
+  transferReference?: string;
+  /** Why it was declined, or any operator note. Visible to the seller. */
+  adminNote?: string;
 }
 
 // --- Shared Components ---

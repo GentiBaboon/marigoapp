@@ -295,7 +295,19 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || request.auth.uid in resource.data.sellerIds || isAdmin());
       allow create: if isActiveUser();
-      allow update: if isAdmin() || (isActiveUser() && (resource.data.buyerId == request.auth.uid || request.auth.uid in resource.data.sellerIds));
+      // `cashSettledAt` records that the buyer's cash actually reached Marigo
+      // from the logistics partner, and it is the single thing that makes a
+      // seller's earnings withdrawable (src/lib/payouts.ts). The party branch
+      // below is deliberately broad — a buyer or seller may drive their own
+      // order's status — so without this carve-out a seller could stamp it on
+      // their own order and pay themselves out of money the platform has not
+      // received yet. Admin-only, for the same reason `role` and `status` are
+      // on users.
+      allow update: if isAdmin() || (
+        isActiveUser()
+        && (resource.data.buyerId == request.auth.uid || request.auth.uid in resource.data.sellerIds)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['cashSettledAt', 'cashSettledBy'])
+      );
       // Admin-only delete — used by the operator reset tool at
       // /admin/danger/reset-orders. No buyer/seller delete path; cancellations
       // go through status updates, not deletions.
@@ -451,6 +463,36 @@ service cloud.firestore {
     // Finance ledger. Append-only: admins create rows from order-lifecycle
     // helpers; nobody updates or deletes them. Readable by the buyer/seller
     // tied to the transaction so each side can show their own history.
+    // Seller withdrawal requests. Money leaves the platform by an operator
+    // making a bank transfer by hand, so this collection is a queue of asks,
+    // not a rail — nothing here moves money on its own.
+    match /payout_requests/{requestId} {
+      // `isFullAdmin`, not `isAdmin`: the latter also accepts moderator and
+      // analyst, and these documents carry bank account numbers and authorise
+      // money leaving the platform. That matches `payouts.manage`, which the
+      // permission table grants to admin and super_admin only — the rules and
+      // the sidebar must agree, or the UI hides a page the database allows.
+      allow read: if isSignedIn() && (resource.data.sellerId == request.auth.uid || isFullAdmin());
+
+      // A seller opens their own, always as `pending`. They state the amount
+      // and the account; the operator checks it against the ledger before
+      // transferring, which is the real control — rules cannot compute a
+      // seller's balance, and an inflated ask simply gets declined in the
+      // queue. What rules *can* stop is someone filing in another member's
+      // name or creating a row that is already approved.
+      allow create: if isActiveUser()
+        && request.resource.data.sellerId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && request.resource.data.bank is map;
+
+      // Only a full admin decides. A seller who could edit their own pending
+      // row could raise the amount after it had been reviewed.
+      allow update: if isFullAdmin();
+      allow delete: if isFullAdmin();
+    }
+
     match /transactions/{txnId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAdmin();

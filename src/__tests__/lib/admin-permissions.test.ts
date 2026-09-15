@@ -10,7 +10,7 @@ import {
 const ALL_PERMISSION_NAMES: AdminPermission[] = [
   'dashboard.view', 'products.manage', 'orders.manage', 'offers.view',
   'users.view', 'users.manage', 'users.change_role',
-  'finance.view', 'finance.manage', 'settings.manage',
+  'finance.view', 'finance.manage', 'payouts.manage', 'settings.manage',
   'moderation.manage', 'marketing.manage', 'logistics.manage',
   'logs.view', 'support.manage', 'disputes.manage',
   'refunds.manage', 'returns.manage', 'analytics.view',
@@ -18,23 +18,29 @@ const ALL_PERMISSION_NAMES: AdminPermission[] = [
 
 describe('admin-permissions', () => {
   describe('ROLE_PERMISSIONS', () => {
-    it('super_admin has all 20 permissions', () => {
-      expect(ROLE_PERMISSIONS.super_admin).toHaveLength(20);
+    it('super_admin has all 21 permissions', () => {
+      expect(ROLE_PERMISSIONS.super_admin).toHaveLength(21);
       for (const perm of ALL_PERMISSION_NAMES) {
         expect(ROLE_PERMISSIONS.super_admin).toContain(perm);
       }
     });
 
     it('admin has all permissions except users.change_role', () => {
-      expect(ROLE_PERMISSIONS.admin).toHaveLength(19);
+      expect(ROLE_PERMISSIONS.admin).toHaveLength(20);
       expect(ROLE_PERMISSIONS.admin).not.toContain('users.change_role');
       for (const perm of ALL_PERMISSION_NAMES.filter(p => p !== 'users.change_role')) {
         expect(ROLE_PERMISSIONS.admin).toContain(perm);
       }
     });
 
-    it('moderator has exactly 10 permissions', () => {
+    // Deliberately not payouts.manage: money leaving the platform is a full
+    // admin's call, and firestore.rules gates payout_requests on isFullAdmin()
+    // to match. A moderator seeing the page the database refuses would be the
+    // worse failure.
+    it('moderator has exactly 10 permissions and cannot touch payouts', () => {
       expect(ROLE_PERMISSIONS.moderator).toHaveLength(10);
+      expect(ROLE_PERMISSIONS.moderator).not.toContain('payouts.manage');
+      expect(ROLE_PERMISSIONS.analyst).not.toContain('payouts.manage');
       expect(ROLE_PERMISSIONS.moderator).toContain('messages.view');
       expect(ROLE_PERMISSIONS.moderator).toContain('dashboard.view');
       expect(ROLE_PERMISSIONS.moderator).toContain('products.manage');

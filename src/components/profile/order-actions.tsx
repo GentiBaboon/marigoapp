@@ -34,12 +34,14 @@ const CANCEL_REASONS = [
   'Other',
 ];
 
+// No "No longer needed": a refund is asked for after the parcel has arrived,
+// and changing your mind is not a fault in the item. It belongs in the
+// cancellation list above, which is what runs before the item ships.
 const REFUND_REASONS = [
   'Item not as described',
   'Item arrived damaged',
   'Wrong item received',
   'Item never arrived',
-  'No longer needed',
   'Other',
 ];
 

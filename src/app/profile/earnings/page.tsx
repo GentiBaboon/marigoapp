@@ -3,8 +3,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, where, limit, doc } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { getMarigoFunctions } from '@/firebase/functions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,19 +28,20 @@ import {
 } from 'recharts';
 import { format, subDays, isWithinInterval, startOfDay } from 'date-fns';
 import Link from 'next/link';
-import { type FirestoreOrder, type FirestoreSettings, DEFAULT_COMMISSION_RATE, toDate } from '@/lib/types';
+import { type FirestoreOrder, type FirestorePayoutRequest, type FirestoreSettings, DEFAULT_COMMISSION_RATE, toDate } from '@/lib/types';
 import { isSettled, newestFirst, sellerNet } from '@/lib/order-money';
+import {
+    amountToMinimum,
+    canRequestWithdrawal,
+    MIN_WITHDRAWAL_ALL,
+    summarizeSellerBalance,
+} from '@/lib/payouts';
 
 export default function SellerEarningsPage() {
     const { user } = useUser();
     const firestore = useFirestore();
     const { formatPrice } = useCurrency();
     const { toast } = useToast();
-    const functions = getMarigoFunctions();
-
-    const [stripeBalance, setStripeBalance] = useState({ available: 0, pending: 0 });
-    const [isBalanceLoading, setIsBalanceLoading] = useState(true);
-    const [isRequestingPayout, setIsRequestingPayout] = useState(false);
 
     // Fetch Seller's Orders for History & Chart
     const salesQuery = useMemoFirebase(() => {
@@ -54,6 +53,12 @@ export default function SellerEarningsPage() {
             where('sellerIds', 'array-contains', user.uid),
             limit(100)
         );
+    }, [user, firestore]);
+
+    // This seller's withdrawal requests — open ones hold part of the balance.
+    const payoutQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return query(collection(firestore, 'payout_requests'), where('sellerId', '==', user.uid), limit(50));
     }, [user, firestore]);
 
     const { data: rawSales, isLoading: isSalesLoading } = useCollection<FirestoreOrder>(salesQuery);
@@ -68,52 +73,24 @@ export default function SellerEarningsPage() {
     const commissionRate = settings?.commissionRate ?? DEFAULT_COMMISSION_RATE;
     const myNet = (sale: FirestoreOrder) => (user ? sellerNet(sale, user.uid, commissionRate) : 0);
 
-    // Fetch Balance from Stripe via Cloud Function
-    useEffect(() => {
-        if (!user) return;
-
-        const fetchBalance = async () => {
-            setIsBalanceLoading(true);
-            try {
-                const getSellerBalance = httpsCallable(functions, 'getSellerBalance');
-                const result: any = await getSellerBalance();
-                setStripeBalance({
-                    available: result.data.available || 0,
-                    pending: result.data.pending || 0
-                });
-            } catch (error) {
-                console.error("Balance fetch error:", error);
-            } finally {
-                setIsBalanceLoading(false);
-            }
-        };
-
-        fetchBalance();
-    }, [user, functions]);
-
-    const handleRequestPayout = async () => {
-        if (stripeBalance.available <= 0) return;
-        
-        setIsRequestingPayout(true);
-        try {
-            const requestPayout = httpsCallable(functions, 'requestPayout');
-            await requestPayout();
-            toast({
-                title: "Payout Requested!",
-                description: "Your funds are being transferred to your bank account."
-            });
-            // Update balance locally
-            setStripeBalance(prev => ({ ...prev, available: 0 }));
-        } catch (error: any) {
-            toast({
-                variant: "destructive",
-                title: "Payout Failed",
-                description: error.message || "Could not process payout."
-            });
-        } finally {
-            setIsRequestingPayout(false);
-        }
-    };
+    // Balance comes from Firestore, not Stripe.
+    //
+    // This page used to call the `getSellerBalance` and `requestPayout`
+    // callables. Both are Stripe Connect paths: they need a connected account
+    // and a captured card balance. Card payments are switched off
+    // (CARD_PAYMENTS_ENABLED) and the Connect functions cannot even be invoked
+    // — the org policy blocks the `allUsers` grant — so the fetch failed CORS
+    // on every load and the payout button threw for every seller who pressed
+    // it. Almost all money here is cash collected at the door, and it is paid
+    // out by hand; `src/lib/payouts.ts` is the model for that, shared with the
+    // wallet so the two pages cannot disagree about one balance.
+    const { data: rawRequests } = useCollection<FirestorePayoutRequest>(payoutQuery);
+    const balance = useMemo(
+        () => summarizeSellerBalance(sales as any, user?.uid ?? '', commissionRate, rawRequests ?? []),
+        [sales, user?.uid, commissionRate, rawRequests],
+    );
+    const gate = canRequestWithdrawal(balance);
+    const shortfall = amountToMinimum(balance.available);
 
     // Calculate Chart Data
     const chartData = useMemo(() => {
@@ -190,14 +167,16 @@ export default function SellerEarningsPage() {
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
                             <Clock className="h-4 w-4" />
-                            Pending (Escrow)
+                            On the way to you
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="text-3xl font-bold">
-                            {isBalanceLoading ? <Skeleton className="h-9 w-32" /> : formatPrice(stripeBalance.pending)}
+                            {isSalesLoading ? <Skeleton className="h-9 w-32" /> : formatPrice(balance.clearing + balance.pending)}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">Held until 72h after delivery</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Sold, but the cash has not reached us yet
+                        </p>
                     </CardContent>
                 </Card>
 
@@ -205,21 +184,28 @@ export default function SellerEarningsPage() {
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium flex items-center gap-2 text-green-700">
                             <CheckCircle2 className="h-4 w-4" />
-                            Available for Payout
+                            Available to withdraw
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="text-3xl font-bold text-green-700">
-                            {isBalanceLoading ? <Skeleton className="h-9 w-32" /> : formatPrice(stripeBalance.available)}
+                            {isSalesLoading ? <Skeleton className="h-9 w-32" /> : formatPrice(balance.available)}
                         </div>
-                        <Button 
-                            className="w-full bg-green-600 hover:bg-green-700 text-white" 
-                            disabled={stripeBalance.available <= 0 || isRequestingPayout}
-                            onClick={handleRequestPayout}
-                        >
-                            {isRequestingPayout ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wallet className="h-4 w-4 mr-2" />}
-                            Request Payout
+                        {/* Withdrawing happens on the wallet, which owns the
+                            form and the request history — two places to start
+                            the same flow is how they drift apart. */}
+                        <Button asChild className="w-full bg-green-600 hover:bg-green-700 text-white">
+                            <Link href="/profile/wallet">
+                                <Wallet className="h-4 w-4 mr-2" />
+                                {gate.ok ? 'Withdraw to my bank' : 'Go to my wallet'}
+                            </Link>
                         </Button>
+                        {!gate.ok && shortfall > 0 && (
+                            <p className="text-xs text-muted-foreground text-center">
+                                {formatPrice(shortfall)} more to reach the{' '}
+                                {MIN_WITHDRAWAL_ALL.toLocaleString('de-DE')} ALL minimum
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
             </div>

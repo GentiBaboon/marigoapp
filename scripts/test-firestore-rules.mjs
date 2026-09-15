@@ -75,6 +75,10 @@ await create('products/p1/offers/o-open', { buyerId: 'banned', sellerId: 'seller
 
 const offer = (buyer) => ({ buyerId: buyer, sellerId: 'seller', offerAmount: 50, amount: 50, status: 'pending' });
 await create('coupons/w10', { code: 'WELCOME10', usedCount: 0, value: 10, isActive: true, firstOrderOnly: true }, 'owner');
+// Payouts: one order the seller is on, and one withdrawal request of theirs.
+await create('orders/o-settle', { buyerId: 'buyer', sellerIds: ['seller'], status: 'completed' }, 'owner');
+await create('payout_requests/pr1', { sellerId: 'seller', amount: 60, status: 'pending', bank: { iban: 'AL35' } }, 'owner');
+const payoutReq = (sellerId, extra = {}) => ({ sellerId, amount: 60, status: 'pending', bank: { iban: 'AL35' }, ...extra });
 
 // ── cases ───────────────────────────────────────────────────────────────────
 const cases = [
@@ -132,6 +136,29 @@ const cases = [
   ['banned cannot open a support chat', 403, () => create('support_chats/sb', { userId: 'banned' }, 'banned')],
   ['banned cannot open a dispute', 403, () => create('disputes/db', { buyerId: 'banned' }, 'banned')],
   ['banned cannot apply as a courier', 403, () => create('courier_profiles/banned', { userId: 'banned' }, 'banned')],
+
+  // Payouts — money leaving the platform.
+  //
+  // The orders update rule lets a buyer or seller drive their own order, so
+  // `cashSettledAt` (which is what releases a seller's money) has to be carved
+  // out explicitly or a seller could stamp it and pay themselves out of cash
+  // Marigo has not received.
+  ['seller cannot mark their own order cash-settled', 403, () => update('orders/o-settle', { cashSettledAt: 'now' }, 'seller')],
+  ['buyer cannot mark an order cash-settled either', 403, () => update('orders/o-settle', { cashSettledAt: 'now' }, 'buyer')],
+  ['seller can still update their own order otherwise', 200, () => update('orders/o-settle', { status: 'completed' }, 'seller')],
+  ['admin can mark an order cash-settled', 200, () => update('orders/o-settle', { cashSettledAt: 'now', cashSettledBy: 'admin1' }, 'admin1')],
+
+  ['seller can open their own withdrawal request', 200, () => create('payout_requests/pr-new', payoutReq('seller'), 'seller')],
+  ['nobody can file a withdrawal in someone else\'s name', 403, () => create('payout_requests/pr-forged', payoutReq('seller'), 'buyer')],
+  ['a request cannot be created already approved', 403, () => create('payout_requests/pr-self', payoutReq('buyer', { status: 'approved' }), 'buyer')],
+  ['a request cannot be created for nothing', 403, () => create('payout_requests/pr-zero', payoutReq('buyer', { amount: 0 }), 'buyer')],
+  ['banned member cannot ask to be paid out', 403, () => create('payout_requests/pr-banned', payoutReq('banned'), 'banned')],
+  ['seller cannot approve their own request', 403, () => update('payout_requests/pr1', { status: 'approved' }, 'seller')],
+  ['seller cannot raise the amount after filing', 403, () => update('payout_requests/pr1', { amount: 9999 }, 'seller')],
+  ['seller can read their own request', 200, () => call('GET', `${BASE}/payout_requests/pr1`, undefined, 'seller')],
+  ['another member cannot read someone\'s bank details', 403, () => call('GET', `${BASE}/payout_requests/pr1`, undefined, 'buyer')],
+  ['admin can read a request', 200, () => call('GET', `${BASE}/payout_requests/pr1`, undefined, 'admin1')],
+  ['admin can mark it paid', 200, () => update('payout_requests/pr1', { status: 'paid' }, 'admin1')],
 
   // Reads are untouched
   ['banned can still read a product', 200, () => call('GET', `${BASE}/products/p1`, undefined, 'banned')],

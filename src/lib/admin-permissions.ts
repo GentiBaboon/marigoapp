@@ -8,6 +8,10 @@ export type AdminPermission =
   | 'users.change_role'
   | 'finance.view'
   | 'finance.manage'
+  /** The seller withdrawal queue on /admin/payouts. Money leaves the platform
+   *  here, so it sits with finance rather than with order handling — a
+   *  moderator does not get it. */
+  | 'payouts.manage'
   | 'settings.manage'
   | 'moderation.manage'
   | 'marketing.manage'
@@ -24,7 +28,7 @@ export type AdminPermission =
 const ALL_PERMISSIONS: AdminPermission[] = [
   'dashboard.view', 'products.manage', 'orders.manage', 'offers.view',
   'users.view', 'users.manage', 'users.change_role',
-  'finance.view', 'finance.manage', 'settings.manage',
+  'finance.view', 'finance.manage', 'payouts.manage', 'settings.manage',
   'moderation.manage', 'marketing.manage', 'logistics.manage',
   'logs.view', 'support.manage', 'messages.view', 'disputes.manage',
   'refunds.manage', 'returns.manage', 'analytics.view',

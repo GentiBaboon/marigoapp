@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Clock, PackageCheck, Pencil, Truck, CheckCircle2 } from 'lucide-react';
+import { Clock, PackageCheck, Pencil, Truck, CheckCircle2, Wallet, ArrowRight } from 'lucide-react';
 import type { FirestoreOrder, FirestoreAddress } from '@/lib/types';
 import { format, addDays } from 'date-fns';
 import { STATUS_RANK, statusLabel, stepState, TIMELINE_STEPS_SELLER } from '@/lib/order-status';
@@ -14,6 +14,8 @@ import { PackingInstructionsDialog } from '@/components/profile/packing-instruct
 import { UpdateShippingOriginDialog } from '@/components/profile/update-shipping-origin-dialog';
 import { ContactPartyButton } from '@/components/profile/contact-party-button';
 import { useUser } from '@/firebase';
+import Link from 'next/link';
+import { isCashSettled, MIN_WITHDRAWAL_ALL } from '@/lib/payouts';
 
 interface SellerOrderTimelineProps {
     order: FirestoreOrder;
@@ -23,6 +25,9 @@ interface SellerOrderTimelineProps {
 export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderTimelineProps) {
     const { status } = order;
     const { user } = useUser();
+    // Whether Marigo has the buyer's cash yet — it changes what the completed
+    // card can honestly promise. See src/lib/payouts.ts.
+    const cashSettled = isCashSettled(order as any);
     const sellerUid = user?.uid;
     // Where the driver is told to come. The parent resolves this: the address
     // the seller last chose for this order, else their default one.
@@ -93,14 +98,52 @@ export function SellerOrderTimeline({ order, shippingFromAddress }: SellerOrderT
                                     </CardContent>
                                 </Card>
                             ) : isCurrentCompleted ? (
+                                // The end of the seller's job is the start of a
+                                // wait, and the old copy ("your payout will be
+                                // processed shortly") promised something nobody
+                                // was doing — there is no automatic payout on a
+                                // cash order. What actually happens is: the
+                                // courier settles with Marigo, then the money
+                                // becomes withdrawable. Say that, and hand them
+                                // the page where it happens.
                                 <Card className="shadow-md border-green-500">
-                                    <CardContent className="p-4 space-y-2">
+                                    <CardContent className="p-4 space-y-3">
                                         <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50 font-semibold">
                                             <CheckCircle2 className="mr-1.5 h-3 w-3" />
                                             DELIVERED
                                         </Badge>
                                         <h4 className="font-semibold text-lg">{statusLabel('completed', 'seller')}</h4>
-                                        <p className="text-sm text-muted-foreground">The buyer has received the package. Your payout will be processed shortly.</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            The buyer has received the package — nothing more is needed from you.
+                                        </p>
+                                        <div className="rounded-lg bg-muted/50 p-3 space-y-1.5">
+                                            <p className="text-sm font-medium flex items-center gap-2">
+                                                <Wallet className="h-4 w-4 text-emerald-700" />
+                                                {cashSettled ? 'Your earnings are ready' : 'Your earnings are on the way'}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {cashSettled ? (
+                                                    <>
+                                                        We have received the payment for this order, so your earnings are
+                                                        available in your wallet. You can withdraw once your balance reaches{' '}
+                                                        {MIN_WITHDRAWAL_ALL.toLocaleString('de-DE')} ALL.
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        The buyer paid the courier in cash. As soon as the courier settles
+                                                        with Marigo, your earnings move to available in your wallet — then you
+                                                        can withdraw them to your bank account from{' '}
+                                                        {MIN_WITHDRAWAL_ALL.toLocaleString('de-DE')} ALL.
+                                                    </>
+                                                )}
+                                            </p>
+                                        </div>
+                                        <Button asChild className="w-full bg-emerald-600 hover:bg-emerald-700">
+                                            <Link href="/profile/wallet">
+                                                Go to my wallet
+                                                <ArrowRight className="ml-2 h-4 w-4" />
+                                            </Link>
+                                        </Button>
                                     </CardContent>
                                 </Card>
                             ) : renderActionCard ? (

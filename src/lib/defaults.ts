@@ -116,7 +116,9 @@ export const DEFAULT_SHIPPING_FEE_ALL = 200;
  * Albania are two crossings, not one.
  */
 export const CROSS_BORDER_SHIPPING_FEE_ALL = 500;
-const ALL_PER_EUR = 93;
+/** Exported so the payout threshold (`src/lib/payouts.ts`) derives from the
+ *  same rate the delivery fees do, rather than restating 93. */
+export const ALL_PER_EUR = 93;
 export const DEFAULT_SHIPPING_FEE_EUR = DEFAULT_SHIPPING_FEE_ALL / ALL_PER_EUR;
 export const CROSS_BORDER_SHIPPING_FEE_EUR = CROSS_BORDER_SHIPPING_FEE_ALL / ALL_PER_EUR;
 

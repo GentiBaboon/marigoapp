@@ -10,20 +10,18 @@
  * and a transaction-style list below. Visual emphasis uses the green palette
  * to distinguish the seller's wallet from the order/listing pages.
  *
- * Money math:
- *   commissionRate ← settings/global.commissionRate (default 0.15)
- *   Per order, the seller's net = totalAmount * (1 - commissionRate).
- *   - Total Sales Revenue: sum of every sale (status = completed | confirmed |
- *     in_preparation | prepared | shipped | reserved). Reflects everything
- *     the buyer paid for.
- *   - Total Earnings: revenue × (1 - commissionRate). What this seller earned
- *     before refunds.
- *   - Available Balance: completed orders only × (1 - rate). Eligible for
- *     payout right now.
- *   - Pending Balance: in-flight orders × (1 - rate). Money that will become
- *     available once delivery is confirmed.
- *   - Refunded: refunded/cancelled orders × (1 - rate). Earnings clawed back.
- *   - Commission Paid: revenue × commissionRate.
+ * Money math lives in `src/lib/payouts.ts` — `summarizeSellerBalance()` —
+ * not here, so the wallet, the withdraw form, the admin queue and the rules
+ * cannot drift into different answers about the same balance. The three
+ * stages it reports are the whole model:
+ *   - available: completed AND the cash reached Marigo, minus anything
+ *     already requested or paid. This is the only withdrawable number.
+ *   - clearing: completed, but Marigo is still waiting on the cash from the
+ *     logistics partner. Almost every order passes through here, because
+ *     almost every order is cash on delivery.
+ *   - pending: sold, parcel still in flight.
+ * Commission comes off before all three (`sellerNet`), so every figure on
+ * this page is the seller's own money.
  *
  * The transaction list below shows each sale row with a Sale/Refund tag,
  * the buyer-paid amount, the platform commission, and the seller's net for
@@ -35,9 +33,20 @@ import * as React from 'react';
 import Link from 'next/link';
 import { collection, query, where, limit, doc } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import type { FirestoreOrder, FirestoreSettings } from '@/lib/types';
+import type { FirestoreOrder, FirestorePayoutRequest, FirestoreSettings, FirestoreUser } from '@/lib/types';
 import { toDate } from '@/lib/types';
 import { newestFirst } from '@/lib/order-money';
+import {
+  amountToMinimum,
+  canRequestWithdrawal,
+  maskIban,
+  MIN_WITHDRAWAL_ALL,
+  PAYOUT_STATUS_LABELS,
+  summarizeSellerBalance,
+  type PayoutRequestStatus,
+} from '@/lib/payouts';
+import { WithdrawDialog } from '@/components/profile/withdraw-dialog';
+import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +62,9 @@ import {
   Undo,
   ReceiptText,
   CalendarRange,
+  Truck,
+  Info,
+  Clock,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -145,6 +157,39 @@ export default function SellerWalletPage() {
   const { data: rawOrders, isLoading } = useCollection<FirestoreOrder>(salesQuery);
   const orders = React.useMemo(() => newestFirst(rawOrders, (o) => toDate(o.createdAt as any)), [rawOrders]);
 
+  // This seller's own withdrawal requests. Single-field `where`, no orderBy —
+  // pairing the two would need a composite index that is not deployed, which
+  // is the failure that used to leave sellers staring at an empty page.
+  const payoutQuery = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return query(collection(firestore, 'payout_requests'), where('sellerId', '==', user.uid), limit(50));
+  }, [firestore, user?.uid]);
+  const { data: rawRequests } = useCollection<FirestorePayoutRequest>(payoutQuery);
+  const requests = React.useMemo(
+    () => newestFirst(rawRequests, (r) => toDate(r.createdAt as any)),
+    [rawRequests],
+  );
+
+  const userRef = useMemoFirebase(
+    () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
+    [firestore, user?.uid],
+  );
+  const { data: firestoreUser } = useDoc<FirestoreUser>(userRef);
+
+  const [withdrawOpen, setWithdrawOpen] = React.useState(false);
+
+  // The payout half of the money model — see src/lib/payouts.ts.
+  const balance = React.useMemo(
+    () => summarizeSellerBalance(orders as any, user?.uid ?? '', commissionRate, requests ?? []),
+    [orders, user?.uid, commissionRate, requests],
+  );
+  const gate = canRequestWithdrawal(balance);
+  const shortfall = amountToMinimum(balance.available);
+  const openRequest = React.useMemo(
+    () => (requests ?? []).find((r) => r.status === 'pending' || r.status === 'approved') ?? null,
+    [requests],
+  );
+
   // Calculate this seller's portion of each order. An order can contain items
   // from multiple sellers; only sum the line items whose sellerId is mine.
   const stats = React.useMemo(() => {
@@ -235,6 +280,100 @@ export default function SellerWalletPage() {
         </p>
       </div>
 
+      {/* Withdrawal — the action the page exists for, directly under the
+          headline number rather than buried below the insight rows. */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Banknote className="h-4 w-4 text-emerald-700" />
+            Available to withdraw
+          </CardTitle>
+          <CardDescription>
+            Earnings from orders where the money has reached Marigo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoading ? (
+            <Skeleton className="h-9 w-40" />
+          ) : (
+            <p className="text-3xl font-extrabold tracking-tight text-emerald-700">
+              {formatPrice(balance.available)}
+            </p>
+          )}
+
+          {openRequest ? (
+            // An open request holds the balance, so showing a withdraw button
+            // here would offer money that is already claimed.
+            <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 space-y-1">
+              <p className="text-sm font-semibold text-amber-900 flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                {PAYOUT_STATUS_LABELS[openRequest.status as PayoutRequestStatus] ?? 'In review'}
+              </p>
+              <p className="text-xs text-amber-900/80">
+                {formatPrice(openRequest.amount)} to {maskIban(openRequest.bank?.iban)}. We will let you know
+                once the transfer is on its way.
+              </p>
+            </div>
+          ) : gate.ok ? (
+            <Button
+              size="lg"
+              className="w-full bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => setWithdrawOpen(true)}
+            >
+              <Banknote className="mr-2 h-4 w-4" />
+              Withdraw {formatPrice(balance.available)}
+            </Button>
+          ) : (
+            <div className="space-y-2">
+              {/* The bar answers "how far off am I?" — a disabled button with
+                  no number is the version sellers ask support about. */}
+              <Progress
+                value={
+                  shortfall > 0
+                    ? Math.min(100, (balance.available / (balance.available + shortfall)) * 100)
+                    : 0
+                }
+                className="h-2"
+              />
+              <p className="text-xs text-muted-foreground">
+                You can withdraw once you reach{' '}
+                <span className="font-semibold text-foreground">
+                  {MIN_WITHDRAWAL_ALL.toLocaleString('de-DE')} ALL
+                </span>{' '}
+                in available earnings
+                {shortfall > 0 ? <> — {formatPrice(shortfall)} to go.</> : '.'}
+              </p>
+            </div>
+          )}
+
+          {/* Why money sits in "clearing" is the single most confusing thing
+              about a cash-on-delivery marketplace, so it is explained in
+              place rather than in a help article nobody opens. */}
+          <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Info className="h-3.5 w-3.5" />
+              How you get paid
+            </p>
+            <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal pl-4">
+              <li>The buyer pays the courier in cash when the parcel arrives.</li>
+              <li>
+                The courier settles with Marigo. Until that happens your earnings sit in{' '}
+                <span className="font-medium text-foreground">on the way</span> below.
+              </li>
+              <li>
+                Once we have the money it moves to{' '}
+                <span className="font-medium text-foreground">available</span>, minus our{' '}
+                {(commissionRate * 100).toFixed(0)}% commission.
+              </li>
+              <li>
+                At {MIN_WITHDRAWAL_ALL.toLocaleString('de-DE')} ALL you can request a transfer to your bank
+                account.
+              </li>
+            </ol>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Insights list — each row reads naturally, no grid of dashboard tiles. */}
       <Card>
         <CardContent className="px-4 py-1 divide-y">
@@ -246,19 +385,27 @@ export default function SellerWalletPage() {
             isLoading={isLoading}
           />
           <InsightRow
-            icon={Banknote}
-            label="Ready for payout"
-            helper="Completed orders, available now"
-            value={formatPrice(stats.available)}
-            accent="positive"
+            icon={Truck}
+            label="On the way to you"
+            helper="Delivered — waiting for the courier to settle with us"
+            value={formatPrice(balance.clearing)}
+            accent="pending"
             isLoading={isLoading}
           />
           <InsightRow
             icon={Hourglass}
             label="Pending"
             helper="In-flight orders not yet completed"
-            value={formatPrice(stats.pending)}
+            value={formatPrice(balance.pending)}
             accent="pending"
+            isLoading={isLoading}
+          />
+          <InsightRow
+            icon={Banknote}
+            label="Withdrawn"
+            helper="Already transferred to your bank"
+            value={formatPrice(balance.paid)}
+            accent="positive"
             isLoading={isLoading}
           />
           <InsightRow
@@ -371,6 +518,57 @@ export default function SellerWalletPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Withdrawal history — short, and only once there is one, so a seller
+          who has never withdrawn is not shown an empty table. */}
+      {requests && requests.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Withdrawals</CardTitle>
+            <CardDescription>Transfers you have requested to your bank account.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ul className="divide-y">
+              {requests.map((r) => {
+                const at = toDate(r.createdAt as any);
+                return (
+                  <li key={r.id} className="flex items-center gap-3 p-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">
+                        {PAYOUT_STATUS_LABELS[r.status as PayoutRequestStatus] ?? r.status}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {at ? format(at, 'd MMM, yyyy') : ''} · {maskIban(r.bank?.iban)}
+                        {r.transferReference ? ` · ref ${r.transferReference}` : ''}
+                      </p>
+                      {/* An operator's note is the only explanation a declined
+                          seller gets, so it is shown rather than swallowed. */}
+                      {r.adminNote && (
+                        <p className="text-[11px] text-muted-foreground mt-1 italic">{r.adminNote}</p>
+                      )}
+                    </div>
+                    <p
+                      className={`text-sm font-bold ${
+                        r.status === 'rejected' ? 'text-muted-foreground line-through' : 'text-emerald-700'
+                      }`}
+                    >
+                      {formatPrice(r.amount)}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      <WithdrawDialog
+        open={withdrawOpen}
+        onOpenChange={setWithdrawOpen}
+        balance={balance}
+        sellerName={firestoreUser?.name ?? undefined}
+        sellerEmail={firestoreUser?.email ?? undefined}
+      />
     </div>
   );
 }
