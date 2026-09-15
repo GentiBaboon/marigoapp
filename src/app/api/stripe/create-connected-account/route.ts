@@ -7,6 +7,7 @@ import {
   firestoreUpdate,
 } from '@/lib/firebase-admin';
 import { checkAccountStanding } from '@/lib/verified-account';
+import { STRIPE_ONBOARDING_ENABLED } from '@/lib/payment-options';
 
 // Same-origin Next.js API route that mirrors the `createStripeConnectedAccount`
 // cloud function. Exists so the browser can hit it without the deployed
@@ -24,6 +25,13 @@ function getStripe() {
 }
 
 export async function POST(req: NextRequest) {
+  // Connect onboarding is switched off while payouts are bank transfers.
+  // Refused here and not only in the UI: hiding a button does not stop a
+  // scripted caller opening a Stripe account against this project.
+  if (!STRIPE_ONBOARDING_ENABLED) {
+    return NextResponse.json({ error: 'Payout onboarding is not available.' }, { status: 403 });
+  }
+
   // Rate limit before any model call — see src/lib/rate-limit.ts for why these
   // routes are the cheapest way to take the whole AI surface down.
   const limited = applyRateLimit(req, stripeConnectLimiter);

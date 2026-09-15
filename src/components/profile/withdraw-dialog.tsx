@@ -33,7 +33,9 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Banknote, ShieldCheck } from 'lucide-react';
 import { omitUndefined } from '@/lib/firestore-write';
 import {
+  amountToMinimum,
   canRequestWithdrawal,
+  MIN_WITHDRAWAL_ALL,
   normalizeIban,
   validateBankDetails,
   type BankDetails,
@@ -80,6 +82,7 @@ export function WithdrawDialog({
   }, [open]);
 
   const gate = canRequestWithdrawal(balance);
+  const shortfallToMinimum = amountToMinimum(balance.available);
 
   const set = (key: keyof BankDetails) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -152,11 +155,36 @@ export function WithdrawDialog({
         <DialogHeader>
           <DialogTitle>Withdraw your earnings</DialogTitle>
           <DialogDescription>
-            We will transfer {formatPrice(balance.available)} to your bank account. Transfers are made by
-            hand, usually within a few working days.
+            {gate.ok ? (
+              <>
+                We will transfer {formatPrice(balance.available)} to your bank account. Transfers are made
+                by hand, usually within a few working days.
+              </>
+            ) : gate.reason === 'request_open' ? (
+              <>You already have a withdrawal in review. We will finish that one first.</>
+            ) : (
+              <>
+                You can start withdrawing from {MIN_WITHDRAWAL_ALL.toLocaleString('de-DE')} ALL and up.
+                Keep selling — your earnings become available once we receive the payment for each order.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
+        {/* Below the floor the form is not the point, so it is not shown —
+            a disabled set of fields invites a seller to fill them in and
+            then find out it was never going to submit. */}
+        {!gate.ok ? (
+          <div className="rounded-lg border bg-muted/40 p-4 space-y-1">
+            <p className="text-sm font-semibold">{formatPrice(balance.available)} available</p>
+            <p className="text-xs text-muted-foreground">
+              {gate.reason === 'request_open'
+                ? 'Your open request is holding this balance.'
+                : `${formatPrice(shortfallToMinimum)} more to go.`}
+            </p>
+          </div>
+        ) : (
+        <>
         <div className="rounded-lg border bg-emerald-50/60 p-3 flex items-start gap-3">
           <Banknote className="h-4 w-4 text-emerald-700 mt-0.5 shrink-0" />
           <div className="text-sm">
@@ -225,15 +253,19 @@ export function WithdrawDialog({
           <ShieldCheck className="h-3.5 w-3.5 mt-px shrink-0" />
           Your account details are used for this transfer only and are not saved to your profile.
         </p>
+        </>
+        )}
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
-            Cancel
+            {gate.ok ? 'Cancel' : 'Close'}
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting || !gate.ok}>
-            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Request {formatPrice(balance.available)}
-          </Button>
+          {gate.ok && (
+            <Button onClick={handleSubmit} disabled={submitting}>
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Request {formatPrice(balance.available)}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

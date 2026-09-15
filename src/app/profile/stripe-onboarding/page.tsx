@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { STRIPE_ONBOARDING_ENABLED } from '@/lib/payment-options';
 
 export default function StripeOnboardingPage() {
     const { user, isUserLoading } = useUser();
@@ -14,10 +15,21 @@ export default function StripeOnboardingPage() {
     const { toast } = useToast();
 
     useEffect(() => {
+        // Hidden while payouts are bank transfers (STRIPE_ONBOARDING_ENABLED).
+        // The wallet rather than a 404: someone who lands here is asking how
+        // they get paid, and that page answers it.
+        if (!STRIPE_ONBOARDING_ENABLED) {
+            router.replace('/profile/wallet');
+            return;
+        }
         if (!isUserLoading && !user) {
             router.replace('/auth');
         }
     }, [user, isUserLoading, router]);
+
+    // Render nothing while the redirect above runs, so the Stripe copy never
+    // flashes up at a seller who is not being asked for any of it.
+    if (!STRIPE_ONBOARDING_ENABLED) return null;
 
     const handleOnboarding = async () => {
         if (!user) return;

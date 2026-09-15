@@ -35,7 +35,6 @@ export const KNOWN_ROUTES = {
   addresses: '/profile/addresses',
   payments: '/profile/payments',
   settings: '/profile/settings',
-  stripeOnboarding: '/profile/stripe-onboarding',
   help: '/help',
   about: '/about',
   privacy: '/privacy',
@@ -203,9 +202,12 @@ ${
 - New listings may go to "pending review" before appearing publicly. Statuses
   are draft, pending review, active, reserved, sold, expired, removed.
 - Manage your listings at ${KNOWN_ROUTES.listings}.
-- To get paid you must connect a payout account (Stripe) at
-  ${KNOWN_ROUTES.stripeOnboarding}. Earnings are at ${KNOWN_ROUTES.earnings} and
-  the balance/payout screen is ${KNOWN_ROUTES.wallet}.
+- Getting paid needs no payout account to be connected. The buyer pays the
+  courier in cash; once that money reaches Marigo the seller's earnings become
+  available in their wallet at ${KNOWN_ROUTES.wallet}, minus commission. From
+  5.000 ALL and up they can request a bank transfer from that page, entering
+  their account details on the request. Transfers are made by hand, usually
+  within a few working days. A breakdown per sale is at ${KNOWN_ROUTES.earnings}.
 - MarigoApp takes a commission on each sale (15% by default). The seller
   receives the rest after the escrow hold ends.
 

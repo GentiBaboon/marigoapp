@@ -6,6 +6,7 @@ import {
   CROSS_BORDER_SHIPPING_FEE_ALL,
 } from '@/lib/types';
 import { CARD_PAYMENTS_ENABLED } from '@/lib/payment-options';
+import { MIN_WITHDRAWAL_ALL } from '@/lib/payouts';
 import { BACKGROUND_REMOVER_ENABLED } from '@/lib/listing-features';
 
 /**
@@ -136,7 +137,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
       },
       {
         q: 'How and when do I get paid?',
-        a: `You need to connect a payout account before you can receive money — there is a Stripe onboarding step in your profile. After that, the buyer's payment is released to you once the item is delivered and the ${DEFAULT_PAYOUT_HOLD_HOURS}-hour hold has passed, minus the ${commissionPct}% commission. Your balance and payout history live in your Wallet, and a breakdown of each sale is under Earnings.`,
+        a: `There is nothing to set up in advance. Most orders are paid in cash to the courier, so your earnings become available once that money reaches us — until then they show as on the way in your Wallet. What lands is the sale price minus the ${commissionPct}% commission. From ${MIN_WITHDRAWAL_ALL.toLocaleString('de-DE')} ALL and up you can request a bank transfer from your Wallet: you enter your account details on the request itself, and we make the transfer by hand, usually within a few working days. A breakdown of each sale is under Earnings.`,
       },
       {
         q: 'Why does my pickup city matter?',

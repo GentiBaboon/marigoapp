@@ -61,12 +61,12 @@ import {
   Banknote,
   Undo,
   ReceiptText,
-  CalendarRange,
-  Truck,
   Info,
   Clock,
+  ChevronDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const COMPLETED_STATUSES = new Set(['completed']);
 const REFUNDED_STATUSES = new Set(['refunded', 'cancelled']);
@@ -177,6 +177,7 @@ export default function SellerWalletPage() {
   const { data: firestoreUser } = useDoc<FirestoreUser>(userRef);
 
   const [withdrawOpen, setWithdrawOpen] = React.useState(false);
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
 
   // The payout half of the money model — see src/lib/payouts.ts.
   const balance = React.useMemo(
@@ -192,16 +193,14 @@ export default function SellerWalletPage() {
 
   // Calculate this seller's portion of each order. An order can contain items
   // from multiple sellers; only sum the line items whose sellerId is mine.
+  // Revenue-side figures only. Everything about what the seller can actually
+  // withdraw comes from `balance` (src/lib/payouts.ts) — two sources for one
+  // number is how the old page ended up disagreeing with itself.
   const stats = React.useMemo(() => {
     const safeOrders = orders ?? [];
     let revenue = 0;
     let refunded = 0;
-    let available = 0;
-    let pending = 0;
     let salesCount = 0;
-    let monthRevenue = 0;
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     for (const o of safeOrders) {
       const myItems = (o.items || []).filter((it: any) => it?.sellerId === user?.uid);
@@ -210,37 +209,18 @@ export default function SellerWalletPage() {
 
       if (REFUNDED_STATUSES.has(o.status)) {
         refunded += mySubtotal;
-      } else if (COMPLETED_STATUSES.has(o.status)) {
+      } else if (COMPLETED_STATUSES.has(o.status) || PENDING_STATUSES.has(o.status)) {
         revenue += mySubtotal;
-        available += mySubtotal * (1 - commissionRate);
         salesCount++;
-        const od = toDate(o.createdAt as any);
-        if (od && od >= monthStart) monthRevenue += mySubtotal;
-      } else if (PENDING_STATUSES.has(o.status)) {
-        revenue += mySubtotal;
-        pending += mySubtotal * (1 - commissionRate);
-        salesCount++;
-        const od = toDate(o.createdAt as any);
-        if (od && od >= monthStart) monthRevenue += mySubtotal;
       }
     }
 
-    const totalEarnings = revenue * (1 - commissionRate);
-    const commissionPaid = revenue * commissionRate;
-    const refundedEarnings = refunded * (1 - commissionRate);
-    const avgSale = salesCount > 0 ? revenue / salesCount : 0;
-
     return {
       revenue,
-      totalEarnings,
-      commissionPaid,
-      available,
-      pending,
-      refunded,
-      refundedEarnings,
+      totalEarnings: revenue * (1 - commissionRate),
+      commissionPaid: revenue * commissionRate,
+      refundedEarnings: refunded * (1 - commissionRate),
       salesCount,
-      monthRevenue,
-      avgSale,
     };
   }, [orders, user?.uid, commissionRate]);
 
@@ -283,23 +263,46 @@ export default function SellerWalletPage() {
       {/* Withdrawal — the action the page exists for, directly under the
           headline number rather than buried below the insight rows. */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Banknote className="h-4 w-4 text-emerald-700" />
-            Available to withdraw
-          </CardTitle>
-          <CardDescription>
-            Earnings from orders where the money has reached Marigo.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        {/* The whole header is the toggle. The balance and the one action are
+            what a seller opens this page for; the threshold, the progress bar
+            and the four-step explanation are things you read once and then
+            never again, so they sit behind a click rather than pushing the
+            rest of the wallet below the fold on every visit. A real <button>,
+            not a div with onClick, so it is reachable by keyboard and
+            announces its own state. */}
+        <button
+          type="button"
+          onClick={() => setDetailsOpen((v) => !v)}
+          aria-expanded={detailsOpen}
+          aria-controls="withdraw-details"
+          className="w-full text-left rounded-t-lg px-6 pt-6 pb-3 hover:bg-muted/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-base font-semibold flex items-center gap-2">
+                <Banknote className="h-4 w-4 text-emerald-700" />
+                Available to withdraw
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Earnings from orders where the money has reached Marigo.
+              </p>
+            </div>
+            <ChevronDown
+              className={cn(
+                'h-5 w-5 shrink-0 text-muted-foreground transition-transform',
+                detailsOpen && 'rotate-180',
+              )}
+            />
+          </div>
           {isLoading ? (
-            <Skeleton className="h-9 w-40" />
+            <Skeleton className="h-9 w-40 mt-4" />
           ) : (
-            <p className="text-3xl font-extrabold tracking-tight text-emerald-700">
+            <p className="text-3xl font-extrabold tracking-tight text-emerald-700 mt-4">
               {formatPrice(balance.available)}
             </p>
           )}
+        </button>
+        <CardContent className="space-y-4 pt-3">
 
           {openRequest ? (
             // An open request holds the balance, so showing a withdraw button
@@ -314,62 +317,76 @@ export default function SellerWalletPage() {
                 once the transfer is on its way.
               </p>
             </div>
-          ) : gate.ok ? (
-            <Button
-              size="lg"
-              className="w-full bg-emerald-600 hover:bg-emerald-700"
-              onClick={() => setWithdrawOpen(true)}
-            >
-              <Banknote className="mr-2 h-4 w-4" />
-              Withdraw {formatPrice(balance.available)}
-            </Button>
           ) : (
+            // The button is always here, disabled until the balance clears the
+            // floor. Rendering nothing at all hid the whole feature from every
+            // seller who had not reached it yet — they had no way to learn that
+            // withdrawing to a bank account is how they get paid.
             <div className="space-y-2">
-              {/* The bar answers "how far off am I?" — a disabled button with
-                  no number is the version sellers ask support about. */}
-              <Progress
-                value={
-                  shortfall > 0
-                    ? Math.min(100, (balance.available / (balance.available + shortfall)) * 100)
-                    : 0
-                }
-                className="h-2"
-              />
-              <p className="text-xs text-muted-foreground">
-                You can withdraw once you reach{' '}
-                <span className="font-semibold text-foreground">
-                  {MIN_WITHDRAWAL_ALL.toLocaleString('de-DE')} ALL
-                </span>{' '}
-                in available earnings
-                {shortfall > 0 ? <> — {formatPrice(shortfall)} to go.</> : '.'}
-              </p>
+              {/* Enabled below the floor too, and the dialog explains why the
+                  transfer cannot happen yet. A disabled button is a control
+                  that tells you nothing when you press it — the same dead end
+                  the cash-settlement card had. */}
+              <Button
+                size="lg"
+                variant={gate.ok ? 'default' : 'outline'}
+                className={gate.ok ? 'w-full bg-emerald-600 hover:bg-emerald-700' : 'w-full'}
+                onClick={() => setWithdrawOpen(true)}
+              >
+                <Banknote className="mr-2 h-4 w-4" />
+                {gate.ok ? <>Withdraw {formatPrice(balance.available)}</> : 'Request a withdrawal'}
+              </Button>
             </div>
           )}
 
-          {/* Why money sits in "clearing" is the single most confusing thing
-              about a cash-on-delivery marketplace, so it is explained in
-              place rather than in a help article nobody opens. */}
-          <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-              <Info className="h-3.5 w-3.5" />
-              How you get paid
-            </p>
-            <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal pl-4">
-              <li>The buyer pays the courier in cash when the parcel arrives.</li>
-              <li>
-                The courier settles with Marigo. Until that happens your earnings sit in{' '}
-                <span className="font-medium text-foreground">on the way</span> below.
-              </li>
-              <li>
-                Once we have the money it moves to{' '}
-                <span className="font-medium text-foreground">available</span>, minus our{' '}
-                {(commissionRate * 100).toFixed(0)}% commission.
-              </li>
-              <li>
-                At {MIN_WITHDRAWAL_ALL.toLocaleString('de-DE')} ALL you can request a transfer to your bank
-                account.
-              </li>
-            </ol>
+          {/* Everything a seller reads once. `hidden` rather than unmounting,
+              so the ids the header points at with aria-controls stay in the
+              document whichever state it is in. */}
+          <div id="withdraw-details" hidden={!detailsOpen} className="space-y-4">
+            {!gate.ok && (
+              <div className="space-y-2">
+                {/* The bar answers "how far off am I?" — a threshold with no
+                    number is the version sellers ask support about. */}
+                <Progress
+                  value={
+                    shortfall > 0
+                      ? Math.min(100, (balance.available / (balance.available + shortfall)) * 100)
+                      : 0
+                  }
+                  className="h-2"
+                />
+                <p className="text-xs text-muted-foreground">
+                  You can start withdrawing from{' '}
+                  <span className="font-semibold text-foreground">
+                    {MIN_WITHDRAWAL_ALL.toLocaleString('de-DE')} ALL
+                  </span>{' '}
+                  and up
+                  {shortfall > 0 ? <> — {formatPrice(shortfall)} to go.</> : '.'}
+                </p>
+              </div>
+            )}
+
+            {/* Why money sits waiting is the single most confusing thing
+                about a cash-on-delivery marketplace, so it is explained in
+                place rather than in a help article nobody opens. */}
+            <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Info className="h-3.5 w-3.5" />
+                How you get paid
+              </p>
+              <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal pl-4">
+                <li>The buyer pays the courier in cash when the parcel arrives.</li>
+                <li>
+                  Once the money reaches us it moves to{' '}
+                  <span className="font-medium text-foreground">available</span>, minus our{' '}
+                  {(commissionRate * 100).toFixed(0)}% commission.
+                </li>
+                <li>
+                  From {MIN_WITHDRAWAL_ALL.toLocaleString('de-DE')} ALL and up you can request a transfer
+                  to your bank account.
+                </li>
+              </ol>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -384,19 +401,17 @@ export default function SellerWalletPage() {
             value={formatPrice(stats.revenue)}
             isLoading={isLoading}
           />
-          <InsightRow
-            icon={Truck}
-            label="On the way to you"
-            helper="Delivered — waiting for the courier to settle with us"
-            value={formatPrice(balance.clearing)}
-            accent="pending"
-            isLoading={isLoading}
-          />
+          {/* One row for everything that is sold but not yet withdrawable,
+              rather than splitting "still in flight" from "delivered, waiting
+              on the courier to settle". The distinction is Marigo's problem,
+              not the seller's — either way the answer to "can I have it?" is
+              not yet, and the steps above already explain why. Clearing is
+              summed in here so no money disappears from the page. */}
           <InsightRow
             icon={Hourglass}
             label="Pending"
-            helper="In-flight orders not yet completed"
-            value={formatPrice(balance.pending)}
+            helper="Sold — not available to withdraw yet"
+            value={formatPrice(balance.pending + balance.clearing)}
             accent="pending"
             isLoading={isLoading}
           />
@@ -421,13 +436,6 @@ export default function SellerWalletPage() {
             label="Commission paid"
             helper={`${(commissionRate * 100).toFixed(0)}% platform fee on all sales`}
             value={formatPrice(stats.commissionPaid)}
-            isLoading={isLoading}
-          />
-          <InsightRow
-            icon={CalendarRange}
-            label="This month"
-            helper={`Avg sale ${formatPrice(stats.avgSale)}`}
-            value={formatPrice(stats.monthRevenue)}
             isLoading={isLoading}
           />
         </CardContent>
