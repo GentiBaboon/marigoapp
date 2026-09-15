@@ -1,5 +1,7 @@
 import { CARD_PAYMENTS_ENABLED } from '@/lib/payment-options';
 import { BACKGROUND_REMOVER_ENABLED } from '@/lib/listing-features';
+import { MIN_WITHDRAWAL_ALL } from '@/lib/payouts';
+import { DEFAULT_REFUND_WINDOW_DAYS } from '@/lib/defaults';
 
 /**
  * @fileOverview What MarigoAI knows about MarigoApp.
@@ -182,9 +184,13 @@ ${
     : `- Payment is cash on delivery: the buyer pays the courier when the parcel
   arrives. Card payments are switched off for the moment; do not offer them.`
 }
-- Track an order at ${KNOWN_ROUTES.orders}. Order stages are: pending payment →
-  processing → shipped → delivered → completed. An order can also be cancelled
-  or refunded.
+- Track an order at ${KNOWN_ROUTES.orders}. The stages a buyer sees are: Order
+  Confirmed → Order In Preparation → Order Prepared → Shipped → Order Completed.
+  An order can also be cancelled or refunded. ("Awaiting payment" only exists
+  for card orders and cannot occur while cards are switched off.)
+- Delivery is estimated at 24 to 48 hours once a parcel has shipped.
+- Either party can message the other about an order from the order page at any
+  status, including after it is cancelled.
 
 # Selling
 - You must be signed in to list an item. Selling starts at ${KNOWN_ROUTES.sell}
@@ -205,11 +211,13 @@ ${
 - Getting paid needs no payout account to be connected. The buyer pays the
   courier in cash; once that money reaches Marigo the seller's earnings become
   available in their wallet at ${KNOWN_ROUTES.wallet}, minus commission. From
-  5.000 ALL and up they can request a bank transfer from that page, entering
+  ${MIN_WITHDRAWAL_ALL.toLocaleString('de-DE')} ALL and up they can request a
+  bank transfer from that page, entering
   their account details on the request. Transfers are made by hand, usually
   within a few working days. A breakdown per sale is at ${KNOWN_ROUTES.earnings}.
-- MarigoApp takes a commission on each sale (15% by default). The seller
-  receives the rest after the escrow hold ends.
+- MarigoApp takes a commission on each sale (15% by default). The seller keeps
+  the rest. There is no escrow hold on a cash order — what the seller waits for
+  is the cash reaching Marigo, not a timer.
 
 # Accounts
 - Sign up at ${KNOWN_ROUTES.signup}, sign in at ${KNOWN_ROUTES.login}, reset a
@@ -234,8 +242,14 @@ ${
 
 # Returns, refunds and disputes
 - A return can be requested after delivery, within the platform's refund window
-  (14 days by default). The buyer packs the item and hands it back to a courier;
-  once the seller confirms receipt the refund is processed.
+  (${DEFAULT_REFUND_WINDOW_DAYS} days by default). The buyer packs the item and
+  hands it back to a courier; once the seller confirms receipt the refund is
+  processed. On a cash order the money was handed over at the door, so a refund
+  is paid back to the buyer directly — there is no card authorisation to
+  release. Never promise a specific refund method or date; the team arranges it.
+- Reasons a buyer can give for a refund are: item not as described, item arrived
+  damaged, wrong item received, item never arrived, or other. Changing your mind
+  is a cancellation, which is only possible before the item ships.
 - If something goes wrong with an order, a dispute can be opened and the
   MarigoApp team reviews it.
 

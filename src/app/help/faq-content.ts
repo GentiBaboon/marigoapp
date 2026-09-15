@@ -45,7 +45,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
     items: [
       {
         q: 'How do I find something specific?',
-        a: 'Use the search icon in the header, or browse from the home page. On the search screen you can narrow by brand, category, size, colour, material, condition, pattern and price. Every item is a single, individual piece — once it sells, that exact listing is gone, so if something catches your eye it is worth saving to your favourites.',
+        a: 'Use the search icon in the header, or browse from the home page. On the search screen you can narrow by brand, category, size, colour, material, condition, pattern and price. Every item is a single, individual piece — once it sells, that exact listing is gone, so if something catches your eye it is worth saving to your favourites. Tap the heart on any listing, and find everything you have saved under the heart in the header or My Favourites in your profile.',
       },
       {
         q: 'Can I pay less than the asking price?',
@@ -53,7 +53,11 @@ export const FAQ_SECTIONS: FaqSection[] = [
       },
       {
         q: 'What happens after I place an order?',
-        a: 'Your order moves through pending payment → processing → shipped → delivered → completed. You can follow it in Orders in your profile, and you will get a notification as each stage changes. An order can also end as cancelled or refunded.',
+        a: 'Your order is confirmed straight away, then moves through Order In Preparation → Order Prepared → Shipped → Order Completed as the seller packs it and a courier takes it. You can follow it in Orders in your profile, and you get a notification at each stage. Once a parcel has shipped, delivery is usually 24 to 48 hours. An order can also end as cancelled or refunded.',
+      },
+      {
+        q: 'Can I message the seller about an order I have already placed?',
+        a: 'Yes, at any point. There is a contact button on the order page whatever stage it has reached — including after a cancellation, which is often exactly when you want to reach them. The thread is per item, so asking about a piece before you buy and asking about the order afterwards stay in the same conversation.',
       },
       {
         q: 'Is the item really authentic?',
@@ -160,7 +164,11 @@ export const FAQ_SECTIONS: FaqSection[] = [
       },
       {
         q: 'When do I get my money back?',
-        a: 'If the payment was still held in escrow, the authorisation is released and nothing is ever taken. If it had already been captured, the refund goes back to the card it was paid from and appears according to your bank’s own timing.',
+        a: 'If the order is cancelled before it ships, you have not paid anything yet — cash is handed over at the door, so there is nothing to return. If you already paid the courier, the team arranges the refund with you once the return is confirmed. Card refunds go back to the card they were paid from, on your bank’s own timing, for the orders that were paid that way.',
+      },
+      {
+        q: 'What reasons can I give for a refund?',
+        a: 'Item not as described, item arrived damaged, wrong item received, item never arrived, or other. Changing your mind is not a refund reason — that is a cancellation, and you can request one from the order page any time before the item ships.',
       },
     ],
   },
