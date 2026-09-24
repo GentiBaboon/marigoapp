@@ -15,8 +15,8 @@ Marigo (a.k.a. **Marigo Luxe**) is a Next.js + Firebase marketplace for pre-owne
 | Auth | Firebase Auth (custom claims for admin / super_admin / moderator) |
 | Database | Firestore |
 | Image storage | Supabase Storage |
-| Payments | Stripe (via Firebase Cloud Functions) |
-| Email | Mailtrap |
+| Payments | Cash on delivery (live). Stripe escrow + Connect is built and deploys but is switched off — `CARD_PAYMENTS_ENABLED` |
+| Email | SendGrid v3 REST (`src/lib/email/`). Mailtrap is the superseded predecessor |
 | AI | Google Genkit (`@genkit-ai/google-genai`) — pricing suggestions, support chat |
 | Tables / charts | TanStack Table, Recharts |
 | Hosting | Vercel (web), Firebase (functions, Firestore) |
@@ -34,11 +34,15 @@ Marigo (a.k.a. **Marigo Luxe**) is a Next.js + Firebase marketplace for pre-owne
 **Selling**
 - Multi-step listing wizard: category → images → details → pricing (with AI suggestion) → review & publish
 - Draft auto-save and edit-listing flow that mirrors the sell wizard
-- Seller dashboard, sales orders, payouts
+- Seller dashboard, sales orders, and a wallet that splits earnings into
+  available / pending / withdrawn
+- **Payouts are bank transfers made by hand.** Cash reaches Marigo through the
+  courier, an operator confirms it against the order, and from 5.000 ALL a
+  seller requests a transfer with their account details. See CLAUDE.md §8b
 
 **Buying**
 - Cart with Firestore sync for signed-in users
-- Multi-step checkout: address → payment (Stripe) → review → success
+- Multi-step checkout: address → payment (cash on delivery) → review → success
 - Buyer order history, order detail, returns, disputes
 
 **Messaging & notifications**
@@ -46,7 +50,7 @@ Marigo (a.k.a. **Marigo Luxe**) is a Next.js + Firebase marketplace for pre-owne
 - In-app notifications collection
 
 **Admin panel** (`/admin`)
-- Orders, products, users, finance / payouts, refunds, returns, disputes, logistics, moderation, marketing
+- Orders, products, users, finance, payouts (the seller withdrawal queue), refunds, returns, disputes, logistics, moderation, marketing
 - Settings: brand catalog (139 seeded), category tree with reorder UI, attributes (patterns / materials / colors with hex), macro filters, homepage blocks, banners
 
 **AI**
@@ -82,7 +86,7 @@ src/
 ├── hooks/                # Custom React hooks
 └── __tests__/            # Vitest suites
 
-functions/                # Firebase Cloud Functions (Stripe, order creation, email)
+functions/                # Firebase Cloud Functions (Stripe, order creation, email, push, ban sync)
 firestore.rules           # Firestore security rules
 firestore.indexes.json    # Composite index definitions
 ```

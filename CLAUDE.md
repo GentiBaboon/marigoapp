@@ -165,9 +165,11 @@ Public:
 - `/about`, `/privacy`, `/terms`
 - `/help` — the Help Centre. Questions live in `src/app/help/faq-content.ts`,
   separate from the page that renders them. **Every figure in an answer is
-  imported from `src/lib/types.ts`** (commission, payout hold, refund window,
-  delivery fees) rather than typed into the prose, so the page cannot quote a
-  rate the checkout no longer charges. The prose is deliberately consistent
+  imported** — from `src/lib/types.ts` (commission, payout hold, refund
+  window, delivery fees) and `src/lib/payouts.ts` (the withdrawal floor) —
+  rather than typed into the prose, so the page cannot quote a rate the
+  checkout no longer charges. The payout answer drifted exactly this way once:
+  a 5.000 ALL literal typed into the prose a week after the constant existed. The prose is deliberately consistent
   with `src/lib/chat-knowledge.ts` — the same ground truth the AI assistant
   gets. Change one, check the other, or the page and the chatbot start
   contradicting each other in public. Search is accent-folded (so `cmimi`
@@ -211,6 +213,22 @@ Public:
     always emitted `OutOfStock` for anything but `active` — only the visible
     word lagged. One helper now decides it, because that label had already
     drifted across two surfaces.
+  - **The view counter counts repeat visits, at most one an hour**
+    (`src/lib/view-throttle.ts`). The guard used to be a permanent
+    `sessionStorage` flag, so the same shopper's second visit was dropped for
+    good and the number only ever measured distinct sessions. It is a
+    `localStorage` timestamp now — `localStorage`, not session, or "once an
+    hour" quietly degrades into "once per tab" — with an in-memory fallback for
+    browsers that refuse storage. Sellers still do not count their own views,
+    and **signed-out visitors do not count at all**: `views` is gated on
+    `isActiveUser()` in the rules, and opening it would mean an unauthenticated
+    write path (§9b has the same argument). So the figure sits well below real
+    traffic.
+  - **The wishlist control is a labelled button**, under "Add to bag", reading
+    "Add to wishlist" / "In wishlist" with the heart filled when saved. It
+    replaced a bare heart icon beside the title that said neither what it did
+    nor whether the item was already saved. Enabled on a sold listing — saving
+    something you just missed is exactly when a shopper reaches for it.
   - **Only `active` / `reserved` / `sold` are public** (`src/lib/product-visibility.ts`).
     A `draft`, `pending_review`, `removed` or `expired` listing used to serve 200
     with `index, follow` *and* Product JSON-LD — a moderation hole, not a
@@ -234,7 +252,7 @@ Auth (`/auth/*`): `login`, `signup`, `forgot-password`, `reset-password`, `verif
   mid-flow. See §6b.
 
 Authenticated (gated by middleware §6):
-- `/profile`, `/profile/addresses`, `/profile/listings`, `/profile/listings/sales/[orderId]`, `/profile/orders`, `/profile/orders/[orderId]`, `/profile/offers`, `/profile/earnings`, `/profile/wallet`, `/profile/payments`, `/profile/settings`, `/profile/stripe-onboarding`
+- `/profile`, `/profile/addresses`, `/profile/listings`, `/profile/listings/sales/[orderId]`, `/profile/orders`, `/profile/orders/[orderId]`, `/profile/offers`, `/profile/earnings`, `/profile/wallet`, `/profile/payments`, `/profile/settings`, `/profile/stripe-onboarding` (hidden — §8b)
   - **The shipping label** (`src/lib/shipping-label.ts`) prints from the
     seller timeline's preparation card, from `in_preparation` through
     `prepared` — while the parcel is still in the seller's hands, where a
@@ -338,6 +356,13 @@ Authenticated (gated by middleware §6):
     card renders with the outcome and the contact button.
   - The dead "Need Help?" menu item and the order page's "Help center" button
     now point at `/help`.
+- **The seller's completed step hands over to the wallet.** It used to say
+  "your payout will be processed shortly" — nothing was processing it, and on
+  a cash order nothing ever would (§8b). It now says the buyer has the parcel
+  and nothing more is needed, explains that the courier has to settle with
+  Marigo first, names the 5.000 ALL floor, and links to `/profile/wallet`. The
+  wording changes once `isCashSettled()` is true, so it never promises money
+  is ready when it is not.
 - **`prepared` is not `in_preparation`.** Both timelines rendered one card for
   the pair, so a seller who had already packed the parcel still saw
   "ACTION NEEDED", a ship-by deadline and the packing checklist, and the buyer
@@ -360,7 +385,7 @@ Authenticated (gated by middleware §6):
 Courier (`/courier/*`, role-gated): `dashboard`, `jobs`, `delivery/[deliveryId]`, `earnings`, `profile`.
 
 Admin (`/admin/*`, role-gated, and **behind the masked gate in §6c**). Sidebar entries map 1:1 to permissions from `src/lib/admin-permissions.ts`:
-`/admin` (dashboard), `products` (+ `[id]`), `orders` (+ `[id]`), `offers`, `users`, `analytics`, `finance`, `marketing`, `logistics`, `moderation`, `disputes`, `refunds`, `returns`, `support` (Assistant Chats), `messages`, `logs`, `settings`.
+`/admin` (dashboard), `products` (+ `[id]`), `orders` (+ `[id]`), `offers`, `users`, `analytics`, `finance`, `payouts`, `marketing`, `logistics`, `moderation`, `disputes`, `refunds`, `returns`, `support` (Assistant Chats), `messages`, `logs`, `settings`.
 - **`/admin/offers`** — every buyer→seller offer across all listings, newest
   first, with whose-turn counts and an acceptance rate. **Read-only**: the
   offer `update` rule names only the two parties, and an operator overriding a
@@ -390,6 +415,22 @@ Admin (`/admin/*`, role-gated, and **behind the masked gate in §6c**). Sidebar 
   once per thread per visit: this is private correspondence between two
   members and reading it should leave a trace. Needs no rules change — the
   conversation rules already grant `isAdmin()` reads.
+- **`/admin/payouts`** — the seller withdrawal queue, gated on `payouts.manage`
+  (admin and super_admin only). Its own entry rather than a Finance tab: every
+  row is a bank transfer a person has to actually make, so the pending count is
+  a to-do list, not a report. **Nothing here moves money** — an operator reads
+  the account details (each field has a copy button; they are retyping an IBAN
+  into a banking app), transfers by hand, and records the outcome. *Approve*
+  claims a row, *Mark paid* stores the transfer reference and writes the
+  `transactions` ledger row, *Decline* returns the amount to the seller's
+  available balance with a note they can read. Amounts stay **EUR** here like
+  the rest of finance; the seller sees lek on their wallet.
+- **`/admin/orders/[id]` carries the cash-settlement switch**
+  (`CashSettlementCard`) — see §8b. Three states, each with something to press:
+  *Waiting* → "Mark cash received"; *Assumed received* (completed before the
+  gate) → "Confirm we received it"; *Received* → "Undo". The grandfathered
+  state rendered **no button at all** at first, which left an operator looking
+  at a state they could not act on.
 - **`/admin/analytics`** — live visitors (Redis, §9b) plus registration history
   by date (Firestore). Two halves, two stores, on purpose: presence is
   ephemeral and expires itself, signup history is durable.
@@ -432,8 +473,9 @@ Types in `src/lib/types.ts` (~855 lines — the single source of truth for both 
 | ↳ `addresses/{id}` | `firstName` + `surname` are the inputs; **`fullName` is composed from them on save** and stays the stored value, because the delivery label, order confirmation, admin order view, courier pickup sheet and the order emails all read it. Plus optional `company` / `apartment`. Countries are Albania and Kosovo only (`src/lib/countries.ts`, Kosovo is `KS`) | — |
 | `products/{id}` | Listings (images, variants, quantity) | `draft`, `pending_review`, `active`, `sold`, `removed`, `expired`, `reserved` |
 | `products/{id}/offers/{offerId}` | Buyer→seller offers | `pending`, `accepted`, `rejected`, `expired` |
-| `orders/{id}` | Checkout orders (multi-seller via `sellerIds[]`, `payouts{}` map for idempotent transfers) | `pending_payment`, `processing`, `shipped`, `delivered`, `completed`, `cancelled`, `refunded` |
+| `orders/{id}` | Checkout orders (multi-seller via `sellerIds[]`, `payouts{}` map for idempotent transfers). **`cashSettledAt` / `cashSettledBy` are admin-only** — the write rule carves them out of the broad party branch, or a seller could stamp their own order and release their own money (§8b) | `pending_payment`, `processing`, `shipped`, `delivered`, `completed`, `cancelled`, `refunded` |
 | `transactions/{id}` | **Append-only finance ledger.** Admin-create only, `update: false`; readable by the tied user or an admin | — |
+| `payout_requests/{id}` | Seller withdrawal requests + the bank details to pay them against (§8b). Read/write is **`isFullAdmin()`**, not `isAdmin()` — these carry account numbers and authorise money leaving. A seller creates their own (`sellerId == auth.uid`, `status == 'pending'`, `amount > 0`) and can never update one | `pending`, `approved`, `paid`, `rejected` |
 | `deliveries/{id}` | Courier delivery tasks | `pending_assignment`, `assigned`, `arrived_for_pickup`, `picked_up`, `in_transit`, `arrived_for_delivery`, `delivered`, `cancelled` |
 | `courier_profiles/{uid}` | Courier KYC & vehicle info | — |
 | `conversations/{id}/messages/{mid}` | Real-time buyer↔seller chat | — |
@@ -474,10 +516,10 @@ Roles (`UserRoleEnum`): `buyer`, `seller`, `courier`, `admin`, `super_admin`, `m
 
 **Server-side auth (`src/lib/firebase-admin.ts`):** `verifyIdToken` validates against Firebase's JWKS with `jose` — no service-account credentials anywhere, which is what lets the app run on Vercel. Firestore reads/writes from API routes go through the REST helpers (`firestoreGet/Query/Update/Create`) using the caller's ID token, so **security rules still apply on the server path**.
 
-**Role gating:** `src/lib/admin-permissions.ts` defines 20 `AdminPermission` values and `ROLE_PERMISSIONS`:
+**Role gating:** `src/lib/admin-permissions.ts` defines 21 `AdminPermission` values and `ROLE_PERMISSIONS`:
 - `super_admin` — everything
 - `admin` — everything except `users.change_role`
-- `moderator` — dashboard, products, moderation, orders, offers, support, messages, disputes, refunds, returns
+- `moderator` — dashboard, products, moderation, orders, offers, support, messages, disputes, refunds, returns. **Not `payouts.manage`** — money leaving the platform is a full admin's call, and `firestore.rules` gates `payout_requests` on `isFullAdmin()` to match. A test asserts both halves, because a sidebar entry the database refuses is the worse failure.
 - `analyst` — dashboard, finance.view, analytics.view, logs.view
 
 Client hooks `use-admin-auth` / `use-courier-auth` enforce this in the UI; Firestore rules enforce it on data.
@@ -730,7 +772,7 @@ either; the first-login bootstrap may create only `buyer` / `active`.
 
 Rules changes ship with `firebase deploy --only firestore:rules`; the function
 with `firebase deploy --only functions:syncBanToAuth`. **`npm run test:rules`**
-runs `scripts/test-firestore-rules.mjs` against the Firestore emulator — 43
+runs `scripts/test-firestore-rules.mjs` against the Firestore emulator — 61
 allow/deny cases over plain REST, no extra dependencies, needs a JVM. Not in
 CI. Add a case for any rule you touch.
 
@@ -945,6 +987,69 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
 `distributeOrderToSellers` computes each seller's net (`subtotal × (1 − commissionRate)`), transfers into their connected account, and writes ledger rows. **Idempotent** via a `payouts[sellerId].transferId` map on the order, so retried captures no-op. Sellers with no `stripeAccountId` are skipped and flagged for manual settlement.
 
 **Known blocker (see `docs/payments-status.md`):** the GCP org policy `constraints/iam.allowedPolicyMemberDomains` prevented granting `allUsers` invoker on Cloud Functions, so the Stripe webhook and the Firebase Hosting rewrite both return 403. **As of 2026-09-07 a project-level exception exists** (set for the sign-up blocking function, §6b), so `handleStripeWebhook` can now be granted the invoker role — a redeploy of it, then a webhook test, is the remaining work; nothing has been redeployed yet. The Connect-onboarding path was worked around with the same-origin `/api/stripe/create-connected-account` route; the webhook has no workaround yet. `docs/payments.md` is the operator runbook (dashboard setup, `functions/.env`, `settings/global` values).
+
+## 8b. Seller payouts (how sellers actually get paid)
+
+**All of it lives in `src/lib/payouts.ts`** — the floor, what counts as
+settled, the balance split, whether a withdrawal is allowed, IBAN validation.
+The wallet, the withdraw form, `/admin/payouts` and the seller timeline only
+render it. That module is the payout half of what `order-money.ts` does for
+order money, and it exists for the same reason: four surfaces were about to
+hold four answers to "what can this seller withdraw?".
+
+**Completed is not settled.** On cash on delivery the buyer hands notes to a
+courier and the money reaches Marigo later, through the logistics partner.
+`completed` says the buyer has the parcel; it says nothing about where the cash
+is. Only an operator knows that, so only an operator can say it —
+`orders.cashSettledAt`, from the admin order page. Until then the seller's
+earnings are **clearing**, not **available**. A `card` order needs no stamp:
+capture already moved the funds.
+
+- **The rule is the thing that holds.** The orders update rule deliberately
+  lets a buyer or seller drive their own order, so `cashSettledAt` is carved
+  out of it explicitly. Without that a seller could stamp their own order and
+  pay themselves out of money the platform has not received. `npm run
+  test:rules` covers it.
+- **`PAYOUT_GATE_FROM` (2026-09-15) grandfathers the past.** Orders completed
+  before it count as settled, because introducing the gate retroactively would
+  have dropped every existing seller's balance to zero overnight. Those read
+  as *"Assumed received"* — a grey badge, not a green one, because nobody
+  actually checked — and an operator can confirm one to replace the assumption
+  with a dated record. It is a frozen historical cutoff; never make it
+  `Date.now()`.
+- **`MIN_WITHDRAWAL_ALL` is 5.000 ALL**, on the seller's **own money after
+  commission**, derived to EUR through `ALL_PER_EUR` rather than restated as a
+  euro literal. Below it the wallet still shows the button — a control that
+  renders nothing teaches a first-week seller that the feature does not exist —
+  and the dialog explains how far off they are instead of offering bank fields
+  that were never going to submit.
+- **`available` is net of paid *and* open requests.** The orders that funded a
+  past payout are still completed and still settled, so without subtracting
+  them a seller could withdraw the same earnings every week forever. One open
+  request at a time, for the same reason.
+- **Bank details live on the request, not the profile.** The user document is
+  world-readable (the public seller profile is built from it), and a standing
+  store of account numbers is a liability where a per-request copy is not.
+  Each row also records what the transfer was actually made against, which is
+  what reconciliation needs.
+- Validation is **shape-only** (length and alphabet, not the ISO 7064
+  checksum): a seller may hold an account abroad, and blocking their money over
+  a subtly wrong checksum implementation has no workaround. An operator reads
+  these before transferring.
+- Verified end to end against real Firestore on 2026-09-15 — create → appear →
+  approve → mark paid → ledger row → seller notification → the seller's own
+  wallet showing **5.580 ALL** for a €60 payout, i.e. the EUR/lek split holding
+  in both directions.
+
+**§8b replaced the Stripe Connect path for the live business.**
+`getSellerBalance` / `requestPayout` are Connect callables needing a connected
+account and a captured card balance; cards are off and the Connect functions
+cannot even be invoked (org policy), so the earnings page's payout button threw
+for every seller who pressed it and the balance fetch failed CORS on every load.
+**`STRIPE_ONBOARDING_ENABLED`** (`src/lib/payment-options.ts`, beside the card
+flag) now hides the rest: `/profile/stripe-onboarding` redirects to the wallet
+and `/api/stripe/create-connected-account` answers 403 — the UI is not the
+guard. Nothing is deleted; flip the constant to restore it.
 
 ## 9. Frontend patterns
 
@@ -1235,7 +1340,16 @@ Cloud Functions (`functions/src/index.ts`, region `europe-west1`, secrets from S
     entry points; robots.txt names GPTBot / OAI-SearchBot / ClaudeBot /
     PerplexityBot / Google-Extended et al. explicitly.
 - Favicons follow the **App Router icon convention**: `src/app/icon.png` and `src/app/apple-icon.png`, with `public/favicon.ico` for clients that probe that path directly. Do not add a `src/app/favicon.ico` — it is served at `/favicon.ico` and beats any `<link rel="icon">` in `layout.tsx`, which is what kept the old orange mark on screen. Both icon routes are excluded in `next-sitemap.config.js`, or they get listed as pages.
-- Mobile-first: bottom `MobileNav` (Home/Search/Cart/Favorites/Profile), hidden ≥ md; header popovers for cart/messages/notifications.
+- Mobile-first: bottom `MobileNav` (**Home / Shop / Sell / Cart / Me**), hidden
+  ≥ md; header popovers for cart/messages/notifications. It has no Favourites
+  entry — this line claimed one for months — which is why `/favorites` had no
+  link anywhere until the header gained a heart (below).
+- **The wishlist heart sits between Messages and Cart in `UserNav`**, and is
+  `hidden md:inline-flex`: a fifth icon does not fit beside the logo at 375px
+  and pushed the bell on top of the wordmark. The phone reaches saved items
+  from **My Favourites** in the profile menu instead. No count badge — a
+  saved-item tally is not something you act on, unlike an unread count or a
+  basket total.
 - The footer's brand column carries `PartnerLogos` — the Startup Albania and
   Ministry of Economy marks, with the funding credit on hover and on focus.
   Matched on **height**, not width: the wordmark is 2.9:1 and the emblem is
@@ -1319,7 +1433,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (805 passing): unit — `account-verification`, `admin-permissions`, `ai-clients`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `defaults`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `legacy-urls`, `listing-options`, `macro-filters`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `push-tokens`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (848 passing): unit — `account-verification`, `admin-permissions`, `ai-clients`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `defaults`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `legacy-urls`, `listing-options`, `macro-filters`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `payouts`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `push-tokens`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`, `view-throttle`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `packing-instructions-dialog`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

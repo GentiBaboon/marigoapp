@@ -101,6 +101,49 @@
 
 ---
 
+## Admin: Payouts (September 2026)
+
+A new sidebar entry, `/admin/payouts`, gated on the new **`payouts.manage`**
+permission — **admin and super_admin only**. Moderators and analysts do not get
+it, and `firestore.rules` gates `payout_requests` on `isFullAdmin()` to match,
+so the sidebar cannot offer a page the database refuses.
+
+**Nothing on the page moves money.** Almost every order is paid in cash at the
+door, so there is no automatic rail out: an operator reads the account details,
+makes the bank transfer by hand, and records what happened.
+
+- **Tabs**: To review / In progress / Paid / Declined / All, each with a count,
+  plus "waiting for review", "owed on those requests" and "paid all time"
+- **Every bank field has a copy button** — an operator is retyping an IBAN into
+  a banking app, and a mistyped one sends a seller's money to a stranger
+- **Approve** claims a row. **Mark paid** takes a bank reference, writes the
+  `transactions` ledger row and notifies the seller. **Decline** requires a
+  reason, which the seller reads on their wallet, and returns the amount to
+  their available balance
+- Amounts are **EUR** here like the rest of finance; the seller sees lek
+
+### Cash settlement, on `/admin/orders/[id]`
+
+The switch that releases a seller's earnings. `completed` means the buyer has
+the parcel; **`cashSettledAt`** means the money reached Marigo through the
+logistics partner. Only the second makes earnings withdrawable, and only an
+operator can know it.
+
+Three states, each with something to press:
+
+| State | Badge | Action |
+|---|---|---|
+| Cash not confirmed | Waiting (amber) | Mark cash received |
+| Completed before 2026-09-15 | Assumed received (grey) | Confirm we received it |
+| Operator confirmed | Received (green), with who and when | Undo |
+
+Card orders show no action — capture already moved the funds. The grandfathered
+state exists so introducing the gate did not drop every existing seller's
+balance to zero; its badge is grey rather than green because nobody actually
+checked.
+
+---
+
 ## Files Changed
 
 | File | Change |
@@ -111,3 +154,9 @@
 | `src/components/sell/steps/CategoryStep.tsx` | Sort parents and subcategories by `order` field |
 | `src/components/home/CategoriesSection.tsx` | Sort category tabs by `order` field |
 | `scripts/seed-brands.mjs` | Utility script for bulk brand seeding via firebase-admin |
+| `src/lib/payouts.ts` | **New** — every payout decision: floor, settlement, balance split, IBAN validation |
+| `src/app/admin/payouts/page.tsx` | **New** — the seller withdrawal queue |
+| `src/components/admin/cash-settlement-card.tsx` | **New** — the "has the cash reached us?" switch on an order |
+| `src/components/profile/withdraw-dialog.tsx` | **New** — the seller's withdrawal form |
+| `src/lib/admin-permissions.ts` | Added `payouts.manage` (admin + super_admin) |
+| `firestore.rules` | `payout_requests` rules; `cashSettledAt` carved out of the orders party branch |

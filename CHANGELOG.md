@@ -1,5 +1,82 @@
 # Marigo App — Feature Changelog
 
+## Session: September 2026
+
+---
+
+### 1. Seller payouts — bank transfer, gated on the cash arriving
+- **New module `src/lib/payouts.ts`** holds every payout decision: the floor,
+  what counts as settled, the balance split, whether a withdrawal is allowed,
+  IBAN validation. 29 unit tests
+- **`orders.cashSettledAt`** — completed means the buyer has the parcel; this
+  means the cash reached Marigo through the courier. Only the second releases a
+  seller's earnings. Admin-only in `firestore.rules`, carved out of the broad
+  party branch so a seller cannot stamp their own order
+- Orders completed before **2026-09-15** are grandfathered as settled, so no
+  existing seller's balance dropped to zero. They show as "Assumed received"
+  with a button to put a real confirmation on the record
+- **5.000 ALL minimum**, on the seller's own money after commission, derived
+  from `ALL_PER_EUR` rather than restated in euro
+- **`payout_requests` collection** — the seller files one with their bank
+  details (kept on the request, not on the world-readable user document);
+  `isFullAdmin()` reads and decides
+- **`/admin/payouts`** — the withdrawal queue: copy buttons per field, approve,
+  mark paid with a reference (writes the `transactions` ledger row and notifies
+  the seller), or decline with a reason
+- New permission `payouts.manage` — admin and super_admin only, matching the
+  rules
+- Verified end to end against real Firestore: create → approve → mark paid →
+  ledger → notification → the seller's wallet showing 5.580 ALL for a €60 payout
+
+### 2. Stripe payout onboarding switched off
+- `STRIPE_ONBOARDING_ENABLED` in `src/lib/payment-options.ts`. Connect needs a
+  connected account and a captured card balance; cards are off and the Connect
+  functions cannot be invoked (org policy), so the payout button threw for every
+  seller who pressed it
+- `/profile/stripe-onboarding` redirects to the wallet; the route answers 403 —
+  the UI is not the guard. "Setup Payouts (Sellers)" removed from the profile
+  menu. Nothing deleted
+
+### 3. Seller wallet rebuilt
+- Available / pending / withdrawn, with "How you get paid" behind a disclosure
+  on the "Available to withdraw" box
+- The withdraw button is always present and pressable; below the floor the
+  dialog explains how far off you are rather than showing fields that cannot
+  submit
+- The completed step of the seller order timeline now hands over to the wallet
+  instead of promising a payout nobody was processing
+
+### 4. Wishlist had no way in
+- Heart in the header between Messages and Cart (desktop; a fifth icon overlaps
+  the logo at 375px), **My Favourites** in the profile menu and the account
+  dropdown for the phone
+- The bottom `MobileNav` never had a Favourites entry, contrary to what the docs
+  said — `/favorites` was reachable only by typing the URL
+- Product page: a labelled "Add to wishlist" / "In wishlist" button replacing the
+  unlabelled heart beside the title
+
+### 5. Product view counts
+- Repeat visits by the same shopper now count, throttled to **once an hour** per
+  listing per browser (`src/lib/view-throttle.ts`). The old guard was a permanent
+  `sessionStorage` flag, so a second visit never counted
+- Signed-out visitors still do not count — `views` is gated on `isActiveUser()`
+
+### 6. Smaller fixes
+- **"My Sales"** in the profile menu and account dropdown, pointing at the Sold
+  tab of `/profile/listings` — already the seller's order list, with no way in
+- The buyer order page's **Help centre button was unreachable**, not broken: the
+  page had no bottom padding, so its last element sat under the fixed
+  `MobileNav`. `pb-28 md:pb-8`
+- **"No longer needed" removed** from the refund reasons — changing your mind is
+  a cancellation, which runs before the item ships
+- **Packing instructions** replaced with the team's own four numbered steps
+- **Help Centre and the assistant corrected**: the order stages were the card
+  flow ("pending payment → processing"), the refund answer described releasing a
+  card authorisation, and the assistant contradicted itself about an escrow hold
+  that does not exist on a cash order
+
+---
+
 ## Session: April 2026
 
 ---
