@@ -1,6 +1,11 @@
 # Payments Integration — Status & Next Steps
 
-_Last updated: 2026-05-27_
+_Stripe status last verified: 2026-05-27. Annotated 2026-09-24._
+
+> **Scope: the Stripe path only, which is switched off.** Sellers are paid
+> today by bank transfer arranged by an operator — CLAUDE.md **§8b** and
+> `/admin/payouts`. This page tracks what would need to be true for Stripe
+> cards and Connect payouts to work, for whenever that is turned back on.
 
 ## ✅ Completed
 
@@ -12,8 +17,25 @@ _Last updated: 2026-05-27_
 | **Stripe sandbox** | Connected. Account `acct_1TZuudCAR95HnxEq`. Test mode keys live in env. |
 | **Stripe Connect** | Express platform enabled on the sandbox. |
 | **Stripe webhook endpoint** | Registered in Stripe dashboard pointing to `https://handlestripewebhook-onno4to5oa-ew.a.run.app`. Subscribed to 5 events: `payment_intent.amount_capturable_updated`, `.succeeded`, `.payment_failed`, `.canceled`, `charge.refunded`. |
-| **Seller onboarding** | Works end-to-end (via Next.js `/api/stripe/create-connected-account` route — bypasses the org policy issue below). Test user's `stripeAccountId = acct_1TbIrgFhRlQ1HNtg` is saved to PROD Firestore. |
+| **Seller onboarding** | Built and working as of 2026-05-27 via the Next.js `/api/stripe/create-connected-account` route, which bypasses the org policy issue below. Test user's `stripeAccountId = acct_1TbIrgFhRlQ1HNtg` is saved to PROD Firestore. **Switched off since 2026-09-15**: that route answers 403 and `/profile/stripe-onboarding` redirects to the wallet, both gated on `STRIPE_ONBOARDING_ENABLED`. Flip the constant to reach it again. |
 | **Platform settings** | `commissionRate = 15%`, `payoutHoldHours = 1`, `refundWindowDays = 1` set in PROD `settings/global`. |
+
+## ⚠️ Was blocked — org policy `iam.allowedPolicyMemberDomains`
+
+**Update 2026-09-07: a project-level exception now exists.** It was set with
+`gcloud org-policies set-policy` (`allowAll: true`, this project only) so the
+sign-up blocking function could be granted `allUsers` invoker — see CLAUDE.md
+§6b. The same exception unblocks `handleStripeWebhook`'s invoker grant, so the
+wall described below is no longer standing.
+
+**What remains:** grant the invoker role, redeploy `handleStripeWebhook`, and
+send a test webhook. Nothing has been redeployed yet, so assume the webhook
+still does not fire until someone confirms it.
+
+**The support-ticket template further down is kept for the record and should
+not be filed** — it asks for the exception that already exists.
+
+### The original report
 
 ## 🚫 Blocked — Org policy `iam.allowedPolicyMemberDomains`
 

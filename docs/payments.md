@@ -1,9 +1,17 @@
 # Payments — Operator Guide
 
-This is the runbook for getting end-to-end payments working in production
-after the code changes that just landed. Everything below has to happen
-**outside the codebase** — either in the Stripe dashboard, in Firestore, or
-in env files.
+> **This is the Stripe path, and it is switched off.** Card payments
+> (`CARD_PAYMENTS_ENABLED`) and Connect payout onboarding
+> (`STRIPE_ONBOARDING_ENABLED`) are both `false` in
+> `src/lib/payment-options.ts`. The live site takes **cash on delivery**, and
+> sellers are paid by **bank transfers an operator makes by hand** — that
+> flow is CLAUDE.md **§8b**, not this document. Nothing here is deleted or
+> wrong; it all still deploys, and it is what you need when cards come back.
+> Do not follow this runbook expecting to learn how a seller gets paid today.
+
+This is the runbook for getting end-to-end Stripe payments working in
+production. Everything below has to happen **outside the codebase** — either
+in the Stripe dashboard, in Firestore, or in env files.
 
 ## 1. Stripe dashboard configuration
 
