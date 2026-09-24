@@ -35,7 +35,7 @@ import { collection, query, where, limit, doc } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import type { FirestoreOrder, FirestorePayoutRequest, FirestoreSettings, FirestoreUser } from '@/lib/types';
 import { toDate } from '@/lib/types';
-import { newestFirst } from '@/lib/order-money';
+import { newestFirst, orderMerchandise } from '@/lib/order-money';
 import {
   amountToMinimum,
   canRequestWithdrawal,
@@ -203,9 +203,13 @@ export default function SellerWalletPage() {
     let salesCount = 0;
 
     for (const o of safeOrders) {
-      const myItems = (o.items || []).filter((it: any) => it?.sellerId === user?.uid);
-      if (myItems.length === 0) continue;
-      const mySubtotal = myItems.reduce((s, it: any) => s + (Number(it?.price) || 0), 0);
+      if (!(o.items || []).some((it: any) => it?.sellerId === user?.uid)) continue;
+      // orderMerchandise, not an inline sum of prices: it multiplies by the
+      // line's quantity. Summing `price` alone undercounted every line where
+      // a buyer took more than one, so this page's "Total Earnings" disagreed
+      // with the "Available to withdraw" figure directly above it — which is
+      // the exact drift src/lib/payouts.ts and order-money.ts exist to stop.
+      const mySubtotal = orderMerchandise(o as any, user?.uid);
 
       if (REFUNDED_STATUSES.has(o.status)) {
         refunded += mySubtotal;
@@ -470,7 +474,7 @@ export default function SellerWalletPage() {
               {orders.map((o) => {
                 const myItems = (o.items || []).filter((it: any) => it?.sellerId === user?.uid);
                 if (myItems.length === 0) return null;
-                const sub = myItems.reduce((s, it: any) => s + (Number(it?.price) || 0), 0);
+                const sub = orderMerchandise(o as any, user?.uid);
                 const isRefund = REFUNDED_STATUSES.has(o.status);
                 const isPending = PENDING_STATUSES.has(o.status);
                 const commission = sub * commissionRate;
