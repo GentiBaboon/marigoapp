@@ -180,8 +180,13 @@ export function CategoryStep() {
                     >
                       <Info className="h-3.5 w-3.5" />
                     </PopoverTrigger>
-                    <PopoverContent side="top" align="start" className="w-72 text-xs leading-relaxed">
-                      If you can not find the brand of your item, put it on item description on the next step and we will edit it before publishing.
+                    <PopoverContent side="top" align="start" className="w-72 space-y-2 text-xs leading-relaxed">
+                      <p>
+                        If your item has no label to be found, choose <strong>Unknown</strong> as the brand.
+                      </p>
+                      <p>
+                        If you know the brand but can not find it in the list, put it on item description on the next step and we will edit it before publishing.
+                      </p>
                     </PopoverContent>
                   </Popover>
                 </div>

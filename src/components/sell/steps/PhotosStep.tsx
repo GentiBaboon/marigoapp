@@ -122,10 +122,10 @@ export function PhotosStep() {
     }
   };
 
-  // The caption has always said "at least 3"; from 2026-05 to 2026-09 the
-  // button let a seller through with one, and a "Skip for now" link with
-  // none, on the theory that ReviewStep would enforce it — which only refused
-  // zero. Enforced here now, and again at publish (src/lib/listing-photos.ts).
+  // Continue needs the minimum. "Skip for now" lets a seller fill in the
+  // rest first, but the listing still cannot be published without it: the
+  // guard in ReviewStep holds (src/lib/listing-photos.ts). Until 2026-09 that
+  // guard refused only zero, which is how one-photo listings got through.
   const photoProblem = photoCountProblem(localImages.length);
   const canContinue = photoProblem === null;
 
@@ -242,7 +242,20 @@ export function PhotosStep() {
           Continue ({localImages.length}/{MAX_LISTING_PHOTOS})
         </Button>
         {photoProblem && (
-          <p className="text-center text-sm text-muted-foreground">{photoProblem}</p>
+          <>
+            <p className="text-center text-sm text-muted-foreground">{photoProblem}</p>
+            {/* Skipping only defers the photos. Publish still needs the
+                minimum: ReviewStep shows the shortfall and refuses to submit. */}
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full h-12 text-sm font-bold text-muted-foreground hover:text-foreground"
+              disabled={!!isProcessing}
+              onClick={nextStep}
+            >
+              Skip for now
+            </Button>
+          </>
         )}
       </div>
     </div>

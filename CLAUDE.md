@@ -280,7 +280,10 @@ Authenticated (gated by middleware §6):
     3, `MAX_LISTING_PHOTOS` 9, `photoCountProblem()` the sentence to show.
     Enforced at the photo step (Continue), the AI assistant (Create my
     draft), the publish guard in `ReviewStep` (the one that holds against a
-    stale draft or a scripted client) and the seller edit page's save. The
+    stale draft or a scripted client) and the seller edit page's save.
+    **"Skip for now" is back on the photo step** (since 2026-10-10, at the
+    team's request): it defers the photos, it does not waive them — Review
+    shows the shortfall up front and swaps Publish for "Add photos". The
     caption had said "at least 3" since March 2026 while the button let one
     through and a "Skip for now" link let none, and the AI path never saw the
     caption at all — two one-photo listings from a real seller on 2026-09-11

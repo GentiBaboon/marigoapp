@@ -34,6 +34,7 @@ import { useCurrency } from '@/context/CurrencyContext';
 
 export function ReviewStep() {
   const { formData, goToStep, nextStep, activeDraft } = useSellForm();
+  const photosShortBy = photoCountProblem(formData.images?.length ?? 0);
   const [isPublishing, setIsPublishing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState<string>('');
@@ -403,6 +404,25 @@ export function ReviewStep() {
 
       {/* Footer Actions */}
       <div className="flex flex-col gap-3 pt-4">
+        {/* A seller may skip the photo step, so the shortfall is shown here
+            before they press Publish, not after the upload has started. */}
+        {photosShortBy && !isPublishing && (
+          <Alert variant="destructive">
+            <Camera className="h-4 w-4" />
+            <AlertTitle>Photos needed</AlertTitle>
+            <AlertDescription>{photosShortBy}</AlertDescription>
+          </Alert>
+        )}
+        {photosShortBy && !isPublishing ? (
+          <Button
+            className="w-full h-16 text-base font-bold shadow-xl rounded-full"
+            size="lg"
+            onClick={() => goToStep(1)}
+          >
+            <Camera className="h-5 w-5 mr-2" />
+            Add photos
+          </Button>
+        ) : (
         <Button 
             className={cn(
                 "w-full h-16 text-base font-bold shadow-xl transition-all active:scale-[0.98] rounded-full",
@@ -424,6 +444,7 @@ export function ReviewStep() {
               </span>
           )}
         </Button>
+        )}
         
         {!isPublishing && (
             <Button 
