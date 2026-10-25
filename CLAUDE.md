@@ -1697,7 +1697,7 @@ aliased as `useRouter`), which the click bridge cannot see.
   and the bar colours, so `MainActivity` pads the content view by the system
   bar (and keyboard) insets on API 36+ and paints the strip above it brand
   purple. Checked on an API 36 emulator 2026-10-25. Each Play upload needs a
-  higher `versionCode` in `android/app/build.gradle` (5 = 1.5).
+  higher `versionCode` in `android/app/build.gradle` (6 = 1.5; 5 was burnt by a rejected upload).
 - **The Play listing is `com.marigoapp.app`** ("Marigo: Fashion Shopping", in
   the *Xheni Maloku PF* developer account — the *Marigoapp* account was
   removed by Google), so Android's `applicationId` is that, while the
