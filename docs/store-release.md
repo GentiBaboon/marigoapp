@@ -36,7 +36,9 @@ further work.
 | Export-compliance answer | `Info.plist` → `ITSAppUsesNonExemptEncryption` | Skips the question on every upload |
 | Release signing | `android/keystore.properties` (gitignored) | Produces a signed `.aab`; absent = unsigned, never a build failure |
 | `targetSdk 35` | `android/variables.gradle` | Play's current floor |
-| In-app account deletion | `src/app/profile/settings/page.tsx` | Required by App Store guideline 5.1.1(v) |
+| In-app account deletion | `src/app/profile/settings/page.tsx` + owner `delete` rule on `users/{uid}` | Required by App Store guideline 5.1.1(v). Until 2026-10-25 the button only signed out and claimed success; it now deletes the profile and `purgeDeletedUser` removes the Auth account. **Needs the rules deployed** |
+| iPhone-only, `arm64` | `TARGETED_DEVICE_FAMILY = 1`, `UIRequiredDeviceCapabilities` | A universal build makes 13" iPad screenshots mandatory, and iPad support can never be withdrawn once shipped |
+| Store listing copy | `docs/app-store-listing.md` | Name, description, keywords, privacy and age answers, review notes |
 
 ---
 
@@ -86,9 +88,45 @@ unzip -l "$(find ~/Library/Developer/Xcode/DerivedData -name App.app -print -qui
 
 ### 2.2 Xcode signing (blocks the iOS upload)
 
-There are **zero code-signing identities** in the keychain
-(`security find-identity -v -p codesigning`). Nothing can be archived until
-Xcode is signed in:
+Xcode is signed in (team `6AF53HFAKG`, an Apple Development identity exists).
+**Solved 2026-10-25 without an iPhone.** The team had no registered device,
+so automatic signing could not create its first profile ("Your team has no
+devices from which to generate a provisioning profile"). The Apple Silicon Mac
+counts as a device, because it runs iPhone apps. One build for "My Mac"
+registered it and created the team profile:
+
+```bash
+xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug \
+  -destination 'id=<Mac Provisioning UDID>' \
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration build
+```
+
+(`system_profiler SPHardwareDataType | grep "Provisioning UDID"`.) Dead ends:
+- forcing Apple Distribution on the command line conflicts with automatic signing;
+- ad-hoc signing is refused by the iOS 26 SDK;
+- an **unsigned** archive does export, but Apple's server-side signing then
+  drops every entitlement (no push, no Sign in with Apple), and nothing fails.
+
+Always check an exported `.ipa` with `codesign -d --entitlements -` before
+uploading.
+
+**Archive and upload** (what shipped 1.0.0 (1) and (2); build 2 adds Report/Block and is the one selected for review):
+```bash
+xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release \
+  -destination 'generic/platform=iOS' -archivePath build/Marigo.xcarchive \
+  -allowProvisioningUpdates archive
+xcodebuild -exportArchive -archivePath build/Marigo.xcarchive -exportPath build/upload \
+  -exportOptionsPlist <plist: method app-store-connect, destination upload, teamID 6AF53HFAKG> \
+  -allowProvisioningUpdates
+```
+Bump `CURRENT_PROJECT_VERSION` before each new upload: App Store Connect
+refuses a build number it has already seen. **Deployment target 13.0 is fine
+until April 2027**, when Apple requires 15.0.
+
+App Store Connect app record: **Marigo - Fashion Marketplace**, Apple ID
+`6826849847`, SKU `marigo-ios-001`.
+
+The original setup steps, for a fresh machine:
 
 Xcode → Settings → Accounts → **+** → Apple ID → sign in as the account that
 owns team `6AF53HFAKG`. Then open `ios/App/App.xcworkspace`, select the **App**
@@ -195,9 +233,18 @@ experience in front of a reviewer.
   it on every App ID and it cannot be unticked — the app does not use it.) Do
   not let a reviewer's boilerplate 3.1.1 note go unanswered: reply citing
   3.1.5(a).
-- **Guideline 4.8** demands Sign in with Apple only where another third-party
-  sign-in is offered. The app offers Apple and email/password on iOS and no
-  Google, so it is satisfied twice over.
+- **Guideline 4.8** demands Sign in with Apple wherever another third-party
+  sign-in is offered. Google came to the iOS app on 2026-10-25, so Apple must
+  stay beside it.
+- **Guideline 1.2 (user-generated content)** needs terms users agree to, a way
+  to report content, a way to block abusive users, and published contact info.
+  All four exist since 2026-10-25: the chat rules dialog (accepted before the
+  first message), **Report** and **Block** in every buyer↔seller thread's ⋮
+  menu (enforced in the Firestore rules, not just the UI), and /help plus
+  hello@marigoapp.com. Listings are also moderated before they go live
+  (`pending_review`). Apple expects reports to be acted on within 24 hours:
+  `/admin/moderation` is the queue, and the admin dashboard counts pending
+  reports.
 - **Guideline 4.2 (minimum functionality)** is the real risk for any Capacitor
   app. The bundle ships inside the binary rather than loading a remote URL,
   which is the important half. The other half is native behaviour a website
