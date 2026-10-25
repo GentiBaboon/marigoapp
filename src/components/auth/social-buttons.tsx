@@ -8,7 +8,12 @@ import { postLoginDestination } from '@/firebase/auth/post-login';
 import { SUSPENDED_MESSAGE } from '@/lib/account-verification';
 import { usePostAuthRedirect } from '@/hooks/use-post-auth-redirect';
 import { signInWithGoogle, completeOAuthRedirect } from '@/firebase/auth/actions';
-import { isAppleSignInAvailable, signInWithAppleNative } from '@/firebase/auth/native-oauth';
+import {
+  isAppleSignInAvailable,
+  isGoogleSignInAvailable,
+  signInWithAppleNative,
+  signInWithGoogleNative,
+} from '@/firebase/auth/native-oauth';
 import { useToast } from '@/hooks/use-toast';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -16,30 +21,16 @@ import { cn } from '@/lib/utils';
 import { IS_NATIVE_BUILD } from '@/lib/platform/native';
 
 /**
- * Whether to offer Google sign-in at all on this build.
+ * Whether to offer the *web* Google button on this build.
  *
- * Sign in with Apple was withdrawn from the website on 2026-09-08 — the
- * button is gone, `signInWithApple` in `firebase/auth/actions.ts` is kept so
- * it can come back without being rewritten. An account that was created with
- * Apple can no longer sign in until it does; none is known to exist.
+ * Off in the native bundle, where the web flow cannot work: Google refuses
+ * OAuth from an embedded browser (`disallowed_useragent`), and the app
+ * initialises Auth without a popupRedirectResolver. Inside the app both
+ * providers go through @capacitor-firebase/authentication instead
+ * (`firebase/auth/native-oauth.ts`), decided at runtime after mount.
  *
- * Off in the native bundle. Neither provider can complete inside a WebView:
- * Google refuses OAuth from an embedded browser outright (`disallowed_useragent`,
- * their anti-phishing policy since 2016), and the app initialises Auth without a
- * popupRedirectResolver anyway — that resolver is what used to hang and stall
- * every Firestore query, so it is not coming back. Showing buttons that can only
- * ever fail is worse than not showing them, and App Store guideline 4.8 only
- * demands Sign in with Apple when some *other* third-party sign-in is on offer,
- * so hiding both keeps that requirement out of play too.
- *
- * A build-time constant, not a runtime check: the native bundle then never
- * contains the markup, so there is no flash of a button that vanishes on
- * hydration. Email and password sign-in is unaffected on every platform.
- *
- * Restoring Google on device means routing it through
- * @capacitor-firebase/authentication as well — the plugin is now installed and
- * Apple already goes that way; Google additionally needs the GoogleSignIn pod
- * and the reversed-client-id URL scheme, which is why it is still off here.
+ * Sign in with Apple was withdrawn from the *website* on 2026-09-08;
+ * `signInWithApple` in `firebase/auth/actions.ts` is kept for its return.
  */
 export const SOCIAL_SIGN_IN_AVAILABLE = !IS_NATIVE_BUILD;
 
@@ -99,10 +90,15 @@ export function SocialButtons({
   // during render would bake "no Apple button" into the HTML that ships inside
   // the binary.
   const [appleAvailable, setAppleAvailable] = useState(false);
-  useEffect(() => setAppleAvailable(isAppleSignInAvailable()), []);
+  const [googleNative, setGoogleNative] = useState(false);
+  useEffect(() => {
+    setAppleAvailable(isAppleSignInAvailable());
+    setGoogleNative(isGoogleSignInAvailable());
+  }, []);
   // True while a returning redirect is being claimed, so the buttons stay
   // disabled instead of inviting a second sign-in on top of one completing.
-  const [resumingRedirect, setResumingRedirect] = useState(true);
+  // Never inside the app: there is no web redirect to come back from.
+  const [resumingRedirect, setResumingRedirect] = useState(!IS_NATIVE_BUILD);
   const router = useRouter();
   const nextPath = usePostAuthRedirect();
   const auth = useAuth();
@@ -113,7 +109,12 @@ export function SocialButtons({
   // redirect path is a dead end — the provider sends the user back, Firebase is
   // holding the result, and the sign-in screen simply renders again as though
   // nothing happened. Resolves to nothing on a normal visit.
+  //
+  // Web only. Inside the app `getRedirectResult` throws `auth/argument-error`
+  // (no popup/redirect resolver exists there), which this effect used to show
+  // as a red "Sign in failed" the moment the sign-in screen opened.
   useEffect(() => {
+    if (IS_NATIVE_BUILD) return;
     let cancelled = false;
     completeOAuthRedirect(auth)
       .then((result) => {
@@ -145,12 +146,20 @@ export function SocialButtons({
   const handleSocialLogin = async (provider: 'google') => {
     setLoading(provider);
     try {
-      const result = await signInWithGoogle(auth);
+      const result = googleNative
+        ? await signInWithGoogleNative(auth)
+        : await signInWithGoogle(auth);
 
       if (result.success && result.user) {
         const outcome = await postLoginDestination(firestore, auth, result.user, nextPath);
         if (outcome.kind === 'go') router.push(outcome.to);
         else toast({ variant: 'destructive', title: 'Account suspended', description: SUSPENDED_MESSAGE });
+        setLoading(null);
+        return;
+      }
+
+      // No error and no user is a dismissed picker — nothing to report.
+      if (!result.error && !result.redirecting) {
         setLoading(null);
         return;
       }
@@ -211,7 +220,8 @@ export function SocialButtons({
 
   // Belt and braces: callers also hide the surrounding divider, but a caller
   // that forgets should still render nothing rather than dead buttons.
-  if (!SOCIAL_SIGN_IN_AVAILABLE && !appleAvailable) return null;
+  const googleAvailable = SOCIAL_SIGN_IN_AVAILABLE || googleNative;
+  if (!googleAvailable && !appleAvailable) return null;
 
   return (
     <div className="space-y-4">
@@ -240,7 +250,7 @@ export function SocialButtons({
           Continue with Apple
         </Button>
       )}
-      {SOCIAL_SIGN_IN_AVAILABLE && (
+      {googleAvailable && (
       <Button
         variant={variant}
         className={cn("w-full", className)}

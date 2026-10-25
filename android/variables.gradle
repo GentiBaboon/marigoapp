@@ -20,4 +20,8 @@ ext {
     androidxJunitVersion = '1.1.5'
     androidxEspressoCoreVersion = '3.5.1'
     cordovaAndroidVersion = '10.1.1'
+    // Links play-services-auth into @capacitor-firebase/authentication so
+    // Google sign-in works natively. Also needs the signing key's SHA-1 on the
+    // Firebase Android app, or Google answers DEVELOPER_ERROR (code 10).
+    rgcfaIncludeGoogle = true
 }

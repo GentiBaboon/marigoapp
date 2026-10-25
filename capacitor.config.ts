@@ -78,8 +78,10 @@ const config: CapacitorConfig = {
       // Only what the app actually offers. Each entry makes the plugin link
       // and initialise that provider natively; listing one that is not
       // configured in the Firebase console is a runtime failure, not a build
-      // one.
-      providers: ['apple.com'],
+      // one. Google also needs its native SDK linked: the
+      // `CapacitorFirebaseAuthentication/Google` pod (ios/App/Podfile) and
+      // `rgcfaIncludeGoogle` (android/variables.gradle).
+      providers: ['apple.com', 'google.com'],
     },
   },
 };

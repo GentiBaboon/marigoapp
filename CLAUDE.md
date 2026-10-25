@@ -590,8 +590,9 @@ decoration.
   from the website on 2026-09-08 and came back on 2026-09-13 in the iOS app
   only** — through the native sheet, not the WebView (§14). `signInWithApple`
   in `src/firebase/auth/actions.ts` is the dormant *web* path; the live native
-  one is `src/firebase/auth/native-oauth.ts`. Google is still off natively, so
-  App Store guideline 4.8 is satisfied either way.
+  one is `src/firebase/auth/native-oauth.ts`. **Google came to both apps on
+  2026-10-25** through the same plugin (§14), which is exactly the case App
+  Store guideline 4.8 is about — so on iOS Apple must stay beside it.
 
 ### Verification is enforced, not just recorded
 
@@ -1362,6 +1363,13 @@ guard. Nothing is deleted; flip the constant to restore it.
   `dark:invert` — the admin sidebar can leave `dark` on the document element.
   Source artwork is **not** in the repo (gitignored); the processed PNGs in
   `public/partners/` are what ships.
+- **Toasts are a light popup** (`components/ui/toast.tsx` + `toaster.tsx`,
+  since 2026-10-25): one white card for every variant, with the variant only
+  tinting a small icon chip (red alert, green tick, purple bell). They used to
+  be solid red / green slabs pinned at `top-0`, which in the edge-to-edge iOS
+  app painted over the clock and the Dynamic Island — the viewport now pads by
+  `env(safe-area-inset-top)`. The close button is always visible; there is no
+  hover on a phone.
 - Error reporting: `src/lib/error-reporter.ts` (`reportError`, `reportWarning`) + `FirebaseErrorListener` mounted globally, fed by `src/firebase/error-emitter.ts`.
 
 ## 9b. Live visitor presence
@@ -1695,14 +1703,37 @@ aliased as `useRouter`), which the click bridge cannot see.
   That document is world-readable (`allow get: if true` — the public seller
   profile is built from it), so a token field there would publish a per-device
   identifier for every member.
-- **Sign in with Apple goes through the native sheet, not the WebView.**
-  `signInWithPopup` has no popup on device and `signInWithRedirect` is severed
-  by Safari's storage partitioning, so `native-oauth.ts` takes Apple's
-  credential from `@capacitor-firebase/authentication` and completes the
-  sign-in with the JS SDK. `skipNativeAuth: true` in `capacitor.config.ts` is
-  load-bearing: without it the native SDK signs in too and there are two
-  sessions that drift. iOS only — on Android the plugin falls back to a web
-  flow needing an Apple Services ID this project has not configured.
+- **Social sign-in goes through native sheets, not the WebView.**
+  `signInWithPopup` has no popup on device, `signInWithRedirect` is severed
+  by Safari's storage partitioning, and Google refuses OAuth in an embedded
+  WebView outright. So `native-oauth.ts` takes the credential from
+  `@capacitor-firebase/authentication` — Apple's sheet, Google's account
+  picker — and completes the sign-in with the JS SDK. `skipNativeAuth: true`
+  in `capacitor.config.ts` is load-bearing: without it the native SDK signs in
+  too and there are two sessions that drift.
+  - **Google, iOS + Android** (since 2026-10-25). iOS needs the
+    `CapacitorFirebaseAuthentication/Google` pod (declared in the Podfile's
+    target block — `cap sync` rewrites `capacitor_pods`) and the
+    REVERSED_CLIENT_ID URL scheme in `Info.plist`. GoogleSignIn 7.1 pins
+    `GTMSessionFetcher ~> 3.3`, so the lock holds 3.5.0, not 4.x. Android
+    needs `rgcfaIncludeGoogle` in `variables.gradle` **and every signing
+    key's SHA-1 on the Firebase Android app** — without it Google answers
+    `DEVELOPER_ERROR` (`"10: "`). Only the debug key is registered so far;
+    the upload key and the **Play App Signing** key (Play Console → App
+    integrity) must be added before a Play build can sign in with Google, then
+    `google-services.json` re-downloaded (it is gitignored).
+  - **Apple, iOS only.** Android's Apple flow is Firebase's browser flow and
+    needs a Services ID, Team ID, key and return URL on the Firebase Apple
+    provider; none is set (checked 2026-10-25). `APPLE_ON_ANDROID` in
+    `native-oauth.ts` turns the button on once they are.
+  - Play services reports failures as a bare status message (`"12501: "` is
+    a cancel), so `isCancellation()` reads the number from the message too —
+    a cancelled picker used to raise "Sign in with Google failed — 12501:".
+  - The redirect resumer in `SocialButtons` is **web only**: in the app
+    `getRedirectResult` throws `auth/argument-error`, which showed a red
+    "Sign in failed" every time the sign-in screen opened.
+  - `CFBundleName` is `MarigoApp`, not `$(PRODUCT_NAME)`: iOS prints it in
+    the "… wants to use accounts.google.com" prompt, which said "App".
 - **`GoogleService-Info.plist` must be added to the Xcode *target***, not merely
   dropped in the folder, or it is absent from the bundle at runtime.
   `AppDelegate` guards `FirebaseApp.configure()` on finding it — `configure()`

@@ -37,6 +37,11 @@ target 'App' do
   # @capacitor-firebase/authentication declares (~> 11.0). Firebase's iOS pods
   # share FirebaseCore, so mixing majors makes CocoaPods fail to resolve.
   pod 'FirebaseMessaging', '~> 11.0'
+
+  # Google sign-in. The plugin's default subspec ('Lite') leaves the
+  # GoogleSignIn SDK out, so signInWithGoogle would fail at runtime. Declared
+  # here rather than in capacitor_pods because `cap sync` rewrites that block.
+  pod 'CapacitorFirebaseAuthentication/Google', :path => '../../node_modules/@capacitor-firebase/authentication'
 end
 
 post_install do |installer|
