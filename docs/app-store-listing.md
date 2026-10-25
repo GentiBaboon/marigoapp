@@ -36,7 +36,7 @@ name is set here and may differ from it.
 | Subtitle (30) | `Buy & sell pre-loved designer` (29) |
 | Category | Primary **Shopping**, secondary **Lifestyle** |
 | Content rights | Contains third-party content: **Yes** — sellers upload their own photos and text |
-| Age rating | Answer the questionnaire as in §5 — expect **13+** |
+| Age rating | **18+** (19+ Korea). Questionnaire as in §5, then *Override to Higher Age Rating* |
 
 ## 3. Version 1.0 — Product page
 
@@ -170,9 +170,24 @@ under-declaring is the riskier mistake.
 ### Age rating answers
 User-generated content: **Yes**. Messaging and chat: **Yes**. Unrestricted
 web access: **No**. Everything else (violence, gambling, mature themes and so
-on): **None**. Expect 13+.
+on): **None**. Apple calculates 4+ from that, but `/terms` requires members to
+be at least 18 and `/privacy` says "Marigo is for adults", and Apple requires
+the rating to match a minimum age in the terms, so it is **overridden to 18+**.
+Keep the two in step if the terms ever change.
 
 ---
+
+## Submitted
+
+**Version 1.0.0 (build 2) was submitted to App Review on 2026-10-25** and is
+*Waiting for Review*. Price Free, available in all 175 regions (Apple's
+default; narrow it under Pricing and Availability). The demo account is
+genti.selenica@gmail.com. Its password is in App Store Connect, not here.
+
+Open item: App Information lists Marigo as a DSA **non-trader**. A business
+selling to EU consumers normally declares trader status (business address and
+phone shown on the listing), which decides whether the app stays available in
+the EU.
 
 ## 6. Before pressing "Submit for Review"
 
