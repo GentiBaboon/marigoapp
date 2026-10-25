@@ -1697,7 +1697,13 @@ aliased as `useRouter`), which the click bridge cannot see.
   and the bar colours, so `MainActivity` pads the content view by the system
   bar (and keyboard) insets on API 36+ and paints the strip above it brand
   purple. Checked on an API 36 emulator 2026-10-25. Each Play upload needs a
-  higher `versionCode` in `android/app/build.gradle` (6 = 1.5; 5 was burnt by a rejected upload).
+  higher `versionCode` in `android/app/build.gradle` (7 = 1.5; 5 and 6 were spent on rejected uploads).
+- **No storage or media permission on Android.** Photos come from an
+  `<input type="file">`, which Capacitor answers with the system photo picker
+  — the chosen file arrives with a one-off URI grant. Play's photo and video
+  permissions policy blocks any build requesting `READ_MEDIA_IMAGES` /
+  `READ_MEDIA_VIDEO` when a picker would do, so the manifest strips them with
+  `tools:node="remove"`. Verified on API 36: picker opens, file reaches the page.
 - **The Play listing is `com.marigoapp.app`** ("Marigo: Fashion Shopping", in
   the *Xheni Maloku PF* developer account — the *Marigoapp* account was
   removed by Google), so Android's `applicationId` is that, while the
