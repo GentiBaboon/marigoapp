@@ -24,11 +24,17 @@ android {
     namespace "com.marigoapp.marigo"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.marigoapp.marigo"
+        // The Play listing is com.marigoapp.app (live since 2026-08, release
+        // 1.4 = versionCode 4), so that is what an Android update must carry.
+        // The 2026-09-13 move to com.marigoapp.marigo was meant to open a new
+        // listing that was never created; keeping it would orphan the existing
+        // users and leave the old listing failing Play's target-API policy.
+        // Only the store identity differs — the Java namespace stays.
+        applicationId "com.marigoapp.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1.0"
+        versionCode 5
+        versionName "1.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

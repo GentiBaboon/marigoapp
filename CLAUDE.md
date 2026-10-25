@@ -1697,7 +1697,15 @@ aliased as `useRouter`), which the click bridge cannot see.
   and the bar colours, so `MainActivity` pads the content view by the system
   bar (and keyboard) insets on API 36+ and paints the strip above it brand
   purple. Checked on an API 36 emulator 2026-10-25. Each Play upload needs a
-  higher `versionCode` in `android/app/build.gradle` (2 = 1.1.0).
+  higher `versionCode` in `android/app/build.gradle` (5 = 1.5).
+- **The Play listing is `com.marigoapp.app`** ("Marigo: Fashion Shopping", in
+  the *Xheni Maloku PF* developer account — the *Marigoapp* account was
+  removed by Google), so Android's `applicationId` is that, while the
+  namespace, Java package and iOS bundle id stay `com.marigoapp.marigo`. The
+  move to `.marigo` (2026-09-13) assumed a new listing that was never created.
+  Firebase has an Android app for each package, both carrying the debug,
+  upload (`B4:B5:…:6D:AF`) and Play signing (`BD:97:…:B1:59`) SHA-1s;
+  `google-services.json` must be the `com.marigoapp.app` one.
 - **Push is FCM on both platforms**, and the iOS half is the part that surprises
   people: `@capacitor/push-notifications` hands back an *APNs* token, which no
   `firebase-admin` call can address. `AppDelegate.swift` exchanges it for an FCM

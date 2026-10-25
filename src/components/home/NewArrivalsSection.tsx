@@ -52,7 +52,12 @@ export function NewArrivalsSection() {
         </h2>
 
         {isLoading ? (
-            <div className="flex space-x-4 pb-4">
+            // Clipped: four skeleton cards are ~816px, and unclipped they widen
+            // the page until products arrive. Android WebView then lays out an
+            // 832px viewport, and the preference sheet's scroll lock reads the
+            // difference as a 420px scrollbar — squeezing the homepage behind
+            // the sheet into a zero-width column on every first launch.
+            <div className="flex space-x-4 pb-4 overflow-hidden">
                 {[...Array(4)].map((_, i) => (
                     <div key={i} className="w-48 flex-shrink-0">
                         <ProductCardSkeleton />

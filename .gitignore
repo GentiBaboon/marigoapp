@@ -137,3 +137,6 @@ email-previews/
 # The versions the site actually serves live in public/partners/ — these
 # sources were swept in by a stray `git add -A` and are not repo assets.
 Logo to place in website footer/
+
+# Play Store upload staging (bundles, store images)
+play-release/
