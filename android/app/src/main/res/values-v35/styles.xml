@@ -13,10 +13,10 @@
   nothing compensating, this opts out and keeps the conventional inset layout.
   The safe-area CSS is still present and simply resolves to 0 here.
 
-  This attribute is a transitional escape hatch: Google has said it goes away in
-  a later platform release. Before raising targetSdk past 35, run the app on an
-  API 35+ emulator, confirm the WebView reports insets, delete this file, and
-  let the CSS take over.
+  The escape hatch only holds on Android 15. On Android 16 an app targeting
+  API 36 is edge to edge regardless, so MainActivity pads the content view by
+  the system-bar insets there instead. Once the WebView is confirmed to report
+  insets to CSS, both can go and the safe-area CSS can take over.
 -->
 <resources>
 

@@ -1,14 +1,15 @@
 ext {
     minSdkVersion = 22
-    // Play rejects a new upload below API 35, and raises the floor every
-    // August. Capacitor 6 does not pin this — every Capacitor module reads
-    // rootProject.ext.compileSdkVersion and only falls back to 34 — so the
-    // bump propagates to all 11 plugins from here.
+    // Play raises the floor every year: from 2026-11-01 an update must target
+    // API 36 (Android 16) or it is refused. Capacitor 6 does not pin this —
+    // every Capacitor module reads rootProject.ext.compileSdkVersion and only
+    // falls back to 34 — so the bump propagates to all 11 plugins from here.
     //
-    // compileSdk 35 requires Android Gradle Plugin 8.6+, which in turn requires
-    // Gradle 8.9+; both are raised to match in build.gradle and the wrapper.
-    compileSdkVersion = 35
-    targetSdkVersion = 35
+    // compileSdk 36 is supported from Android Gradle Plugin 8.9, which in turn
+    // requires Gradle 8.11.1+; both are raised to match in build.gradle and
+    // the wrapper.
+    compileSdkVersion = 36
+    targetSdkVersion = 36
     androidxActivityVersion = '1.8.0'
     androidxAppCompatVersion = '1.6.1'
     androidxCoordinatorLayoutVersion = '1.2.0'

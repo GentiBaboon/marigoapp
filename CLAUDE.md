@@ -1691,6 +1691,13 @@ aliased as `useRouter`), which the click bridge cannot see.
 - **Android needs JDK 17**, not the Java 26 first on the PATH — Gradle 8.9 /
   AGP 8.7.2 refuse to start on it.
   `JAVA_HOME=$(/usr/libexec/java_home -v 17) ./gradlew bundleRelease`.
+- **Android targets API 36** (Play's floor for updates from 2026-11-01), on
+  AGP 8.9.1 / Gradle 8.11.1. Android 16 ignores the
+  `windowOptOutEdgeToEdgeEnforcement` escape hatch in `values-v35/styles.xml`
+  and the bar colours, so `MainActivity` pads the content view by the system
+  bar (and keyboard) insets on API 36+ and paints the strip above it brand
+  purple. Checked on an API 36 emulator 2026-10-25. Each Play upload needs a
+  higher `versionCode` in `android/app/build.gradle` (2 = 1.1.0).
 - **Push is FCM on both platforms**, and the iOS half is the part that surprises
   people: `@capacitor/push-notifications` hands back an *APNs* token, which no
   `firebase-admin` call can address. `AppDelegate.swift` exchanges it for an FCM
