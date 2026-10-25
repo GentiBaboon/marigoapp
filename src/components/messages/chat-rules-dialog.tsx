@@ -72,6 +72,10 @@ export function ChatRulesDialog({ isOpen, onAccept, isAccepting }: ChatRulesDial
               Failure to comply with these rules can result in a <span className="font-bold">permanent ban</span> from the chat.
             </AlertDescription>
           </Alert>
+          <p className="text-muted-foreground text-center text-sm">
+            If someone breaks these rules, open the <span className="font-semibold">⋮</span> menu in your
+            conversation to report or block them.
+          </p>
         </div>
         <DialogFooter>
           <Button type="button" className="w-full bg-black text-white hover:bg-black/90" onClick={onAccept} disabled={isAccepting}>

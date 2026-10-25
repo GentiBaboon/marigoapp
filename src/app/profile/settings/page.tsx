@@ -34,7 +34,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth } from '@/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getMarigoFunctions } from '@/firebase/functions';
 import { signOutUser } from '@/firebase/auth/actions';
@@ -112,12 +112,17 @@ export default function ProfileSettingsPage() {
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
-      // Logic for account deletion via Cloud Function
+      if (!user) return;
+      // Deleting the profile document is the whole request: the
+      // `purgeDeletedUser` Cloud Function then removes the Auth account and
+      // the private subcollections. This used to sign out and claim success
+      // while deleting nothing — App Store guideline 5.1.1(v) rejects that.
+      await deleteDoc(doc(firestore, 'users', user.uid));
       await signOutUser(auth);
       router.push('/');
-      toast({ title: "Account Deleted" });
+      toast({ title: "Account Deleted", description: "Your account and personal data have been removed." });
     } catch (error) {
-       toast({ variant: 'destructive', title: "Deletion Error" });
+       toast({ variant: 'destructive', title: "Deletion Error", description: "We couldn't delete your account. Please try again or contact support." });
     } finally {
        setIsDeleting(false);
     }

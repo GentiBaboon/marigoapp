@@ -1,4 +1,5 @@
 'use client';
+import type { ReactNode } from 'react';
 import { ChevronLeft, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -11,9 +12,11 @@ interface ChatHeaderProps {
   user: { userId: string; name: string; avatar?: string };
   product: { id: string; title: string; image: string };
   isTyping?: boolean;
+  /** Trailing controls, e.g. the Report / Block menu. */
+  actions?: ReactNode;
 }
 
-export function ChatHeader({ user, product, isTyping }: ChatHeaderProps) {
+export function ChatHeader({ user, product, isTyping, actions }: ChatHeaderProps) {
   const productImage = PlaceHolderImages.find(p => p.id === product.image);
   const imageUrl = productImage?.imageUrl || product.image;
   // `product.image` is a placeholder *id* on older conversations. When it
@@ -54,6 +57,7 @@ export function ChatHeader({ user, product, isTyping }: ChatHeaderProps) {
           )}
         </div>
       </Link>
+      {actions}
     </div>
   );
 }

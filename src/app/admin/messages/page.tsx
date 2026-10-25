@@ -125,7 +125,12 @@ export default function AdminMessagesPage() {
     if (viewport) viewport.scrollTop = viewport.scrollHeight;
   }, [messages]);
 
-  const selected = conversations?.find((c) => c.id === selectedId) ?? null;
+  // A thread opened by deep link may be older than the CONVERSATIONS_LIMIT
+  // most recent, so it is held separately when the list does not have it.
+  const [linkedConv, setLinkedConv] = React.useState<FirestoreConversation | null>(null);
+  const selected =
+    conversations?.find((c) => c.id === selectedId) ??
+    (linkedConv && linkedConv.id === selectedId ? linkedConv : null);
 
   // This is private correspondence between two members. Reading it is
   // legitimate for moderation, and it should leave a trace: the same
@@ -144,6 +149,32 @@ export default function AdminMessagesPage() {
       timestamp: serverTimestamp(),
     }).catch((err) => console.warn('[admin/messages] audit log failed', err));
   };
+
+  // `?c=<conversationId>` — the "Read the conversation" link on a report in
+  // /admin/moderation. Read from window.location rather than
+  // useSearchParams(), which would need a Suspense boundary for the static
+  // native export. Goes through openConversation so the read is audited.
+  const linkHandled = React.useRef(false);
+  React.useEffect(() => {
+    if (linkHandled.current || !conversations) return;
+    const id = new URLSearchParams(window.location.search).get('c');
+    if (!id) return;
+    linkHandled.current = true;
+    const inList = conversations.find((c) => c.id === id);
+    if (inList) {
+      openConversation(inList);
+      return;
+    }
+    getDoc(doc(firestore, 'conversations', id))
+      .then((snap) => {
+        if (!snap.exists()) return;
+        const conv = { id: snap.id, ...snap.data() } as FirestoreConversation;
+        setLinkedConv(conv);
+        openConversation(conv);
+      })
+      .catch((err) => console.warn('[admin/messages] linked conversation failed', err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversations, firestore]);
 
   const filtered = React.useMemo(() => {
     if (!conversations) return [];

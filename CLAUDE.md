@@ -383,6 +383,22 @@ Authenticated (gated by middleware §6):
   driven. **Cash orders only**: a card order is authorised for a fixed amount,
   so the origin moves and the money does not.
 - `/messages`, `/messages/[conversationId]` — real-time chat. Sending a message writes it, bumps the recipient's `unreadCount` (the header badge) and calls `/api/messages/notify`, which emails them once per unread stretch (§4 API table). There is still no in-app `notifications` entry for a message — the badge is the in-app signal.
+  - **Report and Block** (since 2026-10-25, App Store guideline 1.2): the ⋮
+    menu in the thread header (`ConversationSafetyMenu`). Vocabulary and the
+    report shape live in `src/lib/moderation.ts`; `canReportOrBlock()` hides
+    both on dispute threads and against staff, so a member can never block
+    support. A **report** is a `reports` document, always `pending`, in the
+    reporter's own name, and lands on `/admin/moderation` with a "Read the
+    conversation" link (`/admin/messages?c=…`, audited like any other read).
+    A **block** is `users/{blocker}/blocks/{blocked}` and is enforced by
+    `blockedBetween()` in the rules, not the UI: in a two-person thread
+    neither side can send, rewrite the inbox preview or open a new thread
+    (threads are per listing). The blocked member is not told; their send is
+    refused with "You can't send messages in this conversation", and
+    `/api/start-conversation` answers 403 `blocked`. Admins are exempt.
+  - **Members may only mark a message read.** The update rule used to let
+    either participant rewrite any message, which would let someone edit the
+    message they were reporting.
 - `/favorites`, `/notifications`
 
 Courier (`/courier/*`, role-gated): `dashboard`, `jobs`, `delivery/[deliveryId]`, `earnings`, `profile`.
@@ -471,6 +487,7 @@ Types in `src/lib/types.ts` (~855 lines — the single source of truth for both 
 |---|---|---|
 | `users/{uid}` | Profile, role, KYC, `stripeAccountId`, `salesCount`, badge tier, preferences. `role` and `status` are admin-only fields (§6d) | `active` / `banned` |
 | `users/{uid}/{wishlist,cart,addresses,paymentMethods}` | Owner-only subcollections | — |
+| `users/{uid}/blocks/{blockedUid}` | Members this user has blocked (§4 messages). Owner-only, so the blocked side cannot see it; `blockedBetween()` in the rules reads it | — |
 | `users/{uid}/pushTokens/{token}` | One document per device, id = the FCM token. Owner-only, and deliberately **not** a field on the user document, which is world-readable | — |
 | `email_verifications/{uid}` | Live 6-digit activation challenge — HMAC'd code, expiry, attempt and send counters. Cleared in place when spent, never deleted | — |
 | ↳ `addresses/{id}` | `firstName` + `surname` are the inputs; **`fullName` is composed from them on save** and stays the stored value, because the delivery label, order confirmation, admin order view, courier pickup sheet and the order emails all read it. Plus optional `company` / `apartment`. Countries are Albania and Kosovo only (`src/lib/countries.ts`, Kosovo is `KS`) | — |
@@ -484,7 +501,7 @@ Types in `src/lib/types.ts` (~855 lines — the single source of truth for both 
 | `conversations/{id}/messages/{mid}` | Real-time buyer↔seller chat | — |
 | `support_chats/{id}/messages/{mid}` | User↔admin support (supports `product_card` messages) | — |
 | `notifications/{id}` | Per-user notifications | `read` flag |
-| `reports/{id}` | User-filed reports (moderation) | `pending`, `resolved` |
+| `reports/{id}` | User-filed reports, worked from `/admin/moderation`. Created only `pending`, as the caller, never about themselves; reason from `REPORT_REASONS`, `details` ≤ 1000 chars. Resolving stamps `resolution` / `resolvedAt` / `resolvedBy` | `pending`, `resolved` |
 | `reviews/{id}` | Seller/product reviews | — |
 | `refunds/{id}`, `disputes/{id}`, `returns/{id}` | Post-purchase workflows (returns have a buyer-driven → seller-driven transition ladder enforced in rules) | — |
 | `coupons/{id}` | Discount codes (admin-writable, signed-in read). **Members may increment `usedCount` by exactly 1** — checkout spends the coupon with the buyer's token, and before that grant the first cash-on-delivery order with `WELCOME10` died on a 403. Both routes now treat the bump as best-effort; `firstOrderOnly` is enforced from the buyer's order history, not this counter | — |
@@ -718,7 +735,9 @@ wordlist, and a scanner cannot follow a door it never sees.
 A ban is `users/{uid}.status == 'banned'`, set from `/admin/users`. **Delete
 is separate and real** (since 2026-09-07; before that it was the same write
 as ban, logged as "soft-deleted"): the row action calls `deleteDoc` on
-`users/{uid}`, which the rules allow a **full admin** only, and the
+`users/{uid}`, which the rules allow a **full admin**, or the member
+themselves from `/profile/settings` (since 2026-10-25, App Store guideline
+5.1.1(v); not while banned, since deleting frees the address), and the
 `purgeDeletedUser` function then removes the Firebase Auth account and the
 owner-only subcollections a document delete leaves behind. Listings, orders,
 messages and the ledger are kept — shared records with another party on
@@ -776,7 +795,7 @@ either; the first-login bootstrap may create only `buyer` / `active`.
 
 Rules changes ship with `firebase deploy --only firestore:rules`; the function
 with `firebase deploy --only functions:syncBanToAuth`. **`npm run test:rules`**
-runs `scripts/test-firestore-rules.mjs` against the Firestore emulator — 61
+runs `scripts/test-firestore-rules.mjs` against the Firestore emulator — 87
 allow/deny cases over plain REST, no extra dependencies, needs a JVM. Not in
 CI. Add a case for any rule you touch.
 
@@ -1444,7 +1463,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (848 passing): unit — `account-verification`, `admin-permissions`, `ai-clients`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `defaults`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `legacy-urls`, `listing-options`, `macro-filters`, `listing-taxonomy`, `offers`, `order-mail`, `order-money`, `otp`, `payouts`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `push-tokens`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`, `view-throttle`. Component — `address-form`, `confirm-action-dialog`, `live-visitors`, `otp-input`, `packing-instructions-dialog`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (872 passing): unit — `account-verification`, `admin-permissions`, `ai-clients`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `defaults`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `legacy-urls`, `listing-options`, `macro-filters`, `listing-taxonomy`, `moderation`, `offers`, `order-mail`, `order-money`, `otp`, `payouts`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `push-tokens`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`, `view-throttle`. Component — `address-form`, `confirm-action-dialog`, `conversation-safety-menu`, `live-visitors`, `otp-input`, `packing-instructions-dialog`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 

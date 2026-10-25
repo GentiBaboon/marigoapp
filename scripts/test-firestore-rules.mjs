@@ -67,10 +67,17 @@ await create('users/buyer', { role: 'buyer', status: 'active', name: 'Buyer' }, 
 await create('users/banned', { role: 'buyer', status: 'banned', name: 'Banned' }, 'owner');
 await create('users/admin1', { role: 'admin', status: 'active', name: 'Admin' }, 'owner');
 await create('users/doomed', { role: 'buyer', status: 'banned', name: 'Doomed' }, 'owner');
+await create('users/leaver', { role: 'buyer', status: 'active', name: 'Leaver' }, 'owner');
 await create('products/p1', { sellerId: 'seller', price: 100, quantity: 1, status: 'active', title: 'Bag' }, 'owner');
 await create('products/p2', { sellerId: 'seller', price: 100, quantity: 1, status: 'active', title: 'Bag 2' }, 'owner');
 await create('products/p3', { sellerId: 'banned', price: 100, quantity: 1, status: 'active', title: 'Banned seller bag' }, 'owner');
 await create('conversations/c1', { participants: ['banned', 'seller'] }, 'owner');
+// Blocking (guideline 1.2): a two-person thread and a message from each side.
+await create('conversations/c2', { participants: ['buyer', 'seller'], lastMessage: 'hi', unreadCount: { buyer: 1, seller: 0 } }, 'owner');
+await create('conversations/c2/messages/from-seller', { senderId: 'seller', content: 'hello', read: false }, 'owner');
+await create('conversations/c-staff', { participants: ['admin1', 'seller'] }, 'owner');
+await create('conversations/c2/messages/from-buyer', { senderId: 'buyer', content: 'is it available?', read: false }, 'owner');
+const report = (reporterId, extra = {}) => ({ type: 'user', itemId: 'seller', reportedUserId: 'seller', conversationId: 'c2', reporterId, reason: 'harassment', details: 'rude', status: 'pending', ...extra });
 await create('products/p1/offers/o-open', { buyerId: 'banned', sellerId: 'seller', offerAmount: 40, amount: 40, status: 'pending' }, 'owner');
 
 const offer = (buyer) => ({ buyerId: buyer, sellerId: 'seller', offerAmount: 50, amount: 50, status: 'pending' });
@@ -107,7 +114,8 @@ const cases = [
   ['banned owner cannot edit their profile', 403, () => update('users/banned', { name: 'New name' }, 'banned')],
   ['owner can still edit their profile', 200, () => update('users/buyer', { name: 'Renamed', phone: '1' }, 'buyer')],
   ['owner can still record lastLoginAt', 200, () => update('users/buyer', { lastLoginAt: 'now' }, 'buyer')],
-  ['owner cannot delete their own account document', 403, () => del('users/buyer', 'buyer')],
+  ['banned owner cannot delete their own account (the ban holds the address)', 403, () => del('users/banned', 'banned')],
+  ['owner can delete their own account document', 200, () => del('users/leaver', 'leaver')],
   ['another member cannot delete a user', 403, () => del('users/doomed', 'seller')],
   ['full admin can delete a user', 200, () => del('users/doomed', 'admin1')],
   ['first login bootstrap (buyer/active) is allowed', 200, () => create('users/newbie', { role: 'buyer', status: 'active', name: 'N' }, 'newbie')],
@@ -159,6 +167,39 @@ const cases = [
   ['another member cannot read someone\'s bank details', 403, () => call('GET', `${BASE}/payout_requests/pr1`, undefined, 'buyer')],
   ['admin can read a request', 200, () => call('GET', `${BASE}/payout_requests/pr1`, undefined, 'admin1')],
   ['admin can mark it paid', 200, () => update('payout_requests/pr1', { status: 'paid' }, 'admin1')],
+
+  // Messages are evidence: a member may mark one read, never rewrite it.
+  ['participant can mark a message read', 200, () => update('conversations/c2/messages/from-seller', { read: true }, 'buyer')],
+  ['participant cannot rewrite the other side\'s message', 403, () => update('conversations/c2/messages/from-seller', { content: 'I never said that' }, 'buyer')],
+  ['participant cannot rewrite their own message either', 403, () => update('conversations/c2/messages/from-buyer', { content: 'edited' }, 'buyer')],
+
+  // Reports
+  ['member can report the other party', 200, () => create('reports/r-ok', report('buyer'), 'buyer')],
+  ['nobody can file a report in someone else\'s name', 403, () => create('reports/r-forged', report('seller'), 'buyer')],
+  ['a report cannot be filed already resolved', 403, () => create('reports/r-resolved', report('buyer', { status: 'resolved' }), 'buyer')],
+  ['a member cannot report themselves', 403, () => create('reports/r-self', report('buyer', { itemId: 'buyer', reportedUserId: 'buyer' }), 'buyer')],
+  ['a report with an unknown type is refused', 403, () => create('reports/r-type', report('buyer', { type: 'listing' }), 'buyer')],
+  ['a member cannot read reports', 403, () => call('GET', `${BASE}/reports/r-ok`, undefined, 'buyer')],
+  ['admin can read a report', 200, () => call('GET', `${BASE}/reports/r-ok`, undefined, 'admin1')],
+
+  // Blocking
+  ['before a block, the buyer can message', 200, () => create('conversations/c2/messages/pre', { senderId: 'buyer', content: 'hi' }, 'buyer')],
+  ['a member cannot block themselves', 403, () => create('users/seller/blocks/seller', { blockedUserId: 'seller' }, 'seller')],
+  ['a member cannot write someone else\'s block list', 403, () => create('users/seller/blocks/buyer', { blockedUserId: 'buyer' }, 'buyer')],
+  ['seller blocks the buyer', 200, () => create('users/seller/blocks/buyer', { blockedUserId: 'buyer', conversationId: 'c2', createdAt: 'now' }, 'seller')],
+  ['the blocked buyer cannot read who blocked them', 403, () => call('GET', `${BASE}/users/seller/blocks/buyer`, undefined, 'buyer')],
+  ['the blocked buyer cannot message the seller', 403, () => create('conversations/c2/messages/post1', { senderId: 'buyer', content: 'hello?' }, 'buyer')],
+  ['the blocker cannot message the buyer either', 403, () => create('conversations/c2/messages/post2', { senderId: 'seller', content: 'hi' }, 'seller')],
+  ['the blocked buyer cannot rewrite the inbox preview', 403, () => update('conversations/c2', { lastMessage: 'abuse' }, 'buyer')],
+  ['the blocked buyer can still clear their own unread badge', 200, () => update('conversations/c2', { unreadCount: { buyer: 0, seller: 0 } }, 'buyer')],
+  ['the blocked buyer cannot open a new thread with the seller', 403, () => create('conversations/c3', { participants: ['buyer', 'seller'] }, 'buyer')],
+  // A seller who blocks support in the admin's "Message seller" thread must
+  // still hear from support.
+  ['seller blocks the admin', 200, () => create('users/seller/blocks/admin1', { blockedUserId: 'admin1' }, 'seller')],
+  ['admin can still post in a thread where they are blocked', 200, () => create('conversations/c-staff/messages/admin', { senderId: 'admin1', content: 'note' }, 'admin1')],
+  ['the blocked buyer cannot lift the block', 403, () => del('users/seller/blocks/buyer', 'buyer')],
+  ['seller unblocks', 200, () => del('users/seller/blocks/buyer', 'seller')],
+  ['after unblocking, the buyer can message again', 200, () => create('conversations/c2/messages/post3', { senderId: 'buyer', content: 'thanks' }, 'buyer')],
 
   // Reads are untouched
   ['banned can still read a product', 200, () => call('GET', `${BASE}/products/p1`, undefined, 'banned')],

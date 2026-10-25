@@ -9,10 +9,14 @@ import type { FirestoreConversation, FirestoreMessage } from '@/lib/types';
 import { ChatHeader } from '@/components/messages/chat-header';
 import { ChatBubble } from '@/components/messages/chat-bubble';
 import { ChatInput } from '@/components/messages/chat-input';
+import { ConversationSafetyMenu } from '@/components/messages/conversation-safety-menu';
+import { useMemberBlock } from '@/components/messages/use-member-block';
+import { canReportOrBlock } from '@/lib/moderation';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, Lock } from 'lucide-react';
+import { ShieldCheck, Lock, Ban } from 'lucide-react';
 
 function ChatSkeleton() {
   return (
@@ -87,8 +91,14 @@ export default function ChatPage() {
     : rawOther;
   const otherUserId = otherUser?.userId;
 
+  // Report / Block (guideline 1.2). Only the viewer's own block is readable;
+  // a block placed *by* the other side shows up as a refused send in ChatInput.
+  const canModerate = canReportOrBlock(conversation, user?.uid);
+  const memberBlock = useMemberBlock(canModerate ? otherUserId : undefined);
+  const iBlockedThem = canModerate && memberBlock.isBlocked;
+
   // Detect if the other user is typing
-  const otherUserTyping = otherUserId
+  const otherUserTyping = otherUserId && !iBlockedThem
     ? (conversation as any)?.typing?.[otherUserId] === true
     : false;
 
@@ -149,6 +159,13 @@ export default function ChatPage() {
           user={otherUser}
           product={{ id: conversation.productId, title: conversation.productTitle, image: conversation.productImage }}
           isTyping={otherUserTyping}
+          actions={canModerate && otherUserId ? (
+            <ConversationSafetyMenu
+              member={{ userId: otherUserId, name: otherUser.name }}
+              conversationId={conversationId}
+              memberBlock={memberBlock}
+            />
+          ) : undefined}
         />
       )}
 
@@ -192,6 +209,16 @@ export default function ChatPage() {
       {isClosed ? (
         <div className="border-t p-4 text-center text-sm text-muted-foreground bg-muted/40">
           This case has ended. You can no longer reply in this thread.
+        </div>
+      ) : iBlockedThem ? (
+        <div className="border-t bg-muted/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-center text-sm text-muted-foreground">
+          <p className="flex items-center justify-center gap-2">
+            <Ban className="h-4 w-4" />
+            You blocked {otherUser?.name}. Neither of you can send messages here.
+          </p>
+          <Button variant="link" size="sm" className="mt-1 h-auto p-0" onClick={() => memberBlock.unblock()}>
+            Unblock
+          </Button>
         </div>
       ) : (
         <ChatInput conversationId={conversationId} otherUserId={otherUserId} />

@@ -147,7 +147,11 @@ async function createConversation(
   });
 
   const doc = await res.json();
-  if (!res.ok) throw new Error(doc.error?.message || 'Failed to create conversation');
+  if (!res.ok) {
+    const error = new Error(doc.error?.message || 'Failed to create conversation') as Error & { status?: number };
+    error.status = res.status;
+    throw error;
+  }
   return doc.name.split('/').pop();
 }
 
@@ -223,6 +227,15 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ conversationId, isNew: true });
   } catch (err: any) {
+    // The caller's standing was checked above, so a refusal from the rules
+    // here means a block between the two members (firestore.rules,
+    // `blockedBetween`). Say so plainly, without saying who blocked whom.
+    if (err?.status === 403) {
+      return NextResponse.json(
+        { error: "You can't message this member.", reason: 'blocked' },
+        { status: 403 },
+      );
+    }
     console.error('start-conversation error:', err);
     return NextResponse.json({ error: err.message || 'Failed' }, { status: 500 });
   }

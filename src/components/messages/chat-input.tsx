@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { SendHorizonal, Image as ImageIcon } from 'lucide-react';
 import { useUser, useFirestore } from '@/firebase';
 import { requestMessageEmail } from '@/lib/message-mail-client';
+import { useToast } from '@/hooks/use-toast';
 import {
   addDoc,
   collection,
@@ -31,6 +32,7 @@ interface ChatInputProps {
 export function ChatInput({ conversationId, otherUserId }: ChatInputProps) {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
   const typingTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const form = useForm<ChatInputValues>({
@@ -101,8 +103,18 @@ export function ChatInput({ conversationId, otherUserId }: ChatInputProps) {
       // route re-reads the conversation and mails only when this message is
       // the first they have not read. See src/lib/message-mail-client.ts.
       if (otherUserId) requestMessageEmail(user, conversationId);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
+      // A refused send is almost always a block (either side) or a suspended
+      // account. It used to fail silently, leaving the text in the box with
+      // no explanation.
+      toast({
+        variant: 'destructive',
+        title: 'Message not sent',
+        description: error?.code === 'permission-denied'
+          ? "You can't send messages in this conversation."
+          : 'Check your connection and try again.',
+      });
     }
   };
 

@@ -11,14 +11,15 @@ import {
 } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Shield, MessageSquare, Star, Trash2, ShieldAlert, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Shield, MessageSquare, Star, Trash2, ShieldAlert, Loader2, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, updateDoc, limit } from 'firebase/firestore';
+import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, where, doc, updateDoc, limit, serverTimestamp } from 'firebase/firestore';
+import { reportReasonLabel } from '@/lib/moderation';
 import type { FirestoreReport, FirestoreProduct, FirestoreUser, FirestoreMessage, FirestoreReview } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,6 +28,7 @@ import { ModerationQueue } from '@/components/admin/products/moderation-queue';
 
 const ReportItem = ({ report }: { report: FirestoreReport }) => {
     const firestore = useFirestore();
+    const { user: adminUser } = useUser();
     const { toast } = useToast();
     const [isActing, setIsActing] = React.useState(false);
 
@@ -55,7 +57,12 @@ const ReportItem = ({ report }: { report: FirestoreReport }) => {
         setIsActing(true);
         try {
             const reportRef = doc(firestore, 'reports', report.id);
-            await updateDoc(reportRef, { status: 'resolved' });
+            await updateDoc(reportRef, {
+                status: 'resolved',
+                resolution: action === 'dismiss' ? 'dismissed' : 'actioned',
+                resolvedAt: serverTimestamp(),
+                ...(adminUser ? { resolvedBy: adminUser.uid } : {}),
+            });
             // In a real app, 'remove' would also delete the content and log the action
             toast({ title: `Report resolved`, description: `The report has been marked as resolved.` });
         } catch (error) {
@@ -124,7 +131,7 @@ const ReportItem = ({ report }: { report: FirestoreReport }) => {
                             {icons[report.type as keyof typeof icons]}
                              Reported {report.type}
                         </CardTitle>
-                        <CardDescription>Reason: {report.reason}</CardDescription>
+                        <CardDescription>Reason: {reportReasonLabel(report.reason)}</CardDescription>
                     </div>
                     <Badge variant="destructive">{report.status.toUpperCase()}</Badge>
                 </div>
@@ -133,20 +140,50 @@ const ReportItem = ({ report }: { report: FirestoreReport }) => {
                 <div className="bg-muted/50 p-3 rounded-lg space-y-3">
                    {renderContent()}
                 </div>
+                {report.details && (
+                    <blockquote className="mt-3 border-l-4 pl-4 text-sm italic whitespace-pre-line">
+                        {report.details}
+                    </blockquote>
+                )}
+                {report.conversationId && (
+                    // Opening it from here goes through the same audited
+                    // viewer as /admin/messages, so it logs `conversation_viewed`.
+                    <Button asChild variant="link" className="mt-2 h-auto p-0">
+                        <Link href={`/admin/messages?c=${encodeURIComponent(report.conversationId)}`}>
+                            <MessageSquare className="mr-2 h-4 w-4" />
+                            Read the conversation
+                        </Link>
+                    </Button>
+                )}
                  <Separator className="my-4" />
                  <p className="text-sm text-muted-foreground">Reported by: <span className="font-medium text-foreground">{reporter?.name || '...'}</span></p>
 
             </CardContent>
-            <CardFooter className="flex justify-end gap-2">
+            <CardFooter className="flex flex-wrap justify-end gap-2">
                 <Button variant="ghost" onClick={() => handleResolve('dismiss')} disabled={isActing}>
                     {isActing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Dismiss
                 </Button>
-                <Button variant="destructive" onClick={() => handleResolve('remove')} disabled={isActing}>
-                    {isActing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Remove Content
-                </Button>
+                {report.type === 'user' ? (
+                    // A person, not a piece of content: the action is taken on
+                    // their account (ban from /admin/users), then recorded here.
+                    <>
+                        <Button asChild variant="outline">
+                            <Link href="/admin/users">Manage account</Link>
+                        </Button>
+                        <Button onClick={() => handleResolve('remove')} disabled={isActing}>
+                            {isActing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            Mark as handled
+                        </Button>
+                    </>
+                ) : (
+                    <Button variant="destructive" onClick={() => handleResolve('remove')} disabled={isActing}>
+                        {isActing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Remove Content
+                    </Button>
+                )}
             </CardFooter>
         </Card>
     )

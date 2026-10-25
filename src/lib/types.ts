@@ -812,9 +812,18 @@ export interface FirestoreReport {
   type: 'product' | 'user' | 'message' | 'review';
   itemId: string;
   reporterId: string;
+  /** A `REPORT_REASONS` value (src/lib/moderation.ts); older reports hold free text. */
   reason: string;
   status: 'pending' | 'resolved';
   createdAt: FirestoreTimestamp;
+  reportedUserId?: string;
+  /** The thread the report was filed from, so a moderator can read it. */
+  conversationId?: string;
+  details?: string;
+  source?: 'conversation' | 'profile';
+  resolution?: 'dismissed' | 'actioned';
+  resolvedAt?: FirestoreTimestamp;
+  resolvedBy?: string;
 }
 
 // --- Payment ---
