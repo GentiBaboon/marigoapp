@@ -8,6 +8,8 @@ import {
   verifyGateCookie,
 } from '@/lib/admin-gate';
 import { isLegacyUrl } from '@/lib/legacy-urls';
+import { downloadRedirectTarget } from '@/lib/app-download';
+import { SITE_URL } from '@/lib/site';
 
 /**
  * Next.js Edge Middleware
@@ -104,6 +106,27 @@ export async function middleware(request: NextRequest) {
   // never be redirected by the auth gate below.
   if (request.method === 'OPTIONS' && pathname.startsWith('/api/')) {
     return applyCors(new NextResponse(null, { status: 204 }), origin);
+  }
+
+  // ── 0a. The "get the app" link ──
+  // download.marigoapp.com (any path) and /download send a phone to its store;
+  // a desktop on the download host lands on /download, which shows both.
+  // 302, never 301, and uncacheable: the answer depends on the user agent, and
+  // a cached redirect would send the next visitor to the wrong store.
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    const target = downloadRedirectTarget({
+      host: request.headers.get('host'),
+      pathname,
+      userAgent: request.headers.get('user-agent'),
+      siteUrl: SITE_URL,
+    });
+    if (target) {
+      const redirect = NextResponse.redirect(target, 302);
+      redirect.headers.set('Cache-Control', 'private, no-store');
+      redirect.headers.set('Vary', 'User-Agent');
+      redirect.headers.set('X-Robots-Tag', 'noindex');
+      return redirect;
+    }
   }
 
   // ── 0b. The previous site's URLs are gone ──

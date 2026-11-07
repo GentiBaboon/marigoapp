@@ -163,6 +163,16 @@ Public:
     above 10 products was silently broken. It also re-sorts to the admin's
     curated order, which a `documentId()` query does not preserve.
 - `/about`, `/privacy`, `/terms`
+- **`/download` and `download.marigoapp.com`** — the "get the app" link
+  (`src/lib/app-download.ts`, run from `src/middleware.ts` step 0a). A phone is
+  302'd to its store — iOS to App Store id `6826849847`, Android to Play
+  `com.marigoapp.app` — from any path on the `download.` host or from
+  `/download` on the main site; a desktop lands on the `/download` page with
+  both buttons. Uncacheable and `Vary: User-Agent`, since the answer depends on
+  the device. This used to be a DNS / Cloudflare rule outside the repo and died
+  silently when the record went away (found 2026-11-07). The host still needs
+  **its own Vercel domain and a DNS-only CNAME in Cloudflare** — the code does
+  nothing for a name that does not resolve.
 - `/help` — the Help Centre. Questions live in `src/app/help/faq-content.ts`,
   separate from the page that renders them. **Every figure in an answer is
   imported** — from `src/lib/types.ts` (commission, payout hold, refund
@@ -1463,7 +1473,7 @@ Utility scripts (`scripts/`): `set-admin-role.ts`, `set-super-admin.mjs`, `seed-
 records the diff. It loads the rules from `src/lib/size-options.ts` through
 `jiti` rather than restating them, so the script cannot drift from the app.
 
-Current tests (872 passing): unit — `account-verification`, `admin-permissions`, `ai-clients`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `defaults`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `legacy-urls`, `listing-options`, `macro-filters`, `listing-taxonomy`, `moderation`, `offers`, `order-mail`, `order-money`, `otp`, `payouts`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `push-tokens`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`, `view-throttle`. Component — `address-form`, `confirm-action-dialog`, `conversation-safety-menu`, `live-visitors`, `otp-input`, `packing-instructions-dialog`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
+Current tests (872 passing): unit — `account-verification`, `admin-permissions`, `app-download`, `ai-clients`, `attribute-options`, `catalog-cache`, `category-url`, `chat-knowledge`, `chat-lexicon`, `cookies`, `coupons`, `csv-export`, `defaults`, `email`, `email-policy`, `error-reporter`, `admin-gate`, `firestore-write`, `homepage-blocks`, `legacy-urls`, `listing-options`, `macro-filters`, `listing-taxonomy`, `moderation`, `offers`, `order-mail`, `order-money`, `otp`, `payouts`, `platform-routes`, `presence`, `price-conversion`, `product-meta`, `product-slug`, `product-visibility`, `push-tokens`, `rate-limit`, `server-safe-libs`, `shipping`, `size-options`, `types`, `unsubscribe`, `use-infinite-scroll`, `view-throttle`. Component — `address-form`, `confirm-action-dialog`, `conversation-safety-menu`, `live-visitors`, `otp-input`, `packing-instructions-dialog`, `product-card`, `user-history`. E2E — `admin`, `auth`, `home`, `search`.
 
 The E2E `home` spec asserts on the literal string **"Shop by Category"** (and on `img[alt="Marigo"]` in the header/footer). Renaming that heading breaks the suite — the other homepage headings are not asserted on.
 
