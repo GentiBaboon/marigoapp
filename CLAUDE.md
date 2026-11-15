@@ -170,9 +170,11 @@ Public:
   `/download` on the main site; a desktop lands on the `/download` page with
   both buttons. Uncacheable and `Vary: User-Agent`, since the answer depends on
   the device. This used to be a DNS / Cloudflare rule outside the repo and died
-  silently when the record went away (found 2026-11-07). The host still needs
-  **its own Vercel domain and a DNS-only CNAME in Cloudflare** — the code does
-  nothing for a name that does not resolve.
+  silently when the record went away (found 2026-11-07). **Live since
+  2026-11-15**: the host is a domain on the Vercel project and a DNS-only
+  CNAME in Cloudflare (`download` → the same `vercel-dns-017` target as
+  `www`). The code does nothing for a name that does not resolve, so if the
+  link dies again, check that record first.
 - `/help` — the Help Centre. Questions live in `src/app/help/faq-content.ts`,
   separate from the page that renders them. **Every figure in an answer is
   imported** — from `src/lib/types.ts` (commission, payout hold, refund
