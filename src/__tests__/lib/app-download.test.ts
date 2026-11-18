@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   APP_STORE_URL,
+  APP_STORE_WEB_URL,
   PLAY_STORE_URL,
   detectStorePlatform,
   downloadRedirectTarget,
@@ -67,5 +68,12 @@ describe('downloadRedirectTarget', () => {
     expect(on('www.marigoapp.com', '/', IPHONE)).toBeNull();
     expect(on('www.marigoapp.com', '/downloads', ANDROID)).toBeNull();
     expect(on('www.marigoapp.com', '/products/abc', IPHONE)).toBeNull();
+  });
+});
+
+describe('APP_STORE_WEB_URL', () => {
+  it('is the full iPhone web listing, not the bare link a Mac hands to its App Store', () => {
+    expect(APP_STORE_WEB_URL).toMatch(/^https:\/\/apps\.apple\.com\/[a-z]{2}\/app\/[a-z-]+\/id6826849847\?platform=iphone$/);
+    expect(APP_STORE_WEB_URL).not.toBe(APP_STORE_URL);
   });
 });

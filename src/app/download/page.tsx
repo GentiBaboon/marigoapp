@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import { Apple, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { APP_STORE_URL, PLAY_STORE_URL } from '@/lib/app-download';
+import { APP_STORE_WEB_URL, PLAY_STORE_URL } from '@/lib/app-download';
 
 /**
  * Both store buttons. Phones rarely see this: middleware sends them straight
@@ -27,13 +27,13 @@ export default function DownloadPage() {
       </div>
       <div className="flex w-full max-w-sm flex-col gap-3 sm:flex-row">
         <Button asChild size="lg" className="flex-1">
-          <a href={APP_STORE_URL} rel="noopener">
+          <a href={APP_STORE_WEB_URL} target="_blank" rel="noopener noreferrer">
             <Apple className="mr-2 h-5 w-5" aria-hidden />
             App Store
           </a>
         </Button>
         <Button asChild size="lg" variant="outline" className="flex-1">
-          <a href={PLAY_STORE_URL} rel="noopener">
+          <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">
             <Smartphone className="mr-2 h-5 w-5" aria-hidden />
             Google Play
           </a>

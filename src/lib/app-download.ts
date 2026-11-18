@@ -10,6 +10,17 @@
 /** App Store Connect Apple ID 6826849847 (docs/store-release.md). */
 export const APP_STORE_URL = 'https://apps.apple.com/app/id6826849847';
 
+/**
+ * The same listing for a desktop browser. On a Mac the bare link is handed to
+ * the Mac App Store app, which has no iPhone-only app and shows "An error
+ * occurred" (reported 2026-11-18). A full storefront + slug URL with
+ * `platform=iphone` is Apple's web page for the iPhone listing; the
+ * `/download` page opens it in a new tab. Phones keep `APP_STORE_URL`, which
+ * is meant to open the App Store app.
+ */
+export const APP_STORE_WEB_URL =
+  'https://apps.apple.com/al/app/marigo-fashion-marketplace/id6826849847?platform=iphone';
+
 /** The Play listing is `com.marigoapp.app`, not the `.marigo` bundle id (CLAUDE.md §14). */
 export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.marigoapp.app';
 
